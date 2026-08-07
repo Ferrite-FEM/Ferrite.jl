@@ -76,7 +76,7 @@ documentation.
    column indices live as a slice. Backing all rows with a single growable buffer (plus an
    isbits metadata array) keeps GC pressure low.
  - `sorted::Bool`: whether each row's column indices are currently sorted. Rows are filled unsorted
-   by the fast path and sorted lazily on demand (see `eachrow`/`add_entry!`).
+   by the counting build in `add_sparsity_entries!` and sorted lazily on demand (see `eachrow`/`add_entry!`).
 
 !!! warning "Internal struct"
     The specific implementation of this struct, such as struct fields, type layout and type
@@ -214,17 +214,19 @@ function _sort_rows!(sp::SparsityPattern, rowrange::UnitRange{Int})
     return
 end
 
-# Fast path: count exact per-row sizes with a column marker, presize the buffer, then marker-dedup
+# The counting build behind add_sparsity_entries!: count exact per-row sizes with a column
+# marker, presize the buffer, then marker-dedup
 # fill each row UNSORTED (sorted lazily). Always includes the diagonal. Non-full `coupling` and
 # `keep_constrained = false` are handled by applying the expanded coupling masks and the
 # constrained-dof filter identically in the count and the fill pass (see _visit_row_candidates!).
-function _fast_fill_cells!(
+function _build_pattern!(
         sp::SparsityPattern, dh::DofHandler,
         couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing,
         isconstrained::Union{Nothing, Vector{Bool}} = nothing,
         neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
         interface_couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing;
         fill_interfaces::Bool = false,
+        oldbuffer::Union{Nothing, ConstructionBuffer{Int, 1}} = nothing,
     )
     nrows = getnrows(sp)
     #...
@@ -239,14 +241,15 @@ function _fast_fill_cells!(
     cell_to_sdh = dh.cell_to_subdofhandler
     _visit_row_candidates!(
         rowlen, nothing, nothing, marker, row_to_cells, row_to_localidx, cell_dofs,
-        cell_to_sdh, couplings, isconstrained, neighbor_cells, interface_couplings
+        cell_to_sdh, couplings, isconstrained, neighbor_cells, interface_couplings, oldbuffer
     )
     buffer = _presize_buffer(rowlen, sp.buffer.sizehint)
     fill!(marker, 0)
     _visit_row_candidates!(
         rowlen, buffer.data, buffer.indices, marker, row_to_cells, row_to_localidx, cell_dofs,
         cell_to_sdh, couplings, isconstrained,
-        fill_interfaces ? neighbor_cells : nothing, fill_interfaces ? interface_couplings : nothing
+        fill_interfaces ? neighbor_cells : nothing, fill_interfaces ? interface_couplings : nothing,
+        oldbuffer
     )
     sp.buffer = buffer
     sp.sorted = false
@@ -354,11 +357,13 @@ function add_sparsity_entries!(
     return sp
 end
 
-# SparsityPattern takes a fast path whenever it is empty: cell entries (including the diagonal,
-# and respecting `coupling` and `keep_constrained`) are exactly counted, the buffer is presized in
-# one allocation, and rows are filled with a marker-dedup append. A non-empty pattern falls back
-# to the generic per-entry path. Interface entries (interface_coupling) and constraints always
-# layer on afterwards, so they are compatible with the fast path.
+# Specialized method for the concrete SparsityPattern.
+# This builds the pattern in bulk: cell entries (including the diagonal, respecting
+# `coupling` and `keep_constrained`) and any pre-existing entries are exactly counted, the
+# buffer is presized in one allocation, and rows are filled with a marker-dedup append.
+# Interface entries (interface_coupling) are reserved for (and, when the enumeration is
+# exact, filled by) the same passes; otherwise they and the constraints layer on afterwards
+# through add_entry!.
 function add_sparsity_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
         keep_constrained::Bool = true,
@@ -371,31 +376,27 @@ function add_sparsity_entries!(
         error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
     end
     interfaces_filled = false
-    if isempty(sp.buffer.data)
-        keep_constrained || _check_keep_constrained_args(dh, ch)
-        couplings = _coupling_to_local_dof_coupling(dh, coupling)
-        isconstrained = keep_constrained ? nothing : _isconstrained_by_dof(ch, getnrows(sp))
-        # With interface entries coming (added below), reserve row space for them up front so
-        # they land in place instead of relocating rows. When the reservation enumeration is
-        # provably exact it doubles as the insertion itself (see _visit_row_candidates!).
-        if interface_coupling === nothing
-            neighbor_cells = interface_couplings = nothing
-        else
-            if topology === nothing
-                topology = ExclusiveTopology(get_grid(dh))
-            end
-            neighbor_cells = create_cell_to_neighbors(dh.grid, topology)
-            interface_couplings = _coupling_to_local_dof_coupling(dh, interface_coupling)
-            interfaces_filled = _can_fill_interfaces_directly(dh)
-        end
-        _fast_fill_cells!(
-            sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings;
-            fill_interfaces = interfaces_filled
-        )
+    keep_constrained || _check_keep_constrained_args(dh, ch)
+    couplings = _coupling_to_local_dof_coupling(dh, coupling)
+    isconstrained = keep_constrained ? nothing : _isconstrained_by_dof(ch, getnrows(sp))
+    # With interface entries coming (added below), reserve row space for them up front so
+    # they land in place instead of relocating rows. When the reservation enumeration is
+    # provably exact it doubles as the insertion itself (see _visit_row_candidates!).
+    if interface_coupling === nothing
+        neighbor_cells = interface_couplings = nothing
     else
-        add_diagonal_entries!(sp)
-        add_cell_entries!(sp, dh, ch; keep_constrained, coupling)
+        if topology === nothing
+            topology = ExclusiveTopology(get_grid(dh))
+        end
+        neighbor_cells = create_cell_to_neighbors(dh.grid, topology)
+        interface_couplings = _coupling_to_local_dof_coupling(dh, interface_coupling)
+        interfaces_filled = _can_fill_interfaces_directly(dh)
     end
+    oldbuffer = isempty(sp.buffer.data) ? nothing : sp.buffer
+    _build_pattern!(
+        sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings;
+        fill_interfaces = interfaces_filled, oldbuffer
+    )
     interface_coupling !== nothing && !interfaces_filled && add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
     ch !== nothing && add_constraint_entries!(sp, ch; keep_constrained)
     return sp
@@ -444,7 +445,7 @@ function _check_keep_constrained_args(dh::DofHandler, ch::Union{ConstraintHandle
     return
 end
 
-# For now interfaces can not be fast-filled with multiple SubDofHandlers (the expanded
+# For now the counting passes cannot fill interface entries directly with multiple SubDofHandlers (the expanded
 # coupling masks are per-sdh and do not apply to a neighbor with a different dof layout);
 # the enumeration still (over)counts cross-sdh neighbors so the reservation covers what
 # add_interface_entries! inserts afterwards.
@@ -919,7 +920,7 @@ function create_celldofs(dh::DofHandler)
     return ArrayOfVectorViews(indices, cell_dofs, LinearIndices((ncells,)))
 end
 
-# For each cell, the cells sharing a facet with it (used by the fast path to reserve row
+# For each cell, the cells sharing a facet with it (used by the counting build to reserve row
 # space for interface entries).
 function create_cell_to_neighbors(grid::AbstractGrid, topology)
     ncells = getncells(grid)
@@ -1000,6 +1001,7 @@ function _visit_row_candidates!(
         couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
         neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
         interface_couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing,
+        oldbuffer::Union{Nothing, ConstructionBuffer{Int, 1}} = nothing,
     )
     counting = data === nothing
     ncols = length(marker) # marker has one slot per column
@@ -1012,6 +1014,20 @@ function _visit_row_candidates!(
             marker[row] = row
             counting || (data[start] = row)
             p = 1
+        end
+        # Entries already stored in the pattern are always kept, deduplicated against the new
+        # candidates by the marker (cf. the retired generic per-entry path, which only ever
+        # added)
+        if oldbuffer !== nothing
+            r_old = oldbuffer.indices[row]
+            for q in 0:(r_old.ncurrent - 1)
+                col = oldbuffer.data[r_old.start + q]
+                if marker[col] != row
+                    marker[col] = row
+                    counting || (data[start + p] = col)
+                    p += 1
+                end
+            end
         end
         # For keep_constrained = false a constrained row stores only the diagonal (included
         # in the pattern just above)

@@ -48,7 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Internal changes
  - `SparsityPattern` has been rewritten: all rows are now stored in a single contiguous
-   buffer and filled by an exact-counting fast path with lazily sorted rows. The internal
+   buffer and filled by an exact-counting fast path with lazily sorted rows (also for builds
+   on patterns with pre-existing entries, which are kept and deduplicated). The internal
    `FastSparsityPattern` (from [#1302]) and the internal `Ferrite.PoolAllocator` module have
    been removed. ([#1397])
  - The documented contract of `Ferrite.eachrow(sp[, row])` for `AbstractSparsityPattern` now
