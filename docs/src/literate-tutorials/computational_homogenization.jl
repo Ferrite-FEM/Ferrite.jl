@@ -305,7 +305,7 @@ Ei = 10 * Em;
 # we want to solve the system 3 times, once for each macroscopic strain component, we
 # assemble 3 right-hand-sides.
 
-function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
+function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ, Ei, Em)
 
     n_basefuncs = getnbasefunctions(cellvalues)
     ndpc = ndofs_per_cell(dh)
@@ -313,10 +313,11 @@ function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler,
     fe = zeros(ndpc, length(εᴹ))
     f = zeros(ndofs(dh), length(εᴹ))
     assembler = start_assemble(K)
+    inclusions = getcellset(dh.grid, "inclusions")
 
     for cell in CellIterator(dh)
 
-        E = cellid(cell) in getcellset(dh.grid, "inclusions") ? Ei : Em
+        E = cellid(cell) in inclusions ? Ei : Em
         reinit!(cellvalues, cell)
         fill!(Ke, 0)
         fill!(fe, 0)
@@ -347,8 +348,8 @@ end;
 # return the right hand side(s) which we collect in another named tuple.
 
 rhs = (
-    dirichlet = doassemble!(cellvalues, K.dirichlet, dh, εᴹ),
-    periodic = doassemble!(cellvalues, K.periodic, dh, εᴹ),
+    dirichlet = doassemble!(cellvalues, K.dirichlet, dh, εᴹ, Ei, Em),
+    periodic = doassemble!(cellvalues, K.periodic, dh, εᴹ, Ei, Em),
 );
 
 # The next step is to solve the systems. Since application of boundary conditions, using
@@ -397,16 +398,18 @@ end
 # ``\bar{\boldsymbol{\sigma}}`` in the RVE. We define a function that does this, and also
 # returns the von Mises stress in every quadrature point for visualization.
 
-function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
+function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ, Ei, Em)
     σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
     σ̄Ω = zero(SymmetricTensor{2, 2})
     Ω = 0.0 # Total volume
+    inclusions = getcellset(dh.grid, "inclusions")
     for cell in CellIterator(dh)
-        E = cellid(cell) in getcellset(dh.grid, "inclusions") ? Ei : Em
+        E = cellid(cell) in inclusions ? Ei : Em
         reinit!(cellvalues, cell)
+        ue = u[celldofs(cell)]
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
-            εμ = function_symmetric_gradient(cellvalues, q_point, u[celldofs(cell)])
+            εμ = function_symmetric_gradient(cellvalues, q_point, ue)
             σ = E ⊡ (εᴹ + εμ)
             σvM_qpdata[q_point, cellid(cell)] = sqrt(3 / 2 * dev(σ) ⊡ dev(σ))
             Ω += dΩ # Update total volume
@@ -431,14 +434,14 @@ end;
 projector = L2Projector(ip, grid)
 
 for i in 1:3
-    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.dirichlet[i], εᴹ[i])
+    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.dirichlet[i], εᴹ[i], Ei, Em)
     proj = project(projector, σ_qp, qr)
     push!(σ.dirichlet, proj)
     push!(σ̄.dirichlet, σ̄_i)
 end
 
 for i in 1:3
-    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.periodic[i], εᴹ[i])
+    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.periodic[i], εᴹ[i], Ei, Em)
     proj = project(projector, σ_qp, qr)
     push!(σ.periodic, proj)
     push!(σ̄.periodic, σ̄_i)
@@ -483,9 +486,10 @@ end
 function matrix_volume_fraction(grid, cellvalues)
     V = 0.0 # Total volume
     Vm = 0.0 # Volume of the matrix
+    inclusions = getcellset(grid, "inclusions")
     for c in CellIterator(grid)
         reinit!(cellvalues, c)
-        is_matrix = !(cellid(c) in getcellset(grid, "inclusions"))
+        is_matrix = !(cellid(c) in inclusions)
         for qp in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, qp)
             V += dΩ
@@ -534,6 +538,7 @@ function homogenize_test(u::Matrix, dh, cv, E_incl, E_mat)                     #
     ĒΩ = zero(SymmetricTensor{4, 2})                                           #src
     Ω = 0.0                                                                    #src
     ue = zeros(ndofs_per_cell(dh), 3)                                          #src
+    inclusions = getcellset(dh.grid, "inclusions")                             #src
     for cell in CellIterator(dh)                                               #src
         reinit!(cv, cell)                                                      #src
         for (localdof, globaldof) in enumerate(celldofs(cell))                 #src
@@ -541,7 +546,7 @@ function homogenize_test(u::Matrix, dh, cv, E_incl, E_mat)                     #
                 ue[localdof, i] = u[globaldof, i]                              #src
             end                                                                #src
         end                                                                    #src
-        E = cellid(cell) in getcellset(dh.grid, "inclusions") ? E_incl : E_mat #src
+        E = cellid(cell) in inclusions ? E_incl : E_mat                        #src
         for qp in 1:getnquadpoints(cv)                                         #src
             dΩ = getdetJdV(cv, qp)                                             #src
             Ω += dΩ                                                            #src
