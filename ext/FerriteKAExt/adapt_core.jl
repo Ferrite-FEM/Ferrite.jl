@@ -10,14 +10,11 @@ Adapt.@adapt_structure Ferrite.SoAContainer
 # Wildcard adapt
 adapt_structure(to, ip::Ferrite.Interpolation) = ip
 
-# Adapted manually (instead of @adapt_structure) since getproperty is overloaded and to
-# preserve the aliasing between the fun_values_nt entries and the unique fun_values tuple
+# Adapted manually (instead of @adapt_structure) since getproperty is overloaded
 function adapt_structure(to, cv::CellValues)
-    old_fun_values = Ferrite.get_fun_values(cv)
-    fun_values = map(fv -> adapt(to, fv), old_fun_values)
-    fun_values_nt = Ferrite._rebuild_fun_values_nt(getfield(cv, :fun_values_nt), old_fun_values, fun_values)
+    fun_values = map(fv -> adapt(to, fv), Ferrite.get_fun_values(cv))
     return CellValues(
-        fun_values_nt, fun_values,
+        getfield(cv, :fun_values_nt), fun_values,
         adapt(to, Ferrite.get_geo_mapping(cv)),
         adapt(to, Ferrite.get_quadrature_rule(cv)),
         adapt(to, Ferrite.getdetJdVs(cv)),
