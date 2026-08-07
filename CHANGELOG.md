@@ -39,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    the previous `copy` methods, `task_local_copy` also duplicates the quadrature rule.
    ([#1070])
 
+### Changed
+ - `CellValues` now supports multiple fields sharing quadrature rule and geometric
+   interpolation by passing a `NamedTuple` of interpolations, e.g.
+   `CellValues(qr, (u = ipu, p = ipp))`. This merges `MultiFieldCellValues` into
+   `CellValues`; `MultiFieldCellValues` remains as an alias for this case and behaves as
+   before. The type parameters of `CellValues` have changed (internal, but may affect
+   code dispatching on them). ([#XXXX])
+
 ### Fixes
 
  - Untangle the tangled `AffineConstraints` in `close!` ([#1327])

@@ -20,7 +20,9 @@ struct SoAContainer{T, T_inner} <: AbstractVector{T}
 end
 
 Base.size(c::SoAContainer) = (c.nels,)
-Base.getindex(c::SoAContainer, i::Integer) = get_substruct(c.soa, i)
+# Assert the element type since e.g. the NamedTuple rebuild in multi-field CellValues
+# extraction is not inferable on its own
+Base.getindex(c::SoAContainer{T}, i::Integer) where {T} = get_substruct(c.soa, i)::T
 function Base.show(io::IO, d::MIME"text/plain", c::SoAContainer{T}) where {T}
     println(io, "SoAContainer{$T}")
     print(io, "Structure of Arrays container with $(c.nels) elements.")
@@ -35,8 +37,10 @@ view_from_shared(a::AbstractArray{<:Any, 3}, i::Integer) = view(a, i, :, :)
 
 # Extract the i-th worker's local slice from batched device data
 function get_substruct(cv::CellValues, i)
-    fv = get_substruct(cv.fun_values, i)
-    return CellValues(fv, cv.geo_mapping, cv.qr, view_from_shared(cv.detJdV, i))
+    old_fun_values = get_fun_values(cv)
+    fun_values = map(fv -> get_substruct(fv, i), old_fun_values)
+    fun_values_nt = _rebuild_fun_values_nt(getfield(cv, :fun_values_nt), old_fun_values, fun_values)
+    return CellValues(fun_values_nt, fun_values, get_geo_mapping(cv), get_quadrature_rule(cv), view_from_shared(getdetJdVs(cv), i))
 end
 
 function get_substruct(fv::FunctionValues, i)

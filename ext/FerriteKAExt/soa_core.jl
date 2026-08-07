@@ -12,11 +12,14 @@ function zeros_shared(backend, a::AbstractArray{T}, N::Integer) where {T}
 end
 
 function as_structure_of_arrays(d, N, cv::CellValues)
+    old_fun_values = Ferrite.get_fun_values(cv)
+    fun_values = map(fv -> as_structure_of_arrays(d, N, fv), old_fun_values)
+    fun_values_nt = Ferrite._rebuild_fun_values_nt(getfield(cv, :fun_values_nt), old_fun_values, fun_values)
     return CellValues(
-        as_structure_of_arrays(d, N, cv.fun_values),
-        as_structure_of_arrays(d, N, cv.geo_mapping),
-        adapt(d, cv.qr),
-        zeros_shared(d, cv.detJdV, N),
+        fun_values_nt, fun_values,
+        as_structure_of_arrays(d, N, Ferrite.get_geo_mapping(cv)),
+        adapt(d, Ferrite.get_quadrature_rule(cv)),
+        zeros_shared(d, Ferrite.getdetJdVs(cv), N),
     )
 end
 
