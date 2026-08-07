@@ -549,6 +549,35 @@ def scene_darcy_flow():
     finish(view, "darcy_flow", twod=True, zoom=1.8, res=[1600, 620])
 
 
+# --- magnetostatics: vector potential (left) next to flux density magnitude
+# (right), showing the flux collected by the iron core around the conductor
+@scene("magnetostatics")
+def scene_magnetostatics():
+    view = new_view()
+    r = OpenDataFile(datadir + "/magnetostatics.vtu")
+    left = surface(r, view, edges=False)
+    colorbar(left, view, ("CELLS", "A"), title="A", pos=[0.02, 0.32], fmt="%.1f")
+    # flux lines: contours of A, equally spaced in A so that each pair of
+    # neighboring lines encloses the same amount of flux (they bunch up inside
+    # the core, which collects almost all of it)
+    pd = CellDatatoPointData(Input=r)
+    fluxlines = Contour(Input=pd)
+    fluxlines.ContourBy = ["POINTS", "A"]
+    fluxlines.Isosurfaces = [0.5 + 1.0 * i for i in range(7)]
+    annotate(lift(fluxlines), view, width=2.0)
+    shifted = Transform(Input=r)
+    shifted.Transform.Translate = [1.1, 0.0, 0.0]
+    right = surface(shifted, view, edges=False)
+    lut = colorbar(right, view, ("POINTS", "B"), title="$\\vert B \\vert$",
+                   pos=[0.87, 0.32], fmt="%.0e", labels=[0.01, 0.1, 1.0, 10.0])
+    # the field spans five orders of magnitude between the air outside the
+    # core and the core itself, so color on a log scale
+    lut.RescaleTransferFunction(1.0e-3, 100.0)
+    lut.MapControlPointsToLogSpace()
+    lut.UseLogScale = 1
+    finish(view, "magnetostatics", twod=True, zoom=1.8, res=[1600, 620])
+
+
 # === how-to guides =========================================================
 
 # --- threaded_assembly: the two grid coloring algorithms side by side

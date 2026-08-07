@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    common facet dimension across the whole grid. ([#843])
  - Experimental CUDA GPU support for assembly using type-stable, non-allocating element
    routines. ([#1291])
+ - New tutorial on magnetostatics using H(curl)-conforming Nedelec elements ([#1467])
 
 ## [v1.6.0] - 2026-08-02
 
@@ -1375,3 +1376,4 @@ poking into Ferrite internals:
 [#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
 [#1468]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1468
 [#1438]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1438
+[#1467]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1467
