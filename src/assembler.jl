@@ -224,8 +224,8 @@ _is_atomic(::SymmetricCSCAssembler{<:Any, <:Any, <:Any, atomic}) where {atomic} 
 _is_atomic(::AbstractAssembler) = false
 
 function _check_atomic_eltype(atomic::Bool, ::Type{T}) where {T}
-    if atomic && !(T <: Union{Float32, Float64})
-        throw(ArgumentError("atomic assembly is only supported for eltypes Float32 and Float64, got $T"))
+    if atomic && !(T <: Union{Float32, Float64, ComplexF32, ComplexF64})
+        throw(ArgumentError("atomic assembly is only supported for eltypes Float32, Float64, ComplexF32 and ComplexF64, got $T"))
     end
     return
 end

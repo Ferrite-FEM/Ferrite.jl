@@ -73,6 +73,23 @@ for (T, llvmT) in ((Float64, "double"), (Float32, "float"))
         end
         return
     end
+    @eval @propagate_inbounds function _atomic_add!(x::Base.ReinterpretArray{$T, 1}, v::$T, i::Int)
+        @boundscheck checkbounds(x, i)
+        GC.@preserve x begin
+            p = pointer(x, i)
+            Base.llvmcall($ir, Cvoid, Tuple{Ptr{$T}, $T}, p, v)
+        end
+        return
+    end
+end
+
+@propagate_inbounds function _atomic_add!(x::Vector{<:Complex{T}}, v::Complex{T}, i::Int) where {T <: Union{Float32, Float64}}
+    @boundscheck checkbounds(x, i)
+    # Reinterpret as flat vector with atomics support
+    xr = reinterpret(T, x)
+    @inbounds _atomic_add!(xr, v.re, 2i-1)
+    @inbounds _atomic_add!(xr, v.im, 2i)
+    return
 end
 
 # Accumulate `v` into `x[i]`, atomically if `atomic` is `Val(true)`. This is the only

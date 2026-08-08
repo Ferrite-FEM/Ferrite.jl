@@ -58,7 +58,7 @@ import LinearAlgebra: Symmetric
     # CSCAssembler: assemble with different row and col dofs
     I = [1, 1, 4, 4, 6, 6]
     J = [1, 3, 1, 3, 1, 3]
-    for T in (Float32, Float64)
+    for T in (Float32, Float64, ComplexF32, ComplexF64)
         V = zeros(T, length(I))
         K = sparse(I, J, V)
         f = zeros(T, 6)
@@ -311,7 +311,7 @@ end
     element_matrix(dofs, ::Type{T}) where {T} = T[sin(T(i) * T(j) / 100) for i in dofs, j in dofs]
     element_vector(dofs, ::Type{T}) where {T} = T[cos(T(i)) for i in dofs]
 
-    for T in (Float64, Float32)
+    for T in (Float64, Float32, ComplexF32, ComplexF64)
         K = allocate_matrix(SparseMatrixCSC{T, Int}, dh)
         f = zeros(T, ndofs(dh))
         Ka = allocate_matrix(SparseMatrixCSC{T, Int}, dh)
