@@ -224,8 +224,8 @@ _is_atomic(::SymmetricCSCAssembler{<:Any, <:Any, <:Any, atomic}) where {atomic} 
 _is_atomic(::AbstractAssembler) = false
 
 function _check_atomic_eltype(atomic::Bool, ::Type{T}) where {T}
-    if atomic && !(T <: Union{Float32, Float64})
-        throw(ArgumentError("atomic assembly is only supported for eltypes Float32 and Float64, got $T"))
+    if atomic && !(T <: AtomicEltypes)
+        throw(ArgumentError("atomic assembly is only supported for eltypes Float16, Float32, Float64, and Complex of these, got $T"))
     end
     return
 end
@@ -268,8 +268,9 @@ The keyword argument `atomic` can be set to `true` to make the accumulation into
 *without* partitioning the cells into independent sets ("grid coloring"), at the cost of
 some overhead and a non-deterministic result: the order in which contributions are added
 to a given entry depends on the task scheduling, and floating point addition is not
-associative. Atomic accumulation is only supported for value types `Float32` and
-`Float64` (other value types throw an `ArgumentError`). Note that each task still needs
+associative. Atomic accumulation is only supported for the value types `Float16`,
+`Float32`, and `Float64`, and `Complex` of these (other value types throw an
+`ArgumentError`). Note that each task still needs
 its own assembler since the assembler contains buffers that are modified during
 `assemble!`. Note also that the value of `atomic` determines a type parameter of the
 returned assembler, so for a type stable setup the value should be a literal (or
@@ -392,7 +393,7 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
             offset = first(nzr) - 1
             for ri in 1:maxlookups
                 val = Ke[rowpermutation[ri], Kecol]
-                iszero(val) || _addindex!(Kvals, offset + sortedrowdofs[ri], val, atomic)
+                iszero(val) || addindex!(Kvals, val, offset + sortedrowdofs[ri], atomic)
             end
             current_col += 1
             continue
@@ -407,7 +408,7 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
                 R = searchsortedfirst(Krows, Kerow_dof, lo, hi, Base.Order.Forward)
                 if R <= hi && Krows[R] == Kerow_dof
                     val = Ke[rowpermutation[ri], Kecol]
-                    iszero(val) || _addindex!(Kvals, R, val, atomic)
+                    iszero(val) || addindex!(Kvals, val, R, atomic)
                     lo = R + 1
                 else
                     # No entry exists in the global matrix for this row, which is allowed
@@ -451,50 +452,6 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
             end
         end
         current_col += 1
-    end
-    return
-end
-
-# Atomic accumulation primitive used for assembling with `atomic = true`.
-#
-# This is written with `llvmcall` since the built-in alternatives in Julia currently
-# generate bad code for floating point addition: `Core.Intrinsics.atomic_pointermodify`
-# (and thus `@atomic`) lowers `+` on floats to a compare-exchange loop with a non-inlined
-# call to `+` inside, whereas this generates a single `atomicrmw fadd` instruction.
-#
-# Monotonic ordering is sufficient since no other memory is synchronized through these
-# additions -- the task join at the end of a threaded assembly loop is the synchronization
-# point that makes the accumulated values visible.
-for (T, llvmT) in ((Float64, "double"), (Float32, "float"))
-    ir = if VERSION >= v"1.12.0-DEV"
-        """
-        %rv = atomicrmw fadd ptr %0, $llvmT %1 monotonic
-        ret void
-        """
-    else
-        """
-        %p = inttoptr i$(Sys.WORD_SIZE) %0 to $(llvmT)*
-        %rv = atomicrmw fadd $(llvmT)* %p, $llvmT %1 monotonic
-        ret void
-        """
-    end
-    @eval @propagate_inbounds function _atomic_add!(x::Vector{$T}, i::Int, v::$T)
-        @boundscheck checkbounds(x, i)
-        GC.@preserve x begin
-            p = pointer(x, i)
-            Base.llvmcall($ir, Cvoid, Tuple{Ptr{$T}, $T}, p, v)
-        end
-        return
-    end
-end
-
-# Accumulate `v` into `x[i]`, atomically if `atomic` is `Val(true)`. This is the only
-# point where the atomic and non-atomic matrix assembly kernels differ.
-@propagate_inbounds function _addindex!(x::AbstractVector, i::Integer, v, ::Val{atomic}) where {atomic}
-    if atomic
-        _atomic_add!(x, Int(i), convert(eltype(x), v))
-    else
-        x[i] += v
     end
     return
 end
