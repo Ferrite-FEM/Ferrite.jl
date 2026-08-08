@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    (e.g. DG), at roughly half the peak memory use. This applies to all entry points
    (`allocate_matrix`, `add_sparsity_entries!`, ...) and the resulting patterns and
    matrices are unchanged. ([#1397])
+ - Building a `SparsityPattern` and instantiating a `SparseMatrixCSC` or `SparseMatrixCSR`
+   from it is now multithreaded: the count and fill passes of the pattern build and the
+   matrix instantiations chunk their rows over tasks, like the lazy row sort already did.
+   The resulting patterns and matrices are independent of the number of threads. ([#1481])
 
 ### Internal changes
  - `SparsityPattern` has been rewritten: all rows are now stored in a single contiguous
@@ -1400,6 +1404,7 @@ poking into Ferrite internals:
 [#1426]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1426
 [#1428]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1428
 [#1397]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1397
+[#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1432]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1432
 [#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
 [#1468]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1468
