@@ -1,11 +1,42 @@
-########################################################################
-# This file contain docstrings that are too large to fit nicely inline #
-########################################################################
+"""
+    AbstractRefShape{refdim}
+
+Supertype for all reference shapes with reference dimension `refdim`. Reference shapes are
+used to define grid cells, interpolations, and quadrature rules.
+
+Currently implemented reference shapes are: [`RefLine`](@ref), [`RefTriangle`](@ref),
+[`RefQuadrilateral`](@ref), [`RefTetrahedron`](@ref), [`RefHexahedron`](@ref),
+[`RefPrism`](@ref), and [`RefPyramid`](@ref).
+
+# Examples
+```julia
+# Create a 1st order Lagrange interpolation on the reference triangle
+interpolation = Lagrange{2, RefTriangle, 1}()
+
+# Create a 2nd order quadrature rule for the reference quadrilateral
+quad_rule = Quadrature{2, RefQuadrilateral}(2)
+```
+
+Implementation details can be found in the devdocs section on [Reference cells](@ref).
+"""
+abstract type AbstractRefShape{refdim} end
+
+"""
+    RefHypercube{dim} <: AbstractRefShape{dim}
+
+Reference shape for a `dim`-dimensional hypercube. See [`AbstractRefShape`](@ref)
+documentation for details.
+"""
+struct RefHypercube{refdim} <: AbstractRefShape{refdim} end
 
 """
     RefLine <: AbstractRefShape{1}
 
-Reference line/interval, reference dimension 1.
+Reference line/interval, alias for [`RefHypercube{1}`](@ref). See [`AbstractRefShape`](@ref)
+documentation for details.
+
+# Extended help
+
 ```
 ----------------+--------------------
 Vertex numbers: | Vertex coordinates:
@@ -17,44 +48,16 @@ Edge numbers:   | Edge identifiers:
 ----------------+--------------------
 ```
 """
-RefLine
-
-@doc raw"""
-    RefTriangle <: AbstractRefShape{2}
-
-Reference triangle, reference dimension 2.
-```
-----------------+--------------------
-Vertex numbers: | Vertex coordinates:
-    2           |
-    | \         | v1: 𝛏 = (1.0, 0.0)
-    |   \       | v2: 𝛏 = (0.0, 1.0)
-ξ₂^ |     \     | v3: 𝛏 = (0.0, 0.0)
-  | 3-------1   |
-  +--> ξ₁       |
-----------------+--------------------
-Edge numbers:   | Edge identifiers:
-    +           |
-    | \         | e1: (v1, v2)
-    2   1       | e2: (v2, v3)
-    |     \     | e3: (v3, v1)
-    +---3---+   |
-----------------+--------------------
-Face numbers:   | Face identifiers:
-    +           |
-    | \         |
-    |   \       | f1: (v1, v2, v3)
-    |  1  \     |
-    +-------+   |
-----------------+--------------------
-```
-"""
-RefTriangle
+const RefLine = RefHypercube{1}
 
 """
     RefQuadrilateral <: AbstractRefShape{2}
 
-Reference quadrilateral, reference dimension 2.
+Reference quadrilateral, alias for [`RefHypercube{2}`](@ref). See [`AbstractRefShape`](@ref)
+documentation for details.
+
+# Extended help
+
 ```
 ----------------+---------------------
 Vertex numbers: | Vertex coordinates:
@@ -81,48 +84,18 @@ Face numbers:   | Face identifiers:
 ----------------+---------------------
 ```
 """
-RefQuadrilateral
-
-@doc raw"""
-    RefTetrahedron <: AbstractRefShape{3}
-
-Reference tetrahedron, reference dimension 3.
-```
----------------------------------------+-------------------------
-Vertex numbers:                        | Vertex coordinates:
-             4                4        |
-  ^ ξ₃      /  \             /| \      |  v1: 𝛏 = (0.0, 0.0, 0.0)
-  |        /     \          / |   \    |  v2: 𝛏 = (1.0, 0.0, 0.0)
-  +-> ξ₂  /        \       /  1___  \  |  v3: 𝛏 = (0.0, 1.0, 0.0)
- /       /      __--3     / /    __‾-3 |  v4: 𝛏 = (0.0, 0.0, 1.0)
-ξ₁      2 __--‾‾         2/__--‾‾      |
----------------------------------------+-------------------------
-Edge numbers:                          | Edge identifiers:
-             +                +        | e1: (v1, v2)
-            /  \             /| \      | e2: (v2, v3)
-         5 /     \ 6      5 / |4  \ 6  | e3: (v3, v1)
-          /        \       /  +__3  \  | e4: (v1, v4)
-         /      __--+     / /1   __‾-+ | e5: (v2, v4)
-        + __--‾‾2        +/__--‾‾2     | e6: (v3, v4)
----------------------------------------+-------------------------
-Face numbers:                          | Face identifiers:
-             +                +        |
-            /  \             /| \      | f1: (v1, v3, v2)
-           /     \          / | 4 \    | f2: (v1, v2, v4)
-          /   3    \       /2 +___  \  | f3: (v2, v3, v4)
-         /      __--+     / /  1 __‾-+ | f4: (v1, v4, v3)
-        + __--‾‾         +/__--‾‾      |
----------------------------------------+-------------------------
-```
-"""
-RefTetrahedron
+const RefQuadrilateral = RefHypercube{2}
 
 """
     RefHexahedron <: AbstractRefShape{3}
 
-Reference hexahedron, reference dimension 3.
+Reference hexahedron, alias for [`RefHypercube{3}`](@ref). See [`AbstractRefShape`](@ref)
+documentation for details.
+
+# Extended help
+
 ```
------------------------------------------+----------------------------
+-----------------------------------------+-----------------------------
 Vertex numbers:                          | Vertex coordinates:
             5--------8        5--------8 | v1: 𝛏 = (-1.0, -1.0, -1.0)
            /        /|       /|        | | v2: 𝛏 = ( 1.0, -1.0, -1.0)
@@ -155,12 +128,97 @@ Face numbers:                            | Face identifiers:
 -----------------------------------------+-----------------------------
 ```
 """
-RefHexahedron
+const RefHexahedron = RefHypercube{3}
+
+"""
+    RefSimplex{dim} <: AbstractRefShape{dim}
+
+Reference shape for a `dim`-dimensional simplex. See [`AbstractRefShape`](@ref)
+documentation for details.
+"""
+struct RefSimplex{refdim} <: AbstractRefShape{refdim} end
+
+@doc raw"""
+    RefTriangle <: AbstractRefShape{2}
+
+Reference triangle, alias for [`RefSimplex{2}`](@ref). See [`AbstractRefShape`](@ref)
+documentation for details.
+
+# Extended help
+
+```
+----------------+--------------------
+Vertex numbers: | Vertex coordinates:
+    2           |
+    | \         | v1: 𝛏 = (1.0, 0.0)
+    |   \       | v2: 𝛏 = (0.0, 1.0)
+ξ₂^ |     \     | v3: 𝛏 = (0.0, 0.0)
+  | 3-------1   |
+  +--> ξ₁       |
+----------------+--------------------
+Edge numbers:   | Edge identifiers:
+    +           |
+    | \         | e1: (v1, v2)
+    2   1       | e2: (v2, v3)
+    |     \     | e3: (v3, v1)
+    +---3---+   |
+----------------+--------------------
+Face numbers:   | Face identifiers:
+    +           |
+    | \         |
+    |   \       | f1: (v1, v2, v3)
+    |  1  \     |
+    +-------+   |
+----------------+--------------------
+```
+"""
+const RefTriangle = RefSimplex{2}
+
+@doc raw"""
+    RefTetrahedron <: AbstractRefShape{3}
+
+Reference tetrahedron, alias for [`RefSimplex{3}`](@ref). See [`AbstractRefShape`](@ref)
+documentation for details.
+
+# Extended help
+
+```
+---------------------------------------+-------------------------
+Vertex numbers:                        | Vertex coordinates:
+             4                4        |
+  ^ ξ₃      /  \             /| \      |  v1: 𝛏 = (0.0, 0.0, 0.0)
+  |        /     \          / |   \    |  v2: 𝛏 = (1.0, 0.0, 0.0)
+  +-> ξ₂  /        \       /  1___  \  |  v3: 𝛏 = (0.0, 1.0, 0.0)
+ /       /      __--3     / /    __‾-3 |  v4: 𝛏 = (0.0, 0.0, 1.0)
+ξ₁      2 __--‾‾         2/__--‾‾      |
+---------------------------------------+-------------------------
+Edge numbers:                          | Edge identifiers:
+             +                +        | e1: (v1, v2)
+            /  \             /| \      | e2: (v2, v3)
+         5 /     \ 6      5 / |4  \ 6  | e3: (v3, v1)
+          /        \       /  +__3  \  | e4: (v1, v4)
+         /      __--+     / /1   __‾-+ | e5: (v2, v4)
+        + __--‾‾2        +/__--‾‾2     | e6: (v3, v4)
+---------------------------------------+-------------------------
+Face numbers:                          | Face identifiers:
+             +                +        |
+            /  \             /| \      | f1: (v1, v3, v2)
+           /     \          / | 4 \    | f2: (v1, v2, v4)
+          /   3    \       /2 +___  \  | f3: (v2, v3, v4)
+         /      __--+     / /  1 __‾-+ | f4: (v1, v4, v3)
+        + __--‾‾         +/__--‾‾      |
+---------------------------------------+-------------------------
+```
+"""
+const RefTetrahedron = RefSimplex{3}
 
 """
     RefPrism <: AbstractRefShape{3}
 
-Reference prism, reference dimension 3.
+Reference prism. See [`AbstractRefShape`](@ref) documentation for details.
+
+# Extended help
+
 ```
 -----------------------------------------+----------------------------
 Vertex numbers:                          | Vertex coordinates:
@@ -195,13 +253,16 @@ Face numbers:                            | Face identifiers:
 -----------------------------------------+----------------------------
 ```
 """
-RefPrism
+struct RefPrism <: AbstractRefShape{3} end
 
 """
     RefPyramid <: AbstractRefShape{3}
 
-Reference pyramid, reference dimension 3. The base is a quadrilateral (vertices v1–v4)
-and v5 is the apex, located directly above v1.
+Reference pyramid. See [`AbstractRefShape`](@ref) documentation for details.
+
+# Extended help
+
+The base is a quadrilateral (vertices v1–v4) and v5 is the apex, located directly above v1.
 ```
 -----------------------------------------+----------------------------
 Vertex coordinates:                      | Edge identifiers:
@@ -220,4 +281,4 @@ Vertex coordinates:                      | Edge identifiers:
 -----------------------------------------+----------------------------
 ```
 """
-RefPyramid
+struct RefPyramid <: AbstractRefShape{3} end
