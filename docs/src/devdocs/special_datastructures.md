@@ -13,9 +13,5 @@ of different dimensions and efficient construction when the number of elements i
 Ferrite.ArrayOfVectorViews
 Ferrite.ConstructionBuffer
 Ferrite.push_at_index!
-```
-
-## `FastSparsityPattern`
-```@docs
-Ferrite.FastSparsityPattern
+Ferrite.insert_sorted_at_index!
 ```
