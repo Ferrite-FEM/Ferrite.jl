@@ -525,6 +525,49 @@ end
         add_sparsity_entries!(sp_big_kc_gen, dh, ch; keep_constrained = false)
         compare_matrices(allocate_matrix(sp_big_kc), allocate_matrix(sp_big_kc_gen))
     end
+    # Multi-chunk builds: enough rows (> 1000, the minimum chunk size) that the chunked
+    # count/fill passes (and the chunked matrix instantiations) span several tasks when the
+    # test runs with threads. Every combination must match the generic per-entry path
+    # exactly, and repeated builds must be identical (the parallel stages are deterministic
+    # regardless of thread count).
+    let
+        grid = generate_grid(Hexahedron, (6, 6, 6))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefHexahedron, 2}())
+        add!(dh, :v, Lagrange{RefHexahedron, 1}()^3)
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:u, getfacetset(grid, "left"), x -> 0.0))
+        close!(ch)
+        topo = ExclusiveTopology(grid)
+        for kwargs in (
+                (;),
+                (; coupling = [true true; false true]),
+                (; keep_constrained = false),
+                (; interface_coupling = trues(2, 2), topology = topo),
+                (; coupling = [true true; false true], interface_coupling = [true false; true true], topology = topo, keep_constrained = false),
+            )
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh, ch; kwargs...)
+            sp_gen = init_sparsity_pattern(dh)
+            Ferrite.add_entry!(sp_gen, 1, 1) # forces the generic branch
+            add_sparsity_entries!(sp_gen, dh, ch; kwargs...)
+            sp_again = add_sparsity_entries!(init_sparsity_pattern(dh), dh, ch; kwargs...)
+            compare_patterns(sp, sp_gen, sp_again)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            compare_matrices_csr(
+                allocate_matrix(SparseMatrixCSR{1, Float64, Int}, sp),
+                allocate_matrix(SparseMatrixCSR{1, Float64, Int}, sp_gen),
+            )
+        end
+        # Oversized pattern at multi-chunk scale (extra rows are diagonal-only and never
+        # constrained)
+        n = ndofs(dh) + 3
+        sp_big = add_sparsity_entries!(SparsityPattern(n, n), dh, ch; keep_constrained = false)
+        sp_big_gen = SparsityPattern(n, n)
+        Ferrite.add_entry!(sp_big_gen, 1, 1) # forces the generic branch
+        add_sparsity_entries!(sp_big_gen, dh, ch; keep_constrained = false)
+        compare_matrices(allocate_matrix(sp_big), allocate_matrix(sp_big_gen))
+    end
     # Test different number types (Int32, Float32)
     for Tv in (Float32, Float64)
         for Ti in (Int32, Int64)

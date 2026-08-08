@@ -220,6 +220,33 @@ function _sort_rows!(sp::SparsityPattern, rowrange::UnitRange{Int})
     return
 end
 
+# Chunk the rows of a count/fill pass over tasks. The only shared mutable state in the row
+# visit is the column marker, so each task gets its own: rows are globally unique, so the
+# row-stamp dedup works unchanged with a fresh marker (a stale stamp from another row never
+# equals `row`), and every per-row result is identical to the serial enumeration no matter
+# how the rows are chunked. In particular the count/fill identity required by
+# _visit_row_candidates! is preserved.
+function _visit_row_candidates_chunked!(
+        rowlen::Vector{Int}, data::Union{Nothing, Vector{Int}}, indices::Union{Nothing, Vector{AdaptiveRange}},
+        ncols::Int, row_to_cells::ArrayOfVectorViews, row_to_localidx::Union{Nothing, ArrayOfVectorViews},
+        cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
+        couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
+        neighbor_cells::Union{Nothing, ArrayOfVectorViews}, interface_couplings::Union{Nothing, Vector{Matrix{Bool}}},
+        oldbuffer::Union{Nothing, ConstructionBuffer{Int, 1}} = nothing,
+    )
+    @sync for rowrange in _task_chunks(length(rowlen))
+        Threads.@spawn begin
+            marker = zeros(Int, ncols) # per-task scratch
+            _visit_row_candidates!(
+                rowlen, data, indices, marker, $rowrange, row_to_cells, row_to_localidx,
+                cell_dofs, cell_to_sdh, couplings, isconstrained, neighbor_cells, interface_couplings,
+                oldbuffer
+            )
+        end
+    end
+    return
+end
+
 # The counting build behind add_sparsity_entries!: count exact per-row sizes with a column
 # marker, presize the buffer, then marker-dedup
 # fill each row UNSORTED (sorted lazily). Always includes the diagonal. Non-full `coupling` and
@@ -243,16 +270,14 @@ function _build_pattern!(
         cell_dofs, nrows, couplings !== nothing || interface_couplings !== nothing
     )
     rowlen = zeros(Int, nrows)
-    marker = zeros(Int, getncols(sp))
     cell_to_sdh = dh.cell_to_subdofhandler
-    _visit_row_candidates!(
-        rowlen, nothing, nothing, marker, row_to_cells, row_to_localidx, cell_dofs,
+    _visit_row_candidates_chunked!(
+        rowlen, nothing, nothing, getncols(sp), row_to_cells, row_to_localidx, cell_dofs,
         cell_to_sdh, couplings, isconstrained, neighbor_cells, interface_couplings, oldbuffer
     )
     buffer = _presize_buffer(rowlen, sp.buffer.sizehint)
-    fill!(marker, 0)
-    _visit_row_candidates!(
-        rowlen, buffer.data, buffer.indices, marker, row_to_cells, row_to_localidx, cell_dofs,
+    _visit_row_candidates_chunked!(
+        rowlen, buffer.data, buffer.indices, getncols(sp), row_to_cells, row_to_localidx, cell_dofs,
         cell_to_sdh, couplings, isconstrained,
         fill_interfaces ? neighbor_cells : nothing, fill_interfaces ? interface_couplings : nothing,
         oldbuffer
@@ -1002,7 +1027,7 @@ end
 # identically; both go through this function to guarantee that.
 function _visit_row_candidates!(
         rowlen::Vector{Int}, data::Union{Nothing, Vector{Int}}, indices::Union{Nothing, Vector{AdaptiveRange}},
-        marker::Vector{Int}, row_to_cells::ArrayOfVectorViews, row_to_localidx::Union{Nothing, ArrayOfVectorViews},
+        marker::Vector{Int}, rowrange::UnitRange{Int}, row_to_cells::ArrayOfVectorViews, row_to_localidx::Union{Nothing, ArrayOfVectorViews},
         cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
         couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
         neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
@@ -1011,7 +1036,7 @@ function _visit_row_candidates!(
     )
     counting = data === nothing
     ncols = length(marker) # marker has one slot per column
-    @inbounds for row in 1:length(rowlen)
+    @inbounds for row in rowrange
         start = counting ? 0 : indices[row].start
         p = 0
         # The diagonal is always stored when the column exists (the pattern may have more
