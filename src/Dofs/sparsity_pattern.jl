@@ -929,6 +929,73 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityP
     return S
 end
 
+# SparsityPattern: the same counting transpose, parallelized by chunking the rows (read
+# through _row_view, order-free just like _eachrow_anyorder). Each chunk counts its rows'
+# columns into a private histogram; the serial combine then converts the histograms in
+# place into per-(chunk, column) write cursors, where a chunk's cursor for a column starts
+# exactly where the previous chunk's ended. Every entry therefore lands at the index the
+# serial ascending row loop would give it, so rowval is bit-identical (in particular
+# per-column sorted) regardless of the number of threads.
+function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern, sym::Bool) where {Tv, Ti}
+    nrows, ncols = getnrows(sp), getncols(sp)
+    chunks = collect(_task_chunks(nrows))
+    # 1. Count the columns of each chunk's rows into a chunk-private histogram
+    hists = Vector{Vector{Ti}}(undef, length(chunks))
+    @sync for (ci, rowrange) in enumerate(chunks)
+        Threads.@spawn begin
+            hists[$ci] = _count_csc_columns_chunk(Ti, sp, $rowrange, sym)
+        end
+    end
+    # 2. Setup colptr, converting each histogram in place into the chunk's first write
+    #    index for every column (exclusive running sum in chunk = ascending row order)
+    colptr = Vector{Ti}(undef, ncols + 1)
+    nzptr = one(Ti)
+    @inbounds for col in 1:ncols
+        colptr[col] = nzptr
+        for hist in hists
+            count = hist[col]
+            hist[col] = nzptr
+            nzptr += count
+        end
+    end
+    colptr[ncols + 1] = nzptr
+    nnz = Int(nzptr) - 1
+    # 3. Allocate rowval and nzval now that nnz is known and populate rowval, each chunk
+    #    advancing its own cursors
+    rowval = Vector{Ti}(undef, nnz)
+    nzval = zeros(Tv, nnz)
+    @sync for (ci, rowrange) in enumerate(chunks)
+        Threads.@spawn _fill_csc_rowval_chunk!(rowval, hists[$ci], sp, $rowrange, sym)
+    end
+    # The last chunk's cursors must have ended at the start of the next column (earlier
+    # chunks' final cursors are the later chunks' start cursors and already consumed)
+    @assert isempty(hists) || all(col -> hists[end][col] == colptr[col + 1], 1:ncols)
+    return SparseMatrixCSC(nrows, ncols, colptr, rowval, nzval)
+end
+
+function _count_csc_columns_chunk(::Type{Ti}, sp::SparsityPattern, rowrange::UnitRange{Int}, sym::Bool) where {Ti}
+    hist = zeros(Ti, getncols(sp))
+    @inbounds for row in rowrange
+        for col in _row_view(sp, row)
+            sym && row > col && continue
+            hist[col] += one(Ti)
+        end
+    end
+    return hist
+end
+
+function _fill_csc_rowval_chunk!(rowval::Vector{Ti}, hist::Vector{Ti}, sp::SparsityPattern, rowrange::UnitRange{Int}, sym::Bool) where {Ti}
+    @inbounds for row in rowrange
+        for col in _row_view(sp, row)
+            sym && row > col && continue
+            k = hist[col]
+            rowval[k] = row
+            hist[col] = k + one(Ti)
+        end
+    end
+    return
+end
+
 # Build the cell -> global dofs map as an ArrayOfVectorViews (a compact copy of the
 # DofHandler's cell dof storage).
 function create_celldofs(dh::DofHandler)
