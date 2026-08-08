@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Euler-Bernoulli beam · Ferrite.jl</title><meta name="title" content="Euler-Bernoulli beam · Ferrite.jl"/><meta property="og:title" content="Euler-Bernoulli beam · Ferrite.jl"/><meta property="twitter:title" content="Euler-Bernoulli beam · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><meta property="og:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/euler_bernoulli_beam/"/><meta property="twitter:url" content="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/euler_bernoulli_beam/"/><link rel="canonical" href="https://ferrite-fem.github.io/Ferrite.jl/stable/tutorials/euler_bernoulli_beam/"/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/citations.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../">Tutorials overview</a></li><li><a class="tocitem" href="../heat_equation/">Heat equation</a></li><li><a class="tocitem" href="../linear_elasticity/">Linear elasticity</a></li><li><a class="tocitem" href="../elastodynamics/">Elastodynamics and modal analysis</a></li><li class="is-active"><a class="tocitem" href>Euler-Bernoulli beam</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Commented-program"><span>Commented program</span></a></li><li><a class="tocitem" href="#euler_bernoulli_beam-plain-program"><span>Plain program</span></a></li></ul></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../plasticity/">Von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Transient heat equation</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li><li><a class="tocitem" href="../stokes-flow/">Stokes flow</a></li><li><a class="tocitem" href="../porous_media/">Porous media</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../reactive_surface/">Reactive surface</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../dg_heat_equation/">Discontinuous Galerkin heat equation</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Topic guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../topics/">Topic guide overview</a></li><li><a class="tocitem" href="../../topics/fe_intro/">Introduction to FEM</a></li><li><a class="tocitem" href="../../topics/reference_shapes/">Reference shapes</a></li><li><a class="tocitem" href="../../topics/FEValues/">FEValues</a></li><li><a class="tocitem" href="../../topics/degrees_of_freedom/">Degrees of freedom</a></li><li><a class="tocitem" href="../../topics/sparse_matrix/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../topics/assembly/">Assembly</a></li><li><a class="tocitem" href="../../topics/boundary_conditions/">Boundary and initial conditions</a></li><li><a class="tocitem" href="../../topics/constraints/">Affine constraints</a></li><li><a class="tocitem" href="../../topics/grid/">Grid</a></li><li><a class="tocitem" href="../../topics/export/">Export</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">API reference</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../reference/">Reference overview</a></li><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of freedom</a></li><li><a class="tocitem" href="../../reference/sparsity_pattern/">Sparsity pattern and sparse matrices</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">How-to guides</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../howto/">How-to guide overview</a></li><li><a class="tocitem" href="../../howto/postprocessing/">Post processing and visualization</a></li><li><a class="tocitem" href="../../howto/threaded_assembly/">Multi-threaded assembly</a></li></ul></li><br><li><input class="collapse-toggle" id="menuitem-7" type="checkbox"/><label class="tocitem" for="menuitem-7"><span class="docs-label">Code gallery</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../../gallery/">Code gallery overview</a></li><li><a class="tocitem" href="../../gallery/helmholtz/">Helmholtz equation</a></li><li><a class="tocitem" href="../../gallery/quasi_incompressible_hyperelasticity/">Nearly Incompressible Hyperelasticity</a></li><li><a class="tocitem" href="../../gallery/landau/">Ginzburg-Landau model energy minimization</a></li><li><a class="tocitem" href="../../gallery/topology_optimization/">Topology optimization</a></li></ul></li><li><a class="tocitem" href="../../devdocs/">Developer documentation</a></li><li><a class="tocitem" href="../../cited-literature/">Cited literature</a></li><li><a class="tocitem" href="../../ferritepapers/">Papers using Ferrite</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Euler-Bernoulli beam</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Euler-Bernoulli beam</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate-tutorials/euler_bernoulli_beam.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="tutorial-euler-bernoulli-beam"><a class="docs-heading-anchor" href="#tutorial-euler-bernoulli-beam">Euler-Bernoulli beam</a><a id="tutorial-euler-bernoulli-beam-1"></a><a class="docs-heading-anchor-permalink" href="#tutorial-euler-bernoulli-beam" title="Permalink"></a></h1><p><img src="../euler_bernoulli_beam-light.png" alt/> <img src="../euler_bernoulli_beam-dark.png" alt/></p><p><em>Figure 1</em>: Deflection of a cantilever beam, clamped at the left end and loaded by a distributed load, a point load, and a moment at the tip.</p><div class="admonition is-success" id="Tip-890781596560e102"><header class="admonition-header">Tip<a class="admonition-anchor" href="#Tip-890781596560e102" title="Permalink"></a></header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/previews/PR1392/tutorials/euler_bernoulli_beam.ipynb"><code>euler_bernoulli_beam.ipynb</code></a>.</p></div></div><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>In this tutorial we solve the Euler-Bernoulli beam equation, our first <em>fourth-order</em> problem. The strong form for a beam on the domain <span>$\Omega = (0, L)$</span> reads</p><p class="math-container">\[EI \frac{\mathrm{d}^4 w}{\mathrm{d}x^4} = q,\]</p><p>where <span>$w$</span> is the transverse deflection, <span>$EI$</span> the bending stiffness, and <span>$q$</span> a distributed load. We consider a cantilever: the left end is clamped,</p><p class="math-container">\[w(0) = 0, \quad w&#39;(0) = 0,\]</p><p>and at the right end we apply a point load <span>$P$</span> and a moment <span>$\bar{M}$</span>.</p><p>To derive the weak form we multiply the strong form with a test function <span>$\delta w$</span> and integrate by parts <em>twice</em>:</p><p class="math-container">\[\int_0^L q \, \delta w \, \mathrm{d}x
+= \int_0^L EI \, w&#39;&#39;&#39;&#39; \, \delta w \, \mathrm{d}x
+= \int_0^L EI \, w&#39;&#39; \, \delta w&#39;&#39; \, \mathrm{d}x
++ \left[ EI \, w&#39;&#39;&#39; \, \delta w - EI \, w&#39;&#39; \, \delta w&#39; \right]_0^L.\]</p><p>In the boundary term we recognize the shear force <span>$V = -EI \, w&#39;&#39;&#39;$</span> and the bending moment <span>$M = EI \, w&#39;&#39;$</span>. At the clamped end the test functions vanish, <span>$\delta w(0) = \delta w&#39;(0) = 0$</span>, and at the tip the natural boundary conditions prescribe <span>$V(L) = P$</span> and <span>$M(L) = \bar{M}$</span>. The weak form thus reads: find <span>$w \in \mathbb{U}$</span> such that</p><p class="math-container">\[\int_0^L EI \, w&#39;&#39; \, \delta w&#39;&#39; \, \mathrm{d}x =
+    \int_0^L q \, \delta w \, \mathrm{d}x + P \, \delta w(L) + \bar{M} \, \delta w&#39;(L)
+    \quad \forall \, \delta w \in \mathbb{T}.\]</p><p>Two things are new compared to the second-order problems in the previous tutorials:</p><ul><li>The weak form contains <em>second</em> derivatives of the trial and test functions, so <span>$\mathbb{U}$</span> and <span>$\mathbb{T}$</span> are subspaces of <span>$H^2$</span>. Piecewise polynomials belong to <span>$H^2$</span> only if they are <span>$C^1$</span>-continuous, i.e. the derivative may not jump between elements. Standard Lagrange interpolations are only <span>$C^0$</span> and can therefore not be used. Instead we use the cubic <a href="../../reference/interpolations/#Ferrite.Hermite"><code>Hermite</code></a> interpolation, which has two degrees of freedom per node – the deflection <span>$w$</span> and the slope <span>$w&#39;$</span> – and sharing both between neighboring elements gives exactly <span>$C^1$</span> continuity.</li><li>The boundary terms load not only the deflection (<span>$P \, \delta w(L)$</span>) but also the <em>slope</em> (<span>$\bar{M} \, \delta w&#39;(L)$</span>). Since the slope is a degree of freedom, applying a point moment is as simple as adding to its entry in the force vector.</li></ul><p>A useful property of this discretization is that the nodal deflections and slopes of the finite element solution are <em>exact</em>, on any mesh, provided that the load term is integrated exactly (which our quadrature rule does for the constant <span>$q$</span> used here). To make this visible we solve with only 4 elements and compare against the analytic solution</p><p class="math-container">\[w(x) = \frac{q x^2 (x^2 - 4Lx + 6L^2)}{24 EI} + \frac{P x^2 (3L - x)}{6 EI}
+     + \frac{\bar{M} x^2}{2 EI}.\]</p><h2 id="Commented-program"><a class="docs-heading-anchor" href="#Commented-program">Commented program</a><a id="Commented-program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-program" title="Permalink"></a></h2><p>Now we solve the problem in Ferrite. What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#euler_bernoulli_beam-plain-program">section</a>.</p><p>First we load Ferrite and define the parameters (in normalized units).</p><pre><code class="language-julia hljs">using Ferrite
+
+L = 1.0  # beam length
+EI = 1.0 # bending stiffness
+q = 1.0  # distributed load
+P = 1.0  # tip point load
+M̄ = 1.0; # tip moment</code></pre><h3 id="Mesh"><a class="docs-heading-anchor" href="#Mesh">Mesh</a><a id="Mesh-1"></a><a class="docs-heading-anchor-permalink" href="#Mesh" title="Permalink"></a></h3><p>We discretize the beam with 4 <code>Line</code> elements. This is our first 1D grid: the facets of a <code>Line</code> cell are its two end vertices, and <code>generate_grid</code> sets up the facet sets <code>&quot;left&quot;</code> and <code>&quot;right&quot;</code> for the two end points. We use <code>&quot;left&quot;</code> for the clamped end below; the tip loads need no facet set since they are applied directly to dofs.</p><pre><code class="language-julia hljs">grid = generate_grid(Line, (4,), Vec((0.0,)), Vec((L,)));</code></pre><h3 id="Trial-and-test-functions"><a class="docs-heading-anchor" href="#Trial-and-test-functions">Trial and test functions</a><a id="Trial-and-test-functions-1"></a><a class="docs-heading-anchor-permalink" href="#Trial-and-test-functions" title="Permalink"></a></h3><p>We use the cubic Hermite interpolation on the reference line. It has 4 basis functions, associated with the dofs <span>$(w_1, w_1&#39;, w_2, w_2&#39;)$</span> where subscripts denote the two vertices: <code>Ferrite.vertexdof_indices(ip) == ((1, 2), (3, 4))</code>. The slope dofs carry the <em>physical</em> derivative <span>$w&#39; = \mathrm{d}w/\mathrm{d}x$</span>.</p><pre><code class="language-julia hljs">ip = Hermite{RefLine, 3}();</code></pre><p>The integrand of the stiffness contribution is a product of two second derivatives, each linear in <span>$\xi$</span>, so two Gauss points integrate it exactly.</p><pre><code class="language-julia hljs">qr = QuadratureRule{RefLine}(2);</code></pre><p>Since the weak form needs second derivatives of the shape functions we construct the <code>CellValues</code> with <code>update_hessians = true</code> (they are off by default for performance) and access them with <a href="../../reference/fevalues/#Ferrite.shape_hessian-Tuple{Ferrite.AbstractValues, Int64, Int64}"><code>shape_hessian</code></a>.</p><pre><code class="language-julia hljs">cellvalues = CellValues(qr, ip; update_hessians = true);</code></pre><h3 id="Degrees-of-freedom"><a class="docs-heading-anchor" href="#Degrees-of-freedom">Degrees of freedom</a><a id="Degrees-of-freedom-1"></a><a class="docs-heading-anchor-permalink" href="#Degrees-of-freedom" title="Permalink"></a></h3><p>The <code>DofHandler</code> distributes the dofs as usual; the two dofs per vertex are handled automatically, giving <span>$2 (n_{el} + 1) = 10$</span> dofs in total.</p><pre><code class="language-julia hljs">dh = DofHandler(grid)
+add!(dh, :w, ip)
+close!(dh);</code></pre><div class="admonition is-warning" id="Numbering-of-degrees-of-freedom-6707ba88d8ebacd1"><header class="admonition-header">Numbering of degrees of freedom<a class="admonition-anchor" href="#Numbering-of-degrees-of-freedom-6707ba88d8ebacd1" title="Permalink"></a></header><div class="admonition-body"><p>Recall that the numbering of degrees of freedom does not follow the numbering of the nodes in the grid. With Hermite there is a second pitfall: <code>u[i]</code> may be either a deflection <em>or</em> a slope dof.</p></div></div><h3 id="Boundary-conditions"><a class="docs-heading-anchor" href="#Boundary-conditions">Boundary conditions</a><a id="Boundary-conditions-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-conditions" title="Permalink"></a></h3><p>The clamped end requires both <span>$w(0) = 0$</span> and <span>$w&#39;(0) = 0$</span>. By default a <code>Dirichlet</code> condition on a Hermite field constrains only the <em>deflection</em> dofs (prescribing a function value to a slope dof would be wrong).</p><pre><code class="language-julia hljs">ch = ConstraintHandler(dh)
+add!(ch, Dirichlet(:w, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; 0.0));</code></pre><p>The slope dofs are constrained with a second <code>Dirichlet</code> with <code>kind = :derivative</code>, where the function now prescribes the derivative <span>$w&#39;$</span> instead of the value:</p><pre><code class="language-julia hljs">add!(ch, Dirichlet(:w, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; 0.0; kind = :derivative))
+close!(ch);</code></pre><h3 id="Assembling-the-linear-system"><a class="docs-heading-anchor" href="#Assembling-the-linear-system">Assembling the linear system</a><a id="Assembling-the-linear-system-1"></a><a class="docs-heading-anchor-permalink" href="#Assembling-the-linear-system" title="Permalink"></a></h3><p>The element routine follows the same structure as in the <a href="../heat_equation/#tutorial-heat-equation">heat equation tutorial</a>, with the stiffness <span>$\int EI \, \delta w&#39;&#39; \, w&#39;&#39; \, \mathrm{d}x$</span> now built from <code>shape_hessian</code>. In 1D the hessian is a 1×1 tensor, so the double contraction <code>⊡</code> is just a scalar product.</p><pre><code class="language-julia hljs">function assemble_global!(K, f, cellvalues, dh, EI, q)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    Ke = zeros(n_basefuncs, n_basefuncs)
+    fe = zeros(n_basefuncs)
+    assembler = start_assemble(K, f)
+    for cell in CellIterator(dh)
+        reinit!(cellvalues, cell)
+        fill!(Ke, 0)
+        fill!(fe, 0)
+        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+            for i in 1:n_basefuncs
+                δw = shape_value(cellvalues, q_point, i)
+                δw′′ = shape_hessian(cellvalues, q_point, i)
+                fe[i] += q * δw * dΩ
+                for j in 1:n_basefuncs
+                    w′′ = shape_hessian(cellvalues, q_point, j)
+                    Ke[i, j] += EI * (δw′′ ⊡ w′′) * dΩ
+                end
+            end
+        end
+        assemble!(assembler, celldofs(cell), Ke, fe)
+    end
+    return K, f
+end
+
+K = allocate_matrix(dh)
+f = zeros(ndofs(dh))
+assemble_global!(K, f, cellvalues, dh, EI, q);</code></pre><h3 id="Point-load-and-point-moment"><a class="docs-heading-anchor" href="#Point-load-and-point-moment">Point load and point moment</a><a id="Point-load-and-point-moment-1"></a><a class="docs-heading-anchor-permalink" href="#Point-load-and-point-moment" title="Permalink"></a></h3><p>The boundary terms of the weak form become contributions to single entries of the force vector: <span>$P$</span> multiplies <span>$\delta w(L)$</span>, i.e. it loads the deflection dof at the tip, and <span>$\bar{M}$</span> multiplies <span>$\delta w&#39;(L)$</span>, i.e. it loads the slope dof. With Lagrange elements a point moment would require e.g. a force couple, but here it is one vector entry. The tip dofs are local dofs 3 (deflection) and 4 (slope) of the last cell.</p><pre><code class="language-julia hljs">tip_dofs = celldofs(dh, getncells(grid))
+f[tip_dofs[3]] += P
+f[tip_dofs[4]] += M̄;</code></pre><h3 id="Solution-of-the-system"><a class="docs-heading-anchor" href="#Solution-of-the-system">Solution of the system</a><a id="Solution-of-the-system-1"></a><a class="docs-heading-anchor-permalink" href="#Solution-of-the-system" title="Permalink"></a></h3><pre><code class="language-julia hljs">apply!(K, f, ch)
+u = K \ f;</code></pre><h3 id="Postprocessing"><a class="docs-heading-anchor" href="#Postprocessing">Postprocessing</a><a id="Postprocessing-1"></a><a class="docs-heading-anchor-permalink" href="#Postprocessing" title="Permalink"></a></h3><p>Since the mesh is 1D we plot the solution directly instead of exporting to VTK. To evaluate the FE solution <em>inside</em> the elements we construct a <code>CellValues</code> with the plotting points as &quot;quadrature&quot; points (the weights are unused).</p><pre><code class="language-julia hljs">ξs = [Vec((ξ,)) for ξ in range(-1.0, 1.0; length = 21)]
+qr_plot = QuadratureRule{RefLine}(zeros(length(ξs)), ξs)
+cv_plot = CellValues(qr_plot, ip; update_hessians = true, update_detJdV = false)
+
+x_fe = Float64[]; w_fe = Float64[]; M_fe = Float64[]
+for cell in CellIterator(dh)
+    reinit!(cv_plot, cell)
+    ue = u[celldofs(cell)]
+    for q_point in 1:getnquadpoints(cv_plot)
+        push!(x_fe, spatial_coordinate(cv_plot, q_point, getcoordinates(cell))[1])
+        push!(w_fe, function_value(cv_plot, q_point, ue))
+        push!(M_fe, EI * function_hessian(cv_plot, q_point, ue)[1, 1])
+    end
+end</code></pre><p>For comparison we evaluate the analytic deflection and bending moment <span>$M(x) = EI \, w&#39;&#39;(x)$</span>:</p><pre><code class="language-julia hljs">w_ana(x) = (q * x^2 * (x^2 - 4L * x + 6L^2) / 24 + P * x^2 * (3L - x) / 6 + M̄ * x^2 / 2) / EI
+M_ana(x) = q * (L - x)^2 / 2 + P * (L - x) + M̄;</code></pre><p>We plot the FE deflection together with the analytic solution and mark the nodal values, which coincide with the analytic curve even on this coarse mesh. In fact, for <span>$q = 0$</span> the analytic solution is a cubic polynomial, and the FE solution would be exact <em>everywhere</em>.</p><pre><code class="language-julia hljs">import Plots
+
+node_x = range(0.0, L; length = getncells(grid) + 1)
+# Transparent background and gray foreground render well on both the light and the dark
+# documentation theme
+theme = (background_color = :transparent, foreground_color = :gray)
+plt_w = Plots.plot(x_fe, w_fe; label = &quot;FE solution&quot;, color = 1, linewidth = 2, theme...)
+Plots.plot!(plt_w, w_ana; xlims = (0, L), label = &quot;analytic&quot;, color = :gray, linestyle = :dash)
+Plots.scatter!(plt_w, node_x, evaluate_at_grid_nodes(dh, u, :w); label = &quot;nodal values&quot;, color = 1)
+Plots.plot!(plt_w; xlabel = &quot;x&quot;, ylabel = &quot;deflection w&quot;, legend = :topleft)</code></pre><img src="b5d0a1ec.svg" alt="Example block output"/><p><em>Figure 2</em>: FE deflection compared to the analytic solution. The nodal values are exact.</p><p>The bending moment is obtained from the second derivative of the solution via <code>function_hessian</code>. The FE moment is piecewise linear and only approximates the quadratic analytic moment: derivatives of the solution converge at a lower rate than the solution itself.</p><pre><code class="language-julia hljs">plt_M = Plots.plot(x_fe, M_fe; label = &quot;FE solution&quot;, color = 1, linewidth = 2, theme...)
+Plots.plot!(plt_M, M_ana; xlims = (0, L), label = &quot;analytic&quot;, color = :gray, linestyle = :dash)
+Plots.plot!(plt_M; xlabel = &quot;x&quot;, ylabel = &quot;bending moment M&quot;, legend = :topright)</code></pre><img src="2fd41f3b.svg" alt="Example block output"/><p><em>Figure 3</em>: Bending moment <span>$M = EI \, w&#39;&#39;$</span>. The distributed load <span>$q$</span> is the part of the solution the cubic elements cannot represent exactly.</p><h2 id="euler_bernoulli_beam-plain-program"><a class="docs-heading-anchor" href="#euler_bernoulli_beam-plain-program">Plain program</a><a id="euler_bernoulli_beam-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#euler_bernoulli_beam-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../euler_bernoulli_beam.jl"><code>euler_bernoulli_beam.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite
+
+L = 1.0  # beam length
+EI = 1.0 # bending stiffness
+q = 1.0  # distributed load
+P = 1.0  # tip point load
+M̄ = 1.0; # tip moment
+
+grid = generate_grid(Line, (4,), Vec((0.0,)), Vec((L,)));
+
+ip = Hermite{RefLine, 3}();
+
+qr = QuadratureRule{RefLine}(2);
+
+cellvalues = CellValues(qr, ip; update_hessians = true);
+
+dh = DofHandler(grid)
+add!(dh, :w, ip)
+close!(dh);
+
+ch = ConstraintHandler(dh)
+add!(ch, Dirichlet(:w, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; 0.0));
+
+add!(ch, Dirichlet(:w, getfacetset(grid, &quot;left&quot;), (x, t) -&gt; 0.0; kind = :derivative))
+close!(ch);
+
+function assemble_global!(K, f, cellvalues, dh, EI, q)
+    n_basefuncs = getnbasefunctions(cellvalues)
+    Ke = zeros(n_basefuncs, n_basefuncs)
+    fe = zeros(n_basefuncs)
+    assembler = start_assemble(K, f)
+    for cell in CellIterator(dh)
+        reinit!(cellvalues, cell)
+        fill!(Ke, 0)
+        fill!(fe, 0)
+        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+            for i in 1:n_basefuncs
+                δw = shape_value(cellvalues, q_point, i)
+                δw′′ = shape_hessian(cellvalues, q_point, i)
+                fe[i] += q * δw * dΩ
+                for j in 1:n_basefuncs
+                    w′′ = shape_hessian(cellvalues, q_point, j)
+                    Ke[i, j] += EI * (δw′′ ⊡ w′′) * dΩ
+                end
+            end
+        end
+        assemble!(assembler, celldofs(cell), Ke, fe)
+    end
+    return K, f
+end
+
+K = allocate_matrix(dh)
+f = zeros(ndofs(dh))
+assemble_global!(K, f, cellvalues, dh, EI, q);
+
+tip_dofs = celldofs(dh, getncells(grid))
+f[tip_dofs[3]] += P
+f[tip_dofs[4]] += M̄;
+
+apply!(K, f, ch)
+u = K \ f;
+
+ξs = [Vec((ξ,)) for ξ in range(-1.0, 1.0; length = 21)]
+qr_plot = QuadratureRule{RefLine}(zeros(length(ξs)), ξs)
+cv_plot = CellValues(qr_plot, ip; update_hessians = true, update_detJdV = false)
+
+x_fe = Float64[]; w_fe = Float64[]; M_fe = Float64[]
+for cell in CellIterator(dh)
+    reinit!(cv_plot, cell)
+    ue = u[celldofs(cell)]
+    for q_point in 1:getnquadpoints(cv_plot)
+        push!(x_fe, spatial_coordinate(cv_plot, q_point, getcoordinates(cell))[1])
+        push!(w_fe, function_value(cv_plot, q_point, ue))
+        push!(M_fe, EI * function_hessian(cv_plot, q_point, ue)[1, 1])
+    end
+end
+
+w_ana(x) = (q * x^2 * (x^2 - 4L * x + 6L^2) / 24 + P * x^2 * (3L - x) / 6 + M̄ * x^2 / 2) / EI
+M_ana(x) = q * (L - x)^2 / 2 + P * (L - x) + M̄;
+
+import Plots
+
+node_x = range(0.0, L; length = getncells(grid) + 1)
+# Transparent background and gray foreground render well on both the light and the dark
+# documentation theme
+theme = (background_color = :transparent, foreground_color = :gray)
+plt_w = Plots.plot(x_fe, w_fe; label = &quot;FE solution&quot;, color = 1, linewidth = 2, theme...)
+Plots.plot!(plt_w, w_ana; xlims = (0, L), label = &quot;analytic&quot;, color = :gray, linestyle = :dash)
+Plots.scatter!(plt_w, node_x, evaluate_at_grid_nodes(dh, u, :w); label = &quot;nodal values&quot;, color = 1)
+Plots.plot!(plt_w; xlabel = &quot;x&quot;, ylabel = &quot;deflection w&quot;, legend = :topleft)
+
+plt_M = Plots.plot(x_fe, M_fe; label = &quot;FE solution&quot;, color = 1, linewidth = 2, theme...)
+Plots.plot!(plt_M, M_ana; xlims = (0, L), label = &quot;analytic&quot;, color = :gray, linestyle = :dash)
+Plots.plot!(plt_M; xlabel = &quot;x&quot;, ylabel = &quot;bending moment M&quot;, legend = :topright)</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../elastodynamics/">« Elastodynamics and modal analysis</a><a class="docs-footer-nextpage" href="../incompressible_elasticity/">Incompressible elasticity »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Saturday 8 August 2026 20:50">Saturday 8 August 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
