@@ -16,6 +16,7 @@ for name in (
         "integration/convergence_test_utils", # shared helpers for the integration convergence tests
         "GPU/runtests",                    # GPU tests, run separately
         "GPU/heat_assembly",               # GPU tests, run separately
+        "GPU/multifield_cellvalues",       # GPU tests, run separately
         "jet",              # JET tests, run separately
         "test_notebooks",   # notebook tests, opt-in
         "coverage/coverage", # coverage tooling, not a test

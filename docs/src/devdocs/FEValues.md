@@ -3,8 +3,7 @@
 ## Type definitions
 * `AbstractValues`
   * `AbstractCellValues`
-    * [`CellValues`](@ref)
-    * [`MultiFieldCellValues`](@ref)
+    * [`CellValues`](@ref) (with [`MultiFieldCellValues`](@ref) as an alias for the multi-field case)
   * `AbstractFacetValues`
     * [`FacetValues`](@ref)
     * [`BCValues`](@ref Ferrite.BCValues)
