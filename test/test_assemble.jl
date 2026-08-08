@@ -308,10 +308,12 @@ end
     close!(dh)
 
     # Deterministic fake element contributions computed from the dofs
-    element_matrix(dofs, ::Type{T}) where {T} = T[sin(T(i) * T(j) / 100) for i in dofs, j in dofs]
-    element_vector(dofs, ::Type{T}) where {T} = T[cos(T(i)) for i in dofs]
+    element_matrix(dofs, ::Type{T}) where {T} = T[sin(i * j / 100) for i in dofs, j in dofs]
+    element_vector(dofs, ::Type{T}) where {T} = T[cos(i) for i in dofs]
+    element_matrix(dofs, ::Type{Complex{T}}) where {T} = Complex{T}[complex(sin(i * j / 100), cos(i * j / 100)) for i in dofs, j in dofs]
+    element_vector(dofs, ::Type{Complex{T}}) where {T} = Complex{T}[complex(cos(i), sin(i)) for i in dofs]
 
-    for T in (Float64, Float32)
+    for T in (Float64, Float32, Float16, ComplexF64, ComplexF32, Complex{Float16})
         K = allocate_matrix(SparseMatrixCSC{T, Int}, dh)
         f = zeros(T, ndofs(dh))
         Ka = allocate_matrix(SparseMatrixCSC{T, Int}, dh)
@@ -329,28 +331,30 @@ end
     end
 
     # Concurrent assembly: shared K and f, but one assembler per task and no coloring
-    K = allocate_matrix(dh)
-    f = zeros(ndofs(dh))
-    a = start_assemble(K, f)
-    for cell in CellIterator(dh)
-        dofs = celldofs(cell)
-        assemble!(a, dofs, element_matrix(dofs, Float64), element_vector(dofs, Float64))
-    end
-    Ka = allocate_matrix(dh)
-    fa = zeros(ndofs(dh))
-    _ = start_assemble(Ka, fa) # zero out
-    @sync for chunk in Iterators.partition(1:getncells(grid), cld(getncells(grid), 4))
-        Threads.@spawn begin
-            asm = start_assemble(Ka, fa; fillzero = false, atomic = true)
-            for cellidx in chunk
-                dofs = celldofs(dh, cellidx)
-                assemble!(asm, dofs, element_matrix(dofs, Float64), element_vector(dofs, Float64))
+    for T in (Float64, ComplexF64)
+        K = allocate_matrix(SparseMatrixCSC{T, Int}, dh)
+        f = zeros(T, ndofs(dh))
+        a = start_assemble(K, f)
+        for cell in CellIterator(dh)
+            dofs = celldofs(cell)
+            assemble!(a, dofs, element_matrix(dofs, T), element_vector(dofs, T))
+        end
+        Ka = allocate_matrix(SparseMatrixCSC{T, Int}, dh)
+        fa = zeros(T, ndofs(dh))
+        _ = start_assemble(Ka, fa) # zero out
+        @sync for chunk in Iterators.partition(1:getncells(grid), cld(getncells(grid), 4))
+            Threads.@spawn begin
+                asm = start_assemble(Ka, fa; fillzero = false, atomic = true)
+                for cellidx in chunk
+                    dofs = celldofs(dh, cellidx)
+                    assemble!(asm, dofs, element_matrix(dofs, T), element_vector(dofs, T))
+                end
             end
         end
+        # Equal up to the (task dependent) summation order
+        @test Ka.nzval ≈ K.nzval rtol = 1.0e-14
+        @test fa ≈ f rtol = 1.0e-14
     end
-    # Equal up to the (task dependent) summation order
-    @test Ka.nzval ≈ K.nzval rtol = 1.0e-14
-    @test fa ≈ f rtol = 1.0e-14
 
     # Symmetric assembler with atomic accumulation
     Ks = allocate_matrix(Symmetric{Float64, SparseMatrixCSC{Float64, Int}}, dh)
@@ -364,9 +368,10 @@ end
     end
     @test Ks == Ksa
 
-    # Atomic accumulation is only supported for Float32/Float64 matrices
+    # Atomic accumulation is only supported for real/complex Float16/Float32/Float64
     @test_throws ArgumentError start_assemble(spzeros(Int, 4, 4); atomic = true)
     @test_throws ArgumentError start_assemble(Symmetric(spzeros(Int, 4, 4)); atomic = true)
+    @test_throws ArgumentError start_assemble(spzeros(Complex{Int}, 4, 4); atomic = true)
 
     # Literal `atomic` values propagate to the type parameter (concrete return type)
     K4 = spzeros(4, 4)

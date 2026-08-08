@@ -47,12 +47,14 @@ end
 # This is written with `llvmcall` since the built-in alternatives in Julia currently
 # generate bad code for floating point addition: `Core.Intrinsics.atomic_pointermodify`
 # (and thus `@atomic`) lowers `+` on floats to a compare-exchange loop with a non-inlined
-# call to `+` inside, whereas this generates a single `atomicrmw fadd` instruction.
+# call to `+` inside, whereas this generates a single `atomicrmw fadd` instruction. (For
+# Float16 there is no atomic add instruction on typical CPUs and LLVM legalizes the
+# `atomicrmw fadd` to a compare-exchange loop, but with the addition inlined.)
 #
 # Monotonic ordering is sufficient since no other memory is synchronized through these
 # additions -- the task join at the end of a threaded assembly loop is the synchronization
 # point that makes the accumulated values visible.
-for (T, llvmT) in ((Float64, "double"), (Float32, "float"))
+for (T, llvmT) in ((Float64, "double"), (Float32, "float"), (Float16, "half"))
     ir = if VERSION >= v"1.12.0-DEV"
         """
         %rv = atomicrmw fadd ptr %0, $llvmT %1 monotonic
@@ -65,21 +67,39 @@ for (T, llvmT) in ((Float64, "double"), (Float32, "float"))
         ret void
         """
     end
-    @eval @propagate_inbounds function _atomic_add!(x::Vector{$T}, v::$T, i::Int)
-        @boundscheck checkbounds(x, i)
-        GC.@preserve x begin
-            p = pointer(x, i)
-            Base.llvmcall($ir, Cvoid, Tuple{Ptr{$T}, $T}, p, v)
-        end
+    @eval @inline function _atomic_fadd!(p::Ptr{$T}, v::$T)
+        Base.llvmcall($ir, Cvoid, Tuple{Ptr{$T}, $T}, p, v)
         return
     end
 end
 
+# Eltypes supported by atomic assembly (see `start_assemble`).
+const AtomicEltypes = Union{Float16, Float32, Float64, Complex{Float16}, Complex{Float32}, Complex{Float64}}
+
+@propagate_inbounds function _atomic_add!(x::Vector{T}, v::T, i::Int) where {T <: Union{Float16, Float32, Float64}}
+    @boundscheck checkbounds(x, i)
+    GC.@preserve x _atomic_fadd!(pointer(x, i), v)
+    return
+end
+
+# Complex addition is component-wise and assembly only accumulates -- no task reads the
+# values until after the task join -- so the real and imaginary parts can be accumulated
+# with two independent atomic additions.
+@propagate_inbounds function _atomic_add!(x::Vector{Complex{T}}, v::Complex{T}, i::Int) where {T <: Union{Float16, Float32, Float64}}
+    @boundscheck checkbounds(x, i)
+    GC.@preserve x begin
+        p = convert(Ptr{T}, pointer(x, i))
+        _atomic_fadd!(p, real(v))
+        _atomic_fadd!(p + sizeof(T), imag(v))
+    end
+    return
+end
+
 # Accumulate `v` into `x[i]`, atomically if `atomic` is `Val(true)`. This is the only
-# point where the atomic and non-atomic matrix assembly kernels differ.
+# point where the atomic and non-atomic assembly kernels differ.
 @propagate_inbounds function addindex!(x::AbstractVector, v, i::Int, ::Val{atomic} = Val(false)) where {atomic}
     if atomic
-        _atomic_add!(x, v, i)
+        _atomic_add!(x, convert(eltype(x), v), i)
     else
         x[i] += v
     end

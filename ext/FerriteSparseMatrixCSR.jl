@@ -35,7 +35,7 @@ end
             offset = first(nzr) - 1
             for ci in 1:maxlookups
                 val = Ke[Kerow, colpermutation[ci]]
-                iszero(val) || Ferrite._addindex!(K.nzval, offset + sortedcoldofs[ci], val, atomic)
+                iszero(val) || Ferrite.addindex!(K.nzval, val, offset + sortedcoldofs[ci], atomic)
             end
             current_row += 1
             continue
@@ -48,7 +48,7 @@ end
                 C = searchsortedfirst(K.colval, Kecol_dof, lo, hi, Base.Order.Forward)
                 if C <= hi && K.colval[C] == Kecol_dof
                     val = Ke[Kerow, colpermutation[ci]]
-                    iszero(val) || Ferrite._addindex!(K.nzval, C, val, atomic)
+                    iszero(val) || Ferrite.addindex!(K.nzval, val, C, atomic)
                     lo = C + 1
                 else
                     # No entry exists in the global matrix for this column, which is
