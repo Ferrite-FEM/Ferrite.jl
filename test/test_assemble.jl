@@ -375,3 +375,12 @@ end
     @test (@inferred (K -> start_assemble(K; atomic = false))(K4)) isa CSCA{false}
     @test (@inferred (K -> start_assemble(K))(K4)) isa CSCA{false}
 end
+
+@testset "addindex! matrix fallback" begin
+    A = zeros(2, 2)
+    Ferrite.addindex!(A, 1.0, 1, 2)
+    @test A == [0.0 1.0; 0.0 0.0]
+    @test_throws ErrorException Ferrite.addindex!(A, 1.0, 1, 2, Val(true))
+    Ferrite.addindex!(A, 0.0, 2, 2, Val(true)) # zero values short-circuit before the error
+    @test A == [0.0 1.0; 0.0 0.0]
+end

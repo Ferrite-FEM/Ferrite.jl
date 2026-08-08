@@ -31,9 +31,9 @@ end
 function addindex!(A::AbstractMatrix{T}, v::T, i::Int, j::Int, ::Val{atomic}) where {T, atomic}
     iszero(v) && return A
     if atomic
-        A[i, j] += v
-    else
         error("Atomic addindex! not supported for matrices.")
+    else
+        A[i, j] += v
     end
     return A
 end
