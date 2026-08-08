@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    common facet dimension across the whole grid. ([#843])
  - Experimental CUDA GPU support for assembly using type-stable, non-allocating element
    routines. ([#1291])
+ - Atomic assembly (`start_assemble(K, f; atomic = true)`) now supports `Float16` and
+   `Complex` of `Float16`/`Float32`/`Float64` as value types, in addition to `Float32`
+   and `Float64`. ([#1474])
 
 ## [v1.6.0] - 2026-08-02
 
@@ -1329,6 +1332,7 @@ poking into Ferrite internals:
 [#1279]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1279
 [#1281]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1281
 [#1286]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1286
+[#1291]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1291
 [#1293]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1293
 [#1294]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1294
 [#1295]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1295
@@ -1367,3 +1371,5 @@ poking into Ferrite internals:
 [#1432]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1432
 [#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
 [#1438]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1438
+[#1452]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1452
+[#1474]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1474
