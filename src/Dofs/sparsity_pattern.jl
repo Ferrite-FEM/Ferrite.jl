@@ -938,7 +938,17 @@ end
 # per-column sorted) regardless of the number of threads.
 function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern, sym::Bool) where {Tv, Ti}
     nrows, ncols = getnrows(sp), getncols(sp)
-    chunks = collect(_task_chunks(nrows))
+    # The serial cursor conversion below costs O(nchunks * ncols) while the parallel count
+    # and scatter phases gain ~ nstored / nchunks, so the optimal chunk count is about
+    # sqrt(nstored / ncols), the square root of the average column length -- beyond that
+    # more chunks make the transpose slower (measured: at 64 threads an uncapped chunk
+    # count nearly cancelled the parallel gain).
+    nstored = 0
+    @inbounds for row in 1:nrows
+        nstored += sp.buffer.indices[row].ncurrent
+    end
+    maxchunks = max(1, isqrt(cld(nstored, max(ncols, 1))))
+    chunks = collect(_task_chunks(nrows, max(1000, cld(nrows, maxchunks))))
     # 1. Count the columns of each chunk's rows into a chunk-private histogram
     hists = Vector{Vector{Ti}}(undef, length(chunks))
     @sync for (ci, rowrange) in enumerate(chunks)
