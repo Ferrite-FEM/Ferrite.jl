@@ -49,7 +49,7 @@ end
 # (and thus `@atomic`) lowers `+` on floats to a compare-exchange loop with a non-inlined
 # call to `+` inside, whereas this generates a single `atomicrmw fadd` instruction. (For
 # Float16 there is no atomic add instruction on typical CPUs and LLVM legalizes the
-# `atomicrmw fadd` to a compare-exchange loop, but with the addition inlined.)
+# `atomicrmw fadd` to a compare-exchange loop.)
 #
 # Monotonic ordering is sufficient since no other memory is synchronized through these
 # additions -- the task join at the end of a threaded assembly loop is the synchronization
