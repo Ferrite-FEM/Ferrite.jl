@@ -182,6 +182,16 @@ function _presize_buffer(rowlen::Vector{Int}, sizehint::Int)
     return ConstructionBuffer{Int, 1}(indices, data, sizehint)
 end
 
+# Split `1:n` into at most `nthreads()` contiguous chunks of at least `minchunk` items:
+# one chunk per thread since the chunked stages have uniform per-item cost (no load
+# balancing needed), with the minimum so that small problems degenerate to a single task
+# (serial-equivalent) instead of spawning useless tasks, and so that per-task scratch is
+# bounded by `nthreads()` copies. All stages parallelized with this helper produce results
+# that are bit-identical regardless of the number of threads.
+function _task_chunks(n::Int, minchunk::Int = 1000)
+    return Iterators.partition(1:n, max(minchunk, cld(n, Threads.nthreads())))
+end
+
 # Hot-path guard: kept tiny so that it inlines into callers; the actual sorting is out of
 # line in _sort_pattern! and only runs when the pattern is unsorted.
 @inline function _ensure_sorted!(sp::SparsityPattern)
@@ -192,11 +202,7 @@ end
 # Sort each row's slice in place (rows are already deduplicated). Rows are disjoint slices of
 # `data`, so they can be sorted in parallel by chunking the rows over tasks.
 @noinline function _sort_pattern!(sp::SparsityPattern)
-    nrows = getnrows(sp)
-    # One chunk per thread (rows have similar cost so no load balancing is needed), but at
-    # least 1000 rows per chunk so that small patterns don't spawn useless tasks.
-    chunksize = max(1000, cld(nrows, Threads.nthreads()))
-    @sync for rowrange in Iterators.partition(1:nrows, chunksize)
+    @sync for rowrange in _task_chunks(getnrows(sp))
         Threads.@spawn _sort_rows!(sp, rowrange)
     end
     sp.sorted = true
