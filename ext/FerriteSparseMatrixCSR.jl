@@ -160,4 +160,37 @@ function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsi
     return SparseMatrixCSR{1}(nrows, Ferrite.getncols(sp), rowptr, colval, nzval)
 end
 
+# SparsityPattern: the same construction, with the rows chunked over tasks: rowptr comes
+# straight from the row lengths, and each chunk copies its rows into disjoint slices of
+# colval (the one-time lazy sort behind _ensure_sorted! is itself parallel). Identical
+# bytes land at identical locations, so the result does not depend on the thread count.
+function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::Ferrite.SparsityPattern, sym::Bool) where {Tv, Ti}
+    sym && throw(ArgumentError("Symmetric SparseMatrixCSR is not supported"))
+    Ferrite._ensure_sorted!(sp)
+    nrows = Ferrite.getnrows(sp)
+    # 1. Setup rowptr
+    rowptr = Vector{Ti}(undef, nrows + 1)
+    rowptr[1] = 1
+    @inbounds for row in 1:nrows
+        rowptr[row + 1] = rowptr[row] + length(Ferrite._row_view(sp, row))
+    end
+    nnz = Int(rowptr[end]) - 1
+    # 2. Allocate colval and nzval now that nnz is known
+    colval = Vector{Ti}(undef, nnz)
+    nzval = zeros(Tv, nnz)
+    # 3. Populate colval chunk by chunk
+    @sync for rowrange in Ferrite._task_chunks(nrows)
+        Threads.@spawn _fill_csr_colval_chunk!(colval, rowptr, sp, rowrange)
+    end
+    return SparseMatrixCSR{1}(nrows, Ferrite.getncols(sp), rowptr, colval, nzval)
+end
+
+function _fill_csr_colval_chunk!(colval::Vector{Ti}, rowptr::Vector{Ti}, sp::Ferrite.SparsityPattern, rowrange::UnitRange{Int}) where {Ti}
+    @inbounds for row in rowrange
+        colidxs = Ferrite._row_view(sp, row)
+        copyto!(colval, Int(rowptr[row]), colidxs, 1, length(colidxs))
+    end
+    return
+end
+
 end
