@@ -477,9 +477,10 @@ end
             compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
             @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
         end
-        # Multiple subdofhandlers: the direct interface fill must NOT trigger (the square
-        # coupling masks do not apply to cross-subdofhandler neighbors in the walk) and the
-        # layered path must match the generic one.
+        # Multiple subdofhandlers: the rectangular per-(sdh, sdh) mask expansions make the
+        # interface enumeration exact for cross-subdofhandler neighbors too, so the counting
+        # build inserts the interface entries directly (exact reservation, no slack) and
+        # must match the generic path.
         dh3 = DofHandler(grid)
         sdh_a = SubDofHandler(dh3, Set(1:12))
         add!(sdh_a, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
@@ -490,6 +491,36 @@ end
             sp = add_sparsity_entries!(init_sparsity_pattern(dh3), dh3; topology = topo, interface_coupling = ic)
             sp_gen = fsp_test_build_generic(dh3; topology = topo, interface_coupling = ic)
             compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
+        end
+        # ... also with different fields per subdofhandler and a restricted (asymmetric)
+        # interface_coupling: the cross-sdh masks are rectangular (different local layouts
+        # on the two sides) and the mask is sized by the fields of the full DofHandler.
+        dh4 = DofHandler(grid)
+        sdh_c = SubDofHandler(dh4, Set(1:12))
+        add!(sdh_c, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        add!(sdh_c, :b, DiscontinuousLagrange{RefQuadrilateral, 1}()^2)
+        sdh_d = SubDofHandler(dh4, Set(13:25))
+        add!(sdh_d, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        close!(dh4)
+        for ic in ([true true; false false], [true false; true true], trues(2, 2))
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh4), dh4; topology = topo, interface_coupling = ic)
+            sp_gen = fsp_test_build_generic(dh4; topology = topo, interface_coupling = ic)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
+        end
+        # ... also with cells not covered by any subdofhandler adjacent to covered cells:
+        # an uncovered neighbor has no dofs and contributes no interface entries, but the
+        # covered side's same-side interface block is still added.
+        dh5 = DofHandler(grid)
+        sdh_e = SubDofHandler(dh5, Set(1:12))
+        add!(sdh_e, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        close!(dh5)
+        let ic = trues(1, 1)
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh5), dh5; topology = topo, interface_coupling = ic)
+            sp_gen = fsp_test_build_generic(dh5; topology = topo, interface_coupling = ic)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
         end
     end
     # The counting build also covers pre-populated patterns (existing entries are kept verbatim and

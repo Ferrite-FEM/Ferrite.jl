@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
  - Atomic assembly support for BlockAssembler. ([#1452])
+ - `add_interface_entries!` (and thereby `interface_coupling` builds) no longer errors for
+   grids where some cells are not covered by any `SubDofHandler`: an uncovered cell has no
+   dofs and contributes no interface entries, but the covered side of such an interface
+   still gets its same-side entries. ([#1490])
  - `add_sparsity_entries!` (and thereby `allocate_matrix`) now guarantees that passing
    `interface_coupling` adds the requested interface entries: the `topology` keyword
    argument is now optional and, when not passed, constructed from the grid (previously
@@ -44,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `keep_constrained = false` are used) and 10-25x for builds with `interface_coupling`
    (e.g. DG), at roughly half the peak memory use. This applies to all entry points
    (`allocate_matrix`, `add_sparsity_entries!`, ...) and the resulting patterns and
-   matrices are unchanged. ([#1397])
+   matrices are unchanged. ([#1397], [#1490])
  - Building a `SparsityPattern` and instantiating a `SparseMatrixCSC` or `SparseMatrixCSR`
    from it is now multithreaded. ([#1481])
 
@@ -1398,6 +1402,7 @@ poking into Ferrite internals:
 [#1388]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1388
 [#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
 [#1393]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1393
+[#1397]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1397
 [#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414
 [#1415]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1415
 [#1417]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1417
@@ -1406,12 +1411,13 @@ poking into Ferrite internals:
 [#1423]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1423
 [#1426]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1426
 [#1428]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1428
-[#1397]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1397
-[#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1432]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1432
 [#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
-[#1468]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1468
 [#1438]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1438
 [#1452]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1452
+[#1466]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1466
+[#1468]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1468
 [#1474]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1474
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
+[#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
+[#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
