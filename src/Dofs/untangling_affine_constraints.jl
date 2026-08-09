@@ -8,12 +8,12 @@ function untangle_constraints!(ch::ConstraintHandler)
     @assert istangled(ch) "the constraints are not tangled"
     A, affine_equation_ordering, _, dofcoeffs_to_remove = _create_lhs_affine_constraint_matrix(ch)
 
-    # update ch.dofcoefficients so that they can be used to construct `C`
+    new_dofcoefficients = copy(ch.dofcoefficients)
+    # update new_dofcoefficients so that they can be used to construct `C`
     for (k, v) in dofcoeffs_to_remove
-        deleteat!(ch.dofcoefficients[k], v)
+        deleteat!(new_dofcoefficients[k], v)
     end
-
-    C, g, affine_fdof_ordering = _create_rhs_affine_constraint_matrices(ch, affine_equation_ordering)
+    C, g, affine_fdof_ordering = _create_rhs_affine_constraint_matrices(ch, new_dofcoefficients, affine_equation_ordering)
 
     # TODO: maybe add possibility to warn user (if user chooses through kwarg) if `A` is ill conditioned
 
@@ -21,7 +21,7 @@ function untangle_constraints!(ch::ConstraintHandler)
         LinearAlgebra.lu(A; check = true)
     catch e
         if e isa LinearAlgebra.SingularException
-            throw(
+            ArgumentError(
                 "the affine constraints are tangled and untangling them results in " *
                     "ill defined constraints. A possibility to avoid this is to guarantee that " *
                     "the constraints are not tangled before calling close!"
@@ -31,18 +31,21 @@ function untangle_constraints!(ch::ConstraintHandler)
         end
     end
 
-    C .= LinearAlgebra.ldiv(luA, C)
-    _update_dof_coefficients!(ch.dofcoefficients, C, affine_equation_ordering, affine_fdof_ordering)
+    copy!(C, LinearAlgebra.ldiv(luA, C))
+    _update_dof_coefficients!(new_dofcoefficients, C, affine_equation_ordering, affine_fdof_ordering)
 
     # TODO: making affine constraint inhomogeneities time dependent requires (?) saving
     # `A⁻¹` or `luA` as it will be needed in update!
-    g .= LinearAlgebra.ldiv(luA, g)
+    copy!(g, LinearAlgebra.ldiv(luA, g))
 
     # we need to update ch.affine_inhomogeneities NOT ch.inhomogeneities
     # as ch.inhomogeneities will be computed in update!
     for (k, v) in affine_equation_ordering
         ch.affine_inhomogeneities[k] = g[v]
     end
+
+    # finally update the dofcoefficients in the constraint handler
+    ch.dofcoefficients .= new_dofcoefficients
 
     @assert !istangled(ch)
     return ch
@@ -67,7 +70,7 @@ of freedom via `A * a_c = C * a_f + g`. Three mappings are also returned.
     `ConstraintHandler` has been closed.
 
 """
-function _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, T}) where {DH, T}
+function _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, Tv, Ti}) where {DH, Tv, Ti}
 
     # maps the constrained dofs to a position in `a_c`
     affine_cdof_ordering = Dict{Int, Int}()
@@ -76,7 +79,7 @@ function _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, T}) wher
     # collect the position of the dof coefficients that need to be removed for ch.dofcoefficients
     dofcoeffs_to_remove = Dict{Int, Vector{Int}}()
 
-    I = Int[]; J = Int[]; V = T[]
+    I = Int[]; J = Int[]; V = Tv[]
     dofmapping⁻¹ = Dict{Int, Int}(v => k for (k, v) in ch.dofmapping)
 
     for (eq, coeffs) in enumerate(ch.dofcoefficients)
@@ -137,7 +140,7 @@ function _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, T}) wher
 end
 
 """
-    _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, T}, affine_equation_ordering::Dict{Int, Int}) where {DH, T}
+    _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, Tv, Ti}, new_dofcoefficients, affine_equation_ordering::Dict{Int, Int}) where {DH, Tv, Ti}
 
 Create and return the constraint matrix, `C`, and the inhomogeneities, `g`, from the tangled affine
 constraints in `ch`. The constraint matrix relates constrained affine dofs, `a_c`, and free, `a_f`, degrees of freedom via
@@ -149,16 +152,16 @@ The rows are indexed using `affine_equation_ordering` from `_create_lhs_affine_c
     constraints that are tangled. Therefore this function is not designed to be used after the
     `ConstraintHandler` has been closed.
 """
-function _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, T}, affine_equation_ordering::Dict{Int, Int}) where {DH, T}
+function _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, Tv, Ti}, new_dofcoefficients::Vector{Union{Nothing, DofCoefficients{Tv, Ti}}}, affine_equation_ordering::Dict{Int, Int}) where {DH, Tv, Ti}
 
     n_tangled_constraints = length(affine_equation_ordering)
-    I = Int[]; J = Int[]; V = T[]
-    g = Vector{T}(undef, n_tangled_constraints) # inhomogeneities
+    I = Int[]; J = Int[]; V = Tv[]
+    g = Vector{Tv}(undef, n_tangled_constraints) # inhomogeneities
 
     # maps the free dofs to a position in `a_f`
     affine_fdof_ordering = Dict{Int, Int}()
 
-    for (eq, coeffs) in enumerate(ch.dofcoefficients)
+    for (eq, coeffs) in enumerate(new_dofcoefficients)
         (isnothing(coeffs) || !haskey(affine_equation_ordering, eq)) && continue
         i = affine_equation_ordering[eq]
         if isempty(coeffs) && haskey(affine_equation_ordering, eq)
@@ -183,13 +186,17 @@ function _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, T}, af
     return C, g, affine_fdof_ordering
 end
 
-function _update_dof_coefficients!(dc::Vector{Union{Nothing, DofCoefficients{T}}}, C::AbstractMatrix, affine_equation_ordering::Dict{Int, Int}, affine_fdof_ordering::Dict{Int, Int}) where {T}
+"""
+    _update_dof_coefficients!(dc::Vector{Union{Nothing, DofCoefficients{Tv, Ti}}}, C::AbstractMatrix, affine_equation_ordering::Dict{Int, Int}, affine_fdof_ordering::Dict{Int, Int}) where {Tv, Ti}
 
+Update the dof coefficients `dc` using the constraint matrix `C` and the mappings `affine_equation_ordering` and `affine_fdof_ordering`.
+"""
+function _update_dof_coefficients!(dc::Vector{Union{Nothing, DofCoefficients{Tv, Ti}}}, C::AbstractMatrix, affine_equation_ordering::Dict{Int, Int}, affine_fdof_ordering::Dict{Int, Int}) where {Tv, Ti}
     affine_fdof_mapping⁻¹ = Dict(v => k for (k, v) in affine_fdof_ordering) # Bijections.jl could avoid this but not really worth it
     affine_equation_ordering⁻¹ = Dict(v => k for (k, v) in affine_equation_ordering)
 
     for (k, _) in affine_equation_ordering
-        dc[k] = DofCoefficients{T}()
+        dc[k] = DofCoefficients{Tv, Ti}()
     end
 
     SparseArrays.dropzeros!(C) # make the following loop over C shorter
@@ -224,8 +231,6 @@ function istangled(ch::ConstraintHandler)
     return false
 end
 
-function _assign_new_index!(d::Dict{Int, Int}, k::Int)
-    return if !haskey(d, k)
-        d[k] = maximum(values(d); init = 0) + 1
-    end
+function _assign_new_index!(d::Dict{Int, Int}, key::Int)
+    return get!(d, key, length(d) + 1)
 end
