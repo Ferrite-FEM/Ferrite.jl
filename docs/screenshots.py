@@ -807,6 +807,37 @@ def scene_elasticity_adaptivity():
                 res=[1000, 920], delay=60)
 
 
+# --- suspension_bridge: axial stress in the bars while the train crosses
+@scene("suspension_bridge")
+def scene_suspension_bridge():
+    view = new_view()
+    WARP = 40.0  # displacement exaggeration, quoted in the example's figure caption
+    r = OpenDataFile(datadir + "/suspension_bridge.vtkhdf")
+    w = warp(r, "u", WARP)
+    # colour by the stress in MPa: the raw values in Pa need exponent labels
+    # which grow too wide for the bar
+    calc = Calculator(Input=w)
+    calc.AttributeType = "Cell Data"
+    calc.ResultArrayName = "s_MPa"
+    calc.Function = "stress/1e6"
+    d = Show(calc, view)
+    d.Representation = "Surface"
+    d.LineWidth = 4.0
+    d.RenderLinesAsTubes = 1
+    lut = colorbar(d, view, ("CELLS", "s_MPa"), title="$\\sigma$ [MPa]",
+                   horizontal=True, fmt="%.0f")
+    lo, hi = data_range_over_time(r, ("CELLS", "stress"))
+    m = max(-lo, hi) / 1e6
+    lut.RescaleTransferFunction(-m, m)  # symmetric, so unstressed bars stay white
+    # the train is drawn in the flat annotation colour and drives in from
+    # outside the frame, which is fixed on the bridge (plus headroom for the
+    # warped deflection) instead of on the moving data bounds
+    t = OpenDataFile(datadir + "/suspension_bridge_train.pvd")
+    annotate(warp(t, "u", WARP), view)
+    finish_anim(view, r, "suspension_bridge", twod=True, zoom=2.6, res=[1500, 540],
+                pan_y=-0.12, frame_bounds=[-4.0, 62.0, -7.0, 12.7, 0.0, 0.0])
+
+
 names = selected or list(SCENES)
 unknown = [n for n in names if n not in SCENES]
 if unknown:

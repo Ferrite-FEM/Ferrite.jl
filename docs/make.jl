@@ -116,6 +116,7 @@ bibtex_plugin = CitationBibliography(
             "gallery/landau.md",
             "gallery/topology_optimization.md",
             "gallery/elasticity_adaptivity.md",
+            "gallery/suspension_bridge.md",
         ],
         "devdocs/index.md",
         "cited-literature.md",

@@ -183,5 +183,6 @@ write_overview(
         ("landau", "Ginzburg–Landau minimization", ["landau_opt-light.png", "landau_opt-dark.png"]),
         ("topology_optimization", "Topology optimization", ["topology_optimization-light.webp", "topology_optimization-dark.webp"]),
         ("elasticity_adaptivity", "Linear elasticity with adaptive mesh refinement", ["elasticity_adaptivity-light.webp", "elasticity_adaptivity-dark.webp"]),
+        ("suspension_bridge", "Suspension bridge under a moving train", ["suspension_bridge-light.webp", "suspension_bridge-dark.webp"]),
     ],
 )

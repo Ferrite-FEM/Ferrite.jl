@@ -61,3 +61,12 @@ approximation conforming. The mesh is read from an Abaqus input file using
 [FerriteMeshParser](https://github.com/Ferrite-FEM/FerriteMeshParser.jl).
 
 *Contributed by*: Maximilian Köhler ([@koehlerson](https://github.com/koehlerson)).
+
+---
+
+#### [Suspension bridge under a moving train](suspension_bridge.md)
+
+A "bridge builder"-style suspension bridge assembled from pin-jointed bars — `Line`
+cells embedded in 2D — with a train driving across it as a sequence of static load
+cases. One factorization of the stiffness matrix serves all load positions, and the
+axial stress in every member is exported as a time series and animated.

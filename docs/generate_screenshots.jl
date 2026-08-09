@@ -56,6 +56,7 @@ const EXAMPLES = Dict(
     "landau" => "literate-gallery/landau.jl",
     "topology_optimization" => "literate-gallery/topology_optimization.jl",
     "elasticity_adaptivity" => "literate-gallery/elasticity_adaptivity.jl",
+    "suspension_bridge" => "literate-gallery/suspension_bridge.jl",
 )
 
 # Extra code evaluated in the example's module after running it, e.g. to
