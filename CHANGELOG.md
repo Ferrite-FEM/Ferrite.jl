@@ -36,7 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    zone coloring of the workstream algorithm are now multithreaded, and remaining serial
    parts use flat arrays instead of `Dict`/`Set` based bookkeeping. Representative
    speedups for 200k-400k cell grids: 3-10x serial, and another 2-3x with 8 threads. The
-   resulting coloring is unchanged and independent of the number of threads. ([#1475])
+   resulting coloring is independent of the number of threads, and unchanged for cellsets
+   that iterate in ascending order. For unordered cellsets (e.g. `Set`) the coloring is
+   now deterministic and may differ from previous releases. ([#1475])
 
 ## [v1.6.0] - 2026-08-02
 

@@ -1,7 +1,14 @@
 # Split `1:n` into at most `maxchunks` contiguous ranges of similar size.
 function _color_chunks(n::Int, maxchunks::Int)
-    return Iterators.partition(1:n, cld(n, min(n, maxchunks)))
+    return Iterators.partition(1:n, max(1, cld(n, maxchunks)))
 end
+
+# Normalize a cellset to a sorted vector of unique cell ids: 1-based indexable, sorted
+# ascending, no duplicates, `Int` elements. Unit ranges already fulfill these
+# requirements and are used as-is. Note that `unique!` on the sorted vector is a cheap
+# allocation-free linear scan.
+_sorted_cellvec(cellset::AbstractUnitRange{Int}) = cellset
+_sorted_cellvec(cellset) = unique!(sort!(collect(Int, cellset)))
 
 function _gather_neighbor_chunk!(colcount, g, cellvec, chunk, nodeptr, nodecells)
     buf = Int[]
@@ -31,13 +38,12 @@ end
 # Incidence matrix for element connections in the grid
 function create_incidence_matrix(g::AbstractGrid, cellset = 1:getncells(g))
     ncells = getncells(g)
-    cellvec = sort!(collect(Int, cellset))
+    cellvec = _sorted_cellvec(cellset)
     if isempty(cellvec)
         return SparseArrays.spzeros(Bool, Int, ncells, ncells)
     end
 
     # Map from node id to the cells in the cellset containing it, in CSR-like form.
-    # Since cells are visited in ascending order each per-node cell list is sorted.
     nnodes = getnnodes(g)
     nodeptr = zeros(Int, nnodes + 1)
     nodeptr[1] = 1
@@ -155,10 +161,11 @@ end
 # See Appendix A in https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf
 function workstream_coloring(incidence_matrix, cellset)
 
-    if length(cellset) == 0
+    cellvec = _sorted_cellvec(cellset)
+    if length(cellvec) == 0
         return Vector{Int}[]
-    elseif length(cellset) == 1
-        return Vector{Int}[Int[first(cellset)]]
+    elseif length(cellvec) == 1
+        return Vector{Int}[Int[first(cellvec)]]
     end
     ncells = size(incidence_matrix, 1)
 
@@ -167,7 +174,6 @@ function workstream_coloring(incidence_matrix, cellset)
     ###################
     # Note: the incidence matrix is assumed to be created with the same cellset, so all
     # neighbors found through it are members of the cellset.
-    cellvec = sort!(collect(Int, cellset))
     zone_of = zeros(Int, ncells) # Zero represents no zone assigned yet
     zones = Vector{Int}[]
     n_visited = 0
