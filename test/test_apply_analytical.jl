@@ -169,7 +169,7 @@ using LinearAlgebra
         @test_throws ErrorException apply_analytical!(zeros(ndofs(mdh)), mdh, :u, x -> 0.0)  # Should be f(x)::Vec{2}
     end
 
-    @testset "Non-nodal interpolations (H(div)/H(curl))" begin
+    @testset "project_analytical! (H(div)/H(curl))" begin
         # Affine (but non-trivial) node transformation: shearing keeps quads/hexes
         # as parallelograms/parallelepipeds so that the cell mappings stay affine.
         function affine_grid(CT, nel)
@@ -192,7 +192,7 @@ using LinearAlgebra
             CT = Ferrite.getcelltype(Ferrite.get_grid(dh))
             cv = CellValues(QuadratureRule{Ferrite.getrefshape(ip)}(qr_order), ip, Ferrite.geometric_interpolation(CT))
             a = zeros(ndofs(dh))
-            apply_analytical!(a, dh, :u, f)
+            project_analytical!(a, dh, :u, f)
             err = 0.0
             for cc in CellIterator(dh)
                 reinit!(cv, cc)
@@ -236,8 +236,8 @@ using LinearAlgebra
             # A higher quadrature order must not change exactness
             a = zeros(ndofs(dh))
             a_qr = zeros(ndofs(dh))
-            apply_analytical!(a, dh, :u, f)
-            apply_analytical!(a_qr, dh, :u, f; qr_order = 2 * Ferrite.getorder(ip) + 2)
+            project_analytical!(a, dh, :u, f)
+            project_analytical!(a_qr, dh, :u, f; qr_order = 2 * Ferrite.getorder(ip) + 2)
             @test a_qr ≈ a atol = 1.0e-12
         end
 
@@ -255,8 +255,8 @@ using LinearAlgebra
             @assert !isempty(shared_dofs)
             a_A = fill(NaN, ndofs(dh))
             a_B = fill(NaN, ndofs(dh))
-            apply_analytical!(a_A, dh, :u, smooth, [A])
-            apply_analytical!(a_B, dh, :u, smooth, [B])
+            project_analytical!(a_A, dh, :u, smooth, [A])
+            project_analytical!(a_B, dh, :u, smooth, [B])
             @test a_A[shared_dofs] ≈ a_B[shared_dofs]
             # Only dofs of the given cellset may be written
             @test all(isnan, a_A[setdiff(1:ndofs(dh), celldofs(dh, A))])
@@ -272,8 +272,8 @@ using LinearAlgebra
                 @assert !isempty(shared_dofs)
                 a_A = fill(NaN, ndofs(dh))
                 a_B = fill(NaN, ndofs(dh))
-                apply_analytical!(a_A, dh, :u, smooth2, [1])
-                apply_analytical!(a_B, dh, :u, smooth2, [2])
+                project_analytical!(a_A, dh, :u, smooth2, [1])
+                project_analytical!(a_B, dh, :u, smooth2, [2])
                 @test a_A[shared_dofs] ≈ a_B[shared_dofs]
             end
         end
@@ -293,7 +293,7 @@ using LinearAlgebra
             a_ch = zeros(ndofs(dh))
             apply!(a_ch, ch)
             a_an = zeros(ndofs(dh))
-            apply_analytical!(a_an, dh, :u, smooth2)
+            project_analytical!(a_an, dh, :u, smooth2)
             @test a_ch[ch.prescribed_dofs] ≈ a_an[ch.prescribed_dofs]
         end
 
@@ -313,23 +313,23 @@ using LinearAlgebra
             grid = perturbed_grid(Triangle, 2)
             dh_single = close!(add!(DofHandler(grid), :u, ip))
             a_single = zeros(ndofs(dh_single))
-            apply_analytical!(a_single, dh_single, :u, smooth2)
+            project_analytical!(a_single, dh_single, :u, smooth2)
             # :u is the second field, so its dofs are offset in the cell dof vector
             dh_mixed = DofHandler(grid)
             add!(dh_mixed, :p, Lagrange{RefTriangle, 1}())
             add!(dh_mixed, :u, ip)
             close!(dh_mixed)
             a_mixed = fill(NaN, ndofs(dh_mixed))
-            apply_analytical!(a_mixed, dh_mixed, :u, smooth2)
+            project_analytical!(a_mixed, dh_mixed, :u, smooth2)
             for cellnr in 1:getncells(grid)
                 dofs_single = celldofs(dh_single, cellnr)[dof_range(dh_single.subdofhandlers[1], :u)]
                 dofs_mixed = celldofs(dh_mixed, cellnr)[dof_range(dh_mixed.subdofhandlers[1], :u)]
                 @test a_mixed[dofs_mixed] ≈ a_single[dofs_single]
             end
-            # :p dofs untouched, and the nodal path accepts (and ignores) qr_order
+            # :p dofs untouched by project_analytical!, and settable with apply_analytical!
             pdofs = setdiff(1:ndofs(dh_mixed), reduce(vcat, [celldofs(dh_mixed, i)[dof_range(dh_mixed.subdofhandlers[1], :u)] for i in 1:getncells(grid)]))
             @test all(isnan, a_mixed[pdofs])
-            apply_analytical!(a_mixed, dh_mixed, :p, x -> norm(x)^2; qr_order = 4)
+            apply_analytical!(a_mixed, dh_mixed, :p, x -> norm(x)^2)
             @test !any(isnan, a_mixed)
 
             # Field only on a subdomain
@@ -339,7 +339,7 @@ using LinearAlgebra
             add!(sdh_A, :u, ip)
             close!(dh_sub)
             a_sub = zeros(ndofs(dh_sub))
-            apply_analytical!(a_sub, dh_sub, :u, smooth2)
+            project_analytical!(a_sub, dh_sub, :u, smooth2)
             for cellnr in set_A
                 dofs_single = celldofs(dh_single, cellnr)[dof_range(dh_single.subdofhandlers[1], :u)]
                 @test a_sub[celldofs(dh_sub, cellnr)] ≈ a_single[dofs_single]
@@ -356,8 +356,8 @@ using LinearAlgebra
             dh = close!(add!(DofHandler(grid), :u, ip))
             a64 = zeros(Float64, ndofs(dh))
             a32 = zeros(Float32, ndofs(dh))
-            apply_analytical!(a64, dh, :u, smooth2)
-            apply_analytical!(a32, dh, :u, smooth2)
+            project_analytical!(a64, dh, :u, smooth2)
+            project_analytical!(a32, dh, :u, smooth2)
             @test a32 ≈ a64 rtol = 1.0e-4
         end
 
@@ -366,11 +366,20 @@ using LinearAlgebra
             dh3 = close!(add!(DofHandler(grid3), :u, Nedelec{RefTetrahedron, 1}()))
             a3 = rand(ndofs(dh3))
             a3_0 = copy(a3)
-            @test_throws ArgumentError apply_analytical!(a3, dh3, :u, x -> Vec(0.0, 0.0, 0.0))
+            # 3D H(curl) not supported by project_analytical! (yet)
+            @test_throws ArgumentError project_analytical!(a3, dh3, :u, x -> Vec(0.0, 0.0, 0.0))
             @test a3 == a3_0 # `a` must not be partially modified when erroring
             grid2 = generate_grid(Triangle, (1, 1))
             dh2 = close!(add!(DofHandler(grid2), :u, RaviartThomas{RefTriangle, 1}()))
-            @test_throws ErrorException apply_analytical!(zeros(ndofs(dh2)), dh2, :u, x -> 0.0) # Should be f(x)::Vec{2}
+            @test_throws ErrorException project_analytical!(zeros(ndofs(dh2)), dh2, :u, x -> 0.0) # Should be f(x)::Vec{2}
+            # apply_analytical! refers to project_analytical! for H(div)/H(curl)
+            a2 = rand(ndofs(dh2))
+            a2_0 = copy(a2)
+            @test_throws ArgumentError apply_analytical!(a2, dh2, :u, x -> Vec(0.0, 0.0))
+            @test a2 == a2_0
+            # project_analytical! is not implemented for nodal interpolations
+            dh_nodal = close!(add!(DofHandler(grid2), :p, Lagrange{RefTriangle, 1}()))
+            @test_throws ArgumentError project_analytical!(zeros(ndofs(dh_nodal)), dh_nodal, :p, x -> 0.0)
         end
     end
 end

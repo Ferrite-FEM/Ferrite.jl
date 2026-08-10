@@ -135,6 +135,7 @@ export
     DofOrder,
     evaluate_at_grid_nodes,
     apply_analytical!,
+    project_analytical!,
 
     # Sparsity pattern
     # AbstractSparsityPattern,

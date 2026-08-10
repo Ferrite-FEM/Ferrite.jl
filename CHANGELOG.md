@@ -53,11 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `RefPyramid`, and extends tetrahedral quadrature beyond the previous maximum order 5 of
    the Keast rules. ([#1389])
  - `function_hessian` is now exported (`shape_hessian` already was). ([#1394])
- - `apply_analytical!` now supports H(div) (`RaviartThomas`, `BrezziDouglasMarini`) and 2D H(curl)
-   (`Nedelec`) interpolations. The dof values are determined by L2 projection of the analytical
-   function's normal/tangential trace on each facet (the same projection as `ProjectedDirichlet`),
-   followed by a cell-local L2 fit for interior dofs. A new keyword `qr_order` allows overriding
-   the default quadrature order. ([#1394])
+ - New function `project_analytical!`: the projection-based counterpart to `apply_analytical!`
+   for interpolations whose dofs are not nodal function values, currently H(div)
+   (`RaviartThomas`, `BrezziDouglasMarini`) and 2D H(curl) (`Nedelec`) interpolations. The dof
+   values are determined by L2 projection of the analytical function's normal/tangential trace
+   on each facet (the same projection as `ProjectedDirichlet`), followed by a cell-local L2 fit
+   for interior dofs. The keyword `qr_order` allows overriding the default quadrature order.
+   ([#1394])
  - New interpolations `Lagrange{RefTetrahedron, 3}`, `Lagrange{RefTetrahedron, 4}` and
    `Lagrange{RefHexahedron, 3}`. ([#1343])
  - Dof distribution now supports interpolations with multiple nodal dofs on faces shared
@@ -141,8 +143,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - `Dirichlet` conditions on a nodeset and `PeriodicDirichlet` now throw an error for
    interpolations they are not implemented for yet (e.g. `Nedelec` and `RaviartThomas`,
    whose dofs are not nodal function values) instead of silently computing wrong values.
-   `apply_analytical!` does the same for interpolations not covered by the new
-   H(div)/H(curl) support. ([#1394])
+   `apply_analytical!` does the same, referring to the new `project_analytical!` for
+   H(div)/H(curl) interpolations. ([#1394])
 
 ### Performance
  - The point search in `PointEvalHandler` no longer searches candidate cells more than once

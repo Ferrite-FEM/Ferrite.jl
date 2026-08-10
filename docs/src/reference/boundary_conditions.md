@@ -32,4 +32,5 @@ Ferrite.RHSData
 
 ```@docs
 apply_analytical!
+project_analytical!
 ```
