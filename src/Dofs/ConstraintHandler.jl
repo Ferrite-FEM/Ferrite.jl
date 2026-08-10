@@ -1762,7 +1762,7 @@ end
 function _apply_local!(
         local_matrix::AbstractMatrix, local_vector::AbstractVector,
         global_dofs::AbstractVector, ch::ConstraintHandler, apply_zero::Bool,
-        global_matrix, global_vector
+        global_matrix, global_vector, atomic::Val = Val(false)
     )
     @assert isclosed(ch)
     # TODO: With apply_zero it shouldn't be required to pass the vector.
@@ -1794,7 +1794,7 @@ function _apply_local!(
     # 3. Condense any affine constraints
     if has_nontrivial_affine_constraints
         # Condense this constraint locally if possible, and otherwise modifies the global arrays.
-        _condense_local!(local_matrix, local_vector, global_matrix, global_vector, global_dofs, ch.dofmapping, ch.dofcoefficients, ch.isconstrained)
+        _condense_local!(local_matrix, local_vector, global_matrix, global_vector, global_dofs, ch.dofmapping, ch.dofcoefficients, ch.isconstrained, atomic)
     end
     # 4. Zero out columns/rows of local matrix and replace diagonal entries with the mean
     if has_constraints
@@ -1825,7 +1825,7 @@ end
         local_matrix::AbstractMatrix, local_vector::AbstractVector,
         global_matrix #=::SparseMatrixCSC=#, global_vector #=::Vector=#,
         global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector,
-        isconstrained::BitVector
+        isconstrained::BitVector, atomic::Val = Val(false)
     )
 
 Condensation of affine constraints on element level. If possible this function only
@@ -1835,7 +1835,7 @@ function _condense_local!(
         local_matrix::AbstractMatrix, local_vector::AbstractVector,
         global_matrix #=::SparseMatrixCSC=#, global_vector #=::Vector=#,
         global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector,
-        isconstrained::BitVector,
+        isconstrained::BitVector, atomic::Val = Val(false),
     )
     @assert axes(local_matrix, 1) == axes(local_matrix, 2) ==
         axes(local_vector, 1) == axes(global_dofs, 1)
@@ -1856,7 +1856,7 @@ function _condense_local!(
                         # can't zero it out later like with the local matrix.
                         if !isconstrained[global_col] && !isconstrained[global_mrow]
                             has_global_arrays || missing_global()
-                            addindex!(global_matrix, mw, global_mrow, global_col)
+                            addindex!(global_matrix, mw, global_mrow, global_col, atomic)
                         end
                     else
                         local_matrix[local_mrow, local_col] += mw
@@ -1877,7 +1877,7 @@ function _condense_local!(
                             # can't zero it out later like with the local matrix.
                             if !haskey(dofmapping, global_row) && !haskey(dofmapping, global_mcol)
                                 has_global_arrays || missing_global()
-                                addindex!(global_matrix, mw, global_row, global_mcol)
+                                addindex!(global_matrix, mw, global_row, global_mcol, atomic)
                             end
                         else
                             local_matrix[local_row, local_mcol] += mw
@@ -1894,7 +1894,7 @@ function _condense_local!(
                                 # can't zero it out later like with the local matrix.
                                 if !haskey(dofmapping, global_mrow) && !haskey(dofmapping, global_mcol)
                                     has_global_arrays || missing_global()
-                                    addindex!(global_matrix, mww, global_mrow, global_mcol)
+                                    addindex!(global_matrix, mww, global_mrow, global_mcol, atomic)
                                 end
                             else
                                 local_matrix[local_mrow, local_mcol] += mww
@@ -1908,7 +1908,7 @@ function _condense_local!(
                 local_mcol = findfirst(==(global_mcol), global_dofs)
                 if local_mcol === nothing
                     has_global_arrays || missing_global()
-                    addindex!(global_vector, vw, global_mcol)
+                    addindex!(global_vector, vw, global_mcol, atomic)
                 else
                     local_vector[local_mcol] += vw
                 end

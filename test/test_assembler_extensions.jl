@@ -96,6 +96,22 @@ using SparseArrays, LinearAlgebra
         V = [-1.0, 1.0, 2.0, -2.0, 2.0, 1.0, -1.0]
         @test Ka == sparsecsr(I, J, V)
         @test fa == [1.0, 4.0, 1.0]
+
+        # Non-local affine constraint condensation also uses atomic accumulation
+        ch_affine = ConstraintHandler(dh)
+        add!(ch_affine, AffineConstraint(1, [3 => 1.0], 0.0))
+        close!(ch_affine)
+        K = allocate_matrix(SparseMatrixCSR, dh, ch_affine)
+        f = zeros(3)
+        Ka = copy(K)
+        fa = copy(f)
+        assembler = start_assemble(K, f)
+        atomic_assembler = start_assemble(Ka, fa; atomic = true)
+        apply_assemble!(assembler, ch_affine, [1, 2], copy(ke), copy(fe))
+        apply_assemble!(atomic_assembler, ch_affine, [1, 2], copy(ke), copy(fe))
+        @test Ka == K
+        @test fa == f
+
         # Atomic accumulation is only supported for Float32/Float64 matrices
         Kint = sparsecsr([1, 2], [1, 2], zeros(Int, 2))
         @test_throws ArgumentError start_assemble(Kint; atomic = true)

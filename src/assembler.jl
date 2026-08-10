@@ -494,9 +494,10 @@ function apply_assemble!(
         local_matrix::AbstractMatrix, local_vector::AbstractVector;
         apply_zero::Bool = false
     )
+    atomic = Val(_is_atomic(assembler))
     _apply_local!(
         local_matrix, local_vector, global_dofs, ch, apply_zero,
-        matrix_handle(assembler), vector_handle(assembler),
+        matrix_handle(assembler), vector_handle(assembler), atomic,
     )
     assemble!(assembler, global_dofs, local_matrix, local_vector)
     return
