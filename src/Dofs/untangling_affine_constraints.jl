@@ -21,11 +21,11 @@ function untangle_constraints!(ch::ConstraintHandler)
         LinearAlgebra.lu(A; check = true)
     catch e
         if e isa LinearAlgebra.SingularException
-            ArgumentError(
+            throw(ArgumentError(
                 "the affine constraints are tangled and untangling them results in " *
                     "ill defined constraints. A possibility to avoid this is to guarantee that " *
                     "the constraints are not tangled before calling close!"
-            )
+            ))
         else
             rethrow(e)
         end
