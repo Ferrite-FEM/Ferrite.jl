@@ -1451,12 +1451,12 @@ end # testset
     @testset "ill defined constraints error on close!" begin
         ch = ConstraintHandler(dh)
         add!(ch, AffineConstraint(1, [1 => 1.0], 0.0))
-                
+
         @test_throws ArgumentError(
-                "the affine constraints are tangled and untangling them results in " *
-                    "ill defined constraints. A possibility to avoid this is to guarantee that " *
-                    "the constraints are not tangled before calling close!"
-            ) close!(ch)
+            "the affine constraints are tangled and untangling them results in " *
+                "ill defined constraints. A possibility to avoid this is to guarantee that " *
+                "the constraints are not tangled before calling close!"
+        ) close!(ch)
     end # subtestset
 
 end # testset
