@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
  - Atomic assembly support for BlockAssembler. ([#1452])
+ - `apply_assemble!` now respects the assembler's atomic mode when non-local affine
+   constraints write directly to the global matrix and vector. ([#1465])
  - `add_interface_entries!` (and thereby `interface_coupling` builds) no longer errors for
    grids where some cells are not covered by any `SubDofHandler`: an uncovered cell has no
    dofs and contributes no interface entries, but the covered side of such an interface

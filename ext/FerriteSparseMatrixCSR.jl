@@ -93,6 +93,20 @@ end
     end
 end
 
+function Ferrite.addindex!(A::SparseMatrixCSR{Bi, Tv}, v::Tv, i::Int, j::Int, ::Val{atomic} = Val(false)) where {Bi, Tv, atomic}
+    @boundscheck checkbounds(A, i, j)
+    iszero(v) && return A
+    nzr = nzrange(A, i)
+    stored_j = j - (1 - Bi)
+    searchk = searchsortedfirst(A.colval, stored_j, first(nzr), last(nzr), Base.Order.Forward)
+    if searchk <= last(nzr) && A.colval[searchk] == stored_j
+        Ferrite.addindex!(A.nzval, v, searchk, Val{atomic}())
+        return A
+    else
+        throw(Ferrite.SparsityError())
+    end
+end
+
 function Ferrite.zero_out_rows!(K::SparseMatrixCSR, ch::ConstraintHandler)
     @debug @assert issorted(ch.prescribed_dofs)
     for row in ch.prescribed_dofs
