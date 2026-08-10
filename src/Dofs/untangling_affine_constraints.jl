@@ -8,7 +8,7 @@ function untangle_constraints!(ch::ConstraintHandler)
     @assert istangled(ch) "the constraints are not tangled"
     A, affine_equation_ordering, _, dofcoeffs_to_remove = _create_lhs_affine_constraint_matrix(ch)
 
-    new_dofcoefficients = copy(ch.dofcoefficients)
+    new_dofcoefficients = deepcopy(ch.dofcoefficients)
     # update new_dofcoefficients so that they can be used to construct `C`
     for (k, v) in dofcoeffs_to_remove
         deleteat!(new_dofcoefficients[k], v)
