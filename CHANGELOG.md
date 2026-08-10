@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `Complex` of `Float16`/`Float32`/`Float64` as value types, in addition to `Float32`
    and `Float64`. ([#1474])
 
+### Performance
+ - `create_coloring` is significantly faster: the incidence matrix construction and the
+   zone coloring of the workstream algorithm are now multithreaded, and remaining serial
+   parts use flat arrays instead of `Dict`/`Set` based bookkeeping. Representative
+   speedups for 200k-400k cell grids: 3-10x serial, and another 2-3x with 8 threads. The
+   resulting coloring is unchanged and independent of the number of threads. ([#1475])
+
 ## [v1.6.0] - 2026-08-02
 
 ### Added
@@ -1381,3 +1388,4 @@ poking into Ferrite internals:
 [#1438]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1438
 [#1452]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1452
 [#1474]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1474
+[#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
