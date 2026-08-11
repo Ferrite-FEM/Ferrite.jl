@@ -936,7 +936,7 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern, 
     rowval = Vector{Ti}(undef, nnz)
     nzval = zeros(Tv, nnz)
     @sync for (ci, rowrange) in enumerate(chunks)
-        Threads.@spawn _fill_csc_rowval_chunk!(rowval, hists[$ci], sp, $rowrange, sym)
+        Threads.@spawn _fill_csc_rowval_chunk!(rowval, hists[ci], sp, rowrange, sym)
     end
     # The last chunk's cursors must have ended at the start of the next column
     @assert isempty(hists) || all(col -> hists[end][col] == colptr[col + 1], 1:ncols)
