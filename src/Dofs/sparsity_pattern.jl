@@ -215,30 +215,6 @@ function _sort_rows!(sp::SparsityPattern, rowrange::UnitRange{Int})
     return
 end
 
-# Chunk the rows of a count/fill pass over tasks. Each task gets its own column marker
-# (the only shared mutable state); per-row results are independent of the chunking since
-# the row stamps are globally unique.
-function _visit_row_candidates_chunked!(
-        rowlen::Vector{Int}, data::Union{Nothing, Vector{Int}}, indices::Union{Nothing, Vector{AdaptiveRange}},
-        ncols::Int, row_to_cells::ArrayOfVectorViews, row_to_localidx::Union{Nothing, ArrayOfVectorViews},
-        cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
-        couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
-        neighbor_cells::Union{Nothing, ArrayOfVectorViews}, interface_couplings::Union{Nothing, Vector{Matrix{Bool}}},
-        oldbuffer::Union{Nothing, ConstructionBuffer{Int, 1}} = nothing,
-    )
-    @sync for rowrange in _task_chunks(length(rowlen))
-        Threads.@spawn begin
-            marker = zeros(Int, ncols) # per-task scratch
-            _visit_row_candidates!(
-                rowlen, data, indices, marker, $rowrange, row_to_cells, row_to_localidx,
-                cell_dofs, cell_to_sdh, couplings, isconstrained, neighbor_cells, interface_couplings,
-                oldbuffer
-            )
-        end
-    end
-    return
-end
-
 # The counting build behind add_sparsity_entries!: count exact per-row sizes with a column
 # marker, presize the buffer, then marker-dedup
 # fill each row UNSORTED (sorted lazily). Always includes the diagonal. Non-full `coupling` and
@@ -1079,6 +1055,30 @@ function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int, build_lo
     row_to_cells = ArrayOfVectorViews(indices, cells, lin)
     row_to_localidx = localidx === nothing ? nothing : ArrayOfVectorViews(indices, localidx, lin)
     return row_to_cells, row_to_localidx
+end
+
+# Chunk the rows of a count/fill pass over tasks. Each task gets its own column marker
+# (the only shared mutable state); per-row results are independent of the chunking since
+# the row stamps are globally unique.
+function _visit_row_candidates_chunked!(
+        rowlen::Vector{Int}, data::Union{Nothing, Vector{Int}}, indices::Union{Nothing, Vector{AdaptiveRange}},
+        ncols::Int, row_to_cells::ArrayOfVectorViews, row_to_localidx::Union{Nothing, ArrayOfVectorViews},
+        cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
+        couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
+        neighbor_cells::Union{Nothing, ArrayOfVectorViews}, interface_couplings::Union{Nothing, Vector{Matrix{Bool}}},
+        oldbuffer::Union{Nothing, ConstructionBuffer{Int, 1}} = nothing,
+    )
+    @sync for rowrange in _task_chunks(length(rowlen))
+        Threads.@spawn begin
+            marker = zeros(Int, ncols) # per-task scratch
+            _visit_row_candidates!(
+                rowlen, data, indices, marker, $rowrange, row_to_cells, row_to_localidx,
+                cell_dofs, cell_to_sdh, couplings, isconstrained, neighbor_cells, interface_couplings,
+                oldbuffer
+            )
+        end
+    end
+    return
 end
 
 # Count (data === nothing) or fill (data/indices from the presized buffer) the per-row
