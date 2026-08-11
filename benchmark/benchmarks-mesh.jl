@@ -55,10 +55,19 @@ let g = SUITE["mesh"]["sets"]
     )
 end
 
-# Grid coloring, used to set up threaded assembly.
+# Grid coloring, used to set up threaded assembly. The 3D grids gather many more
+# node-sharing neighbor candidates per cell than the 2D grid (quadrilateral ~12,
+# hexahedron ~56, tetrahedron ~92), so they weight the sort/dedup path of the incidence
+# matrix construction differently.
 SUITE["mesh"]["coloring"] = BenchmarkGroup()
 let g = SUITE["mesh"]["coloring"]
-    grid = generate_grid(Quadrilateral, (50, 50))
-    g["workstream (Quadrilateral 50×50)"] = @benchmarkable create_coloring($grid; alg = ColoringAlgorithm.WorkStream) evals = 1
-    g["greedy (Quadrilateral 50×50)"] = @benchmarkable create_coloring($grid; alg = ColoringAlgorithm.Greedy) evals = 1
+    quadgrid = generate_grid(Quadrilateral, (50, 50))
+    g["workstream (Quadrilateral 50×50)"] = @benchmarkable create_coloring($quadgrid; alg = ColoringAlgorithm.WorkStream) evals = 1
+    g["greedy (Quadrilateral 50×50)"] = @benchmarkable create_coloring($quadgrid; alg = ColoringAlgorithm.Greedy) evals = 1
+    hexgrid = generate_grid(Hexahedron, (15, 15, 15))
+    g["workstream (Hexahedron 15×15×15)"] = @benchmarkable create_coloring($hexgrid; alg = ColoringAlgorithm.WorkStream) evals = 1
+    g["greedy (Hexahedron 15×15×15)"] = @benchmarkable create_coloring($hexgrid; alg = ColoringAlgorithm.Greedy) evals = 1
+    tetgrid = generate_grid(Tetrahedron, (8, 8, 8))
+    g["workstream (Tetrahedron 8×8×8)"] = @benchmarkable create_coloring($tetgrid; alg = ColoringAlgorithm.WorkStream) evals = 1
+    g["greedy (Tetrahedron 8×8×8)"] = @benchmarkable create_coloring($tetgrid; alg = ColoringAlgorithm.Greedy) evals = 1
 end
