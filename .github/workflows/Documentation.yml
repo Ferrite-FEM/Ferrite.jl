@@ -4,6 +4,10 @@ on:
   push:
     branches: ['master']
     tags: ['*']
+concurrency:
+  # Cancel in progress builds for PRs with new commits
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ startsWith(github.ref, 'refs/pull/') && 'pr' || github.sha }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 jobs:
   docs:
     name: Julia 1.12 - ubuntu-latest
