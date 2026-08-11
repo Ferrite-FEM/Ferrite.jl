@@ -138,8 +138,7 @@ end
 
 # The pattern rows are exactly CSR's rows: `eachrow` hands out the sorted column indices
 # (for `SparsityPattern` this sorts the rows lazily, a no-op if already sorted), so `rowptr`
-# follows from the row lengths and each row is copied straight into `colval`. The copy,
-# the only part that depends on the pattern type, is dispatched through _fill_colval!.
+# follows from the row lengths and each row is copied straight into `colval`.
 function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsityPattern, sym::Bool) where {Tv, Ti}
     sym && throw(ArgumentError("Symmetric SparseMatrixCSR is not supported"))
     nrows = Ferrite.getnrows(sp)
@@ -166,6 +165,9 @@ function _fill_colval!(colval::Vector, rowptr::Vector, sp::AbstractSparsityPatte
     for colidxs in Ferrite.eachrow(sp)
         k = _copyto!(colval, k, colidxs)
     end
+    # The copy pass must consume exactly the row lengths that built rowptr, i.e. eachrow
+    # must enumerate identically in both passes
+    @assert k == rowptr[end]
     return
 end
 
