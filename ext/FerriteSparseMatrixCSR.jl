@@ -138,7 +138,8 @@ end
 
 # The pattern rows are exactly CSR's rows: `eachrow` hands out the sorted column indices
 # (for `SparsityPattern` this sorts the rows lazily, a no-op if already sorted), so `rowptr`
-# follows from the row lengths and each row is copied straight into `colval`.
+# follows from the row lengths and each row is copied straight into `colval`. The copy,
+# the only part that depends on the pattern type, is dispatched through _fill_colval!.
 function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsityPattern, sym::Bool) where {Tv, Ti}
     sym && throw(ArgumentError("Symmetric SparseMatrixCSR is not supported"))
     nrows = Ferrite.getnrows(sp)
@@ -148,44 +149,39 @@ function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsi
     for (row, colidxs) in enumerate(Ferrite.eachrow(sp))
         rowptr[row + 1] = rowptr[row] + length(colidxs)
     end
-    nnz = rowptr[end] - 1
-    # 2. Allocate colval and nzval now that nnz is known
-    colval = Vector{Ti}(undef, nnz)
-    nzval = zeros(Tv, nnz)
-    # 3. Populate colval row by row
-    k = 1
-    for colidxs in Ferrite.eachrow(sp)
-        k = _copyto!(colval, k, colidxs)
-    end
-    return SparseMatrixCSR{1}(nrows, Ferrite.getncols(sp), rowptr, colval, nzval)
-end
-
-# SparsityPattern: the same construction, with the rows chunked over tasks: rowptr comes
-# straight from the row lengths, and each chunk copies its rows into disjoint slices of
-# colval (the one-time lazy sort behind _ensure_sorted! is itself parallel). Identical
-# bytes land at identical locations, so the result does not depend on the thread count.
-function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::Ferrite.SparsityPattern, sym::Bool) where {Tv, Ti}
-    sym && throw(ArgumentError("Symmetric SparseMatrixCSR is not supported"))
-    Ferrite._ensure_sorted!(sp)
-    nrows = Ferrite.getnrows(sp)
-    # 1. Setup rowptr
-    rowptr = Vector{Ti}(undef, nrows + 1)
-    rowptr[1] = 1
-    @inbounds for row in 1:nrows
-        rowptr[row + 1] = rowptr[row] + length(Ferrite._row_view(sp, row))
-    end
     nnz = Int(rowptr[end]) - 1
     # 2. Allocate colval and nzval now that nnz is known
     colval = Vector{Ti}(undef, nnz)
     nzval = zeros(Tv, nnz)
-    # 3. Populate colval chunk by chunk
-    @sync for rowrange in Ferrite._task_chunks(nrows)
-        Threads.@spawn _fill_csr_colval_chunk!(colval, rowptr, sp, rowrange)
-    end
+    # 3. Populate colval
+    _fill_colval!(colval, rowptr, sp)
     return SparseMatrixCSR{1}(nrows, Ferrite.getncols(sp), rowptr, colval, nzval)
 end
 
-function _fill_csr_colval_chunk!(colval::Vector{Ti}, rowptr::Vector{Ti}, sp::Ferrite.SparsityPattern, rowrange::UnitRange{Int}) where {Ti}
+# Generic AbstractSparsityPattern: the interface only promises whole-pattern row iteration
+# (rows may be lazy generators, and implementations need not support concurrent row
+# access), so the rows are copied serially in iteration order.
+function _fill_colval!(colval::Vector, rowptr::Vector, sp::AbstractSparsityPattern)
+    k = 1
+    for colidxs in Ferrite.eachrow(sp)
+        k = _copyto!(colval, k, colidxs)
+    end
+    return
+end
+
+# SparsityPattern: the rows are random-access views of disjoint slices (sorted by the
+# eachrow call that built rowptr; the _ensure_sorted! here is a free double check), so
+# each chunk of rows is copied concurrently into its disjoint slice of colval. Identical
+# bytes land at identical locations, so the result does not depend on the thread count.
+function _fill_colval!(colval::Vector{Ti}, rowptr::Vector{Ti}, sp::Ferrite.SparsityPattern) where {Ti}
+    Ferrite._ensure_sorted!(sp)
+    @sync for rowrange in Ferrite._task_chunks(Ferrite.getnrows(sp))
+        Threads.@spawn _fill_colval_chunk!(colval, rowptr, sp, rowrange)
+    end
+    return
+end
+
+function _fill_colval_chunk!(colval::Vector{Ti}, rowptr::Vector{Ti}, sp::Ferrite.SparsityPattern, rowrange::UnitRange{Int}) where {Ti}
     @inbounds for row in rowrange
         colidxs = Ferrite._row_view(sp, row)
         copyto!(colval, Int(rowptr[row]), colidxs, 1, length(colidxs))
