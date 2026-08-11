@@ -182,12 +182,7 @@ function _presize_buffer(rowlen::Vector{Int}, sizehint::Int)
     return ConstructionBuffer{Int, 1}(indices, data, sizehint)
 end
 
-# Split `1:n` into at most `nthreads()` contiguous chunks of at least `minchunk` items:
-# one chunk per thread since the chunked stages have uniform per-item cost (no load
-# balancing needed), with the minimum so that small problems degenerate to a single task
-# (serial-equivalent) instead of spawning useless tasks, and so that per-task scratch is
-# bounded by `nthreads()` copies. All stages parallelized with this helper produce results
-# that are bit-identical regardless of the number of threads.
+# Split `1:n` into at most `nthreads()` contiguous chunks of at least `minchunk` items.
 function _task_chunks(n::Int, minchunk::Int = 1000)
     return Iterators.partition(1:n, max(minchunk, cld(n, Threads.nthreads())))
 end
@@ -220,12 +215,9 @@ function _sort_rows!(sp::SparsityPattern, rowrange::UnitRange{Int})
     return
 end
 
-# Chunk the rows of a count/fill pass over tasks. The only shared mutable state in the row
-# visit is the column marker, so each task gets its own: rows are globally unique, so the
-# row-stamp dedup works unchanged with a fresh marker (a stale stamp from another row never
-# equals `row`), and every per-row result is identical to the serial enumeration no matter
-# how the rows are chunked. In particular the count/fill identity required by
-# _visit_row_candidates! is preserved.
+# Chunk the rows of a count/fill pass over tasks. Each task gets its own column marker
+# (the only shared mutable state); per-row results are independent of the chunking since
+# the row stamps are globally unique.
 function _visit_row_candidates_chunked!(
         rowlen::Vector{Int}, data::Union{Nothing, Vector{Int}}, indices::Union{Nothing, Vector{AdaptiveRange}},
         ncols::Int, row_to_cells::ArrayOfVectorViews, row_to_localidx::Union{Nothing, ArrayOfVectorViews},
@@ -929,20 +921,15 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityP
     return S
 end
 
-# SparsityPattern: the same counting transpose, parallelized by chunking the rows (read
-# through _row_view, order-free just like _eachrow_anyorder). Each chunk counts its rows'
-# columns into a private histogram; the serial combine then converts the histograms in
-# place into per-(chunk, column) write cursors, where a chunk's cursor for a column starts
-# exactly where the previous chunk's ended. Every entry therefore lands at the index the
-# serial ascending row loop would give it, so rowval is bit-identical (in particular
-# per-column sorted) regardless of the number of threads.
+# SparsityPattern: the counting transpose parallelized by chunking the rows: each chunk
+# counts its rows' columns into a private histogram, and the serial combine converts the
+# histograms in place into per-(chunk, column) write cursors so that the chunks scatter
+# into disjoint slots in serial (ascending row) order, keeping each column sorted.
 function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern, sym::Bool) where {Tv, Ti}
     nrows, ncols = getnrows(sp), getncols(sp)
-    # The serial cursor conversion below costs O(nchunks * ncols) while the parallel count
-    # and scatter phases gain ~ nstored / nchunks, so the optimal chunk count is about
-    # sqrt(nstored / ncols), the square root of the average column length -- beyond that
-    # more chunks make the transpose slower (measured: at 64 threads an uncapped chunk
-    # count nearly cancelled the parallel gain).
+    # The serial cursor conversion costs O(nchunks * ncols) while the parallel phases gain
+    # ~ nstored / nchunks, so cap the chunk count at the optimum, ~ sqrt(average column
+    # length) -- more chunks than that make the transpose slower.
     nstored = 0
     @inbounds for row in 1:nrows
         nstored += sp.buffer.indices[row].ncurrent
@@ -956,8 +943,7 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern, 
             hists[$ci] = _count_csc_columns_chunk(Ti, sp, $rowrange, sym)
         end
     end
-    # 2. Setup colptr, converting each histogram in place into the chunk's first write
-    #    index for every column (exclusive running sum in chunk = ascending row order)
+    # 2. Setup colptr and convert each histogram in place into the chunk's write cursors
     colptr = Vector{Ti}(undef, ncols + 1)
     nzptr = one(Ti)
     @inbounds for col in 1:ncols
@@ -970,15 +956,13 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern, 
     end
     colptr[ncols + 1] = nzptr
     nnz = Int(nzptr) - 1
-    # 3. Allocate rowval and nzval now that nnz is known and populate rowval, each chunk
-    #    advancing its own cursors
+    # 3. Allocate rowval and nzval now that nnz is known and populate rowval
     rowval = Vector{Ti}(undef, nnz)
     nzval = zeros(Tv, nnz)
     @sync for (ci, rowrange) in enumerate(chunks)
         Threads.@spawn _fill_csc_rowval_chunk!(rowval, hists[$ci], sp, $rowrange, sym)
     end
-    # The last chunk's cursors must have ended at the start of the next column (earlier
-    # chunks' final cursors are the later chunks' start cursors and already consumed)
+    # The last chunk's cursors must have ended at the start of the next column
     @assert isempty(hists) || all(col -> hists[end][col] == colptr[col + 1], 1:ncols)
     return SparseMatrixCSC(nrows, ncols, colptr, rowval, nzval)
 end

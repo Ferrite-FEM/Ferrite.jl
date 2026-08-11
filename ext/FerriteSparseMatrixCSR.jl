@@ -165,16 +165,13 @@ function _fill_colval!(colval::Vector, rowptr::Vector, sp::AbstractSparsityPatte
     for colidxs in Ferrite.eachrow(sp)
         k = _copyto!(colval, k, colidxs)
     end
-    # The copy pass must consume exactly the row lengths that built rowptr, i.e. eachrow
-    # must enumerate identically in both passes
+    # The copy pass must consume exactly the row lengths that built rowptr
     @assert k == rowptr[end]
     return
 end
 
-# SparsityPattern: the rows are random-access views of disjoint slices (sorted by the
-# eachrow call that built rowptr; the _ensure_sorted! here is a free double check), so
-# each chunk of rows is copied concurrently into its disjoint slice of colval. Identical
-# bytes land at identical locations, so the result does not depend on the thread count.
+# SparsityPattern: the rows are random-access views of disjoint slices, so each chunk of
+# rows is copied concurrently into its disjoint slice of colval.
 function _fill_colval!(colval::Vector{Ti}, rowptr::Vector{Ti}, sp::Ferrite.SparsityPattern) where {Ti}
     Ferrite._ensure_sorted!(sp)
     @sync for rowrange in Ferrite._task_chunks(Ferrite.getnrows(sp))

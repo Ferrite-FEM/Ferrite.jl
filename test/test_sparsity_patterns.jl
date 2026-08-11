@@ -526,10 +526,8 @@ end
         compare_matrices(allocate_matrix(sp_big_kc), allocate_matrix(sp_big_kc_gen))
     end
     # Multi-chunk builds: enough rows (> 1000, the minimum chunk size) that the chunked
-    # count/fill passes (and the chunked matrix instantiations) span several tasks when the
-    # test runs with threads. Every combination must match the generic per-entry path
-    # exactly, and repeated builds must be identical (the parallel stages are deterministic
-    # regardless of thread count).
+    # passes and instantiations span several tasks when the test runs with threads. All
+    # combinations must match the generic path exactly, and repeated builds be identical.
     let
         grid = generate_grid(Hexahedron, (6, 6, 6))
         dh = DofHandler(grid)
