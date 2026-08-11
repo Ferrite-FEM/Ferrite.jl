@@ -3,26 +3,34 @@ function _color_chunks(n::Int, maxchunks::Int)
     return Iterators.partition(1:n, max(1, cld(n, maxchunks)))
 end
 
-# Normalize a cellset to a sorted vector of unique cell ids: 1-based indexable, sorted
-# ascending, no duplicates, `Int` elements. Unit ranges already fulfill these
-# requirements and are used as-is. Note that `unique!` on the sorted vector is a cheap
-# allocation-free linear scan.
+# We need a sorted collection without duplicates. The default case (`cells = 1:ncells`)
+# fulfills this already.
 _sorted_cellvec(cellset::AbstractUnitRange{Int}) = cellset
 _sorted_cellvec(cellset) = unique!(sort!(collect(Int, cellset)))
 
-function _gather_neighbor_chunk!(colcount, g, cellvec, chunk, nodeptr, nodecells)
+function _gather_neighbor_chunk!(colcount, grid, cellvec, chunk, nodeptr, nodecells)
     buf = Int[]
     candidates = Int[]
+    # Loop over cells in the chunk
     for i in chunk
         cellid = cellvec[i]
         empty!(candidates)
-        for v in get_node_ids(getcells(g, cellid))
+        # Loop over nodes of the cell
+        for v in get_node_ids(getcells(grid, cellid))
+            # Loop over the cells connected to this node
             for r in nodeptr[v]:(nodeptr[v + 1] - 1)
                 cell_neighbour = nodecells[r]
                 cell_neighbour == cellid || push!(candidates, cell_neighbour)
             end
         end
-        sort!(candidates)
+        # QuickSort sorts in-place without allocations. The default algorithm dispatches
+        # to counting/radix sort which allocates a workspace on each call so we use QuickSort
+        # which performs better here.
+        sort!(candidates; alg = QuickSort)
+        # Each per-node cell list in nodecells is duplicate-free, but candidates
+        # concatenates the lists of all nodes of this cell, so a neighbor sharing k nodes
+        # with the cell occurs k times. After sorting, duplicates are adjacent and can be
+        # skipped by comparing with the previous entry (a unique! fused with the counting).
         prev = 0
         for cell_neighbour in candidates
             if cell_neighbour != prev
@@ -36,19 +44,19 @@ function _gather_neighbor_chunk!(colcount, g, cellvec, chunk, nodeptr, nodecells
 end
 
 # Incidence matrix for element connections in the grid
-function create_incidence_matrix(g::AbstractGrid, cellset = 1:getncells(g))
-    ncells = getncells(g)
+function create_incidence_matrix(grid::AbstractGrid, cellset = 1:getncells(grid))
+    ncells = getncells(grid)
     cellvec = _sorted_cellvec(cellset)
     if isempty(cellvec)
         return SparseArrays.spzeros(Bool, Int, ncells, ncells)
     end
 
     # Map from node id to the cells in the cellset containing it, in CSR-like form.
-    nnodes = getnnodes(g)
+    nnodes = getnnodes(grid)
     nodeptr = zeros(Int, nnodes + 1)
     nodeptr[1] = 1
     for cellid in cellvec
-        for v in get_node_ids(getcells(g, cellid))
+        for v in get_node_ids(getcells(grid, cellid))
             nodeptr[v + 1] += 1
         end
     end
@@ -58,7 +66,7 @@ function create_incidence_matrix(g::AbstractGrid, cellset = 1:getncells(g))
     nodecells = Vector{Int}(undef, nodeptr[end] - 1)
     cursor = copy(nodeptr)
     for cellid in cellvec
-        for v in get_node_ids(getcells(g, cellid))
+        for v in get_node_ids(getcells(grid, cellid))
             nodecells[cursor[v]] = cellid
             cursor[v] += 1
         end
@@ -67,13 +75,13 @@ function create_incidence_matrix(g::AbstractGrid, cellset = 1:getncells(g))
     # For each cell, gather the unique cells sharing at least one node with it.
     # Since `cellvec` is sorted, each chunk corresponds to a contiguous range of
     # columns in the CSC structure, so the chunk buffers can be computed in
-    # parallel and copied over without synchronization.
+    # parallel and afterwards concatenated to form rowval.
     chunks = collect(_color_chunks(length(cellvec), Threads.nthreads()))
     colcount = zeros(Int, ncells)
     buffers = Vector{Vector{Int}}(undef, length(chunks))
     @sync for (ci, chunk) in enumerate(chunks)
         Threads.@spawn begin
-            buffers[$ci] = _gather_neighbor_chunk!(colcount, g, cellvec, $chunk, nodeptr, nodecells)
+            buffers[$ci] = _gather_neighbor_chunk!(colcount, grid, cellvec, $chunk, nodeptr, nodecells)
         end
     end
 
@@ -83,11 +91,12 @@ function create_incidence_matrix(g::AbstractGrid, cellset = 1:getncells(g))
         colptr[c + 1] = colptr[c] + colcount[c]
     end
     rowval = Vector{Int}(undef, colptr[end] - 1)
-    @sync for (ci, chunk) in enumerate(chunks)
-        Threads.@spawn begin
-            buf = buffers[$ci]
-            copyto!(rowval, colptr[cellvec[first($chunk)]], buf, 1, length(buf))
-        end
+    @assert length(rowval) == sum(length, buffers; init = 0)
+    # This loop is trivially parallelizable but it is just a memcpy so there is no
+    # measurable speedup from doing so.
+    for (ci, chunk) in enumerate(chunks)
+        buf = buffers[ci]
+        copyto!(rowval, colptr[cellvec[first(chunk)]], buf, 1, length(buf))
     end
     nzval = fill(true, length(rowval))
     return SparseMatrixCSC(ncells, ncells, colptr, rowval, nzval)
@@ -213,6 +222,9 @@ function workstream_coloring(incidence_matrix, cellset)
     # TODO: The reference uses DSATUR algorithm instead of greedy
     # Zones are colored in parallel: cells in a zone only ever compare colors with cells
     # in the same zone, so each task reads and writes a disjoint part of `cell_colors`.
+    # Zone sizes vary wildly (they are levels of a breadth-first traversal), so
+    # oversubscribe with 4x more tasks than threads to get some load balancing from the
+    # scheduler.
     zone_colors = Vector{Vector{Vector{Int}}}(undef, length(zones))
     cell_colors = zeros(Int, ncells)
     @sync for chunk in _color_chunks(length(zones), 4 * Threads.nthreads())
