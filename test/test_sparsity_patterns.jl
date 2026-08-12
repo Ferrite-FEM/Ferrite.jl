@@ -520,9 +520,7 @@ end
         add!(ch, Dirichlet(:a, getfacetset(dh.grid, "left"), x -> 0.0))
         close!(ch)
         sp_big_kc = add_sparsity_entries!(SparsityPattern(n, n), dh, ch; keep_constrained = false)
-        sp_big_kc_gen = SparsityPattern(n, n)
-        Ferrite.add_entry!(sp_big_kc_gen, 1, 1) # forces the generic branch
-        add_sparsity_entries!(sp_big_kc_gen, dh, ch; keep_constrained = false)
+        sp_big_kc_gen = fsp_test_build_generic(dh, ch; sp = SparsityPattern(n, n), keep_constrained = false)
         compare_matrices(allocate_matrix(sp_big_kc), allocate_matrix(sp_big_kc_gen))
     end
     # Multi-chunk builds: enough rows (> 1000, the minimum chunk size) that the chunked
@@ -546,9 +544,7 @@ end
                 (; coupling = [true true; false true], interface_coupling = [true false; true true], topology = topo, keep_constrained = false),
             )
             sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh, ch; kwargs...)
-            sp_gen = init_sparsity_pattern(dh)
-            Ferrite.add_entry!(sp_gen, 1, 1) # forces the generic branch
-            add_sparsity_entries!(sp_gen, dh, ch; kwargs...)
+            sp_gen = fsp_test_build_generic(dh, ch; kwargs...)
             sp_again = add_sparsity_entries!(init_sparsity_pattern(dh), dh, ch; kwargs...)
             compare_patterns(sp, sp_gen, sp_again)
             compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
@@ -561,9 +557,7 @@ end
         # constrained)
         n = ndofs(dh) + 3
         sp_big = add_sparsity_entries!(SparsityPattern(n, n), dh, ch; keep_constrained = false)
-        sp_big_gen = SparsityPattern(n, n)
-        Ferrite.add_entry!(sp_big_gen, 1, 1) # forces the generic branch
-        add_sparsity_entries!(sp_big_gen, dh, ch; keep_constrained = false)
+        sp_big_gen = fsp_test_build_generic(dh, ch; sp = SparsityPattern(n, n), keep_constrained = false)
         compare_matrices(allocate_matrix(sp_big), allocate_matrix(sp_big_gen))
     end
     # Test different number types (Int32, Float32)
