@@ -186,7 +186,9 @@ function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
     if !isclosed(dh)
         print(io, "  Not closed!")
     else
-        print(io, "  Total dofs: ", ndofs(dh))
+        # Deliberately not `ndofs(dh)`: printing a DofHandler that became stale through a
+        # grid mutation should describe it (last-closed state), not throw.
+        print(io, "  Total dofs: ", dh.ndofs)
     end
     return
 end

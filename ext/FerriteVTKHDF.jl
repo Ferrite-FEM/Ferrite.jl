@@ -10,6 +10,7 @@ import Ferrite: write_solution, write_projection, write_cell_data, write_node_da
 using VTKHDF: VTKHDF, vtkhdf_grid, VTKPointData, VTKCellData
 
 function Ferrite.VTKHDFGridFile(filename::String, dh::DofHandler; kwargs...)
+    Ferrite._check_epoch(dh)
     for sdh in dh.subdofhandlers
         for ip in sdh.field_interpolations
             if !isa(conformity(ip), H1Conformity)
