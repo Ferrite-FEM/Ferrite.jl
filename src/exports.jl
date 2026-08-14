@@ -125,6 +125,7 @@ export
     DofHandler,
     SubDofHandler,
     close!,
+    reclose!,
     ndofs,
     ndofs_per_cell,
     celldofs!,

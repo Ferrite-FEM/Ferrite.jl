@@ -100,8 +100,8 @@ end
 
 Maps from grid entities (vertices, edges, faces) to the first dof distributed on that entity,
 one entry per field. Produced as scratch storage while distributing dofs and retained by a
-[`DofHandler`](@ref) only when its grid is a `NonConformingGrid`, where it is needed to build
-the affine constraints that tie hanging nodes to their masters.
+[`DofHandler`](@ref) only when its grid has hanging nodes (see `has_hanging_nodes`), where it
+is needed to build the affine constraints that tie hanging nodes to their masters.
 
 - `vertices[f][v]` is the first dof on vertex `v` for field `f` (`0` if unvisited).
 - `edges[f][(a, b)]` is the first dof on the edge between global vertices `a < b`.
@@ -125,9 +125,13 @@ mutable struct DofHandler{dim, G <: AbstractGrid{dim}} <: AbstractDofHandler
     const grid::G
     ndofs::Int
     # Maps from entity to dofs. These are scratch structures during dof distribution and are
-    # only retained afterwards for a `NonConformingGrid` (to build conformity constraints for
-    # hanging nodes), otherwise this is `nothing`. See [`EntityMaps`](@ref).
+    # only retained afterwards for grids with hanging nodes (to build conformity constraints,
+    # see `has_hanging_nodes`), otherwise this is `nothing`. See [`EntityMaps`](@ref).
     entitymaps::Union{Nothing, EntityMaps}
+    # The grid's epoch (see `grid_epoch`) at the time of `close!`. `0` means the grid is not
+    # epoch-tracked; for epoch-tracked (adaptive) grids, `_check_epoch` compares this
+    # against the grid's current epoch and errors on mismatch (fix with `reclose!`).
+    grid_epoch::Int
 end
 
 """
@@ -159,7 +163,7 @@ close!(dh)
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
     ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1, nothing)
+    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1, nothing, 0)
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
@@ -196,6 +200,32 @@ get_grid(dh::DofHandler) = dh.grid
 Return the number of degrees of freedom in `dh`
 """
 ndofs(dh::AbstractDofHandler) = dh.ndofs
+ndofs(dh::DofHandler) = (_check_epoch(dh); dh.ndofs)
+
+"""
+    _check_epoch(dh::DofHandler)
+
+Guard against use of a `DofHandler` whose (epoch-tracked, adaptive) grid has been refined
+or coarsened since [`close!`](@ref): errors on an epoch mismatch, pointing to
+[`reclose!`](@ref). A no-op for grids that are not epoch-tracked (`grid_epoch(grid) == 0`).
+Called at per-loop entry points (`CellIterator` construction, `ConstraintHandler`
+construction, [`ndofs`](@ref), VTK export) — not per cell.
+"""
+@inline _check_epoch(dh::DofHandler) = _check_epoch(dh, get_grid(dh))
+@inline _check_epoch(::AbstractDofHandler) = nothing
+@inline function _check_epoch(dh::DofHandler, grid::AbstractGrid)
+    current = grid_epoch(grid)
+    dh.grid_epoch == current || _stale_dofhandler_error(dh.grid_epoch, current)
+    return nothing
+end
+@noinline function _stale_dofhandler_error(closed_epoch::Int, current_epoch::Int)
+    error(
+        "The DofHandler is stale: its grid has been mutated (refined/coarsened/balanced) " *
+            "since close! (grid epoch $current_epoch, DofHandler closed at epoch " *
+            "$closed_epoch). Call reclose!(dh) to re-distribute the dofs against the current " *
+            "grid state, then rebuild the ConstraintHandler."
+    )
+end
 
 """
     ndofs_per_cell(dh::AbstractDofHandler[, cell::Int=1])
@@ -442,14 +472,81 @@ function __close!(dh::DofHandler{dim}) where {dim}
     dh.ndofs = nextdof - 1
     dh.closed = true
 
-    # Retain the entity maps only for non-conforming grids, where they are needed to build
-    # the conformity (hanging-node) constraints. Conforming grids discard them.
-    if get_grid(dh) isa NonConformingGrid
+    # Retain the entity maps only for grids with hanging nodes, where they are needed to
+    # build the conformity constraints. Conforming grids discard them.
+    if has_hanging_nodes(get_grid(dh))
         dh.entitymaps = EntityMaps(vertexdicts, edgedicts, facedicts)
     end
 
+    # Record the grid's epoch (0 for grids that are not epoch-tracked): `_check_epoch`
+    # compares against it so that use after a later grid mutation errors (see `reclose!`).
+    dh.grid_epoch = grid_epoch(get_grid(dh))
+
     return dh, vertexdicts, edgedicts, facedicts
 
+end
+
+"""
+    reclose!(dh::DofHandler)
+
+Re-distribute the dofs of an already closed `dh` against the **current** state of its grid —
+the companion of grid mutation on adaptive grids (e.g. `Ferrite.AMR.ForestBWG`): after
+`refine!`/`coarsen!`/`balanceforest!` the old dof distribution is meaningless (cell ids and
+node numbering change) and every use of `dh` errors, until `reclose!` re-runs the
+distribution and records the new grid epoch.
+
+Fields, interpolations and the internal dof-distribution order are kept; `ndofs(dh)`,
+`celldofs` and all dof ranges are recomputed from scratch. A `ConstraintHandler` built
+against the old distribution remains stale — rebuild it (re-`add!`ing the constraints), as
+in the adaptive loop:
+
+```julia
+dh = DofHandler(forest); add!(dh, :u, ip); close!(dh)
+while adapting
+    ch = ConstraintHandler(dh); add!(ch, ConformityConstraint(:u)); add!(ch, dbc); close!(ch)
+    # assemble / solve / estimate / mark
+    refine!(forest, marked); balanceforest!(forest)
+    reclose!(dh)
+end
+```
+
+Currently only a `DofHandler` with a single `SubDofHandler` covering the whole domain is
+supported (its cellset is regenerated as `1:getncells(grid)`); subdomains error since their
+cellsets are bound to the old cell numbering.
+"""
+function reclose!(dh::DofHandler)
+    isclosed(dh) || error("reclose! expects a closed DofHandler; call close!(dh) first.")
+    if length(dh.subdofhandlers) != 1
+        error(
+            "reclose! currently supports only a single SubDofHandler covering the whole " *
+                "domain, got $(length(dh.subdofhandlers)) SubDofHandlers. Rebuild the " *
+                "DofHandler instead."
+        )
+    end
+    sdh = dh.subdofhandlers[1]
+    old_ncells = length(dh.cell_to_subdofhandler)
+    if length(sdh.cellset) != old_ncells
+        error(
+            "reclose! currently supports only a SubDofHandler covering the whole domain, " *
+                "but the cellset covers $(length(sdh.cellset)) of $old_ncells cells. Rebuild " *
+                "the DofHandler instead."
+        )
+    end
+    # Re-resolve the (epoch-bound) whole-domain cellset against the current grid state and
+    # reset every ncells-sized structure fixed at construction/close time.
+    ncells = getncells(get_grid(dh))
+    empty!(sdh.cellset)
+    union!(sdh.cellset, 1:ncells)
+    resize!(dh.cell_to_subdofhandler, ncells)
+    fill!(dh.cell_to_subdofhandler, 0)
+    resize!(dh.cell_dofs_offset, ncells)
+    fill!(dh.cell_dofs_offset, 0)
+    empty!(dh.cell_dofs)
+    dh.ndofs = -1
+    dh.entitymaps = nothing
+    dh.closed = false
+    __close!(dh)
+    return dh
 end
 
 """

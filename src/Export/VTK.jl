@@ -32,6 +32,7 @@ struct VTKGridFile{VTK <: WriteVTK.DatasetFile}
     node_mapping::Union{Vector{Int}, Nothing}
 end
 function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
+    _check_epoch(dh)
     for sdh in dh.subdofhandlers
         for ip in sdh.field_interpolations
             if !isa(conformity(ip), H1Conformity)

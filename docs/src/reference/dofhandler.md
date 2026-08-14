@@ -14,6 +14,7 @@ SubDofHandler
 add!(::DofHandler, ::Symbol, ::Interpolation)
 add!(::SubDofHandler, ::Symbol, ::Interpolation)
 close!(::DofHandler)
+reclose!(::DofHandler)
 ```
 
 ## DoF renumbering

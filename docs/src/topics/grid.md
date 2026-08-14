@@ -104,6 +104,29 @@ It can be very useful to use a grid type for a certain special case, e.g. mixed 
 In order to define your own `<: AbstractGrid` you need to fulfill the `AbstractGrid` interface.
 In case that certain structures are preserved from the `Ferrite.Grid` type, you don't need to dispatch on your own type, but rather rely on the fallback `AbstractGrid` dispatch.
 
+### Required methods
+
+Ferrite's internals (`DofHandler` dof distribution, `CellIterator`/`CellCache`,
+`getcoordinates`, constraint handling, VTK export) reach a grid only through the accessor
+functions below — never through the `cells`/`nodes` fields directly. The field-based
+`AbstractGrid` fallbacks make all of them work automatically for any grid that stores
+`cells::Vector{<:AbstractCell}` and `nodes::Vector{<:Node}` plus the usual set dictionaries;
+a grid with a different internal representation must override them. For a conforming grid
+the required set is:
+
+- cells: `getcells(grid)`, `getcells(grid, i::Int)`, `getcells(grid, v::AbstractVector{Int})`,
+  `getncells(grid)`, `getcelltype(grid)`, `getcelltype(grid, i::Int)`
+- nodes/coordinates: `getnodes(grid)`, `getnodes(grid, i)`, `getnnodes(grid)`,
+  `get_node_coordinate(grid, n)`, `get_coordinate_type(grid)`, `get_coordinate_eltype(grid)`
+- sets (needed for boundary conditions and subdomains): `getcellset(s)`, `getfacetset(s)`,
+  `getnodeset(s)`, `getvertexset(s)`
+
+Optional traits with fallbacks: `has_hanging_nodes(grid)` (default `false`; return `true`
+for non-conforming grids so the `DofHandler` retains the entity → dof maps needed for
+conformity constraints) and `grid_epoch(grid)` (default `0`, i.e. not epoch-tracked; adaptive
+grids return a counter incremented on every mutation so that stale `DofHandler` use errors,
+see `reclose!`).
+
 ### Example
 
 As a starting point, we choose a minimal working example from the test suite:

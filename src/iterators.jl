@@ -260,6 +260,7 @@ function CellIterator(
         set = 1:getncells(grid)
     end
     if gridordh isa DofHandler
+        _check_epoch(gridordh)
         # TODO: Since the CellCache is resizeable this is not really necessary to check
         #       here, but might be useful to catch slow code paths?
         _check_same_celltype(get_grid(gridordh), set)
@@ -270,6 +271,7 @@ function CellIterator(gridordh::Union{Grid, DofHandler}, flags::UpdateFlags)
     return CellIterator(gridordh, nothing, flags)
 end
 function CellIterator(sdh::SubDofHandler, flags::UpdateFlags = UpdateFlags())
+    _check_epoch(sdh.dh)
     return CellIterator(CellCache(sdh, flags), sdh.cellset)
 end
 

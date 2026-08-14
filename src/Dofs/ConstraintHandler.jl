@@ -177,6 +177,7 @@ ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
 ConstraintHandler(::Type{Tv}, dh::AbstractDofHandler) where {Tv} = ConstraintHandler(Tv, Int, dh)
 function ConstraintHandler(::Type{Tv}, ::Type{Ti}, dh::AbstractDofHandler) where {Tv <: Number, Ti <: Integer}
     @assert isclosed(dh)
+    _check_epoch(dh)
     return ConstraintHandler(
         Dirichlet[], ProjectedDirichlet[], Ti[], Ti[], Tv[], Union{Nothing, Tv}[],
         Union{Nothing, DofCoefficients{Tv, Ti}}[], Dict{Ti, Ti}(), BitVector(), BCValues{Tv, Ti}[], dh, false,
@@ -1214,7 +1215,7 @@ function _add!(
         max_x = Tx(i -> typemin(eltype(Tx)))
         for facetpair in facet_map, facet_indices in (facetpair.mirror, facetpair.image)
             cellidx, facetidx = facet_indices
-            nodes = facets(grid.cells[cellidx])[facetidx]
+            nodes = facets(getcells(grid, cellidx))[facetidx]
             union!(all_node_idxs, nodes)
             for n in nodes
                 x = get_node_coordinate(grid, n)
@@ -1470,7 +1471,7 @@ __to_facetset(_, set::AbstractSet{FacetIndex}) = set
 __to_facetset(grid, set::String) = getfacetset(grid, set)
 function __collect_boundary_facets(grid::Grid)
     candidates = Dict{Tuple, FacetIndex}()
-    for (ci, c) in enumerate(grid.cells)
+    for (ci, c) in enumerate(getcells(grid))
         for (fi, fn) in enumerate(facets(c))
             facet = sortfacet_fast(fn)
             if haskey(candidates, facet)
@@ -1491,14 +1492,14 @@ function __collect_periodic_facets_tree!(facet_map::Vector{PeriodicFacetPair}, g
 
     mirror_mean_x = Tx[]
     for (c, f) in mset
-        fn = facets(grid.cells[c])[f]
+        fn = facets(getcells(grid, c))[f]
         push!(mirror_mean_x, sum(get_node_coordinate(grid, i) for i in fn) / length(fn))
     end
 
     # Same dance for the image
     image_mean_x = Tx[]
     for (c, f) in iset
-        fn = facets(grid.cells[c])[f]
+        fn = facets(getcells(grid, c))[f]
         # Apply transformation to all coordinates
         push!(image_mean_x, sum(transformation(get_node_coordinate(grid, i))::Tx for i in fn) / length(fn))
     end
@@ -1599,9 +1600,9 @@ end
 # have opposing normal vectors
 function __check_periodic_facets(grid::Grid, fi::FacetIndex, fj::FacetIndex, known_order::Bool, tol::Float64)
     cii, fii = fi
-    nodes_i = facets(grid.cells[cii])[fii]
+    nodes_i = facets(getcells(grid, cii))[fii]
     cij, fij = fj
-    nodes_j = facets(grid.cells[cij])[fij]
+    nodes_j = facets(getcells(grid, cij))[fij]
 
     # 1. Check that normals are opposite TODO: Should use FacetValues here
     ni = __outward_normal(grid, nodes_i)
@@ -1675,9 +1676,9 @@ end
 # vectors, and ii) compute the relative rotation.
 function __check_periodic_facets_f(grid::Grid, fi::FacetIndex, fj::FacetIndex, xmi, xmj, transformation::F, tol::Float64) where {F}
     cii, fii = fi
-    nodes_i = facets(grid.cells[cii])[fii]
+    nodes_i = facets(getcells(grid, cii))[fii]
     cij, fij = fj
-    nodes_j = facets(grid.cells[cij])[fij]
+    nodes_j = facets(getcells(grid, cij))[fij]
 
     # 1. Check if normals are aligned or opposite TODO: Should use FacetValues here
     ni = __outward_normal(grid, nodes_i)
