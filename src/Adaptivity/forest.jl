@@ -357,7 +357,6 @@ function coarsen!(forest::ForestBWG, cellids::AbstractVector{<:Integer}; require
     isempty(cellids) && return
     cmarked = issorted(cellids) ? cellids : sort(cellids)
     _apply_refine_coarsen!(forest, cmarked, eltype(cmarked)[], require_all_siblings)
-    _invalidate!(forest)
     return
 end
 
@@ -390,7 +389,6 @@ function refine_and_coarsen!(
         cmarked = issorted(coarsen_ids) ? coarsen_ids : sort(coarsen_ids)
         rmarked = issorted(refine_ids) ? refine_ids : sort(refine_ids)
         _apply_refine_coarsen!(forest, cmarked, rmarked, require_all_siblings)
-        _invalidate!(forest)
     end
     balance && balanceforest!(forest)
     return
@@ -419,6 +417,8 @@ function _apply_refine_coarsen!(forest::ForestBWG, cmarked::AbstractVector{<:Int
         end
         offset += n
     end
+    # one bump for the whole logical mutation, however many trees it rewrote
+    _invalidate!(forest)
     return
 end
 
@@ -583,17 +583,16 @@ end
 # and must not materialize).
 Ferrite.getcells(forest::ForestBWG) = _materialized(forest).cells
 Ferrite.getcells(forest::ForestBWG, v::Union{Integer, AbstractVector{<:Integer}}) = _materialized(forest).cells[v]
-Ferrite.getcells(forest::ForestBWG, setname::String) = _materialized(forest).cells[collect(getcellset(forest, setname))]
+# getcells(forest, setname), getnnodes and get_node_coordinate(forest, n) are the generic
+# AbstractGrid fallbacks, which compose through the overrides above.
 # All trees materialize into one concrete cell type (`MC`), independent of `i`.
 Ferrite.getcelltype(::ForestBWG{<:Any, <:Any, <:Any, MC}) where {MC} = MC
 Ferrite.getcelltype(::ForestBWG{<:Any, <:Any, <:Any, MC}, i::Integer) where {MC} = MC
 
 Ferrite.getnodes(forest::ForestBWG) = _materialized(forest).nodes
 Ferrite.getnodes(forest::ForestBWG, v::Union{Integer, AbstractVector{<:Integer}}) = _materialized(forest).nodes[v]
-Ferrite.getnnodes(forest::ForestBWG) = length(_materialized(forest).nodes)
 Ferrite.get_coordinate_type(::ForestBWG{dim, <:Any, T}) where {dim, T} = Vec{dim, T}
 Ferrite.get_coordinate_eltype(::ForestBWG{<:Any, <:Any, T}) where {T} = T
-Ferrite.get_node_coordinate(forest::ForestBWG, n::Integer) = get_node_coordinate(_materialized(forest).nodes[n])
 
 Ferrite.getcellset(forest::ForestBWG, setname::String) = _materialized(forest).cellsets[setname]
 Ferrite.getcellsets(forest::ForestBWG) = _materialized(forest).cellsets
@@ -2548,7 +2547,7 @@ end
 # the facade.
 function _materialize_snapshot(forest::ForestBWG{dim, C, T}) where {dim, C, T}
     node_map = dim == 2 ? node_map₂ : node_map₃
-    celltype = dim == 2 ? Quadrilateral : Hexahedron
+    celltype = _materialized_celltype(Val(dim))
     NV = 2^dim
     ncells = getncells(forest)
     ntrees = length(forest.cells)

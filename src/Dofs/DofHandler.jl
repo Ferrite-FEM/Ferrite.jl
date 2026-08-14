@@ -161,9 +161,26 @@ close!(dh)
     nodes in the associated grid.
 """
 function DofHandler(grid::G) where {dim, G <: AbstractGrid{dim}}
-    ncells = getncells(grid)
     sdhs = SubDofHandler{DofHandler{dim, G}}[]
-    return DofHandler{dim, G}(sdhs, Symbol[], Int[], zeros(Int, ncells), zeros(Int, ncells), false, grid, -1, nothing, 0)
+    dh = DofHandler{dim, G}(sdhs, Symbol[], Int[], Int[], Int[], false, grid, -1, nothing, 0)
+    return _reset_dof_state!(dh, getncells(grid))
+end
+
+# Every ncells-sized or close-derived field of a DofHandler, (re)set in one place. The
+# constructor and `reclose!` must agree on this list: a cache added to the struct and
+# initialized only in the constructor would survive `reclose!` at its stale
+# pre-refinement length — exactly the silent-staleness class the epoch guard exists to
+# rule out.
+function _reset_dof_state!(dh::DofHandler, ncells::Int)
+    resize!(dh.cell_to_subdofhandler, ncells)
+    fill!(dh.cell_to_subdofhandler, 0)
+    resize!(dh.cell_dofs_offset, ncells)
+    fill!(dh.cell_dofs_offset, 0)
+    empty!(dh.cell_dofs)
+    dh.ndofs = -1
+    dh.entitymaps = nothing
+    dh.closed = false
+    return dh
 end
 
 function Base.show(io::IO, mime::MIME"text/plain", dh::DofHandler)
@@ -535,18 +552,12 @@ function reclose!(dh::DofHandler)
         )
     end
     # Re-resolve the (epoch-bound) whole-domain cellset against the current grid state and
-    # reset every ncells-sized structure fixed at construction/close time.
+    # reset every ncells-sized structure fixed at construction/close time (shared with the
+    # constructor, so the two lists cannot drift apart).
     ncells = getncells(get_grid(dh))
     empty!(sdh.cellset)
     union!(sdh.cellset, 1:ncells)
-    resize!(dh.cell_to_subdofhandler, ncells)
-    fill!(dh.cell_to_subdofhandler, 0)
-    resize!(dh.cell_dofs_offset, ncells)
-    fill!(dh.cell_dofs_offset, 0)
-    empty!(dh.cell_dofs)
-    dh.ndofs = -1
-    dh.entitymaps = nothing
-    dh.closed = false
+    _reset_dof_state!(dh, ncells)
     __close!(dh)
     return dh
 end
