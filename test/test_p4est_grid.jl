@@ -200,14 +200,19 @@ end
 
 @testset "vertex/node sets are not transferred $dim D" for (dim, CT) in ((2, Quadrilateral), (3, Hexahedron))
     # creategrid only carries cellsets and facetsets onto the refined grid. The forest keeps
-    # the macro vertex/node sets, but the materialized grid has both empty -- documented on
+    # the macro vertex/node sets in its fields (indexed against the *macro* grid), but both
+    # the facade accessors and the materialized grid report them empty -- documented on
     # `creategrid`/`NonConformingGrid`, pinned here so the behaviour cannot drift silently.
     grid = generate_grid(CT, ntuple(_ -> 2, dim))
     addvertexset!(grid, "vs", x -> x[1] ≈ -1.0)
     grid.nodesets["ns"] = Ferrite.OrderedSet([1, 2])
     forest = ForestBWG(grid, 3)
-    @test Ferrite.getvertexsets(forest) == Ferrite.getvertexsets(grid)
-    @test Ferrite.getnodesets(forest) == Ferrite.getnodesets(grid)
+    @test forest.vertexsets == Ferrite.getvertexsets(grid)
+    @test forest.nodesets == Ferrite.getnodesets(grid)
+    @test isempty(Ferrite.getvertexsets(forest))
+    @test isempty(Ferrite.getnodesets(forest))
+    @test_throws KeyError getvertexset(forest, "vs")
+    @test_throws KeyError getnodeset(forest, "ns")
 
     Ferrite.AMR.refine!(forest, [1])
     Ferrite.AMR.balanceforest!(forest)

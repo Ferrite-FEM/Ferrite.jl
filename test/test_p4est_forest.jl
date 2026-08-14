@@ -874,11 +874,11 @@ end
     forest = ForestBWG(grid, 3)
     Ferrite.AMR.refine_all!(forest, 1)
 
-    # getcells collects the leaves of all trees in cell id order (tree by tree, Morton
-    # order within each tree); the scalar getcells(forest, cellid) deliberately throws
-    # instead of hitting the generic fallback, which would return a whole tree
-    @test_throws ArgumentError getcells(forest, 7)
-    @test_throws ArgumentError getcells(forest, [1, 2])
+    # the facade materializes the fine grid on demand: getcells returns the materialized
+    # Quadrilateral cells (never trees or octants), for all three accessor variants
+    @test getcells(forest, 7) isa Quadrilateral
+    @test getcells(forest, [1, 2]) == getcells(forest)[1:2]
+    @test eltype(getcells(forest)) === Quadrilateral
 
     # marking a cell already at the maximum level is a documented no-op — also when the
     # tree's *first* leaf is the max-level one (used to throw from the 2^dim size hint)
@@ -895,7 +895,8 @@ end
         g = Ferrite.AMR.creategrid(f)
         @test getncells(g) == n
     end
-    leaves = getcells(forest)
+    # getleaves collects the leaf octants in cell id order (formerly getcells(forest))
+    leaves = Ferrite.AMR.getleaves(forest)
     @test length(leaves) == getncells(forest)
     @test leaves[7] == forest.cells[2].leaves[3]
     @test leaves[1] == forest.cells[1].leaves[1]
@@ -919,9 +920,8 @@ end
         @test getnnodes(Ferrite.AMR.creategrid(f)) == 45
     end
 
-    # NOTE: getcelltype currently exposes the octree (tree) type; this will change
-    @test getcelltype(forest) === eltype(forest.cells) === getcelltype(forest, 1)
-    @test getcelltype(forest) <: Ferrite.AMR.OctreeBWG
+    # the facade reports the materialized cell type, never the octree (tree) type
+    @test getcelltype(forest) === Quadrilateral === getcelltype(forest, 1)
 
     # getneighborhood forwards to the macro topology
     top = ExclusiveTopology(grid)
@@ -977,11 +977,11 @@ end
     # (ids 1:nchild) recovers the original forest octant-for-octant
     forest = ForestBWG(generate_grid(CT, ntuple(_ -> 2, dim)), 4)
     Ferrite.AMR.refine_all!(forest, 1)
-    base = getcells(forest)
+    base = Ferrite.AMR.getleaves(forest)
     Ferrite.AMR.refine!(forest, [1])
     @test getncells(forest) == length(base) + (nchild - 1)
     Ferrite.AMR.coarsen!(forest, collect(1:nchild))
-    @test getcells(forest) == base
+    @test Ferrite.AMR.getleaves(forest) == base
     for tree in forest.cells
         @test issorted(tree.leaves)
     end
@@ -994,7 +994,7 @@ end
     f2 = deepcopy(f1)
     Ferrite.AMR._coarsen_all!(f1)
     Ferrite.AMR.coarsen!(f2, collect(1:getncells(f2)); require_all_siblings = true)
-    @test getcells(f1) == getcells(f2)
+    @test Ferrite.AMR.getleaves(f1) == Ferrite.AMR.getleaves(f2)
 
     # policy modularity: one marked sibling is a no-op under all-siblings, collapses the
     # family under any-sibling

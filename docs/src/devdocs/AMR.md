@@ -252,13 +252,43 @@ Ferrite.AMR.inside
 Ferrite.AMR._maximum_size
 ```
 
-## From a forest to a `NonConformingGrid`
+## From a forest to a grid: the materialization facade
 
 The operations above manipulate the forest of octrees (refine, coarsen, balance, neighbour
-lookups). To actually solve a finite element problem we must turn that forest into a concrete
-grid — this is [`creategrid`](@ref Ferrite.AMR.creategrid), which produces a
-`NonConformingGrid`: an ordinary grid plus the *hanging-node constraints* (`conformity_info`)
-that make a conforming finite element field possible.
+lookups). To actually solve a finite element problem the forest must answer *grid* queries —
+cells, nodes, sets — for its current refinement state. The `ForestBWG` does this itself: it
+subtypes `AbstractGrid` and overrides the accessor interface (`getcells`, `getnodes`,
+`getfacetset`, …) to forward to a lazily materialized snapshot
+(`Ferrite.AMR.ForestSnapshot`) kept in an internal cache box
+(`Ferrite.AMR.MaterializedForest`). Every mutator (`refine!`, `coarsen!`,
+`refine_and_coarsen!`, `refine_all!`, `balanceforest!`) bumps the cache's *epoch*
+([`Ferrite.grid_epoch`](@ref)) and drops the snapshot; the next grid query rebuilds it. A
+`DofHandler` records the epoch at `close!` and every per-loop entry point
+(`CellIterator`/`ConstraintHandler` construction, `ndofs`, VTK export) errors on a mismatch,
+pointing to [`reclose!`](@ref), which re-distributes the dofs against the current state:
+
+```julia
+forest = ForestBWG(grid0, b)
+dh = DofHandler(forest); add!(dh, :u, ip); close!(dh)
+while adapting
+    ch = ConstraintHandler(dh); add!(ch, ConformityConstraint(:u)); add!(ch, dbc); close!(ch)
+    # assemble / solve / estimate (facetskeleton(forest)) / mark
+    refine!(forest, marked); balanceforest!(forest)
+    reclose!(dh)
+end
+```
+
+The snapshot is produced by the [`creategrid`](@ref Ferrite.AMR.creategrid) pipeline
+described below. `creategrid` itself remains as a thin transitional wrapper producing a
+detached `NonConformingGrid` (deprecated): an ordinary grid plus the *hanging-node
+constraints* (`conformity_info`, read it through the accessor
+[`Ferrite.AMR.conformity_info`](@ref)) that make a conforming finite element field possible.
+
+Known facade gaps, shared with `creategrid`: node/vertex sets are not reconstructed onto the
+refined grid (the accessors report them empty), `ExclusiveTopology(forest)` errors (use
+[`facetskeleton`](@ref) instead — the
+fine-grid topology is ill-defined on hanging meshes), and `transform_coordinates!(forest, f)`
+errors (the transform would be lost on rematerialization; transform the base grid instead).
 
 !!! warning "`conformity_info` is subject to change"
     `conformity_info` currently stores hanging *vertices* and their master vertices — exactly

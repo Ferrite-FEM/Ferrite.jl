@@ -30,6 +30,21 @@ refine_and_coarsen!
 balanceforest!
 ```
 
+## The grid facade
+
+A `ForestBWG` answers all `AbstractGrid` queries for its current refinement state through an
+epoch-guarded materialization cache; a `DofHandler` built on it detects staleness after
+refinement and is re-distributed with [`reclose!`](@ref).
+
+```@docs
+Ferrite.grid_epoch
+Ferrite.has_hanging_nodes
+Ferrite.AMR.conformity_info
+Ferrite.AMR.MaterializedForest
+Ferrite.AMR.ForestSnapshot
+Ferrite.AMR.getleaves
+```
+
 ## Materialization
 
 ```@docs

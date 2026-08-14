@@ -30,6 +30,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Atomic assembly (`start_assemble(K, f; atomic = true)`) now supports `Float16` and
    `Complex` of `Float16`/`Float32`/`Float64` as value types, in addition to `Float32`
    and `Float64`. ([#1474])
+ - AMR: a `ForestBWG` is now used directly as the grid ("the forest is the grid"): it
+   answers all `AbstractGrid` queries (`getcells`, `getnodes`, `getfacetset`,
+   `getcoordinates`, ...) for its current refinement state through an epoch-guarded, lazily
+   materialized snapshot, so the explicit `grid = creategrid(forest)` step disappears from
+   user code. Every mutator (`refine!`, `coarsen!`, `refine_and_coarsen!`, `refine_all!`,
+   `balanceforest!`) bumps the forest's epoch; a `DofHandler` records the epoch at `close!`
+   and errors on use after a later mutation instead of silently assembling against a stale
+   dof distribution. The new exported `reclose!(dh)` re-distributes the dofs against the
+   current grid state (currently for a single whole-domain `SubDofHandler`). New
+   internal-but-stable accessors: `Ferrite.grid_epoch(grid)` (cache-invalidation key for
+   downstream packages), `Ferrite.has_hanging_nodes(grid)` (trait replacing dispatch on
+   `NonConformingGrid`) and `Ferrite.AMR.conformity_info(grid)` (hanging node -> masters
+   mapping). ([#1413])
+
+### Changed
+ - AMR: `getcells(forest::ForestBWG)` now returns the materialized
+   `Quadrilateral`/`Hexahedron` cells of the current refinement state (matching the
+   `AbstractGrid` interface) instead of the internal leaf octants, and
+   `getcells(forest, i)` returns cell `i` instead of throwing. The octant-returning
+   behaviour moved to `Ferrite.AMR.getleaves(forest)`. `getcelltype(forest)` now returns
+   the materialized cell type instead of leaking the octree type, and
+   `getnodesets`/`getvertexsets` on a forest now return empty sets (set reconstruction on
+   the refined grid is a known gap) instead of the macro grid's sets with wrong ids.
+   `ExclusiveTopology(forest)` and `transform_coordinates!(forest, f)` now throw
+   descriptive errors instead of silently operating on octree internals. ([#1413])
+
+### Deprecated
+ - AMR: `NonConformingGrid` (and with it the `grid = creategrid(forest)` workflow) is
+   deprecated in favour of using the `ForestBWG` directly as the grid together with
+   `reclose!`. Both keep working during the transition. ([#1413])
 
 ## [v1.6.0] - 2026-08-02
 
@@ -1380,4 +1410,5 @@ poking into Ferrite internals:
 [#1468]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1468
 [#1438]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1438
 [#1452]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1452
+[#1413]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1413
 [#1474]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1474
