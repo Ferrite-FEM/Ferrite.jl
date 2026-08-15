@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    arguments used for matrix allocation can be forwarded as-is, and uses the
    interpolations to pick the sharpest safe conflict graph (e.g. fewer colors for purely
    discontinuous discretizations). Default behavior (and its determinism guarantee) is
-   unchanged. ([#1493])
+   unchanged. ([#1495])
  - Added mesh-free [`AlgebraicVariable`s](https://ferrite-fem.github.io/Ferrite.jl/dev/topics/algebraic_variables/)
    and coupling descriptors for small global unknowns such as Lagrange multipliers and
    homogenized quantities. See the documentation for details. ([#1422])
@@ -1446,4 +1446,4 @@ poking into Ferrite internals:
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
-[#1493]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1493
+[#1495]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1495
