@@ -2,6 +2,5 @@
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Ferrite = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-PkgBenchmark = "32113eaa-f34f-5b0d-bd6c-c81e245fc73d"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
