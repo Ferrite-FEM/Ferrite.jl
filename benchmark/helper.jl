@@ -4,7 +4,7 @@
 # kernels, mirroring how the documented tutorials write them.
 #
 # Everything lives in a module so that including the benchmark files into `Main` (as
-# PkgBenchmark and Tachometer do) does not leak helper names.
+# Tachometer does) does not leak helper names.
 module FerriteBenchmarkHelpers
 
 using Ferrite
