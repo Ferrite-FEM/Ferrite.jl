@@ -167,6 +167,8 @@ algebraic variables to spatial fields or other algebraic variables.
    of `:σ̄`;
  - `(:u, :σ̄)` declares both directions at once.
 
+A single entry may be passed bare, without the surrounding collection.
+
 See also [`FacetCoupling`](@ref) and [`AlgebraicCoupling`](@ref).
 """
 struct CellCoupling{DH <: DofHandler} <: AbstractCoupling
