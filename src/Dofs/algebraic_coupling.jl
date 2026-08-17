@@ -20,7 +20,7 @@ end
 
 # Collect the coupled block pairs declared by the field coupling matrix.
 function _coupled_blocks(
-        fields::Tuple{Vararg{Symbol}}, coupling::Matrix{Bool},
+        fields::Vector{Symbol}, coupling::Matrix{Bool},
         names::Vector{Symbol}, ranges::Vector{UnitRange{Int}}, n_cell_dofs::Int,
     )
     field_ranges = map(fields) do fname
@@ -44,7 +44,7 @@ end
 # dofs of the descriptor's algebraic variables.
 function _local_layout_info(
         dh::DofHandler, sdh::Union{SubDofHandler, Nothing},
-        fields::Tuple{Vararg{Symbol}}, coupling::Matrix{Bool},
+        fields::Vector{Symbol}, coupling::Matrix{Bool},
     )
     names = Symbol[]
     ranges = UnitRange{Int}[]
@@ -76,23 +76,23 @@ end
 # Descriptor validation      #
 ##############################
 
-function _validate_coupling_fields(dh::DofHandler, fields)
+function _validate_coupling_fields(dh::DofHandler, fields::Vector{Symbol})
     isclosed(dh) || error("coupling descriptors require a closed DofHandler")
-    fields isa Union{Tuple, AbstractVector} || error("`fields` must be a tuple or vector of `Symbol`s, got $(repr(fields))")
     isempty(fields) && error("`fields` must name at least one variable")
-    all(x -> x isa Symbol, fields) || error("`fields` must be a collection of `Symbol`s, got $(repr(fields))")
-    fields_t = Tuple(fields)
-    allunique(fields_t) || error("duplicate names in `fields = $(fields_t)`")
-    for name in fields_t
+    allunique(fields) || error("duplicate names in `fields = $(Tuple(fields))`")
+    for name in fields
         if _find_algebraic_variable(dh, name) === nothing && name ∉ getfieldnames(dh)
             error("no spatial field or algebraic variable named :$name in the DofHandler (fields: $(getfieldnames(dh)), algebraic variables: $(dh.algebraic_names))")
         end
     end
-    return fields_t
+    return fields
 end
 
-# Normalize pair/tuple entries to a field coupling matrix.
-function _process_algebraic_coupling(dh::DofHandler, spec)
+# Normalize pair/tuple entries to a field list and coupling matrix. The specification is
+# `@nospecialize`d: user code is free to pass any tuple/vector shape without triggering a
+# fresh compilation of the parsing, and the descriptors store the normalized
+# (shape-independent) form.
+function _process_algebraic_coupling(dh::DofHandler, @nospecialize(spec))
     # A bare entry is accepted as a one-entry specification
     if spec isa Pair || spec isa Tuple{Symbol, Symbol}
         spec = (spec,)
@@ -124,7 +124,7 @@ function _process_algebraic_coupling(dh::DofHandler, spec)
         a in names || push!(names, a)
         b in names || push!(names, b)
     end
-    fields_t = _validate_coupling_fields(dh, Tuple(names))
+    _validate_coupling_fields(dh, names)
     for (a, b) in directed
         if _find_algebraic_variable(dh, a) === nothing && _find_algebraic_variable(dh, b) === nothing
             error(
@@ -134,15 +134,15 @@ function _process_algebraic_coupling(dh::DofHandler, spec)
             )
         end
     end
-    coupling_mat = zeros(Bool, length(fields_t), length(fields_t))
+    coupling_mat = zeros(Bool, length(names), length(names))
     for (a, b) in directed
-        coupling_mat[findfirst(==(a), fields_t), findfirst(==(b), fields_t)] = true
+        coupling_mat[findfirst(==(a), names), findfirst(==(b), names)] = true
     end
-    return fields_t, coupling_mat
+    return names, coupling_mat
 end
 
 # Verify that the descriptor's spatial fields exist on the SubDofHandler of `entity`.
-function _check_spatial_fields_on_sdh(dh::DofHandler, sdh::SubDofHandler, fields::Tuple{Vararg{Symbol}}, entity::String)
+function _check_spatial_fields_on_sdh(dh::DofHandler, sdh::SubDofHandler, fields::Vector{Symbol}, entity::String)
     for name in fields
         _find_algebraic_variable(dh, name) === nothing || continue
         if name ∉ sdh.field_names
@@ -169,16 +169,21 @@ algebraic variables to spatial fields or other algebraic variables.
 
 See also [`FacetCoupling`](@ref) and [`AlgebraicCoupling`](@ref).
 """
-struct CellCoupling{N, DH <: DofHandler} <: AbstractCoupling
+struct CellCoupling{DH <: DofHandler} <: AbstractCoupling
     dh::DH
     cells::OrderedSet{Int}
-    fields::NTuple{N, Symbol}
+    fields::Vector{Symbol}
     coupling::Matrix{Bool}
     layout_infos::Vector{Union{Nothing, LocalLayoutInfo}} # indexed by SubDofHandler index
 end
 
 function CellCoupling(dh::DofHandler, cells::IntegerCollection; algebraic_coupling)
-    fields_t, coupling_mat = _process_algebraic_coupling(dh, algebraic_coupling)
+    fields, coupling_mat = _process_algebraic_coupling(dh, algebraic_coupling)
+    return _cell_coupling(dh, cells, fields, coupling_mat)
+end
+
+# Barrier taking the normalized specification, compiled independently of its input shape
+function _cell_coupling(dh::DofHandler, cells::IntegerCollection, fields::Vector{Symbol}, coupling_mat::Matrix{Bool})
     # Own a copy so later mutation of `cells` cannot invalidate the precomputed layouts
     cellset = OrderedSet{Int}(cells)
     ncells = getncells(get_grid(dh))
@@ -189,10 +194,10 @@ function CellCoupling(dh::DofHandler, cells::IntegerCollection; algebraic_coupli
         sdhidx == 0 && error("cell $cellid does not belong to any SubDofHandler")
         layout_infos[sdhidx] === nothing || continue
         sdh = dh.subdofhandlers[sdhidx]
-        _check_spatial_fields_on_sdh(dh, sdh, fields_t, "cell $cellid")
-        layout_infos[sdhidx] = _local_layout_info(dh, sdh, fields_t, coupling_mat)
+        _check_spatial_fields_on_sdh(dh, sdh, fields, "cell $cellid")
+        layout_infos[sdhidx] = _local_layout_info(dh, sdh, fields, coupling_mat)
     end
-    return CellCoupling(dh, cellset, fields_t, coupling_mat, layout_infos)
+    return CellCoupling(dh, cellset, fields, coupling_mat, layout_infos)
 end
 
 """
@@ -204,17 +209,21 @@ Structural descriptor for weak-form terms integrated over the facets in `facets`
 The local layout contains all dofs of each adjacent cell, since facet terms may use cell
 gradients.
 """
-struct FacetCoupling{N, DH <: DofHandler} <: AbstractCoupling
+struct FacetCoupling{DH <: DofHandler} <: AbstractCoupling
     dh::DH
     facets::OrderedSet{FacetIndex}
     adjacent_cells::OrderedSet{Int} # unique cells adjacent to `facets`
-    fields::NTuple{N, Symbol}
+    fields::Vector{Symbol}
     coupling::Matrix{Bool}
     layout_infos::Vector{Union{Nothing, LocalLayoutInfo}} # indexed by SubDofHandler index
 end
 
 function FacetCoupling(dh::DofHandler, facets::AbstractVecOrSet{FacetIndex}; algebraic_coupling)
-    fields_t, coupling_mat = _process_algebraic_coupling(dh, algebraic_coupling)
+    fields, coupling_mat = _process_algebraic_coupling(dh, algebraic_coupling)
+    return _facet_coupling(dh, facets, fields, coupling_mat)
+end
+
+function _facet_coupling(dh::DofHandler, facets::AbstractVecOrSet{FacetIndex}, fields::Vector{Symbol}, coupling_mat::Matrix{Bool})
     # The descriptor owns its entity set, see the CellCoupling constructor
     facetset = OrderedSet{FacetIndex}(facets)
     grid = get_grid(dh)
@@ -230,10 +239,10 @@ function FacetCoupling(dh::DofHandler, facets::AbstractVecOrSet{FacetIndex}; alg
         push!(adjacent_cells, cellid)
         layout_infos[sdhidx] === nothing || continue
         sdh = dh.subdofhandlers[sdhidx]
-        _check_spatial_fields_on_sdh(dh, sdh, fields_t, "the cell of facet ($cellid, $facetid)")
-        layout_infos[sdhidx] = _local_layout_info(dh, sdh, fields_t, coupling_mat)
+        _check_spatial_fields_on_sdh(dh, sdh, fields, "the cell of facet ($cellid, $facetid)")
+        layout_infos[sdhidx] = _local_layout_info(dh, sdh, fields, coupling_mat)
     end
-    return FacetCoupling(dh, facetset, adjacent_cells, fields_t, coupling_mat, layout_infos)
+    return FacetCoupling(dh, facetset, adjacent_cells, fields, coupling_mat, layout_infos)
 end
 
 """
@@ -243,22 +252,22 @@ Descriptor for terms involving only algebraic variables. See [`CellCoupling`](@r
 the keywords. Since diagonal matrix entries are always allocated, this is only needed for
 off-diagonal entries.
 """
-struct AlgebraicCoupling{N, DH <: DofHandler} <: AbstractCoupling
+struct AlgebraicCoupling{DH <: DofHandler} <: AbstractCoupling
     dh::DH
-    fields::NTuple{N, Symbol}
+    fields::Vector{Symbol}
     coupling::Matrix{Bool}
     layout_info::LocalLayoutInfo
 end
 
 function AlgebraicCoupling(dh::DofHandler; algebraic_coupling)
-    fields_t, coupling_mat = _process_algebraic_coupling(dh, algebraic_coupling)
-    for name in fields_t
+    fields, coupling_mat = _process_algebraic_coupling(dh, algebraic_coupling)
+    for name in fields
         if _find_algebraic_variable(dh, name) === nothing
             error(":$name is a spatial field, but an AlgebraicCoupling can only couple algebraic variables; use a CellCoupling or FacetCoupling for terms involving spatial fields")
         end
     end
-    layout_info = _local_layout_info(dh, nothing, fields_t, coupling_mat)
-    return AlgebraicCoupling(dh, fields_t, coupling_mat, layout_info)
+    layout_info = _local_layout_info(dh, nothing, fields, coupling_mat)
+    return AlgebraicCoupling(dh, fields, coupling_mat, layout_info)
 end
 
 ########################
@@ -278,7 +287,7 @@ entities(c::FacetCoupling) = copy(c.facets)
 
 Return the variable names participating in `coupling`.
 """
-fields(c::AbstractCoupling) = c.fields
+fields(c::AbstractCoupling) = Tuple(c.fields)
 
 function _show_coupling(io::IO, c::AbstractCoupling, name::String, entity_str::Union{String, Nothing})
     println(io, name, ":")

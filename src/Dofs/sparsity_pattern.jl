@@ -407,7 +407,7 @@ end
 # Validate the `algebraic_couplings` keyword and add the entries of each descriptor.
 function _add_algebraic_coupling_entries!(
         sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
-        algebraic_couplings, keep_constrained::Bool,
+        @nospecialize(algebraic_couplings), keep_constrained::Bool,
     )
     for descriptor in _iterate_algebraic_couplings(algebraic_couplings)
         descriptor isa AbstractCoupling || error("`algebraic_couplings` must contain coupling descriptors (`CellCoupling`, `FacetCoupling`, `AlgebraicCoupling`), got $(repr(descriptor))")
