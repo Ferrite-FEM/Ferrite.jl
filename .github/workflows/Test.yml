@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 jobs:
   test:
-    name: Julia ${{ matrix.julia-version }} - ${{ matrix.os }}
+    name: Julia ${{ matrix.julia-version }} - ${{ matrix.os }} - ${{ matrix.threads }} thread(s)
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     continue-on-error: ${{ matrix.julia-version == 'pre' }}
@@ -18,11 +18,17 @@ jobs:
       matrix:
         julia-version: ['lts', '1', 'pre']
         os: ['ubuntu-latest']
+        threads: ['2']
         include:
           - os: windows-latest
             julia-version: '1'
+            threads: '2'
           - os: macOS-latest
             julia-version: '1'
+            threads: '2'
+          - os: ubuntu-latest
+            julia-version: '1'
+            threads: '1'
     steps:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
@@ -31,6 +37,8 @@ jobs:
       - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+        env:
+          JULIA_NUM_THREADS: ${{ matrix.threads }}
       - name: JET tests
         shell: julia --color=yes --project=@jet {0}
         run: |
