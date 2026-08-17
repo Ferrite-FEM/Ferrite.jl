@@ -30,9 +30,6 @@ algebraic_basis_value
 CellCoupling
 FacetCoupling
 AlgebraicCoupling
-LocalDofLayout
-local_dofs!
-dof_range(::LocalDofLayout, ::Symbol)
 ```
 
 ## DoF renumbering

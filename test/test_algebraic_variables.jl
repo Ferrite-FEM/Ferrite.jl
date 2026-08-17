@@ -102,11 +102,11 @@ end
     K = allocate_matrix(dh; algebraic_couplings = (cpl,))
     f = zeros(3)
     assembler = start_assemble(K, f)
-    layout = local_dofs!(LocalDofLayout(), cpl)
+    dofs = vcat(algebraic_dofs(dh, :z), algebraic_dofs(dh, :p0))
     Ke = [2.0 0.0 1.0; 0.0 2.0 0.0; 1.0 0.0 2.0]
-    assemble!(assembler, layout, Ke, ones(3))
+    assemble!(assembler, dofs, Ke, ones(3))
     K, f = finish_assemble(assembler)
-    @test K[collect(layout), collect(layout)] ≈ Ke
+    @test K[dofs, dofs] ≈ Ke
     # Cell/facet descriptors with empty entity sets contribute nothing (in particular on a
     # DofHandler without any SubDofHandlers)
     empty_cpl = CellCoupling(dh, Int[]; algebraic_coupling = ((:z, :p0),))
@@ -506,7 +506,7 @@ end
     @test_throws ErrorException AlgebraicCoupling(dh; algebraic_coupling = ((:u, :z),))
 end
 
-@testset "local layouts and assembly" begin
+@testset "augmented local dofs and assembly" begin
     grid = generate_grid(Quadrilateral, (3, 3))
     dh = DofHandler(grid)
     add!(dh, :u, Lagrange{RefQuadrilateral, 1}()^2)
@@ -519,49 +519,16 @@ end
     fcpl = FacetCoupling(dh, right; algebraic_coupling = ((:u, :p0),))
     acpl = AlgebraicCoupling(dh; algebraic_coupling = ((:p0, :p0), (:p0, :z), (:z, :z)))
 
-    # Deterministic appended ordering: celldofs, then algebraic in descriptor field order
-    layout = LocalDofLayout()
-    for cc in CellIterator(dh, [4])
-        @test local_dofs!(layout, cc, ccpl) === layout
-        @test layout isa LocalDofLayout
-        @test collect(layout) == vcat(celldofs(cc), algebraic_dofs(dh, :z), algebraic_dofs(dh, :p0))
-        @test layout[dof_range(layout, :u)] == celldofs(cc)[dof_range(dh, :u)]
-        @test layout[dof_range(layout, :p)] == celldofs(cc)[dof_range(dh, :p)]
-        @test layout[dof_range(layout, :z)] == algebraic_dofs(dh, :z)
-        @test layout[dof_range(layout, :p0)] == algebraic_dofs(dh, :p0)
-        @test_throws ErrorException dof_range(layout, :nope)
-        # Read-only
-        @test_throws Exception layout[1] = 1
-        # Wrong entity/descriptor combinations (typed API: no such method)
-        @test_throws MethodError local_dofs!(layout, cc, fcpl)
-    end
-    # The layout is reused as the iterator advances
-    for cc in CellIterator(dh, [1, 2])
-        local_dofs!(layout, cc, ccpl)
-        @test collect(layout) == vcat(celldofs(dh, cellid(cc)), algebraic_dofs(dh, :z), algebraic_dofs(dh, :p0))
-    end
-    # Entity must belong to the descriptor set
-    sub = CellCoupling(dh, [1]; algebraic_coupling = ((:p, :p0),))
-    for cc in CellIterator(dh, [2])
-        @test_throws ErrorException local_dofs!(layout, cc, sub)
-    end
-    for fc in FacetIterator(dh, getfacetset(grid, "left"))
-        @test_throws ErrorException local_dofs!(layout, fc, fcpl)
-    end
-    # Mismatched handler
-    dhx = DofHandler(grid)
-    add!(dhx, :p, Lagrange{RefQuadrilateral, 1}())
-    add!(dhx, :p0, AlgebraicVariable())
-    close!(dhx)
-    cplx = CellCoupling(dhx, [1]; algebraic_coupling = ((:p, :p0),))
-    for cc in CellIterator(dh, [1])
-        @test_throws ErrorException local_dofs!(layout, cc, cplx)
-    end
-    # Algebraic layout
-    lay = local_dofs!(LocalDofLayout(), acpl)
-    @test collect(lay) == vcat(algebraic_dofs(dh, :p0), algebraic_dofs(dh, :z))
-    @test dof_range(lay, :p0) == 1:1
-    @test dof_range(lay, :z) == 2:3
+    # The augmented local dof vector is plain user code: cell dofs first, then the
+    # algebraic dofs in an order chosen by the assembly loop
+    n = ndofs_per_cell(dh)
+    zdofs = algebraic_dofs(dh, :z)
+    p0dofs = algebraic_dofs(dh, :p0)
+    nl = n + length(zdofs) + length(p0dofs)
+    dofs = Vector{Int}(undef, nl)
+    dofs[(n + 1):(n + 2)] .= zdofs
+    dofs[n + 3] = only(p0dofs)
+    range_u = dof_range(dh, :u)
 
     # Assembly equivalence with direct global insertion, and residual assembly
     couplings = (c = ccpl, f = fcpl, a = acpl)
@@ -571,42 +538,31 @@ end
     fref = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
     for cc in CellIterator(dh)
-        local_dofs!(layout, cc, ccpl)
-        nl = length(layout)
+        copyto!(dofs, celldofs(cc))
         Ke = reshape(float.(1:(nl * nl)), nl, nl) .+ cellid(cc)
         fe = float.(1:nl)
         # keep u-rows/cols zero: mask them out like a kernel would
-        ru = dof_range(layout, :u)
-        Ke[ru, :] .= 0; Ke[:, ru] .= 0; fe[ru] .= 0
-        assemble!(assembler, layout, Ke, fe)
-        Kref[collect(layout), collect(layout)] .+= Ke
-        fref[collect(layout)] .+= fe
+        Ke[range_u, :] .= 0; Ke[:, range_u] .= 0; fe[range_u] .= 0
+        assemble!(assembler, dofs, Ke, fe)
+        Kref[dofs, dofs] .+= Ke
+        fref[dofs] .+= fe
     end
-    lay0 = local_dofs!(LocalDofLayout(), acpl)
+    # An algebraic-only term uses the global algebraic dofs directly
+    adofs = vcat(p0dofs, zdofs)
     Ke0 = [1.0 2.0 3.0; 4.0 5.0 6.0; 7.0 8.0 9.0]
     fe0 = [1.0, 2.0, 3.0]
-    assemble!(assembler, lay0, Ke0, fe0)
-    Kref[collect(lay0), collect(lay0)] .+= Ke0
-    fref[collect(lay0)] .+= fe0
+    assemble!(assembler, adofs, Ke0, fe0)
+    Kref[adofs, adofs] .+= Ke0
+    fref[adofs] .+= fe0
     K, f = finish_assemble(assembler)
     @test Matrix(K) ≈ Kref
     @test f ≈ fref
 
-    # Correctness after global renumbering
-    renumber!(dh, DofOrder.FieldWise())
-    ccpl2 = CellCoupling(dh, 1:getncells(grid); algebraic_coupling = ((:p, :z), (:p, :p0), (:z, :z), (:z, :p0), (:p0, :p0)))
-    for cc in CellIterator(dh, [4])
-        local_dofs!(layout, cc, ccpl2)
-        @test layout[dof_range(layout, :z)] == algebraic_dofs(dh, :z)
-        @test layout[dof_range(layout, :p0)] == algebraic_dofs(dh, :p0)
-    end
-
     # Forgetting algebraic_couplings= gives the existing missing-sparsity-entry error
     Kmiss = allocate_matrix(dh)
     amiss = start_assemble(Kmiss)
-    lmiss = local_dofs!(LocalDofLayout(), AlgebraicCoupling(dh; algebraic_coupling = ((:p0, :p0), (:p0, :z), (:z, :z))))
     err = try
-        assemble!(amiss, lmiss, ones(3, 3))
+        assemble!(amiss, adofs, ones(3, 3))
         nothing
     catch e
         e
@@ -632,13 +588,14 @@ end
     K = allocate_matrix(dh, ch; algebraic_couplings = (cpl,))
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
-    layout = LocalDofLayout()
+    nl = ndofs_per_cell(dh) + 1
+    dofs = Vector{Int}(undef, nl)
+    dofs[nl] = p0dof
     for cc in CellIterator(dh)
-        local_dofs!(layout, cc, cpl)
-        nl = length(layout)
+        copyto!(dofs, celldofs(cc))
         Ke = Matrix(2.0 * I, nl, nl) .+ 0.5
         fe = ones(nl)
-        apply_assemble!(assembler, ch, layout, Ke, fe)
+        apply_assemble!(assembler, ch, dofs, Ke, fe)
     end
     K, f = finish_assemble(assembler)
     apply!(K, f, ch)
@@ -655,25 +612,26 @@ end
     close!(dh)
     cpl = CellCoupling(dh, 1:getncells(grid); algebraic_coupling = ((:u, :p0), (:p0, :p0)))
     ncells = getncells(grid)
+    nl = ndofs_per_cell(dh) + 1
     function element!(Ke, fe, cellid)
         Ke .= 1.0 .+ cellid / ncells
         fe .= cellid
         return
     end
-    function assemble_all!(K, f, atomic::Bool, coupling = cpl)
+    function assemble_all!(K, f, atomic::Bool)
         chunks = collect(Iterators.partition(1:ncells, max(1, ncells ÷ 4)))
         tasks = map(chunks) do chunk
             Threads.@spawn begin
                 # Each task owns its assembler, buffers, and iterator
                 assembler = start_assemble(K, f; fillzero = false, atomic = atomic)
-                layout = LocalDofLayout()
+                dofs = Vector{Int}(undef, nl)
+                dofs[nl] = only(algebraic_dofs(dh, :p0))
                 for cc in CellIterator(dh, chunk)
-                    local_dofs!(layout, cc, coupling)
-                    nl = length(layout)
+                    copyto!(dofs, celldofs(cc))
                     Ke = zeros(nl, nl)
                     fe = zeros(nl)
                     element!(Ke, fe, cellid(cc))
-                    assemble!(assembler, layout, Ke, fe)
+                    assemble!(assembler, dofs, Ke, fe)
                 end
             end
         end
@@ -683,13 +641,13 @@ end
     # CSC
     Kser = allocate_matrix(dh; algebraic_couplings = (cpl,)); fser = zeros(ndofs(dh))
     aser = start_assemble(Kser, fser)
-    layout = LocalDofLayout()
+    dofs = Vector{Int}(undef, nl)
+    dofs[nl] = only(algebraic_dofs(dh, :p0))
     for cc in CellIterator(dh)
-        local_dofs!(layout, cc, cpl)
-        nl = length(layout)
+        copyto!(dofs, celldofs(cc))
         Ke = zeros(nl, nl); fe = zeros(nl)
         element!(Ke, fe, cellid(cc))
-        assemble!(aser, layout, Ke, fe)
+        assemble!(aser, dofs, Ke, fe)
     end
     finish_assemble(aser)
     Kthr = allocate_matrix(dh; algebraic_couplings = (cpl,)); fthr = zeros(ndofs(dh))
@@ -709,21 +667,21 @@ end
     sp = BlockSparsityPattern([ndofs(dh) - 1, 1])
     cpl2 = CellCoupling(dh, 1:ncells; algebraic_coupling = ((:u, :p0), (:p0, :p0)))
     add_sparsity_entries!(sp, dh; algebraic_couplings = (cpl2,))
-    # Serial reference in the renumbered ordering
+    # Serial reference in the renumbered ordering (the tail is re-queried after renumber!)
     Kser2 = allocate_matrix(dh; algebraic_couplings = (cpl2,)); fser2 = zeros(ndofs(dh))
     aser2 = start_assemble(Kser2, fser2)
+    dofs[nl] = only(algebraic_dofs(dh, :p0))
     for cc in CellIterator(dh)
-        local_dofs!(layout, cc, cpl2)
-        nl = length(layout)
+        copyto!(dofs, celldofs(cc))
         Ke = zeros(nl, nl); fe = zeros(nl)
         element!(Ke, fe, cellid(cc))
-        assemble!(aser2, layout, Ke, fe)
+        assemble!(aser2, dofs, Ke, fe)
     end
     finish_assemble(aser2)
     Kblock = allocate_matrix(BlockMatrix, sp)
     fblock = BlockVector(zeros(ndofs(dh)), [ndofs(dh) - 1, 1])
     start_assemble(Kblock, fblock) # zero K and f once; the tasks use fillzero = false
-    assemble_all!(Kblock, fblock, true, cpl2)
+    assemble_all!(Kblock, fblock, true)
     @test Matrix(Kblock) ≈ Matrix(Kser2)
     @test Vector(fblock) ≈ fser2
 end
@@ -820,12 +778,12 @@ end
         return re
     end
     assembler = start_assemble(K, f)
-    layout = LocalDofLayout()
+    dofs = Vector{Int}(undef, nlocal)
+    dofs[(nbase + 1):end] .= algebraic_dofs(dh, :σ̄)
+    range_u = dof_range(dh, :u)
+    range_σ = (nbase + 1):nlocal
     for cc in CellIterator(dh)
-        local_dofs!(layout, cc, descriptor)
-        range_u = dof_range(layout, :u)
-        range_σ = dof_range(layout, :σ̄)
-        @assert length(layout) == nlocal
+        copyto!(dofs, celldofs(cc))
         fill!(Ke, 0); fill!(fe, 0)
         reinit!(cv, cc)
         for qp in 1:getnquadpoints(cv)
@@ -855,7 +813,7 @@ end
             )
             @test Ke_ad ≈ Ke
         end
-        apply_assemble!(assembler, ch, layout, Ke, fe)
+        apply_assemble!(assembler, ch, dofs, Ke, fe)
     end
     K, f = finish_assemble(assembler)
     a = K \ f
@@ -915,22 +873,23 @@ end
     nlocal = nbase + 1
     Keb = zeros(nlocal, nlocal)
     feb = zeros(nlocal)
-    layout = LocalDofLayout()
+    bdofs = Vector{Int}(undef, nlocal)
+    bdofs[nlocal] = λdof
+    range_u = dof_range(dh, :u)
+    λlocal = nlocal # local index of the multiplier
     for fc in FacetIterator(dh, boundary)
-        local_dofs!(layout, fc, descriptor)
-        range_u = dof_range(layout, :u)
-        range_λ = dof_range(layout, :λ)
+        copyto!(bdofs, celldofs(fc))
         fill!(Keb, 0); fill!(feb, 0)
         reinit!(fv, fc)
         for qp in 1:getnquadpoints(fv)
             dΓ = getdetJdV(fv, qp)
             for (i, I) in pairs(range_u)
                 v = shape_value(fv, qp, i)
-                Keb[I, only(range_λ)] += v * dΓ
-                Keb[only(range_λ), I] += v * dΓ
+                Keb[I, λlocal] += v * dΓ
+                Keb[λlocal, I] += v * dΓ
             end
         end
-        assemble!(assembler, layout, Keb, feb)
+        assemble!(assembler, bdofs, Keb, feb)
     end
     K, f = finish_assemble(assembler)
     a = K \ f
@@ -964,10 +923,9 @@ end
         n = ndofs_per_cell(dh)
         assemble!(assembler, celldofs(cc), Matrix(1.0 * I, n, n), zeros(n))
     end
-    layout = local_dofs!(LocalDofLayout(), zd)
     Kpp = [2.0 1.0; 1.0 3.0]
     fp = [1.0, 2.0]
-    assemble!(assembler, layout, Kpp, fp)
+    assemble!(assembler, pdofs, Kpp, fp)
     K, f = finish_assemble(assembler)
     a = K \ f
     @test a[pdofs] ≈ Kpp \ fp

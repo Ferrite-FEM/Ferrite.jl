@@ -132,8 +132,6 @@ export
     CellCoupling,
     FacetCoupling,
     AlgebraicCoupling,
-    LocalDofLayout,
-    local_dofs!,
     close!,
     ndofs,
     ndofs_per_cell,

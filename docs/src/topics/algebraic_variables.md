@@ -60,10 +60,9 @@ prescribed quantities, the total value is the prescribed part plus the reconstru
 ## Coupling descriptors
 
 Since an algebraic variable has no mesh support, Ferrite cannot derive from the mesh where
-it enters the weak form. This is declared with a *coupling descriptor*, which is used for
-two things: to allocate the corresponding test/trial blocks in the sparsity pattern, and
-to build the augmented local dof layouts during assembly. The weak-form contribution
-itself is still assembled by user code.
+it enters the weak form. This is declared with a *coupling descriptor*, which is used to
+allocate the corresponding test/trial blocks in the sparsity pattern. The weak-form
+contribution itself is still assembled by user code.
 
 The descriptor type selects the entities over which the terms are integrated:
 
@@ -114,16 +113,19 @@ assembly.
 ## Assembly
 
 Assembly over a descriptor's entities works like ordinary assembly, with the local system
-augmented by the algebraic dofs: [`local_dofs!`](@ref) fills a [`LocalDofLayout`](@ref)
-with the cell dofs followed by the descriptor's algebraic dofs, and [`dof_range`](@ref)
-gives the local range of each variable. Like `CellValues`, [`AlgebraicValues`](@ref) is
-constructed once and passed to the element routine:
+augmented by the algebraic dofs. There is no dedicated data structure for this: since the
+algebraic dofs are global and the same for every entity, the augmented dof vector is an
+ordinary `Vector{Int}` where the constant tail from [`algebraic_dofs`](@ref) is written
+once, outside the loop, and only the cell dofs are refreshed per entity. The assembler
+only requires that the entries of the dof vector match the rows/columns of `Ke`, so the
+local placement of the algebraic dofs is a choice made by the assembly code. Like
+`CellValues`, [`AlgebraicValues`](@ref) is constructed once and passed to the element
+routine:
 
 ```julia
 σ̄values = AlgebraicValues(σ̄var)
 
-function element_routine!(Ke, fe, ae, layout, cellvalues, σ̄values)
-    range_σ = dof_range(layout, :σ̄)
+function element_routine!(Ke, fe, ae, range_σ, cellvalues, σ̄values)
     σ̄ = algebraic_value(σ̄values, ae, range_σ)
 
     for (iσ, I) in pairs(range_σ)
@@ -133,40 +135,45 @@ function element_routine!(Ke, fe, ae, layout, cellvalues, σ̄values)
     return
 end
 
-function assemble_volume!(assembler, dh, ch, coupling, cellvalues, σ̄values, a)
+function assemble_volume!(assembler, dh, ch, cellvalues, σ̄values, a)
+    n = ndofs_per_cell(dh)
     nσ = getnbasefunctions(σ̄values)
-    nlocal = ndofs_per_cell(dh) + nσ
-    Ke = zeros(eltype(a), nlocal, nlocal)
-    fe = zeros(eltype(a), nlocal)
-    layout = LocalDofLayout()
+    dofs = Vector{Int}(undef, n + nσ)
+    dofs[(n + 1):end] .= algebraic_dofs(dh, :σ̄) # constant tail, written once
+    range_σ = (n + 1):(n + nσ)                   # local placement of the σ̄ dofs
+    Ke = zeros(eltype(a), n + nσ, n + nσ)
+    fe = zeros(eltype(a), n + nσ)
 
     for cell in CellIterator(dh)
-        local_dofs!(layout, cell, coupling)
-        ae = a[layout]
+        copyto!(dofs, celldofs(cell)) # refresh the first n entries
+        ae = a[dofs]
         fill!(Ke, 0)
         fill!(fe, 0)
         reinit!(cellvalues, cell)
-        element_routine!(Ke, fe, ae, layout, cellvalues, σ̄values)
-        apply_assemble!(assembler, ch, layout, Ke, fe)
+        element_routine!(Ke, fe, ae, range_σ, cellvalues, σ̄values)
+        apply_assemble!(assembler, ch, dofs, Ke, fe)
     end
     return
 end
 ```
 
-For an algebraic-only term:
+For an algebraic-only term the "local" dofs are simply the global algebraic dofs:
 
 ```julia
-layout = local_dofs!(LocalDofLayout(), couplings.zero_d)
-range_p0 = dof_range(layout, :p0)
-range_z = dof_range(layout, :z)
-Ke = zeros(length(layout), length(layout))
-fe = zeros(length(layout))
+dofs = vcat(algebraic_dofs(dh, :p0), algebraic_dofs(dh, :z))
+range_p0 = 1:1
+range_z = 2:3
+Ke = zeros(length(dofs), length(dofs))
+fe = zeros(length(dofs))
 # assemble the 0D contribution
-assemble!(assembler, layout, Ke, fe)
+assemble!(assembler, dofs, Ke, fe)
 ```
 
-Note that `dof_range(layout, :p0)` is a range of *local* indices into the augmented
-system, not the global dof numbers (those are given by `algebraic_dofs(dh, :p0)`).
+Since the augmented dof vector is built by user code, it must list the algebraic dofs of
+the variables that the element routine writes to; forgetting a variable (or the
+`algebraic_couplings` keyword during matrix allocation) surfaces as a
+missing-sparsity-entry error on the first `assemble!`. After [`renumber!`](@ref), rebuild
+the tail from the re-queried `algebraic_dofs`.
 
 ## Threading and matrix structure
 

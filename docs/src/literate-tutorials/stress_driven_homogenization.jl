@@ -182,9 +182,8 @@ algebraic_dofs(dh, :εbar)
 # ``\boldsymbol{u}``-``\bar{\boldsymbol{\varepsilon}}`` blocks (the tuple form is
 # bidirectional) and, since ``\boldsymbol{K}_{\varepsilon\varepsilon}`` is a full
 # ``3 \times 3`` block here, also the coupling of the variable with itself. The
-# descriptor is used both when allocating the matrix (to add the corresponding entries
-# to the sparsity pattern) and during assembly (to build the augmented local dof
-# layouts).
+# descriptor is used when allocating the matrix, to add the corresponding entries to the
+# sparsity pattern.
 coupling = CellCoupling(dh, 1:getncells(grid); algebraic_coupling = ((:u, :εbar), (:εbar, :εbar)));
 
 # The fluctuation field is periodic across the RVE, which [`PeriodicDirichlet`](@ref)
@@ -236,9 +235,10 @@ av_ε = AlgebraicValues(ε̄var);
 # and the only non-zero right hand side entries are the ones for the algebraic variable,
 # ``f_\beta = |\Omega^e|\, \bar{\boldsymbol{\sigma}} : \boldsymbol{E}_\beta``. The
 # assembly loop looks just like any other two-field loop; the only new ingredient is
-# that the local system is *augmented* with the algebraic dofs through
-# [`local_dofs!`](@ref), which fills a reusable layout with the ordinary cell dofs followed
-# by the three strain dofs, with local [`dof_range`](@ref) queries by name. The
+# that the local system is *augmented* with the algebraic dofs. Since they are global
+# dofs, shared by every cell, their numbers (from [`algebraic_dofs`](@ref)) are appended
+# after the cell dofs once, outside the loop, and only the cell dofs are refreshed per
+# cell. The local ranges of the two variables are constant for the same reason. The
 # augmented `Ke`/`fe` are scattered by the standard assembler. (One thing to keep in
 # mind for large problems: since the algebraic dofs are shared between all cells,
 # *colored threaded assembly is not applicable* -- the supported threaded path is the
@@ -247,17 +247,19 @@ av_ε = AlgebraicValues(ε̄var);
 # The optional last argument `ch` condenses the constraints during assembly with
 # [`apply_assemble!`](@ref) instead of `apply!` after assembly -- this is used in the
 # blocked solve at the end of the tutorial.
-function assemble_system!(K, f, dh, cv_u, av_ε, coupling, σ̄, Ei, Em, incl_cells, ch = nothing)
-    n = ndofs_per_cell(dh) + getnbasefunctions(av_ε)
-    Ke = zeros(n, n)
-    fe = zeros(n)
+function assemble_system!(K, f, dh, cv_u, av_ε, σ̄, Ei, Em, incl_cells, ch = nothing)
+    n = ndofs_per_cell(dh)
+    nε = getnbasefunctions(av_ε)
+    dofs = Vector{Int}(undef, n + nε)
+    dofs[(n + 1):end] .= algebraic_dofs(dh, :εbar) # constant tail, written once
+    range_u = dof_range(dh, :u)
+    range_ε = (n + 1):(n + nε) # local placement of the strain dofs
+    Ke = zeros(n + nε, n + nε)
+    fe = zeros(n + nε)
     assembler = start_assemble(K, f)
-    layout = LocalDofLayout()
     for cell in CellIterator(dh)
         reinit!(cv_u, cell)
-        local_dofs!(layout, cell, coupling)
-        range_u = dof_range(layout, :u)
-        range_ε = dof_range(layout, :εbar)
+        copyto!(dofs, celldofs(cell)) # refresh the first n entries
         fill!(Ke, 0)
         fill!(fe, 0)
         E = cellid(cell) in incl_cells ? Ei : Em
@@ -286,9 +288,9 @@ function assemble_system!(K, f, dh, cv_u, av_ε, coupling, σ̄, Ei, Em, incl_ce
             end
         end
         if ch === nothing
-            assemble!(assembler, layout, Ke, fe)
+            assemble!(assembler, dofs, Ke, fe)
         else
-            apply_assemble!(assembler, ch, layout, Ke, fe)
+            apply_assemble!(assembler, ch, dofs, Ke, fe)
         end
     end
     return K, f
@@ -304,7 +306,7 @@ end;
 # pattern:
 K = allocate_matrix(dh, ch; algebraic_couplings = (coupling,))
 f = zeros(ndofs(dh))
-assemble_system!(K, f, dh, cv_u, av_ε, coupling, σ̄, Ei, Em, incl_cells)
+assemble_system!(K, f, dh, cv_u, av_ε, σ̄, Ei, Em, incl_cells)
 apply!(K, f, ch)
 a = K \ f
 apply!(a, ch);
@@ -381,7 +383,7 @@ function effective_stiffness(dh, cv_u, av_ε, coupling, Ei, Em, incl_cells, peri
         return close!(chβ)
     end
     K = allocate_matrix(dh, chs[1]; algebraic_couplings = (coupling,))
-    assemble_system!(K, zeros(ndofs(dh)), dh, cv_u, av_ε, coupling, zero(SymmetricTensor{2, 2}), Ei, Em, incl_cells)
+    assemble_system!(K, zeros(ndofs(dh)), dh, cv_u, av_ε, zero(SymmetricTensor{2, 2}), Ei, Em, incl_cells)
     rhsdata = get_rhs_data(chs[1], K)
     apply!(K, chs[1])
     F = lu(K)
@@ -544,8 +546,9 @@ using BlockArrays
 # block and the three `:εbar` dofs the last. Renumbering invalidates dof-based data
 # structures, so we re-query [`algebraic_dofs`](@ref) (which returns the *renumbered*
 # dofs) and recreate the constraint handler. The coupling descriptor, however, does not
-# store global dof numbers -- the local layouts read them from the `DofHandler` on
-# every call -- so it remains valid across the renumbering.
+# store global dof numbers -- they are read from the `DofHandler` when the sparsity
+# entries are added -- so it remains valid across the renumbering, and so does
+# `assemble_system!`, which likewise re-queries `algebraic_dofs` on every call.
 renumber!(dh, DofOrder.FieldWise())
 gdofs = algebraic_dofs(dh, :εbar)
 nu = ndofs(dh) - nε
@@ -570,7 +573,7 @@ bsp = BlockSparsityPattern([nu, nε])
 add_sparsity_entries!(bsp, dh, ch; algebraic_couplings = (coupling,))
 Kb = allocate_matrix(BlockMatrix, bsp)
 fb = mortar([zeros(nu), zeros(nε)])
-assemble_system!(Kb, fb, dh, cv_u, av_ε, coupling, σ̄, Ei, Em, incl_cells, ch);
+assemble_system!(Kb, fb, dh, cv_u, av_ε, σ̄, Ei, Em, incl_cells, ch);
 
 # The blocks are ordinary matrices (`SparseMatrixCSC` for the sparse ones), so the
 # Schur complement solve is a direct transcription of the formulas: one Cholesky

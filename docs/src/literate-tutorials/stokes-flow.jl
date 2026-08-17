@@ -557,7 +557,7 @@ main()
 # [`FacetCoupling`](@ref) over the boundary facets declares the
 # ``\underline{\underline{C}}_p`` and ``\underline{\underline{C}}_p^\mathrm{T}`` blocks
 # in the sparsity pattern (the tuple form of `algebraic_coupling` couples both
-# directions), and builds the augmented local dof layouts during assembly.
+# directions).
 
 function setup_multiplier_dofs(grid, ipu, ipp)
     dh = DofHandler(grid)
@@ -595,23 +595,26 @@ end
 # `celldofs`, so `assemble_system!` from above is reused as is. What remains are the
 # multiplier terms, ``\lambda \int_{\Gamma} \delta p\ \mathrm{d}\Gamma`` and
 # ``\delta\lambda \int_{\Gamma} p\ \mathrm{d}\Gamma``, assembled in a loop over the
-# boundary facets where the local system is augmented with the multiplier dof through
-# [`local_dofs!`](@ref). Compare with `setup_mean_constraint` above: it is the same
-# integral, but assembled directly into the matrix blocks instead of being turned into
-# an `AffineConstraint`. (The augmented local matrix also contains (zero) entries
-# coupling `:u` and `:λ`, which is fine: assembling an explicit zero into an entry that
-# is missing from the sparsity pattern is allowed.)
+# boundary facets where the local system is augmented with the multiplier dof: since it
+# is a global dof, its number (from [`algebraic_dofs`](@ref)) is simply appended after
+# the cell dofs, once, outside the loop, and only the cell dofs are refreshed per facet.
+# Compare with `setup_mean_constraint` above: it is the same integral, but assembled
+# directly into the matrix blocks instead of being turned into an `AffineConstraint`.
+# (The augmented local matrix also contains (zero) entries coupling `:u` and `:λ`, which
+# is fine: assembling an explicit zero into an entry that is missing from the sparsity
+# pattern is allowed.)
 
-function assemble_multiplier_terms!(assembler, dh, coupling, fvp, Γ)
-    nl = ndofs_per_cell(dh) + 1
-    Ke = zeros(nl, nl)
-    fe = zeros(nl)
-    layout = LocalDofLayout()
+function assemble_multiplier_terms!(assembler, dh, fvp, Γ)
+    n = ndofs_per_cell(dh)
+    dofs = Vector{Int}(undef, n + 1)
+    dofs[n + 1] = only(algebraic_dofs(dh, :λ))
+    range_p = dof_range(dh, :p)
+    λdof = n + 1 # local index of the multiplier
+    Ke = zeros(n + 1, n + 1)
+    fe = zeros(n + 1)
     for facet in FacetIterator(dh, Γ)
         reinit!(fvp, facet)
-        local_dofs!(layout, facet, coupling)
-        range_p = dof_range(layout, :p)
-        λdof = only(dof_range(layout, :λ))
+        copyto!(dofs, celldofs(facet)) # refresh the first n entries
         fill!(Ke, 0)
         for qp in 1:getnquadpoints(fvp)
             dΓ = getdetJdV(fvp, qp)
@@ -621,7 +624,7 @@ function assemble_multiplier_terms!(assembler, dh, coupling, fvp, Γ)
                 Ke[λdof, I] += Cip
             end
         end
-        assemble!(assembler, layout, Ke, fe)
+        assemble!(assembler, dofs, Ke, fe)
     end
     return
 end
@@ -647,7 +650,7 @@ function main_multiplier(h = 0.05)
     ## Assemble the cell contributions (unchanged) and the multiplier terms
     assemble_system!(K, f, dh, cvu, cvp)
     assembler = start_assemble(K, f; fillzero = false)
-    assemble_multiplier_terms!(assembler, dh, coupling, fvp, Γ)
+    assemble_multiplier_terms!(assembler, dh, fvp, Γ)
     ## Apply boundary conditions and solve
     apply!(K, f, ch)
     a = K \ f

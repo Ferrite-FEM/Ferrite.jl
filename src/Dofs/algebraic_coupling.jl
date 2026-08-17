@@ -1,17 +1,16 @@
-# Coupling descriptors and local dof layouts for algebraic variables.
+# Coupling descriptors for algebraic variables.
 
 ########################
 # Local layout metadata #
 ########################
 
-# Metadata for the augmented local layout of one descriptor on one SubDofHandler,
-# precomputed at descriptor construction and reused for every entity.
-# The coupled (test-range, trial-range) block pairs of a layout, split into blocks that
-# involve cell dofs and blocks between algebraic dofs only (the latter reference the same
-# global dofs for every entity and only need to be added to a sparsity pattern once).
+# Sparsity metadata for the augmented local layout (cell dofs followed by the
+# descriptor's algebraic dofs) of one descriptor on one SubDofHandler, precomputed at
+# descriptor construction. The coupled (test-range, trial-range) block pairs are split
+# into blocks that involve cell dofs and blocks between algebraic dofs only (the latter
+# reference the same global dofs for every entity and only need to be added to a
+# sparsity pattern once).
 struct LocalLayoutInfo
-    names::Vector{Symbol}          # sdh field names followed by the descriptor's algebraic variables
-    ranges::Vector{UnitRange{Int}} # local dof range for each entry in `names`
     n_cell_dofs::Int               # number of ordinary cell dofs (0 for AlgebraicCoupling)
     n_total::Int                   # total number of local dofs
     algebraic_indices::Vector{Int} # indices into the DofHandler's algebraic registries, in descriptor field order
@@ -70,7 +69,7 @@ function _local_layout_info(
     end
     n_total = offset
     cell_blocks, algebraic_blocks = _coupled_blocks(fields, coupling, names, ranges, n_cell_dofs)
-    return LocalLayoutInfo(names, ranges, n_cell_dofs, n_total, algebraic_indices, cell_blocks, algebraic_blocks)
+    return LocalLayoutInfo(n_cell_dofs, n_total, algebraic_indices, cell_blocks, algebraic_blocks)
 end
 
 ##############################
@@ -310,57 +309,10 @@ function _iterate_algebraic_couplings(cs)
     return cs
 end
 
-##################
-# LocalDofLayout #
-##################
-
-"""
-    LocalDofLayout
-
-Read-only vector of global dof indices for the augmented local system of one coupling
-descriptor. It contains the cell dofs followed by the descriptor's algebraic dofs and can
-be passed to [`assemble!`](@ref) or [`apply_assemble!`](@ref). Construct it once with
-`LocalDofLayout()` and update it with [`local_dofs!`](@ref).
-"""
-mutable struct LocalDofLayout <: AbstractVector{Int}
-    const dofs::Vector{Int}
-    # `names`/`ranges` alias the descriptor's layout metadata and must not be mutated
-    names::Vector{Symbol}
-    ranges::Vector{UnitRange{Int}}
-end
-
-LocalDofLayout() = LocalDofLayout(Int[], Symbol[], UnitRange{Int}[])
-
-Base.size(l::LocalDofLayout) = size(l.dofs)
-Base.IndexStyle(::Type{LocalDofLayout}) = IndexLinear()
-Base.@propagate_inbounds Base.getindex(l::LocalDofLayout, i::Int) = l.dofs[i]
-
-"""
-    dof_range(layout::LocalDofLayout, name::Symbol)
-
-Return the local dof range of `name` in `layout`.
-"""
-function dof_range(l::LocalDofLayout, name::Symbol)
-    i = findfirst(==(name), l.names)
-    if i === nothing
-        error("no field or algebraic variable named :$name in this layout (available: $(l.names))")
-    end
-    return l.ranges[i]
-end
-
-# Resolve the owning DofHandler of a cache created from a DofHandler or SubDofHandler.
-function _owning_dof_handler(cc::CellCache)
-    dh = cc.dh
-    dh === nothing && error("`local_dofs!` requires a cache created from a DofHandler, not from a Grid")
-    return dh isa SubDofHandler ? dh.dh : dh
-end
-
-function _update_local_dofs!(layout::LocalDofLayout, dh::DofHandler, cell_dofs::AbstractVector{Int}, info::LocalLayoutInfo)
-    if length(cell_dofs) != info.n_cell_dofs
-        error("expected $(info.n_cell_dofs) cell dofs but the cache holds $(length(cell_dofs)) (was the cache created with `UpdateFlags(dofs = true)`?)")
-    end
-    # Copy the cell dofs: the iterator's scratch storage is overwritten when it advances
-    dofs = layout.dofs
+# Fill `dofs` with the cell dofs followed by the active dofs of the descriptor's
+# algebraic variables: the augmented local dof vector whose entries the sparsity blocks
+# below index into.
+function _augmented_dofs!(dofs::Vector{Int}, dh::DofHandler, cell_dofs::AbstractVector{Int}, info::LocalLayoutInfo)
     resize!(dofs, info.n_total)
     copyto!(dofs, 1, cell_dofs, 1, info.n_cell_dofs)
     k = info.n_cell_dofs
@@ -371,45 +323,7 @@ function _update_local_dofs!(layout::LocalDofLayout, dh::DofHandler, cell_dofs::
         end
     end
     @assert k == info.n_total
-    layout.names = info.names
-    layout.ranges = info.ranges
-    return layout
-end
-
-"""
-    local_dofs!(layout::LocalDofLayout, cell::CellCache, coupling::CellCoupling)
-    local_dofs!(layout::LocalDofLayout, facet::FacetCache, coupling::FacetCoupling)
-    local_dofs!(layout::LocalDofLayout, coupling::AlgebraicCoupling)
-
-Update `layout` with the augmented local dofs of `coupling` and return it. Construct one
-layout outside the assembly loop and reuse it for each entity.
-"""
-function local_dofs!(layout::LocalDofLayout, cc::CellCache, c::CellCoupling)
-    if _owning_dof_handler(cc) !== c.dh
-        error("the cell cache and the coupling descriptor belong to different DofHandlers")
-    end
-    cid = cellid(cc)
-    if cid ∉ c.cells
-        error("cell $cid is not in the cell set of this CellCoupling")
-    end
-    info = c.layout_infos[c.dh.cell_to_subdofhandler[cid]]::LocalLayoutInfo
-    return _update_local_dofs!(layout, c.dh, celldofs(cc), info)
-end
-
-function local_dofs!(layout::LocalDofLayout, fc::FacetCache, c::FacetCoupling)
-    if _owning_dof_handler(fc.cc) !== c.dh
-        error("the facet cache and the coupling descriptor belong to different DofHandlers")
-    end
-    facet = FacetIndex(cellid(fc), fc.current_facet_id)
-    if facet ∉ c.facets
-        error("facet $(facet.idx) is not in the facet set of this FacetCoupling")
-    end
-    info = c.layout_infos[c.dh.cell_to_subdofhandler[cellid(fc)]]::LocalLayoutInfo
-    return _update_local_dofs!(layout, c.dh, celldofs(fc), info)
-end
-
-function local_dofs!(layout::LocalDofLayout, c::AlgebraicCoupling)
-    return _update_local_dofs!(layout, c.dh, Int[], c.layout_info)
+    return dofs
 end
 
 ##################################
@@ -452,8 +366,8 @@ end
 
 function _add_coupling_entries!(sp::AbstractSparsityPattern, c::AbstractCoupling, ch::Union{ConstraintHandler, Nothing}, keep_constrained::Bool)
     if c isa AlgebraicCoupling
-        layout = local_dofs!(LocalDofLayout(), c)
-        _add_block_entries!(sp, layout, c.layout_info.algebraic_blocks, ch, keep_constrained)
+        dofs = _augmented_dofs!(Int[], c.dh, Int[], c.layout_info)
+        _add_block_entries!(sp, dofs, c.layout_info.algebraic_blocks, ch, keep_constrained)
         return sp
     end
     # A facet term uses all dofs of the adjacent cell, so it suffices to visit each
@@ -469,17 +383,17 @@ function _add_cell_coupling_entries!(
     )
     isempty(cells) && return sp
     cc = CellCache(dh, UpdateFlags(nodes = false, coords = false, dofs = true))
-    layout = LocalDofLayout()
+    dofs = Int[]
     firstcell = true
     for cellid in cells
         reinit!(cc, cellid)
         info = layout_infos[dh.cell_to_subdofhandler[cellid]]::LocalLayoutInfo
-        _update_local_dofs!(layout, dh, celldofs(cc), info)
-        _add_block_entries!(sp, layout, info.cell_blocks, ch, keep_constrained)
+        _augmented_dofs!(dofs, dh, celldofs(cc), info)
+        _add_block_entries!(sp, dofs, info.cell_blocks, ch, keep_constrained)
         if firstcell
             # The algebraic-only blocks reference the same global dofs for every cell, so
             # adding them for one cell suffices
-            _add_block_entries!(sp, layout, info.algebraic_blocks, ch, keep_constrained)
+            _add_block_entries!(sp, dofs, info.algebraic_blocks, ch, keep_constrained)
             firstcell = false
         end
     end
