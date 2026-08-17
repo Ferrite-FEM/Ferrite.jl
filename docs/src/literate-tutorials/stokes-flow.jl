@@ -570,7 +570,7 @@ function setup_multiplier_dofs(grid, ipu, ipp)
         getfacetset(grid, "Γ1"), getfacetset(grid, "Γ2"),
         getfacetset(grid, "Γ3"), getfacetset(grid, "Γ4"),
     )
-    coupling = FacetCoupling(dh, Γ; algebraic_coupling = ((:p, :λ),))
+    coupling = FacetCoupling(dh, Γ; algebraic_coupling = (:p, :λ))
     return dh, Γ, coupling
 end
 #md nothing #hide
@@ -645,7 +645,7 @@ function main_multiplier(h = 0.05)
     cvu, cvp, fvp = setup_fevalues(ipu, ipp, ipg)
     ch = setup_multiplier_constraints(dh)
     coupling_matrix = [true true; true false] # no coupling between pressure test/trial functions
-    K = allocate_matrix(dh, ch; coupling = coupling_matrix, algebraic_couplings = (coupling,))
+    K = allocate_matrix(dh, ch; coupling = coupling_matrix, algebraic_couplings = coupling)
     f = zeros(ndofs(dh))
     ## Assemble the cell contributions (unchanged) and the multiplier terms
     assemble_system!(K, f, dh, cvu, cvp)
