@@ -188,11 +188,14 @@ assembler = start_assemble(K, f; atomic = true)
 A variable coupled to a field over the whole domain gives the matrix a few dense rows and
 columns. This is inherent to global coupling and nothing to fix at the sparsity level.
 If the solver should exploit the structure instead (e.g. eliminating the small algebraic
-block with a Schur complement, or a block preconditioner), renumber with
-[`DofOrder.FieldWise`](@ref) to group the algebraic dofs into their own block, optionally
-combined with a [`BlockSparsityPattern`](@ref); the
+block with a Schur complement, or a block preconditioner), note that algebraic dofs are
+always numbered after all spatial dofs, so a two-block split
+`[spatial dofs | algebraic dofs]` (e.g. `[u, p | λ]` for Stokes with a multiplier) works
+without renumbering, optionally combined with a [`BlockSparsityPattern`](@ref); the
 [stress-driven homogenization tutorial](@ref tutorial-stress-driven-homogenization) shows
-this.
+this. For per-field blocks (e.g. `[u | p | λ]`), renumber with
+[`DofOrder.FieldWise`](@ref), which sorts the spatial fields into blocks and keeps each
+algebraic variable as a trailing block.
 
 ## Scope
 

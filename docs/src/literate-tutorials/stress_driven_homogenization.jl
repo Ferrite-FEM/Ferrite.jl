@@ -541,23 +541,16 @@ end;
 # [BlockArrays.jl](https://github.com/JuliaArrays/BlockArrays.jl) package extension.
 using BlockArrays
 
-# Blocked matrices require blocked dofs, so we renumber the dofs field-wise, which
-# treats the algebraic variable as a trailing field: the `:u` dofs become the first
-# block and the three `:εbar` dofs the last. Renumbering invalidates dof-based data
-# structures, so we re-query [`algebraic_dofs`](@ref) (which returns the *renumbered*
-# dofs) and recreate the constraint handler. The coupling descriptor, however, does not
-# store global dof numbers -- they are read from the `DofHandler` when the sparsity
-# entries are added -- so it remains valid across the renumbering, and so does
-# `assemble_system!`, which likewise re-queries `algebraic_dofs` on every call.
-renumber!(dh, DofOrder.FieldWise())
+# Blocked matrices require blocked dofs: the `:u` dofs must form the first block and
+# the three `:εbar` dofs the last. This is already the case here, since algebraic dofs
+# are always numbered after all spatial dofs, and `:u` is the only spatial field. (With
+# several spatial fields, renumber with [`DofOrder.FieldWise`](@ref) to sort the
+# spatial dofs into per-field blocks -- the algebraic variables remain the trailing
+# blocks.)
 gdofs = algebraic_dofs(dh, :εbar)
 nu = ndofs(dh) - nε
 gdofs == collect((nu + 1):ndofs(dh))
 @test gdofs == collect((nu + 1):ndofs(dh)) #src
-
-ch = ConstraintHandler(dh)
-add_fluctuation_constraints!(ch, periodic_facets, corner)
-close!(ch);
 
 # The blocked sparsity pattern is filled by the same generic `add_sparsity_entries!`
 # (with the same `algebraic_couplings` keyword), and `allocate_matrix` instantiates a
