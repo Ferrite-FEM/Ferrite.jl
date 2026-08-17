@@ -584,6 +584,11 @@ end
     # An AffineConstraint whose master is an algebraic dof
     free_u_dof = celldofs(dh, 3)[2]
     add!(ch, AffineConstraint(free_u_dof, [p0dof => 2.0], 1.0))
+    # A regular constraint between two spatial dofs: guards that the elimination
+    # incorporates the algebraic row/column of the involved dofs correctly
+    u_slave = celldofs(dh, 9)[2]
+    u_master = celldofs(dh, 9)[3]
+    add!(ch, AffineConstraint(u_slave, [u_master => 0.5], 0.25))
     close!(ch)
     K = allocate_matrix(dh, ch; algebraic_couplings = (cpl,))
     f = zeros(ndofs(dh))
@@ -598,10 +603,26 @@ end
         apply_assemble!(assembler, ch, dofs, Ke, fe)
     end
     K, f = finish_assemble(assembler)
-    apply!(K, f, ch)
+    # The system is fully condensed by apply_assemble! -- no global apply!(K, f, ch)
     a = K \ f
     apply!(a, ch)
     @test a[free_u_dof] ≈ 2.0 * a[p0dof] + 1.0
+    @test a[u_slave] ≈ 0.5 * a[u_master] + 0.25
+    # Reference path: plain assembly with global elimination must give the same solution
+    Kref = allocate_matrix(dh, ch; algebraic_couplings = (cpl,))
+    fref = zeros(ndofs(dh))
+    aref = start_assemble(Kref, fref)
+    for cc in CellIterator(dh)
+        copyto!(dofs, celldofs(cc))
+        Ke = Matrix(2.0 * I, nl, nl) .+ 0.5
+        fe = ones(nl)
+        assemble!(aref, dofs, Ke, fe)
+    end
+    Kref, fref = finish_assemble(aref)
+    apply!(Kref, fref, ch)
+    bref = Kref \ fref
+    apply!(bref, ch)
+    @test bref ≈ a
 end
 
 @testset "threaded atomic assembly" begin
