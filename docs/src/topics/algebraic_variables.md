@@ -12,9 +12,8 @@ explicitly with a coupling descriptor.
 
 ## Declaring algebraic variables
 
-Algebraic variables are added before `close!`, with a value shape and, optionally, a
-selection of active components. The variables declared here serve as the running example
-for the rest of this page:
+Algebraic variables are added before `close!`, with a value shape. The variables declared
+here serve as the running example for the rest of this page:
 
 ```julia
 dh = DofHandler(grid)
@@ -25,21 +24,18 @@ p0var = AlgebraicVariable()
 add!(dh, :p0, p0var)                                      # one scalar dof
 add!(dh, :z, AlgebraicVariable{Vec{3}}())                 # three dofs
 add!(dh, :σ̄, σ̄var)                                      # three dofs
-add!(dh, :σ̄₁, AlgebraicVariable{SymmetricTensor{2, 2}}(
-    active_components = ((1, 1), (2, 2)),                 # two dofs
-))
 close!(dh)
 ```
 
 The value shape may be scalar, `Vec{dim}`, or a second or fourth order `Tensor` or
-`SymmetricTensor` (with `dim` in `1:3`). Only active components receive dofs, and spatial
-fields and algebraic variables share one name namespace.
+`SymmetricTensor` (with `dim` in `1:3`). Every independent component receives a dof, and
+spatial fields and algebraic variables share one name namespace.
 
 Use [`algebraic_dofs`](@ref) to query the global dof numbers. Renumbering updates these
 numbers, so query them after the final call to [`renumber!`](@ref).
 
 ```julia
-algebraic_dofs(dh, :σ̄₁)
+algebraic_dofs(dh, :σ̄)
 ```
 
 ## Values
@@ -47,14 +43,15 @@ algebraic_dofs(dh, :σ̄₁)
 [`algebraic_value`](@ref) reconstructs the typed value from a solution vector:
 
 ```julia
-σ̄ = algebraic_value(dh, a, :σ̄₁) # ::SymmetricTensor{2, 2, Float64}
+σ̄ = algebraic_value(dh, a, :σ̄) # ::SymmetricTensor{2, 2, Float64}
 ```
 
-Inactive components are zero in the reconstructed value. When they represent known,
-prescribed quantities, the total value is the prescribed part plus the reconstruction:
+To prescribe individual components (e.g. mixed control, where some components are known),
+use an [`AffineConstraint`](@ref) on the corresponding dof; the prescribed value then
+appears in the reconstruction like any other coefficient:
 
 ```julia
-σ = σ_prescribed + algebraic_value(dh, a, :σ̄₁)
+add!(ch, AffineConstraint(algebraic_dofs(dh, :σ̄)[2], Pair{Int, Float64}[], 1.0e9))
 ```
 
 ## Coupling descriptors

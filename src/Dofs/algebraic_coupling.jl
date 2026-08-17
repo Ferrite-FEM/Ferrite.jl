@@ -40,7 +40,7 @@ function _coupled_blocks(
 end
 
 # Build the layout metadata for one SubDofHandler (`sdh === nothing` for the algebraic-only
-# layout of an AlgebraicCoupling): all cell dofs in celldofs order followed by the active
+# layout of an AlgebraicCoupling): all cell dofs in celldofs order followed by the
 # dofs of the descriptor's algebraic variables.
 function _local_layout_info(
         dh::DofHandler, sdh::Union{SubDofHandler, Nothing},
@@ -309,7 +309,7 @@ function _iterate_algebraic_couplings(cs)
     return cs
 end
 
-# Fill `dofs` with the cell dofs followed by the active dofs of the descriptor's
+# Fill `dofs` with the cell dofs followed by the dofs of the descriptor's
 # algebraic variables: the augmented local dof vector whose entries the sparsity blocks
 # below index into.
 function _augmented_dofs!(dofs::Vector{Int}, dh::DofHandler, cell_dofs::AbstractVector{Int}, info::LocalLayoutInfo)

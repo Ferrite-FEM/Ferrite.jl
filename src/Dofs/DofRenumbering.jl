@@ -159,7 +159,7 @@ target block is maintained.
 DofOrder.FieldWise
 
 # Number of dof components per variable: spatial fields in `getfieldnames(dh)` order
-# followed by the algebraic variables (counting active components only).
+# followed by the algebraic variables.
 function _combined_variable_dims(dh::DofHandler)
     field_dims = Int[n_components(dh, fieldname) for fieldname in dh.field_names]
     append!(field_dims, n_algebraic_dofs(v) for v in dh.algebraic_variables)
@@ -191,7 +191,7 @@ order as in the DofHandler. This can be customized by passing a vector of length
 `ncomponents` that maps each component to a "target block" (see [`DofOrder.FieldWise`](@ref)
 for details).
 
-Each active component of an algebraic variable counts as one component here, following
+Each component of an algebraic variable counts as one component here, following
 after all spatial components.
 
 This renumbering is stable such that the original relative ordering of dofs within each
@@ -235,7 +235,7 @@ function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.Compone
             end
         end
     end
-    # Algebraic dofs: one component per active component, after all spatial components
+    # Algebraic dofs: one component per independent component, after all spatial components
     component_offset = sum(field_dims; init = 0)
     for (vidx, variable) in pairs(dh.algebraic_variables)
         for (k, dof) in pairs(dh.algebraic_dofs[vidx])

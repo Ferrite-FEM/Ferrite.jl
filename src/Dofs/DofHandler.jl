@@ -448,7 +448,7 @@ end
 
 Add the algebraic (mesh-free) variable `variable` called `name` to the DofHandler `dh`.
 
-Algebraic variables receive one global dof per active component (see
+Algebraic variables receive one global dof per independent component (see
 [`AlgebraicVariable`](@ref)), numbered after all spatial dofs in `close!`. They have no
 implicit mesh support: their dofs do not appear in `celldofs`, and coupling to spatial
 fields is declared explicitly with [`CellCoupling`](@ref), [`FacetCoupling`](@ref), and

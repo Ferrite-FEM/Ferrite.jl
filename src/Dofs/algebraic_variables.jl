@@ -5,7 +5,7 @@ struct ScalarValueShape end
 
 """
     AlgebraicVariable()
-    AlgebraicVariable{V}(; active_components = nothing)
+    AlgebraicVariable{V}()
 
 Declaration of a typed algebraic (mesh-free) unknown that can be added to a
 [`DofHandler`](@ref) with [`add!`](@ref add!(::DofHandler, ::Symbol, ::AlgebraicVariable)).
@@ -13,47 +13,38 @@ Its dofs are not attached to the mesh and do not appear in `celldofs`.
 
 `AlgebraicVariable()` declares a scalar. Supported value shapes are `Vec{dim}`,
 `Tensor{2, dim}`, `SymmetricTensor{2, dim}`, `Tensor{4, dim}`, and
-`SymmetricTensor{4, dim}`, where `dim` is in `1:3`.
-
-By default every component receives a dof. The `active_components` keyword selects a
-subset using Cartesian indices; for example `(1, 3)` for a `Vec` or
-`((1, 1), (2, 2))` for a second order tensor.
+`SymmetricTensor{4, dim}`, where `dim` is in `1:3`. Every independent component of the
+value shape receives one dof; to prescribe individual components, use an
+[`AffineConstraint`](@ref) on the corresponding dof.
 
 # Examples
 ```julia
 add!(dh, :p0, AlgebraicVariable())                            # one scalar unknown
 add!(dh, :z, AlgebraicVariable{Vec{3}}())                     # three unknowns
 add!(dh, :σ̄, AlgebraicVariable{SymmetricTensor{2, 2}}())      # three unknowns
-add!(dh, :σ̄₁, AlgebraicVariable{SymmetricTensor{2, 2}}(
-    active_components = ((1, 1), (2, 2)),                     # two unknowns
-))
 ```
 
 See also [`AlgebraicValues`](@ref) and [`algebraic_value`](@ref).
 """
 struct AlgebraicVariable{V, N, CI}
-    active_components::NTuple{N, CI}
+    components::NTuple{N, CI}
 end
 
-function AlgebraicVariable{V}(; active_components::Union{Nothing, Tuple} = nothing) where {V}
-    components = _canonicalize_active_components(V, active_components)
+function AlgebraicVariable{V}() where {V}
+    components = _canonical_components(V)
     return AlgebraicVariable{V, length(components), eltype(typeof(components))}(components)
 end
 
-AlgebraicVariable(; kwargs...) = AlgebraicVariable{ScalarValueShape}(; kwargs...)
+AlgebraicVariable() = AlgebraicVariable{ScalarValueShape}()
 
-# Number of dofs owned by the variable (one per active component).
-n_algebraic_dofs(v::AlgebraicVariable) = length(v.active_components)
+# Number of dofs owned by the variable (one per independent component).
+n_algebraic_dofs(v::AlgebraicVariable) = length(v.components)
 
-function Base.show(io::IO, v::AlgebraicVariable{V}) where {V}
+function Base.show(io::IO, ::AlgebraicVariable{V}) where {V}
     if V === ScalarValueShape
         print(io, "AlgebraicVariable()")
     else
-        print(io, "AlgebraicVariable{", V, "}(")
-        if v.active_components != _canonical_components(V)
-            print(io, "active_components = ", v.active_components)
-        end
-        print(io, ")")
+        print(io, "AlgebraicVariable{", V, "}()")
     end
     return
 end
@@ -111,56 +102,22 @@ function _canonical_components(::Type{V}) where {V}
     return Tuple(unique(_canonical_index(V, Tuple(I)) for I in CartesianIndices(dims)))
 end
 
-# Normalize a component index to its canonical representative, checking rank and bounds.
-function _normalize_component(::Type{ScalarValueShape}, c)
-    (c isa Integer && c == 1) || error("a scalar AlgebraicVariable has a single component selected by the index 1, got $(repr(c))")
-    return 1
-end
-function _normalize_component(::Type{V}, c) where {V}
-    dims = _index_space(V)
-    N = length(dims)
-    if !(N == 1 ? c isa Integer : c isa NTuple{N, Integer})
-        example = N == 1 ? "plain indices (e.g. `active_components = (1, 3)`)" :
-            N == 2 ? "index 2-tuples (e.g. `active_components = ((1, 1), (2, 2))`)" :
-            "index 4-tuples (e.g. `active_components = ((1, 1, 2, 2),)`)"
-        error("components of a `$V` valued AlgebraicVariable are selected with $example, got $(repr(c))")
-    end
-    idx = N == 1 ? (Int(c),) : map(Int, c)
-    if !all(ntuple(k -> 1 <= idx[k] <= dims[k], N))
-        error("component index $(N == 1 ? only(idx) : idx) out of bounds for value shape `$V`")
-    end
-    return _canonical_index(V, idx)
-end
-
-function _canonicalize_active_components(::Type{V}, selection::Union{Nothing, Tuple}) where {V}
-    canonical = _canonical_components(V)
-    selection === nothing && return canonical
-    isempty(selection) && error("active_components must select at least one component")
-    normalized = map(c -> _normalize_component(V, c), selection)
-    if !allunique(normalized)
-        error("duplicate (or symmetry-equivalent duplicate) entries in active_components = $(selection)")
-    end
-    # Store in canonical order, independent of the supplied order
-    return Tuple(filter(in(normalized), collect(canonical)))
-end
-
 #####################################
 # Value reconstruction and basis    #
 #####################################
 
-# One-hot basis direction for the canonical active component `c`. `_reconstruct_value`
+# One-hot basis direction for the canonical component `c`. `_reconstruct_value`
 # canonicalizes the indices it queries, so comparing against `c` is exact.
 function _algebraic_basis_value(::Type{V}, c, ::Type{T}) where {V, T}
     return _reconstruct_value(V, comp -> comp == c ? one(T) : zero(T))
 end
 
-# Reconstruct the typed value of `v`: active component `k` reads `a[dofs[k]]`, inactive
-# components are zero.
+# Reconstruct the typed value of `v`: component `k` reads `a[dofs[k]]`.
 function _reconstruct_algebraic_value(v::AlgebraicVariable{V}, a::AbstractVector{T}, dofs::AbstractVector{Int}) where {V, T}
-    comps = v.active_components
+    comps = v.components
     coefficient = function (c)
-        k = findfirst(==(c), comps)
-        return k === nothing ? zero(T) : a[dofs[k]]
+        k = findfirst(==(c), comps)::Int # canonical indices are always found
+        return a[dofs[k]]
     end
     return _reconstruct_value(V, coefficient)
 end
@@ -187,7 +144,7 @@ struct AlgebraicValues{AV <: AlgebraicVariable, N, VT}
 end
 
 function AlgebraicValues(::Type{T}, v::AlgebraicVariable{V, N}) where {T <: Number, V, N}
-    basis = ntuple(i -> _algebraic_basis_value(V, v.active_components[i], T), Val(N))
+    basis = ntuple(i -> _algebraic_basis_value(V, v.components[i], T), Val(N))
     return AlgebraicValues(v, basis)
 end
 AlgebraicValues(v::AlgebraicVariable) = AlgebraicValues(Float64, v)
@@ -206,7 +163,7 @@ Return the cached basis direction for the `i`th algebraic dof.
 """
 function algebraic_basis_value(av::AlgebraicValues, i::Int)
     if !(1 <= i <= getnbasefunctions(av))
-        error("active dof index $i out of bounds for AlgebraicValues with $(getnbasefunctions(av)) active dof(s)")
+        error("dof index $i out of bounds for AlgebraicValues with $(getnbasefunctions(av)) dof(s)")
     end
     return av.basis[i]
 end

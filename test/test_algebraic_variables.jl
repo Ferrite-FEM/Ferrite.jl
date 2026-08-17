@@ -12,30 +12,13 @@ using Random: randperm
 hasentry(K::SparseMatrixCSC, i::Int, j::Int) = i in view(rowvals(K), nzrange(K, j))
 
 @testset "AlgebraicVariable declarations" begin
-    # Full and active component counts
-    @test AlgebraicVariable().active_components == (1,)
-    @test AlgebraicVariable{Vec{3}}().active_components == (1, 2, 3)
-    @test AlgebraicVariable{Tensor{2, 2}}().active_components == ((1, 1), (2, 1), (1, 2), (2, 2))
-    @test AlgebraicVariable{SymmetricTensor{2, 2}}().active_components == ((1, 1), (2, 1), (2, 2))
-    @test AlgebraicVariable{SymmetricTensor{2, 3}}().active_components ==
+    # Component counts and canonical (Tensors.jl storage) order
+    @test AlgebraicVariable().components == (1,)
+    @test AlgebraicVariable{Vec{3}}().components == (1, 2, 3)
+    @test AlgebraicVariable{Tensor{2, 2}}().components == ((1, 1), (2, 1), (1, 2), (2, 2))
+    @test AlgebraicVariable{SymmetricTensor{2, 2}}().components == ((1, 1), (2, 1), (2, 2))
+    @test AlgebraicVariable{SymmetricTensor{2, 3}}().components ==
         ((1, 1), (2, 1), (3, 1), (2, 2), (3, 2), (3, 3))
-    # Partial selections are canonicalized independent of input order
-    @test AlgebraicVariable{Vec{3}}(active_components = (3, 1)).active_components == (1, 3)
-    @test AlgebraicVariable{SymmetricTensor{2, 2}}(active_components = ((2, 2), (1, 1))).active_components ==
-        ((1, 1), (2, 2))
-    # Symmetry-equivalent indices are normalized to the same component
-    @test AlgebraicVariable{SymmetricTensor{2, 2}}(active_components = ((1, 2),)).active_components == ((2, 1),)
-    @test AlgebraicVariable(active_components = (1,)).active_components == (1,)
-    # Invalid selections
-    @test_throws ErrorException AlgebraicVariable{Vec{3}}(active_components = ()) # empty
-    @test_throws ErrorException AlgebraicVariable{Vec{3}}(active_components = (0,)) # out of bounds
-    @test_throws ErrorException AlgebraicVariable{Vec{3}}(active_components = (4,)) # out of bounds
-    @test_throws ErrorException AlgebraicVariable{Vec{3}}(active_components = (1, 1)) # duplicate
-    @test_throws ErrorException AlgebraicVariable{Vec{3}}(active_components = ((1, 1),)) # wrong rank
-    @test_throws ErrorException AlgebraicVariable{Tensor{2, 2}}(active_components = (1,)) # wrong rank
-    @test_throws ErrorException AlgebraicVariable{Tensor{2, 2}}(active_components = ((3, 1),)) # out of bounds
-    @test_throws ErrorException AlgebraicVariable{SymmetricTensor{2, 2}}(active_components = ((1, 2), (2, 1))) # symmetry-equivalent duplicate
-    @test_throws ErrorException AlgebraicVariable(active_components = (2,))
     # Unsupported shapes
     @test_throws ErrorException AlgebraicVariable{Float64}()
     @test_throws ErrorException AlgebraicVariable{Vec{3, Float64}}() # coefficient type must not be fixed
@@ -48,10 +31,6 @@ hasentry(K::SparseMatrixCSC, i::Int, j::Int) = i in view(rowvals(K), nzrange(K, 
     @test Ferrite.n_algebraic_dofs(AlgebraicVariable{Tensor{4, 2}}()) == 16
     @test Ferrite.n_algebraic_dofs(AlgebraicVariable{SymmetricTensor{4, 2}}()) == 9
     @test Ferrite.n_algebraic_dofs(AlgebraicVariable{SymmetricTensor{4, 3}}()) == 36
-    @test AlgebraicVariable{SymmetricTensor{4, 2}}(active_components = ((1, 2, 2, 1),)).active_components ==
-        ((2, 1, 2, 1),) # both index pairs normalized by minor symmetry
-    @test_throws ErrorException AlgebraicVariable{Tensor{4, 2}}(active_components = ((1, 2),)) # wrong rank
-    @test_throws ErrorException AlgebraicVariable{SymmetricTensor{4, 2}}(active_components = ((1, 2, 1, 1), (2, 1, 1, 1))) # symmetry-equivalent duplicate
 end
 
 @testset "fourth order value reconstruction and basis" begin
@@ -64,7 +43,7 @@ end
     add!(dh, :C, Cvar)
     close!(dh)
     for (name, var) in ((:A4, A4var), (:C, Cvar))
-        comps = var.active_components
+        comps = var.components
         dofs = algebraic_dofs(dh, name)
         a = zeros(ndofs(dh))
         a[dofs] .= 1:length(dofs)
@@ -205,7 +184,7 @@ end
     # add! returns the handler
     @test add!(dh, :p0, AlgebraicVariable()) === dh
     @test add!(dh, :z, AlgebraicVariable{Vec{3}}()) === dh
-    add!(dh, :σ̄, AlgebraicVariable{SymmetricTensor{2, 2}}(active_components = ((1, 1), (2, 2))))
+    add!(dh, :σ̄, AlgebraicVariable{SymmetricTensor{2, 2}}())
     # Name conflicts in both declaration orders
     @test_throws ErrorException add!(dh, :u, AlgebraicVariable()) # spatial exists
     @test_throws ErrorException add!(dh, :p0, AlgebraicVariable()) # algebraic exists
@@ -214,12 +193,12 @@ end
     # Adding after close!
     @test_throws ErrorException add!(dh, :q, AlgebraicVariable())
     # Deterministic initial numbering: spatial dofs first, then algebraic in declaration
-    # order and active-component order
+    # order and canonical component order
     nspatial = 2 * getnnodes(grid)
-    @test ndofs(dh) == nspatial + 1 + 3 + 2
+    @test ndofs(dh) == nspatial + 1 + 3 + 3
     @test algebraic_dofs(dh, :p0) == [nspatial + 1]
     @test algebraic_dofs(dh, :z) == collect(nspatial .+ (2:4))
-    @test algebraic_dofs(dh, :σ̄) == collect(nspatial .+ (5:6))
+    @test algebraic_dofs(dh, :σ̄) == collect(nspatial .+ (5:7))
     # celldofs remain purely spatial
     @test maximum(maximum, (celldofs(dh, i) for i in 1:getncells(grid))) == nspatial
     @test ndofs_per_cell(dh) == 6
@@ -239,9 +218,9 @@ end
     dh = DofHandler(grid)
     add!(dh, :u, Lagrange{RefTriangle, 1}())
     p0var = AlgebraicVariable()
-    zvar = AlgebraicVariable{Vec{3}}(active_components = (1, 3))
+    zvar = AlgebraicVariable{Vec{3}}()
     Avar = AlgebraicVariable{Tensor{2, 2}}()
-    σ̄var = AlgebraicVariable{SymmetricTensor{2, 2}}(active_components = ((1, 1), (2, 2)))
+    σ̄var = AlgebraicVariable{SymmetricTensor{2, 2}}()
     add!(dh, :p0, p0var)
     add!(dh, :z, zvar)
     add!(dh, :A, Avar)
@@ -250,35 +229,33 @@ end
     for T in (Float64, Float32)
         a = zeros(T, ndofs(dh))
         a[algebraic_dofs(dh, :p0)] .= 3
-        a[algebraic_dofs(dh, :z)] .= [1, 2]
+        a[algebraic_dofs(dh, :z)] .= [1, 2, 4]
         a[algebraic_dofs(dh, :A)] .= [1, 2, 3, 4]
-        a[algebraic_dofs(dh, :σ̄)] .= [5, 6]
+        a[algebraic_dofs(dh, :σ̄)] .= [5, 7, 6]
         p0 = algebraic_value(dh, a, :p0)
         @test p0 === T(3)
         z = algebraic_value(dh, a, :z)
         @test z isa Vec{3, T}
-        @test z == Vec{3, T}((1, 0, 2)) # typed zero in inactive component
+        @test z == Vec{3, T}((1, 2, 4))
         A = algebraic_value(dh, a, :A)
         @test A isa Tensor{2, 2, T}
         @test A == Tensor{2, 2, T}((1, 2, 3, 4)) # column major, matching Tensors storage
         σ̄ = algebraic_value(dh, a, :σ̄)
         @test σ̄ isa SymmetricTensor{2, 2, T}
-        @test σ̄ == SymmetricTensor{2, 2, T}((5, 0, 6))
-        # Explicit addition of prescribed inactive components is user code
-        σ_prescribed = SymmetricTensor{2, 2, T}((0, 7, 0))
-        @test (σ_prescribed + σ̄)[2, 1] == 7
+        @test σ̄ == SymmetricTensor{2, 2, T}((5, 7, 6)) # (1,1), (2,1), (2,2)
+        @test σ̄[1, 2] == σ̄[2, 1] == 7
     end
     # Wrong-kind and length errors
     a = zeros(ndofs(dh))
     @test_throws ErrorException algebraic_value(dh, a, :u)
     @test_throws ErrorException algebraic_value(dh, a, :nope)
     @test_throws ErrorException algebraic_value(dh, zeros(3), :p0)
-    # DofHandler-free reconstruction from an extracted coefficient slice, in
-    # active-component order, matching the global-vector method
+    # DofHandler-free reconstruction from an extracted coefficient slice, in canonical
+    # component order, matching the global-vector method
     for T in (Float64, Float32)
         a = zeros(T, ndofs(dh))
-        a[algebraic_dofs(dh, :z)] .= [1, 2]
-        a[algebraic_dofs(dh, :σ̄)] .= [5, 6]
+        a[algebraic_dofs(dh, :z)] .= [1, 2, 4]
+        a[algebraic_dofs(dh, :σ̄)] .= [5, 7, 6]
         for (name, var) in ((:p0, p0var), (:z, zvar), (:A, Avar), (:σ̄, σ̄var))
             av = AlgebraicValues(T, var)
             dofvals = a[algebraic_dofs(dh, name)]
@@ -288,16 +265,17 @@ end
     end
     @test algebraic_value(AlgebraicValues(AlgebraicVariable()), [4.0]) === 4.0
     # The scalar type follows the input, so dual numbers pass through (AD inside a kernel)
-    let av = AlgebraicValues(AlgebraicVariable{SymmetricTensor{2, 2}}(active_components = ((1, 1), (2, 2))))
-        d1 = ForwardDiff.Dual(5.0, 1.0, 0.0)
-        d2 = ForwardDiff.Dual(6.0, 0.0, 1.0)
-        σ̄d = algebraic_value(av, [d1, d2])
+    let av = AlgebraicValues(AlgebraicVariable{SymmetricTensor{2, 2}}())
+        d1 = ForwardDiff.Dual(5.0, 1.0, 0.0, 0.0)
+        d2 = ForwardDiff.Dual(7.0, 0.0, 1.0, 0.0)
+        d3 = ForwardDiff.Dual(6.0, 0.0, 0.0, 1.0)
+        σ̄d = algebraic_value(av, [d1, d2, d3])
         @test σ̄d isa SymmetricTensor{2, 2, typeof(d1)}
         @test ForwardDiff.value(σ̄d[1, 1]) == 5.0
         @test ForwardDiff.value(σ̄d[2, 2]) == 6.0
-        @test ForwardDiff.value(σ̄d[2, 1]) == 0.0
+        @test ForwardDiff.value(σ̄d[2, 1]) == 7.0
         # ∂σ̄/∂coefficient recovers the basis directions
-        for k in 1:2
+        for k in 1:3
             E = algebraic_basis_value(av, k)
             for i in 1:2, j in 1:2
                 @test ForwardDiff.partials(σ̄d[i, j], k) == E[i, j]
@@ -306,12 +284,12 @@ end
     end
     # Length mismatch (e.g. passing the full local vector instead of the variable's slice)
     zv = AlgebraicValues(zvar)
-    @test_throws ErrorException algebraic_value(zv, zeros(3))
-    # Basis directions map active dof index -> declared component
+    @test_throws ErrorException algebraic_value(zv, zeros(2))
+    # Basis directions map dof index -> canonical component
     @test algebraic_basis_value(zv, 1) == Vec{3}((1.0, 0.0, 0.0))
-    @test algebraic_basis_value(zv, 2) == Vec{3}((0.0, 0.0, 1.0))
+    @test algebraic_basis_value(zv, 3) == Vec{3}((0.0, 0.0, 1.0))
     @test algebraic_basis_value(AlgebraicValues(Float32, zvar), 2) isa Vec{3, Float32}
-    @test_throws ErrorException algebraic_basis_value(zv, 3)
+    @test_throws ErrorException algebraic_basis_value(zv, 4)
     @test_throws ErrorException algebraic_basis_value(zv, 0)
     @test algebraic_basis_value(AlgebraicValues(p0var), 1) === 1.0
     σ̄full = AlgebraicValues(AlgebraicVariable{SymmetricTensor{2, 2}}())
@@ -322,7 +300,7 @@ end
     # The basis is the derivative of the reconstructed value w.r.t. the coefficient
     ac = algebraic_dofs(dh, :σ̄)
     σ̄v = AlgebraicValues(σ̄var)
-    for i in 1:2
+    for i in 1:3
         ei = zeros(ndofs(dh)); ei[ac[i]] = 1.0
         @test algebraic_value(dh, ei, :σ̄) == algebraic_basis_value(σ̄v, i)
     end
@@ -342,34 +320,34 @@ end
     add!(dh, :u, Lagrange{RefTriangle, 1}()^2)
     add!(dh, :p, Lagrange{RefTriangle, 1}())
     add!(dh, :p0, AlgebraicVariable())
-    add!(dh, :σ̄, AlgebraicVariable{SymmetricTensor{2, 2}}(active_components = ((1, 1), (2, 2))))
+    add!(dh, :σ̄, AlgebraicVariable{SymmetricTensor{2, 2}}())
     close!(dh)
     n = ndofs(dh)
     # Arbitrary permutation and inverse round trip; value reconstruction follows
     perm = randperm(n)
     renumber!(dh, perm)
     a = zeros(n)
-    a[algebraic_dofs(dh, :σ̄)] .= [1.0, 2.0]
-    @test algebraic_value(dh, a, :σ̄) == SymmetricTensor{2, 2}((1.0, 0.0, 2.0))
+    a[algebraic_dofs(dh, :σ̄)] .= [1.0, 3.0, 2.0]
+    @test algebraic_value(dh, a, :σ̄) == SymmetricTensor{2, 2}((1.0, 3.0, 2.0))
     renumber!(dh, invperm(perm))
-    @test algebraic_dofs(dh, :p0) == [n - 2]
-    @test algebraic_dofs(dh, :σ̄) == [n - 1, n]
+    @test algebraic_dofs(dh, :p0) == [n - 3]
+    @test algebraic_dofs(dh, :σ̄) == [n - 2, n - 1, n]
     # Field-wise: every algebraic variable is one block
     renumber!(dh, DofOrder.FieldWise())
-    @test algebraic_dofs(dh, :p0) == [n - 2]
-    @test algebraic_dofs(dh, :σ̄) == [n - 1, n]
+    @test algebraic_dofs(dh, :p0) == [n - 3]
+    @test algebraic_dofs(dh, :σ̄) == [n - 2, n - 1, n]
     # Custom block targets over the combined variable ordering (u, p, p0, σ̄)
     renumber!(dh, DofOrder.FieldWise([2, 2, 1, 1]))
     @test algebraic_dofs(dh, :p0) == [1]
-    @test algebraic_dofs(dh, :σ̄) == [2, 3]
+    @test algebraic_dofs(dh, :σ̄) == [2, 3, 4]
     @test_throws ErrorException renumber!(dh, DofOrder.FieldWise([1, 2, 1])) # wrong length
-    # Component-wise: components (ux, uy, p, p0, σ̄₁₁, σ̄₂₂)
+    # Component-wise: components (ux, uy, p, p0, σ̄₁₁, σ̄₂₁, σ̄₂₂)
     renumber!(dh, DofOrder.ComponentWise())
-    @test algebraic_dofs(dh, :σ̄) == [n - 1, n]
-    renumber!(dh, DofOrder.ComponentWise([6, 5, 4, 3, 2, 1]))
-    @test algebraic_dofs(dh, :p0) == [3]
-    @test algebraic_dofs(dh, :σ̄) == [2, 1]
-    @test_throws ErrorException renumber!(dh, DofOrder.ComponentWise(collect(1:5))) # wrong length
+    @test algebraic_dofs(dh, :σ̄) == [n - 2, n - 1, n]
+    renumber!(dh, DofOrder.ComponentWise([7, 6, 5, 4, 3, 2, 1]))
+    @test algebraic_dofs(dh, :p0) == [4]
+    @test algebraic_dofs(dh, :σ̄) == [3, 2, 1]
+    @test_throws ErrorException renumber!(dh, DofOrder.ComponentWise(collect(1:6))) # wrong length
     # Unchanged behavior without algebraic variables
     dh2 = DofHandler(grid)
     add!(dh2, :u, Lagrange{RefTriangle, 1}()^2)
