@@ -1233,3 +1233,33 @@ end
         end
     end
 end
+
+@testset "global_dof_range" begin
+    grid = generate_grid(Quadrilateral, (2, 2))
+    ip = Lagrange{RefQuadrilateral, 1}()
+
+    # Single (implicit) SubDofHandler
+    dh = DofHandler(grid)
+    add!(dh, :u, ip^2)
+    add!(dh, :p, ip)
+    close!(dh)
+    err = ErrorException("dofs for field u not continuously enumerated, renumber by field")
+    @test_throws err global_dof_range(dh, :u)
+    renumber!(dh, DofOrder.FieldWise())
+    @test global_dof_range(dh, :u) == 1:18
+    @test global_dof_range(dh, :p) == 19:27
+    @test_throws ErrorException("field :T not found in the DofHandler") global_dof_range(dh, :T)
+
+    # Multiple SubDofHandlers, :p only on a subdomain
+    dh = DofHandler(grid)
+    sdh1 = SubDofHandler(dh, Set(1:2))
+    add!(sdh1, :u, ip^2)
+    add!(sdh1, :p, ip)
+    sdh2 = SubDofHandler(dh, Set(3:4))
+    add!(sdh2, :u, ip^2)
+    close!(dh)
+    @test_throws err global_dof_range(dh, :u)
+    renumber!(dh, DofOrder.FieldWise())
+    @test global_dof_range(dh, :u) == 1:18
+    @test global_dof_range(dh, :p) == 19:24
+end
