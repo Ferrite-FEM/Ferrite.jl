@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - New function `global_dof_range(dh, field_name)` for computing the global dof range for
    dofs pertaining to a specific field. This requires dofs to be enumerated field wise,
    see `renumber!` and `DofOrder.FieldWise`. ([#457])
+ - New function `collect_dofs(dh; field, components, cellset)` for collecting the (sorted)
+   global dofs matching the given filtering arguments, e.g. dofs pertaining to specific
+   components of a field on a subset of the cells. ([#XXXX])
 
 ### Performance
  - `create_coloring` is significantly faster: the incidence matrix construction and the

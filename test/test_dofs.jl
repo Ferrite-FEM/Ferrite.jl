@@ -1263,3 +1263,61 @@ end
     @test global_dof_range(dh, :u) == 1:18
     @test global_dof_range(dh, :p) == 19:24
 end
+
+@testset "collect_dofs" begin
+    grid = generate_grid(Quadrilateral, (2, 2))
+    ip = Lagrange{RefQuadrilateral, 1}()
+
+    # Single (implicit) SubDofHandler
+    dh = DofHandler(grid)
+    add!(dh, :u, ip^2)
+    add!(dh, :p, ip)
+    close!(dh)
+    # No filters -> all dofs
+    @test collect_dofs(dh) == 1:ndofs(dh)
+    # Field filter
+    udofs = sort!(unique!(reduce(vcat, celldofs(dh, i)[dof_range(dh, :u)] for i in 1:getncells(grid))))
+    pdofs = sort!(unique!(reduce(vcat, celldofs(dh, i)[dof_range(dh, :p)] for i in 1:getncells(grid))))
+    @test collect_dofs(dh; field = :u) == udofs
+    @test collect_dofs(dh; field = :p) == pdofs
+    # Component filter (verify against ComponentWise renumbering: blocks u1, u2, p)
+    renumber!(dh, DofOrder.ComponentWise())
+    @test collect_dofs(dh; field = :u, components = [1]) == 1:9
+    @test collect_dofs(dh; field = :u, components = [2]) == 10:18
+    @test collect_dofs(dh; field = :u, components = [1, 2]) == 1:18
+    @test collect_dofs(dh; field = :p, components = [1]) == 19:27
+    # Cell set filter
+    @test collect_dofs(dh; cellset = Set(1)) == sort(celldofs(dh, 1))
+    @test collect_dofs(dh; field = :u, cellset = Set(1)) == sort(celldofs(dh, 1)[dof_range(dh, :u)])
+    @test collect_dofs(dh; field = :u, components = [2], cellset = Set(1)) ==
+        sort(celldofs(dh, 1)[dof_range(dh, :u)][2:2:end])
+    # Argument errors
+    @test_throws ArgumentError("must specify field when specifying components") collect_dofs(dh; components = [1])
+    @test_throws ArgumentError("components must be sorted and unique") collect_dofs(dh; field = :u, components = [2, 1])
+    @test_throws ArgumentError("components must be sorted and unique") collect_dofs(dh; field = :u, components = [1, 1])
+    @test_throws ArgumentError("components out of range for field :u with 2 components") collect_dofs(dh; field = :u, components = [1, 3])
+    @test_throws ArgumentError("field :T not found in the DofHandler") collect_dofs(dh; field = :T)
+
+    # Multiple SubDofHandlers, :p only on a subdomain
+    dh = DofHandler(grid)
+    sdh1 = SubDofHandler(dh, Set(1:2))
+    add!(sdh1, :u, ip^2)
+    add!(sdh1, :p, ip)
+    sdh2 = SubDofHandler(dh, Set(3:4))
+    add!(sdh2, :u, ip^2)
+    close!(dh)
+    @test collect_dofs(dh) == 1:ndofs(dh)
+    pdofs = sort!(unique!(reduce(vcat, celldofs(dh, i)[dof_range(sdh1, :p)] for i in 1:2)))
+    @test collect_dofs(dh; field = :p) == pdofs
+    # Cell set overlapping both subdomains, filtered on a field that only exists in one
+    @test collect_dofs(dh; field = :p, cellset = Set([2, 3])) ==
+        sort(celldofs(dh, 2)[dof_range(sdh1, :p)])
+
+    # Component filtering requires a scalar or vectorized interpolation
+    grid = generate_grid(Triangle, (1, 1))
+    dh = DofHandler(grid)
+    add!(dh, :h, RaviartThomas{RefTriangle, 1}())
+    close!(dh)
+    @test collect_dofs(dh; field = :h) == 1:ndofs(dh)
+    @test_throws ArgumentError collect_dofs(dh; field = :h, components = [1])
+end

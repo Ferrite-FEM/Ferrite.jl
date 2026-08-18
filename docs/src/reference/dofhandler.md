@@ -29,6 +29,7 @@ ndofs
 ndofs_per_cell
 dof_range
 global_dof_range
+collect_dofs
 celldofs
 celldofs!
 ```

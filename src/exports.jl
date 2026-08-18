@@ -131,6 +131,7 @@ export
     celldofs,
     dof_range,
     global_dof_range,
+    collect_dofs,
     renumber!,
     DofOrder,
     evaluate_at_grid_nodes,
