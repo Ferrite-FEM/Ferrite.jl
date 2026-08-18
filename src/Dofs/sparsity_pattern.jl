@@ -411,8 +411,7 @@ function _add_algebraic_coupling_entries!(
     )
     for descriptor in _iterate_algebraic_couplings(algebraic_couplings)
         descriptor isa AbstractCoupling || error("`algebraic_couplings` must contain coupling descriptors (`CellCoupling`, `FacetCoupling`, `AlgebraicCoupling`), got $(repr(descriptor))")
-        descriptor.dh === dh || error("a coupling descriptor in `algebraic_couplings` belongs to another DofHandler")
-        add_coupling_entries!(sp, descriptor, ch; keep_constrained)
+        add_coupling_entries!(sp, dh, descriptor, ch; keep_constrained)
     end
     return sp
 end

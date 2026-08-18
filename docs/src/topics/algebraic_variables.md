@@ -59,7 +59,9 @@ add!(ch, AffineConstraint(algebraic_dofs(dh, :σ̄)[2], Pair{Int, Float64}[], 1.
 Since an algebraic variable has no mesh support, Ferrite cannot derive from the mesh where
 it enters the weak form. This is declared with a *coupling descriptor*, which is used to
 allocate the corresponding test/trial blocks in the sparsity pattern. The weak-form
-contribution itself is still assembled by user code.
+contribution itself is still assembled by user code. A descriptor only declares the
+coupling and is independent of any `DofHandler`; the variable names are resolved when the
+descriptor is used, e.g. when allocating a matrix.
 
 The descriptor type selects the entities over which the terms are integrated:
 
@@ -76,15 +78,14 @@ driven by `:p0`:
 ```julia
 couplings = (
     volume = CellCoupling(
-        dh, 1:getncells(grid);
+        1:getncells(grid);
         algebraic_coupling = ((:u, :σ̄),),
     ),
     boundary = FacetCoupling(
-        dh, controlled_boundary;
+        controlled_boundary;
         algebraic_coupling = ((:u, :p0),),
     ),
-    zero_d = AlgebraicCoupling(
-        dh;
+    zero_d = AlgebraicCoupling(;
         algebraic_coupling = ((:p0, :z), (:z, :z)),
     ),
 )

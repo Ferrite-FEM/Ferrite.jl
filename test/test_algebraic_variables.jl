@@ -77,7 +77,7 @@ end
     for d in 1:3
         @test hasentry(K0, d, d)
     end
-    cpl = AlgebraicCoupling(dh; algebraic_coupling = ((:z, :z), (:z, :p0), (:p0, :p0)))
+    cpl = AlgebraicCoupling(; algebraic_coupling = ((:z, :z), (:z, :p0), (:p0, :p0)))
     K = allocate_matrix(dh; algebraic_couplings = (cpl,))
     f = zeros(3)
     assembler = start_assemble(K, f)
@@ -88,8 +88,8 @@ end
     @test K[dofs, dofs] ≈ Ke
     # Cell/facet descriptors with empty entity sets contribute nothing (in particular on a
     # DofHandler without any SubDofHandlers)
-    empty_cpl = CellCoupling(dh, Int[]; algebraic_coupling = ((:z, :p0),))
-    empty_fpl = FacetCoupling(dh, Set{FacetIndex}(); algebraic_coupling = ((:z, :p0),))
+    empty_cpl = CellCoupling(Int[]; algebraic_coupling = ((:z, :p0),))
+    empty_fpl = FacetCoupling(Set{FacetIndex}(); algebraic_coupling = ((:z, :p0),))
     K_empty = allocate_matrix(dh; algebraic_couplings = (empty_cpl, empty_fpl))
     @test nnz(K_empty) == nnz(K0)
     # No dangling "Fields:" header when there are no spatial fields
@@ -107,7 +107,7 @@ end
     @test Ferrite.has_algebraic_variables(dh)
     # The descriptor owns its entity set: mutating the input set afterwards has no effect
     myset = OrderedCollections.OrderedSet{FacetIndex}(getfacetset(grid, "right"))
-    cpl = FacetCoupling(dh, myset; algebraic_coupling = ((:u, :p0),))
+    cpl = FacetCoupling(myset; algebraic_coupling = ((:u, :p0),))
     n_before = length(Ferrite.entities(cpl))
     push!(myset, first(getfacetset(grid, "left")))
     @test length(Ferrite.entities(cpl)) == n_before
@@ -143,38 +143,40 @@ end
     cells = 1:getncells(grid)
     pattern(K) = (K.colptr, rowvals(K))
     # A symmetric tuple couples both directions
-    K_pair = allocate_matrix(dh; algebraic_couplings = CellCoupling(dh, cells; algebraic_coupling = ((:p, :λ),)))
+    K_pair = allocate_matrix(dh; algebraic_couplings = CellCoupling(cells; algebraic_coupling = ((:p, :λ),)))
     # `=>` couples one way only (test => trial)
-    K_dir = allocate_matrix(dh; algebraic_couplings = CellCoupling(dh, cells; algebraic_coupling = (:p => :λ,)))
+    K_dir = allocate_matrix(dh; algebraic_couplings = CellCoupling(cells; algebraic_coupling = (:p => :λ,)))
     pdof = first(celldofs(dh, 1)[dof_range(dh, :p)])
     @test hasentry(K_dir, pdof, λdof) && !hasentry(K_dir, λdof, pdof)
     # A bare entry is accepted as a one-entry specification
-    K_bare_pair = allocate_matrix(dh; algebraic_couplings = CellCoupling(dh, cells; algebraic_coupling = :p => :λ))
+    K_bare_pair = allocate_matrix(dh; algebraic_couplings = CellCoupling(cells; algebraic_coupling = :p => :λ))
     @test pattern(K_bare_pair) == pattern(K_dir)
-    K_bare_tuple = allocate_matrix(dh; algebraic_couplings = CellCoupling(dh, cells; algebraic_coupling = (:p, :λ)))
+    K_bare_tuple = allocate_matrix(dh; algebraic_couplings = CellCoupling(cells; algebraic_coupling = (:p, :λ)))
     @test pattern(K_bare_tuple) == pattern(K_pair)
     # Participating variables are derived from the entries, in order of first appearance
-    cpl = CellCoupling(dh, cells; algebraic_coupling = (:λ => :p, (:z, :p), :z => :z))
+    cpl = CellCoupling(cells; algebraic_coupling = (:λ => :p, (:z, :p), :z => :z))
     @test Ferrite.fields(cpl) == (:λ, :p, :z)
     # Symmetric self entry of a multi-dof variable gives its dense block
-    K_self = allocate_matrix(dh; algebraic_couplings = AlgebraicCoupling(dh; algebraic_coupling = ((:z, :z),)))
+    K_self = allocate_matrix(dh; algebraic_couplings = AlgebraicCoupling(; algebraic_coupling = ((:z, :z),)))
     for i in zdofs, j in zdofs
         @test hasentry(K_self, i, j)
     end
     # The same directed coupling from a pair and a tuple collides
-    @test_throws ErrorException CellCoupling(dh, cells; algebraic_coupling = (:p => :λ, (:p, :λ)))
-    @test_throws ErrorException CellCoupling(dh, cells; algebraic_coupling = (:p => :λ, :p => :λ))
-    # Every entry must involve an algebraic variable
-    @test_throws ErrorException CellCoupling(dh, cells; algebraic_coupling = (:u => :p,))
-    @test_throws ErrorException FacetCoupling(dh, getfacetset(grid, "right"); algebraic_coupling = ((:u, :p), (:u, :λ)))
+    @test_throws ErrorException CellCoupling(cells; algebraic_coupling = (:p => :λ, (:p, :λ)))
+    @test_throws ErrorException CellCoupling(cells; algebraic_coupling = (:p => :λ, :p => :λ))
+    # Every entry must involve an algebraic variable (names are resolved when the
+    # descriptor is used against a DofHandler)
+    @test_throws ErrorException allocate_matrix(dh; algebraic_couplings = CellCoupling(cells; algebraic_coupling = (:u => :p,)))
+    @test_throws ErrorException allocate_matrix(dh; algebraic_couplings = FacetCoupling(getfacetset(grid, "right"); algebraic_coupling = ((:u, :p), (:u, :λ))))
     # The internal Boolean matrix is not a user-facing input form
-    @test_throws ErrorException CellCoupling(dh, cells; algebraic_coupling = Bool[0 1; 1 0])
+    @test_throws ErrorException CellCoupling(cells; algebraic_coupling = Bool[0 1; 1 0])
     # Uninterpretable specifications error descriptively
-    @test_throws ErrorException CellCoupling(dh, cells; algebraic_coupling = ())
-    @test_throws ErrorException CellCoupling(dh, cells; algebraic_coupling = ((:p, :λ, :z),))
-    @test_throws ErrorException CellCoupling(dh, cells; algebraic_coupling = (:p,))
-    @test_throws ErrorException CellCoupling(dh, cells; algebraic_coupling = :p)
-    @test_throws ErrorException CellCoupling(dh, cells; algebraic_coupling = (:p => :nope,))
+    @test_throws ErrorException CellCoupling(cells; algebraic_coupling = ())
+    @test_throws ErrorException CellCoupling(cells; algebraic_coupling = ((:p, :λ, :z),))
+    @test_throws ErrorException CellCoupling(cells; algebraic_coupling = (:p,))
+    @test_throws ErrorException CellCoupling(cells; algebraic_coupling = :p)
+    # An unknown variable name errors when the descriptor is used
+    @test_throws ErrorException allocate_matrix(dh; algebraic_couplings = CellCoupling(cells; algebraic_coupling = (:p => :nope,)))
 end
 
 @testset "DofHandler integration" begin
@@ -373,7 +375,7 @@ end
         subset_dofs(name),
     )
     # Asymmetric coupling on a cell subset, only field :p couples
-    cpl = CellCoupling(dh, subset; algebraic_coupling = (:p => :λ,))
+    cpl = CellCoupling(subset; algebraic_coupling = (:p => :λ,))
     K = allocate_matrix(dh; algebraic_couplings = cpl) # single descriptor, no tuple
     for d in subset_dofs(:p)
         @test hasentry(K, d, λdof)   # test p, trial λ
@@ -398,15 +400,19 @@ end
     add!(dh3, :λ, AlgebraicVariable())
     close!(dh3)
     λ3 = only(algebraic_dofs(dh3, :λ))
-    cpl3 = CellCoupling(dh3, 1:getncells(grid); algebraic_coupling = ((:u, :λ),))
+    cpl3 = CellCoupling(1:getncells(grid); algebraic_coupling = ((:u, :λ),))
     K3 = allocate_matrix(dh3; algebraic_couplings = (cpl3,))
     for cell in (2, 7), d in celldofs(dh3, cell)[dof_range(dh3.subdofhandlers[dh3.cell_to_subdofhandler[cell]], :u)]
         @test hasentry(K3, d, λ3)
     end
     # Clear failure when a selected cell lacks a named field
-    @test_throws ErrorException CellCoupling(dh3, 1:getncells(grid); algebraic_coupling = ((:p, :λ),))
+    cpl_bad = CellCoupling(1:getncells(grid); algebraic_coupling = ((:p, :λ),))
+    @test_throws ErrorException allocate_matrix(dh3; algebraic_couplings = (cpl_bad,))
     # But restricting to cells that carry the field works
-    CellCoupling(dh3, 1:4; algebraic_coupling = ((:p, :λ),))
+    allocate_matrix(dh3; algebraic_couplings = CellCoupling(1:4; algebraic_coupling = ((:p, :λ),)))
+    # A descriptor is DofHandler-independent and can be reused with several DofHandlers
+    K_reuse = allocate_matrix(dh; algebraic_couplings = (cpl3,))
+    @test hasentry(K_reuse, first(celldofs(dh, 1)[dof_range(dh, :u)]), λdof)
 end
 
 @testset "facet-coupling sparsity" begin
@@ -418,7 +424,7 @@ end
     p0dof = only(algebraic_dofs(dh, :p0))
     right = getfacetset(grid, "right")
     left = getfacetset(grid, "left")
-    cpl = FacetCoupling(dh, right; algebraic_coupling = ((:u, :p0),))
+    cpl = FacetCoupling(right; algebraic_coupling = ((:u, :p0),))
     K = allocate_matrix(dh; algebraic_couplings = (cpl,))
     adjacent = Set(first(f) for f in right)
     for cellid in 1:getncells(grid)
@@ -438,12 +444,12 @@ end
         end
     end
     # Asymmetric facet mask
-    cpl_asym = FacetCoupling(dh, right; algebraic_coupling = (:u => :p0,))
+    cpl_asym = FacetCoupling(right; algebraic_coupling = (:u => :p0,))
     Ka = allocate_matrix(dh; algebraic_couplings = (cpl_asym,))
     d = first(celldofs(dh, first(first(right))))
     @test hasentry(Ka, d, p0dof) && !hasentry(Ka, p0dof, d)
     # Multiple boundaries with separate descriptors; overlapping descriptors -> union
-    cpl_left = FacetCoupling(dh, left; algebraic_coupling = ((:u, :p0),))
+    cpl_left = FacetCoupling(left; algebraic_coupling = ((:u, :p0),))
     K2 = allocate_matrix(dh; algebraic_couplings = (vol = cpl, vol2 = cpl, lft = cpl_left)) # duplicate on purpose
     for f in union(right, left), d in celldofs(dh, first(f))
         @test hasentry(K2, d, p0dof)
@@ -469,19 +475,19 @@ end
         @test !hasentry(K0, d, zdofs[mod1(i + 1, 3)])
     end
     # Dense self-coupling of one variable
-    K1 = allocate_matrix(dh; algebraic_couplings = AlgebraicCoupling(dh; algebraic_coupling = ((:z, :z),)))
+    K1 = allocate_matrix(dh; algebraic_couplings = AlgebraicCoupling(; algebraic_coupling = ((:z, :z),)))
     for i in zdofs, j in zdofs
         @test hasentry(K1, i, j)
     end
     @test !hasentry(K1, zdofs[1], wdofs[1])
     # Asymmetric cross-coupling between two variables
-    K2 = allocate_matrix(dh; algebraic_couplings = AlgebraicCoupling(dh; algebraic_coupling = (:z => :w,)))
+    K2 = allocate_matrix(dh; algebraic_couplings = AlgebraicCoupling(; algebraic_coupling = (:z => :w,)))
     for i in zdofs, j in wdofs
         @test hasentry(K2, i, j)
         @test !hasentry(K2, j, i)
     end
-    # AlgebraicCoupling rejects spatial fields
-    @test_throws ErrorException AlgebraicCoupling(dh; algebraic_coupling = ((:u, :z),))
+    # AlgebraicCoupling rejects spatial fields when used
+    @test_throws ErrorException allocate_matrix(dh; algebraic_couplings = AlgebraicCoupling(; algebraic_coupling = ((:u, :z),)))
 end
 
 @testset "augmented local dofs and assembly" begin
@@ -493,9 +499,9 @@ end
     add!(dh, :z, AlgebraicVariable{Vec{2}}())
     close!(dh)
     right = getfacetset(grid, "right")
-    ccpl = CellCoupling(dh, 1:getncells(grid); algebraic_coupling = ((:p, :z), (:p, :p0), (:z, :z), (:z, :p0), (:p0, :p0)))
-    fcpl = FacetCoupling(dh, right; algebraic_coupling = ((:u, :p0),))
-    acpl = AlgebraicCoupling(dh; algebraic_coupling = ((:p0, :p0), (:p0, :z), (:z, :z)))
+    ccpl = CellCoupling(1:getncells(grid); algebraic_coupling = ((:p, :z), (:p, :p0), (:z, :z), (:z, :p0), (:p0, :p0)))
+    fcpl = FacetCoupling(right; algebraic_coupling = ((:u, :p0),))
+    acpl = AlgebraicCoupling(; algebraic_coupling = ((:p0, :p0), (:p0, :z), (:z, :z)))
 
     # The augmented local dof vector is plain user code: cell dofs first, then the
     # algebraic dofs in an order chosen by the assembly loop
@@ -556,7 +562,7 @@ end
     add!(dh, :p0, AlgebraicVariable())
     close!(dh)
     p0dof = only(algebraic_dofs(dh, :p0))
-    cpl = CellCoupling(dh, 1:getncells(grid); algebraic_coupling = ((:u, :p0), (:p0, :p0)))
+    cpl = CellCoupling(1:getncells(grid); algebraic_coupling = ((:u, :p0), (:p0, :p0)))
     ch = ConstraintHandler(dh)
     add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0.0))
     # An AffineConstraint whose master is an algebraic dof
@@ -609,7 +615,7 @@ end
     add!(dh, :u, Lagrange{RefQuadrilateral, 1}())
     add!(dh, :p0, AlgebraicVariable())
     close!(dh)
-    cpl = CellCoupling(dh, 1:getncells(grid); algebraic_coupling = ((:u, :p0), (:p0, :p0)))
+    cpl = CellCoupling(1:getncells(grid); algebraic_coupling = ((:u, :p0), (:p0, :p0)))
     ncells = getncells(grid)
     nl = ndofs_per_cell(dh) + 1
     function element!(Ke, fe, cellid)
@@ -664,7 +670,7 @@ end
     # BlockArrays assembler (extension)
     renumber!(dh, DofOrder.FieldWise())
     sp = BlockSparsityPattern([ndofs(dh) - 1, 1])
-    cpl2 = CellCoupling(dh, 1:ncells; algebraic_coupling = ((:u, :p0), (:p0, :p0)))
+    cpl2 = CellCoupling(1:ncells; algebraic_coupling = ((:u, :p0), (:p0, :p0)))
     add_sparsity_entries!(sp, dh; algebraic_couplings = (cpl2,))
     # Serial reference in the renumbered ordering (the tail is re-queried after renumber!)
     Kser2 = allocate_matrix(dh; algebraic_couplings = (cpl2,)); fser2 = zeros(ndofs(dh))
@@ -749,7 +755,7 @@ end
     add!(ch, Dirichlet(:u, getvertexset(grid, "xaxis"), x -> (ε̄ ⋅ x)[2:2], [2]))
     close!(ch); update!(ch, 0.0)
 
-    descriptor = CellCoupling(dh, 1:getncells(grid); algebraic_coupling = ((:u, :σ̄),))
+    descriptor = CellCoupling(1:getncells(grid); algebraic_coupling = ((:u, :σ̄),))
     K = allocate_matrix(dh, ch; algebraic_couplings = (rve = descriptor,))
     f = zeros(ndofs(dh))
 
@@ -840,7 +846,7 @@ end
     close!(dh)
     λdof = only(algebraic_dofs(dh, :λ))
     boundary = union((getfacetset(grid, name) for name in ("left", "right", "top", "bottom"))...)
-    descriptor = FacetCoupling(dh, boundary; algebraic_coupling = ((:u, :λ),))
+    descriptor = FacetCoupling(boundary; algebraic_coupling = ((:u, :λ),))
     K = allocate_matrix(dh; algebraic_couplings = (mean_u = descriptor,))
     f = zeros(ndofs(dh))
 
@@ -914,7 +920,7 @@ end
     add!(dh, :p, AlgebraicVariable{Vec{2}}())
     close!(dh)
     pdofs = algebraic_dofs(dh, :p)
-    zd = AlgebraicCoupling(dh; algebraic_coupling = ((:p, :p),))
+    zd = AlgebraicCoupling(; algebraic_coupling = ((:p, :p),))
     K = allocate_matrix(dh; algebraic_couplings = (zd,))
     f = zeros(ndofs(dh))
     assembler = start_assemble(K, f)
