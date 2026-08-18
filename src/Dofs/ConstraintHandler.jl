@@ -699,15 +699,20 @@ function _apply_v(v::AbstractVector, ch::ConstraintHandler, apply_zero::Bool)
     return v
 end
 
-function apply!(K::Union{AbstractSparseMatrix, Symmetric}, ch::ConstraintHandler)
+function apply!(K::AbstractMatrix, ch::ConstraintHandler)
     return apply!(K, eltype(K)[], ch, true)
 end
 
-function apply_zero!(K::Union{AbstractSparseMatrix, Symmetric}, f::AbstractVector, ch::ConstraintHandler)
+function apply_zero!(K::AbstractMatrix, f::AbstractVector, ch::ConstraintHandler)
     return apply!(K, f, ch, true)
 end
 
-function apply!(KK::Union{AbstractSparseMatrix, Symmetric{<:Any, <:AbstractSparseMatrix}}, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool = false)
+# The implementation below only uses the internal matrix interface (`meandiag`,
+# `add_inhomogeneities!`, `_condense!`, `zero_out_columns!`, `zero_out_rows!` and scalar
+# `setindex!`), so any matrix type dispatching those is supported -- see the devdocs on
+# assembly. `AbstractSparseMatrixCSC` and `SparseMatrixCSR` are covered here and in the
+# SparseMatricesCSR extension, `BlockMatrix` in the BlockArrays extension.
+function apply!(KK::AbstractMatrix, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool = false)
     @assert isclosed(ch)
     sym = isa(KK, Symmetric)
     K = sym ? KK.data : KK
@@ -752,20 +757,31 @@ end
 # Optimized version for SparseMatrixCSC
 add_inhomogeneities!(f::AbstractVector, K::SparseMatrixCSC, ch::ConstraintHandler) = add_inhomogeneities_csc!(f, K, ch, false)
 add_inhomogeneities!(f::AbstractVector, K::Symmetric{<:Any, <:SparseMatrixCSC}, ch::ConstraintHandler) = add_inhomogeneities_csc!(f, K.data, ch, true)
-function add_inhomogeneities_csc!(f::AbstractVector, K::SparseMatrixCSC, ch::ConstraintHandler, sym::Bool)
-    (; inhomogeneities, prescribed_dofs, dofmapping) = ch
-
+# Compute "f -= K[:, d] * v" for each prescribed dof `d` with inhomogeneity `v`. The dofs
+# and the rows of `K` are indexed in the same numbering, which is the global one for a plain
+# matrix and the block local one when `K` is a block of a blocked matrix (`f` is then a view
+# of the corresponding rows). With `sym` only the stored upper triangle is visited.
+function _add_inhomogeneities_cols!(f::AbstractVector, K::AbstractSparseMatrixCSC, prescribed_dofs::AbstractVector{<:Integer}, inhomogeneities::AbstractVector, sym::Bool)
+    rows = rowvals(K)
+    vals = nonzeros(K)
     @inbounds for i in 1:length(inhomogeneities)
         d = prescribed_dofs[i]
         v = inhomogeneities[i]
         if v != 0
             for j in nzrange(K, d)
-                r = K.rowval[j]
+                r = rows[j]
                 sym && r > d && break # don't look below diagonal
-                f[r] -= v * K.nzval[j]
+                f[r] -= v * vals[j]
             end
         end
     end
+    return f
+end
+
+function add_inhomogeneities_csc!(f::AbstractVector, K::SparseMatrixCSC, ch::ConstraintHandler, sym::Bool)
+    (; inhomogeneities, prescribed_dofs, dofmapping) = ch
+
+    _add_inhomogeneities_cols!(f, K, prescribed_dofs, inhomogeneities, sym)
     if sym
         # In the symmetric case, for a constrained dof `d`, we handle the contribution
         # from `K[1:d, d]` in the loop above, but we are still missing the contribution
@@ -795,14 +811,71 @@ end
 end
 
 """
-    _condense!(K::AbstractSparseMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false)
+    _condense!(K::AbstractMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false)
 
 Condenses affine constraints K := C'*K*C and f := C'*f in-place, assuming the sparsity pattern is correct.
 """
-function _condense!(K::AbstractSparseMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false) where {T, Ti}
+function _condense!(K::AbstractMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false) where {T, Ti}
     # Return early if there are no non-trivial affine constraints
     any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
     error("condensation of ::$(typeof(K)) matrix not supported")
+end
+
+"""
+    _condense_column!(Kdst, Ksrc::AbstractSparseMatrixCSC, srccol::Int, rowoffset::Int, coloffset::Int, col_coeffs, dofcoefficients, dofmapping)
+
+Condense the stored entries of column `srccol` of `Ksrc` by adding their affine contributions
+to `Kdst`. `rowoffset`/`coloffset` translate the indices of `Ksrc` into the global dof
+numbering of `Kdst`; they are zero when `Ksrc === Kdst` and equal to the block offsets when
+`Ksrc` is a block of a blocked `Kdst`. `col_coeffs` are the coefficients of the global column
+`srccol + coloffset`.
+
+The contributions are always added to unconstrained rows/columns, i.e. to entries whose own
+coefficients are `nothing`. Writing into `Kdst` while iterating `Ksrc` is therefore safe: a
+modified entry is skipped when the iteration reaches it.
+"""
+@inline function _condense_column!(
+        Kdst::AbstractMatrix, Ksrc::AbstractSparseMatrixCSC, srccol::Int,
+        rowoffset::Int, coloffset::Int, col_coeffs,
+        dofcoefficients::Vector, dofmapping::Dict{<:Integer, <:Integer},
+    )
+    col = srccol + coloffset
+    rows = rowvals(Ksrc)
+    vals = nonzeros(Ksrc)
+    for a in nzrange(Ksrc, srccol)
+        Kval = vals[a]
+        iszero(Kval) && continue
+        row = rows[a] + rowoffset
+        row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
+        if col_coeffs === nothing
+            row_coeffs === nothing && continue
+            for (d, v) in row_coeffs
+                addindex!(Kdst, v * Kval, d, col)
+            end
+            # Perform f - K*g. However, this has already been done outside of this function so we skip this.
+            # if condense_f
+            #     f[col] -= Kval * ac.b;
+            # end
+        elseif row_coeffs === nothing
+            for (d, v) in col_coeffs
+                addindex!(Kdst, v * Kval, row, d)
+            end
+        else
+            for (d1, v1) in row_coeffs, (d2, v2) in col_coeffs
+                addindex!(Kdst, v1 * v2 * Kval, d1, d2)
+            end
+        end
+    end
+    return
+end
+
+# Condense the rhs contribution of the constrained column `col` with coefficients `col_coeffs`.
+@inline function _condense_rhs_column!(f::AbstractVector, col::Int, col_coeffs)
+    for (d, v) in col_coeffs
+        f[d] += f[col] * v
+    end
+    f[col] = 0
+    return
 end
 
 # Condenses K and f: C'*K*C, C'*f, in-place assuming the sparsity pattern is correct
@@ -822,45 +895,9 @@ function _condense!(K::SparseMatrixCSC, f::AbstractVector, dofcoefficients::Vect
 
     for col in 1:ndofs
         col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
-        if col_coeffs === nothing
-            for a in nzrange(K, col)
-                Kval = K.nzval[a]
-                iszero(Kval) && continue
-                row = K.rowval[a]
-                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
-                row_coeffs === nothing && continue
-                for (d, v) in row_coeffs
-                    addindex!(K, v * Kval, d, col)
-                end
-
-                # Perform f - K*g. However, this has already been done in outside this functions so we skip this.
-                # if condense_f
-                #     f[col] -= K.nzval[a] * ac.b;
-                # end
-            end
-        else
-            for a in nzrange(K, col)
-                Kval = K.nzval[a]
-                iszero(Kval) && continue
-                row = K.rowval[a]
-                row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
-                if row_coeffs === nothing
-                    for (d, v) in col_coeffs
-                        addindex!(K, v * Kval, row, d)
-                    end
-                else
-                    for (d1, v1) in row_coeffs, (d2, v2) in col_coeffs
-                        addindex!(K, v1 * v2 * Kval, d1, d2)
-                    end
-                end
-            end
-
-            if condense_f
-                for (d, v) in col_coeffs
-                    f[d] += f[col] * v
-                end
-                f[col] = 0.0
-            end
+        _condense_column!(K, K, col, 0, 0, col_coeffs, dofcoefficients, dofmapping)
+        if col_coeffs !== nothing && condense_f
+            _condense_rhs_column!(f, col, col_coeffs)
         end
     end
     return
@@ -929,20 +966,32 @@ zero_out_rows!
 
 # columns need to be stored entries, this is not checked
 function zero_out_columns!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler) # can be removed in 0.7 with #24711 merged
-    @debug @assert issorted(ch.prescribed_dofs)
-    for col in ch.prescribed_dofs
+    return _zero_out_columns!(K, ch.prescribed_dofs)
+end
+
+function zero_out_rows!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler)
+    return _zero_out_rows!(K, ch.isconstrained)
+end
+
+# Kernels for the two functions above, taking the prescribed dofs and the constrained mask
+# directly instead of the constraint handler. This lets a blocked matrix reuse them per block
+# by passing the block local dofs and a view of the mask, see the BlockArrays extension.
+function _zero_out_columns!(K::AbstractSparseMatrixCSC, prescribed_dofs::AbstractVector{<:Integer})
+    @debug @assert issorted(prescribed_dofs)
+    nzval = nonzeros(K)
+    for col in prescribed_dofs
         r = nzrange(K, col)
-        K.nzval[r] .= 0.0
+        nzval[r] .= 0
     end
     return
 end
 
-function zero_out_rows!(K::AbstractSparseMatrixCSC, ch::ConstraintHandler)
-    @boundscheck checkbounds(ch.isconstrained, axes(K, 1))
-    rowval = K.rowval
-    nzval = K.nzval
+function _zero_out_rows!(K::AbstractSparseMatrixCSC, isconstrained::AbstractVector{Bool})
+    @boundscheck checkbounds(isconstrained, axes(K, 1))
+    rowval = rowvals(K)
+    nzval = nonzeros(K)
     @inbounds for (i, row) in pairs(rowval)
-        if ch.isconstrained[row]
+        if isconstrained[row]
             nzval[i] = zero(eltype(K))
         end
     end
@@ -1758,11 +1807,12 @@ function apply_local!(
 end
 
 # Element local application of boundary conditions. Global matrix and vectors are necessary
-# if there are affine constraints that connect dofs from different elements.
+# if there are affine constraints that connect dofs from different elements. `atomic` controls
+# whether those global writes use atomic additions, see `start_assemble`.
 function _apply_local!(
         local_matrix::AbstractMatrix, local_vector::AbstractVector,
         global_dofs::AbstractVector, ch::ConstraintHandler, apply_zero::Bool,
-        global_matrix, global_vector
+        global_matrix, global_vector, atomic::Val = Val(false)
     )
     @assert isclosed(ch)
     # TODO: With apply_zero it shouldn't be required to pass the vector.
@@ -1794,7 +1844,7 @@ function _apply_local!(
     # 3. Condense any affine constraints
     if has_nontrivial_affine_constraints
         # Condense this constraint locally if possible, and otherwise modifies the global arrays.
-        _condense_local!(local_matrix, local_vector, global_matrix, global_vector, global_dofs, ch.dofmapping, ch.dofcoefficients, ch.isconstrained)
+        _condense_local!(local_matrix, local_vector, global_matrix, global_vector, global_dofs, ch.dofmapping, ch.dofcoefficients, ch.isconstrained, atomic)
     end
     # 4. Zero out columns/rows of local matrix and replace diagonal entries with the mean
     if has_constraints
@@ -1825,17 +1875,19 @@ end
         local_matrix::AbstractMatrix, local_vector::AbstractVector,
         global_matrix #=::SparseMatrixCSC=#, global_vector #=::Vector=#,
         global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector,
-        isconstrained::BitVector
+        isconstrained::BitVector, atomic::Val = Val(false)
     )
 
 Condensation of affine constraints on element level. If possible this function only
-modifies the local arrays.
+modifies the local arrays. Constraints reaching outside of `global_dofs` are written
+directly into `global_matrix`/`global_vector`; `atomic` controls whether those writes use
+atomic additions, which is required when assembling concurrently without grid coloring.
 """
 function _condense_local!(
         local_matrix::AbstractMatrix, local_vector::AbstractVector,
         global_matrix #=::SparseMatrixCSC=#, global_vector #=::Vector=#,
         global_dofs::AbstractVector, dofmapping::Dict, dofcoefficients::Vector,
-        isconstrained::BitVector,
+        isconstrained::BitVector, atomic::Val = Val(false),
     )
     @assert axes(local_matrix, 1) == axes(local_matrix, 2) ==
         axes(local_vector, 1) == axes(global_dofs, 1)
@@ -1856,7 +1908,7 @@ function _condense_local!(
                         # can't zero it out later like with the local matrix.
                         if !isconstrained[global_col] && !isconstrained[global_mrow]
                             has_global_arrays || missing_global()
-                            addindex!(global_matrix, mw, global_mrow, global_col)
+                            addindex!(global_matrix, mw, global_mrow, global_col, atomic)
                         end
                     else
                         local_matrix[local_mrow, local_col] += mw
@@ -1877,7 +1929,7 @@ function _condense_local!(
                             # can't zero it out later like with the local matrix.
                             if !haskey(dofmapping, global_row) && !haskey(dofmapping, global_mcol)
                                 has_global_arrays || missing_global()
-                                addindex!(global_matrix, mw, global_row, global_mcol)
+                                addindex!(global_matrix, mw, global_row, global_mcol, atomic)
                             end
                         else
                             local_matrix[local_row, local_mcol] += mw
@@ -1894,7 +1946,7 @@ function _condense_local!(
                                 # can't zero it out later like with the local matrix.
                                 if !haskey(dofmapping, global_mrow) && !haskey(dofmapping, global_mcol)
                                     has_global_arrays || missing_global()
-                                    addindex!(global_matrix, mww, global_mrow, global_mcol)
+                                    addindex!(global_matrix, mww, global_mrow, global_mcol, atomic)
                                 end
                             else
                                 local_matrix[local_mrow, local_mcol] += mww
@@ -1908,7 +1960,7 @@ function _condense_local!(
                 local_mcol = findfirst(==(global_mcol), global_dofs)
                 if local_mcol === nothing
                     has_global_arrays || missing_global()
-                    addindex!(global_vector, vw, global_mcol)
+                    addindex!(global_vector, vw, global_mcol, atomic)
                 else
                     local_vector[local_mcol] += vw
                 end

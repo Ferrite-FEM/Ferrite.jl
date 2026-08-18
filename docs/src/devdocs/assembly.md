@@ -29,11 +29,21 @@ Ferrite.zero_out_columns!
 Ferrite._condense!
 ```
 
-and the `AbstractSparseMatrix` interface for their custom matrix type. Optional dispatches to speed up operations might be
+and the `AbstractMatrix` interface for their custom matrix type. [`apply!`](@ref) itself is
+generic and dispatches on `AbstractMatrix`, so a custom format is supported as soon as the
+functions above are dispatched -- there is no need to add an `apply!` method. Optional
+dispatches to speed up operations might be
 
 ```@docs
 Ferrite.add_inhomogeneities!
 ```
+
+The kernels backing the CSC implementations of the above take the prescribed dofs and the
+constrained mask directly instead of the [`ConstraintHandler`](@ref), so that a matrix built
+from CSC blocks can reuse them per block by passing block local indices. See
+`Ferrite._zero_out_columns!`, `Ferrite._zero_out_rows!`,
+`Ferrite._add_inhomogeneities_cols!` and `Ferrite._condense_column!`, and the BlockArrays
+extension for an example of how they are composed.
 
 ## Custom assembler
 
@@ -49,6 +59,11 @@ For local elimination support the following functions might also need custom dis
 ```@docs
 Ferrite._condense_local!
 ```
+
+Note that [`apply_assemble!`](@ref) passes the assembler's `atomic` flag on to
+`Ferrite._condense_local!`, so a custom assembler supporting atomic accumulation should
+report it through `Ferrite._is_atomic` in order to make the global writes of non-local
+constraints concurrency-safe as well.
 
 ## Type definitions
 

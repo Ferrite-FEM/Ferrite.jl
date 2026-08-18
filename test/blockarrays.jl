@@ -1,4 +1,4 @@
-using Ferrite, BlockArrays, SparseArrays, Test
+using Ferrite, BlockArrays, SparseArrays, LinearAlgebra, Test
 
 @testset "BlockArrays.jl extension" begin
     grid = generate_grid(Triangle, (10, 10))
@@ -67,8 +67,31 @@ using Ferrite, BlockArrays, SparseArrays, Test
     @test K ≈ KB
     @test f ≈ fB
 
-    # Global application of BC not supported yet
-    @test_throws ErrorException apply!(KB, fB, ch)
+    # Global application of BC, including the non-local affine (periodic) constraints
+    fdofs = Ferrite.free_dofs(ch)
+    pdofs = ch.prescribed_dofs
+    let K = copy(K), f = copy(f), KB = copy(KB), fB = copy(fB)
+        apply!(K, f, ch)
+        apply!(KB, fB, ch)
+        @test K ≈ KB
+        @test f ≈ fB
+        # The free block is the condensed system, the prescribed block is diagonal
+        @test KB[fdofs, fdofs] ≈ K[fdofs, fdofs]
+        @test isdiag(KB[pdofs, pdofs])
+        @test K \ f ≈ KB \ fB
+    end
+    let K = copy(K), f = copy(f), KB = copy(KB), fB = copy(fB)
+        apply_zero!(K, f, ch)
+        apply_zero!(KB, fB, ch)
+        @test K ≈ KB
+        @test f ≈ fB
+    end
+    # Matrix only, i.e. with an empty rhs
+    let K = copy(K), KB = copy(KB)
+        apply!(K, ch)
+        apply!(KB, ch)
+        @test K ≈ KB
+    end
 
     # Custom blocking
     perm = invperm([ch.free_dofs; ch.prescribed_dofs])
@@ -89,6 +112,104 @@ using Ferrite, BlockArrays, SparseArrays, Test
     fill!(K.nzval, 1)
     foreach(x -> fill!(x.nzval, 1), blocks(KB))
     @test K == KB
+end
+
+@testset "BlockAssembler with atomic accumulation" begin
+    grid = generate_grid(Triangle, (10, 10))
+    dh = DofHandler(grid)
+    ip = Lagrange{RefTriangle, 1}()
+    add!(dh, :u, ip^2)
+    add!(dh, :p, ip)
+    close!(dh)
+    renumber!(dh, DofOrder.FieldWise())
+    nd = ndofs(dh) ÷ 3
+
+    # Periodic constraints couple dofs across elements, so `apply_assemble!` below has to
+    # write into the global matrix and vector from `Ferrite._condense_local!`
+    ch = ConstraintHandler(dh)
+    add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid, "top", "bottom")))
+    add!(ch, Dirichlet(:p, getfacetset(grid, "left"), (x, t) -> 0))
+    close!(ch)
+    update!(ch, 0)
+
+    bsp = BlockSparsityPattern([2nd, 1nd])
+    add_sparsity_entries!(bsp, dh, ch)
+    allocate_block_matrix() = allocate_matrix(BlockMatrix, bsp)
+
+    # Deterministic fake element contributions computed from the dofs
+    element_matrix(dofs) = [sin(i * j / 100) for i in dofs, j in dofs]
+    element_vector(dofs) = [cos(i) for i in dofs]
+
+    function doassemble!(assembler; condense = false)
+        for cc in CellIterator(dh)
+            dofs = celldofs(cc)
+            ke = element_matrix(dofs)
+            fe = element_vector(dofs)
+            if condense
+                apply_assemble!(assembler, ch, dofs, ke, fe)
+            else
+                assemble!(assembler, dofs, ke, fe)
+            end
+        end
+        return
+    end
+
+    # Sequential atomic assembly gives bitwise identical results, both for plain assembly
+    # and for assembly with local condensation of constraints
+    for condense in (false, true)
+        K = allocate_block_matrix()
+        f = similar(K, axes(K, 1))
+        Ka = allocate_block_matrix()
+        fa = similar(Ka, axes(Ka, 1))
+        doassemble!(start_assemble(K, f); condense)
+        doassemble!(start_assemble(Ka, fa; atomic = true); condense)
+        @test K == Ka
+        @test f == fa
+    end
+
+    # A rhs which is not blocked like the matrix takes the fallback path in `assemble!`,
+    # which must be atomic too
+    K = allocate_block_matrix()
+    f = zeros(ndofs(dh))
+    Ka = allocate_block_matrix()
+    fa = zeros(ndofs(dh))
+    doassemble!(start_assemble(K, f))
+    doassemble!(start_assemble(Ka, fa; atomic = true))
+    @test K == Ka
+    @test f == fa
+
+    # Concurrent assembly: shared K and f, but one assembler per task and no coloring
+    Kc = allocate_block_matrix()
+    fc = similar(Kc, axes(Kc, 1))
+    _ = start_assemble(Kc, fc) # zero out
+    @sync for chunk in Iterators.partition(1:getncells(grid), cld(getncells(grid), 4))
+        Threads.@spawn begin
+            asm = start_assemble(Kc, fc; fillzero = false, atomic = true)
+            for cellidx in chunk
+                dofs = celldofs(dh, cellidx)
+                apply_assemble!(asm, ch, dofs, element_matrix(dofs), element_vector(dofs))
+            end
+        end
+    end
+    Ks = allocate_block_matrix()
+    fs = similar(Ks, axes(Ks, 1))
+    doassemble!(start_assemble(Ks, fs; atomic = true); condense = true)
+    # Equal up to the (task dependent) summation order
+    @test Kc ≈ Ks rtol = 1.0e-14
+    @test fc ≈ fs rtol = 1.0e-14
+
+    # Atomic accumulation is only supported for real/complex Float16/Float32/Float64
+    Ki = BlockArray(zeros(Int, 4, 4), [2, 2], [2, 2])
+    fi = BlockArray(zeros(Int, 4), [2, 2])
+    @test_throws ArgumentError start_assemble(Ki, fi; atomic = true)
+
+    # Literal `atomic` values propagate to the type parameter, i.e. `@inferred` holds and
+    # the flag is a compile time constant
+    KB = allocate_block_matrix()
+    fB = similar(KB, axes(KB, 1))
+    @test Ferrite._is_atomic(@inferred ((K, f) -> start_assemble(K, f; atomic = true))(KB, fB))
+    @test !Ferrite._is_atomic(@inferred ((K, f) -> start_assemble(K, f; atomic = false))(KB, fB))
+    @test !Ferrite._is_atomic(@inferred ((K, f) -> start_assemble(K, f))(KB, fB))
 end
 
 @testset "BlockAssembler with dense blocks" begin

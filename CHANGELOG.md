@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
  - Atomic assembly support for BlockAssembler. ([#1452])
+ - `apply_assemble!` now performs the global writes that arise from condensing affine
+   constraints reaching outside of the element (e.g. `PeriodicDirichlet`) atomically when the
+   assembler was created with `atomic = true`. Previously these writes were always
+   non-atomic, which is a data race when assembling concurrently without grid coloring. This
+   affects all assemblers. ([#1486])
  - `add_sparsity_entries!` (and thereby `allocate_matrix`) now guarantees that passing
    `interface_coupling` adds the requested interface entries: the `topology` keyword
    argument is now optional and, when not passed, constructed from the grid (previously
@@ -30,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Atomic assembly (`start_assemble(K, f; atomic = true)`) now supports `Float16` and
    `Complex` of `Float16`/`Float32`/`Float64` as value types, in addition to `Float32`
    and `Float64`. ([#1474])
+ - `apply!` and `apply_zero!` now work for a `BlockMatrix` with blocks in CSC
+   storage (as created by `allocate_matrix(BlockMatrix, ::BlockSparsityPattern)`), including
+   condensation of affine constraints. Previously constraints could only be applied to a
+   blocked system with `apply_assemble!`. As part of this, `apply!` and `apply_zero!`
+   dispatch on `AbstractMatrix` rather than `AbstractSparseMatrix`, so a custom matrix format
+   is supported as soon as it dispatches the internal interface documented in the devdocs on
+   assembly. ([#1486])
 
 ### Performance
  - `create_coloring` is significantly faster: the incidence matrix construction and the
@@ -1407,3 +1419,4 @@ poking into Ferrite internals:
 [#1452]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1452
 [#1474]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1474
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
+[#1486]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1486
