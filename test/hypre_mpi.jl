@@ -1,5 +1,5 @@
 # Run with e.g.
-#   mpiexecjl --project=docs -np 4 julia test/hypre_mpi.jl 1000
+#   mpiexecjl --project=docs -np 4 julia --project=docs test/hypre_mpi.jl 1000
 using Ferrite, MPI, HYPRE, Metis, TimerOutputs
 
 # Initialize MPI and HYPRE
@@ -37,19 +37,20 @@ function assemble_global(cellvalues::CellValues, A::HYPREMatrix, b::HYPREVector,
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
     assembler = start_assemble(A, b)
-    for cell in CellIterator(dh, getcellset(dh.grid, "proc-$(rank)"))
+    for cell in CellIterator(dh, getcellset(Ferrite.get_grid(dh), "proc-$(rank)"))
         reinit!(cellvalues, cell)
         assemble_element!(Ke, fe, cellvalues)
         apply_assemble!(assembler, ch, celldofs(cell), Ke, fe)
     end
-    # TODO: Should maybe be finish_assemble! (with !)
     finish_assemble(assembler)
     return A, b
 end
 
 # Partition the grid using Metis.jl
 function partition_grid!(grid)
-    # TODO: Can this be done on all ranks? Not sure if Metis is deterministic.
+    # Partition on the root rank and broadcast the result: Metis' output is not
+    # guaranteed to be reproducible between processes, and all ranks must agree on
+    # the partitioning.
     if rank == root
         cell_connectivity = Ferrite.create_incidence_matrix(grid)
         parts = Metis.partition(cell_connectivity, comm_size)
@@ -59,12 +60,8 @@ function partition_grid!(grid)
     MPI.Bcast!(parts, comm)
 
     # Create the cell sets based on the Metis partition
-    sets = [Set{Int}() for _ in 1:comm_size]
-    for (cell_id, part_id) in pairs(parts)
-        push!(sets[part_id], cell_id)
-    end
     for p in 1:comm_size
-        addcellset!(grid, "proc-$p", sets[p])
+        addcellset!(grid, "proc-$p", findall(==(p), parts))
     end
     return grid
 end
@@ -93,17 +90,17 @@ function main(n)
 
     # Renumber dofs by part
     @timeit "Renumber DoFs by processor" begin
-        all = Set{Int}()
+        seen = Set{Int}()
         sets = [Set{Int}() for _ in 1:comm_size]
         cc = CellCache(dh)
         for p in 1:comm_size
             set = sets[p]
             for cell_id in getcellset(grid, "proc-$p")
                 reinit!(cc, cell_id)
-                union!(set, cc.dofs)
+                union!(set, celldofs(cc))
             end
-            setdiff!(set, all)
-            union!(all, set)
+            setdiff!(set, seen)
+            union!(seen, set)
         end
         iperm = Int[]
         rank_dof_ranges = UnitRange{Int}[]
@@ -132,8 +129,9 @@ function main(n)
     end
 
 
-    # Set up HYPRE arrays
-    ilower, iupper = extrema(rank_dof_range)
+    # Set up HYPRE arrays. Note first/last instead of extrema: an empty dof range
+    # gives ilower > iupper, which HYPRE interprets as "no owned rows".
+    ilower, iupper = first(rank_dof_range), last(rank_dof_range)
     A = HYPREMatrix(comm, ilower, iupper)
     b = HYPREVector(comm, ilower, iupper)
 
@@ -149,12 +147,20 @@ function main(n)
         xh = HYPRE.solve(solver, A, b)
     end
 
+    # Report convergence
+    iterations = HYPRE.GetNumIterations(solver)
+    residual = HYPRE.GetFinalRelativeResidualNorm(solver)
+    rank == root && println("PCG converged after $(iterations) iterations (final relative residual norm: $(residual))")
+
     # Copy solution from HYPRE to Julia
     @timeit "Collect solution to root for VTK output" begin
         x = Vector{Float64}(undef, length(rank_dof_range))
         copy!(x, xh)
 
-        # Collect to root rank
+        # Collect to root rank. Note that this relies on the renumbering above:
+        # every rank's owned dofs form a contiguous block, so concatenating the
+        # blocks in rank order (which is what Gatherv! does) reassembles the
+        # global solution vector.
         if rank == root
             X = Vector{Float64}(undef, ndofs(dh))
             counts = length.(rank_dof_ranges)
@@ -182,6 +188,6 @@ end
 # Run it!
 if abspath(PROGRAM_FILE) == @__FILE__
     n = parse(Int, get(ARGS, 1, "100"))
-    main(n)
+    main(10) # warmup run for compilation
     main(n)
 end
