@@ -57,3 +57,9 @@ fetch_assets(
         variants(["quasi_incompressible_hyperelasticity", "topology_optimization", "elasticity_adaptivity"], ".webp"),
     ),
 )
+
+# Reference shape figures
+fetch_assets(
+    joinpath(@__DIR__, "src", "assets"),
+    ["ref-" * n * ".svg" for n in ("line", "triangle", "quadrilateral", "tetrahedron", "hexahedron", "prism", "pyramid")],
+)
