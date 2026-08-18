@@ -39,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Atomic assembly (`start_assemble(K, f; atomic = true)`) now supports `Float16` and
    `Complex` of `Float16`/`Float32`/`Float64` as value types, in addition to `Float32`
    and `Float64`. ([#1474])
+ - `apply!` and `apply_zero!` now work for a `BlockMatrix` with blocks in CSC
+   storage (as created by `allocate_matrix(BlockMatrix, ::BlockSparsityPattern)`), including
+   condensation of affine constraints. Previously constraints could only be applied to a
+   blocked system with `apply_assemble!`. As part of this, `apply!` and `apply_zero!`
+   dispatch on `AbstractMatrix` rather than `AbstractSparseMatrix`, so a custom matrix format
+   is supported as soon as it dispatches the internal interface documented in the devdocs on
+   assembly. ([#1486])
 
 ### Performance
  - `create_coloring` is significantly faster: the incidence matrix construction and the
@@ -1437,3 +1444,4 @@ poking into Ferrite internals:
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
+[#1486]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1486
