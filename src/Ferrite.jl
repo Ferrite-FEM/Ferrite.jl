@@ -30,33 +30,12 @@ using .CollectionsOfViews:
     insert_sorted_at_index!, ConstructionBuffer
 
 include("exports.jl")
-
-
-"""
-    AbstractRefShape{refdim}
-
-Supertype for all reference shapes, with reference dimension `refdim`. Reference shapes are
-used to define grid cells, shape functions, and quadrature rules. Currently existing
-reference shapes are: [`RefLine`](@ref), [`RefTriangle`](@ref), [`RefQuadrilateral`](@ref),
-[`RefTetrahedron`](@ref), [`RefHexahedron`](@ref), [`RefPrism`](@ref), [`RefPyramid`](@ref).
-"""
-abstract type AbstractRefShape{refdim} end
-
-# See src/docs.jl for detailed documentation
-struct RefHypercube{refdim} <: AbstractRefShape{refdim} end
-struct RefSimplex{refdim} <: AbstractRefShape{refdim} end
-const RefLine = RefHypercube{1}
-const RefQuadrilateral = RefHypercube{2}
-const RefHexahedron = RefHypercube{3}
-const RefTriangle = RefSimplex{2}
-const RefTetrahedron = RefSimplex{3}
-struct RefPrism <: AbstractRefShape{3} end
-struct RefPyramid <: AbstractRefShape{3} end
+include("refshapes.jl")
 
 """
     Ferrite.getrefdim(RefShape::Type{<:AbstractRefShape})
 
-Get the dimension of the reference shape
+Get the dimension of the reference shape.
 """
 getrefdim(::Type{<:AbstractRefShape}) # To get correct doc filtering
 getrefdim(::Type{<:AbstractRefShape{rdim}}) where {rdim} = rdim
@@ -175,7 +154,6 @@ include("PointEvalHandler.jl")
 # Other
 include("soa_utils.jl")
 include("deprecations.jl")
-include("docs.jl")
 
 # Adaptivity
 include("Adaptivity/AMR.jl")
