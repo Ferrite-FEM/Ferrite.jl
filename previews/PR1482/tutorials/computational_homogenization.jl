@@ -59,7 +59,7 @@ close!(ch_neumann)
 
 ch = (dirichlet = ch_dirichlet, periodic = ch_periodic, neumann = ch_neumann);
 
-neumann_coupling = CellCoupling(dofhandlers.neumann, 1:getncells(grid); algebraic_coupling = ((:u, :λ), (:λ, :λ)));
+neumann_coupling = CellCoupling(1:getncells(grid); algebraic_coupling = ((:u, :λ), (:λ, :λ)));
 
 K_dirichlet = allocate_matrix(dofhandlers.dirichlet)
 K_periodic = allocate_matrix(dofhandlers.periodic, ch.periodic)

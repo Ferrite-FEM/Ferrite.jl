@@ -184,7 +184,7 @@ algebraic_dofs(dh, :εbar)
 # ``3 \times 3`` block here, also the coupling of the variable with itself. The
 # descriptor is used when allocating the matrix, to add the corresponding entries to the
 # sparsity pattern.
-coupling = CellCoupling(dh, 1:getncells(grid); algebraic_coupling = ((:u, :εbar), (:εbar, :εbar)));
+coupling = CellCoupling(1:getncells(grid); algebraic_coupling = ((:u, :εbar), (:εbar, :εbar)));
 
 # The fluctuation field is periodic across the RVE, which [`PeriodicDirichlet`](@ref)
 # enforces with [`AffineConstraint`](@ref)s between the "mirror" and "image" boundary

@@ -28,7 +28,7 @@ nε = length(algebraic_dofs(dh, :εbar))
 
 algebraic_dofs(dh, :εbar)
 
-coupling = CellCoupling(dh, 1:getncells(grid); algebraic_coupling = ((:u, :εbar), (:εbar, :εbar)));
+coupling = CellCoupling(1:getncells(grid); algebraic_coupling = ((:u, :εbar), (:εbar, :εbar)));
 
 periodic_facets = collect_periodic_facets(grid, "left", "right")
 collect_periodic_facets!(periodic_facets, grid, "bottom", "top")

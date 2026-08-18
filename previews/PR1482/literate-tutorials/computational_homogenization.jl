@@ -307,7 +307,7 @@ ch = (dirichlet = ch_dirichlet, periodic = ch_periodic, neumann = ch_neumann);
 # to define the coupling between the displacement field and the Lagrange multipliers.
 # We do this by passing the fields we want to couple to `CellCoupling`.
 
-neumann_coupling = CellCoupling(dofhandlers.neumann, 1:getncells(grid); algebraic_coupling = ((:u, :λ), (:λ, :λ)));
+neumann_coupling = CellCoupling(1:getncells(grid); algebraic_coupling = ((:u, :λ), (:λ, :λ)));
 
 K_dirichlet = allocate_matrix(dofhandlers.dirichlet)
 K_periodic = allocate_matrix(dofhandlers.periodic, ch.periodic)

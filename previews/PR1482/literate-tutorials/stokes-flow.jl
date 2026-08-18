@@ -570,7 +570,7 @@ function setup_multiplier_dofs(grid, ipu, ipp)
         getfacetset(grid, "Γ1"), getfacetset(grid, "Γ2"),
         getfacetset(grid, "Γ3"), getfacetset(grid, "Γ4"),
     )
-    coupling = FacetCoupling(dh, Γ; algebraic_coupling = (:p, :λ))
+    coupling = FacetCoupling(Γ; algebraic_coupling = (:p, :λ))
     return dh, Γ, coupling
 end
 #md nothing #hide
