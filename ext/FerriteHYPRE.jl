@@ -40,7 +40,7 @@ end
 ### HYPREAssembler and associated methods ##
 ############################################
 
-struct HYPREAssembler <: Ferrite.AbstractAssembler
+struct HYPREAssembler <: Ferrite.AbstractAssembler{HYPRE_Complex}
     A::HYPRE.HYPREAssembler
 end
 
