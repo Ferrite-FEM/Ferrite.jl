@@ -1,6 +1,6 @@
 module CollectionsOfViews
 
-export ArrayOfVectorViews, push_at_index!, ConstructionBuffer
+export ArrayOfVectorViews, push_at_index!, insert_sorted_at_index!, ConstructionBuffer
 
 # `AdaptiveRange` and `ConstructionBuffer` are used to efficiently build up an `ArrayOfVectorViews`
 # when the size of each view is unknown.
@@ -56,6 +56,58 @@ function push_at_index!(b::ConstructionBuffer, val, indices::Vararg{Int, N}) whe
     else # We have space in an already allocated section
         b.data[r.start + r.ncurrent] = val
         setindex!(b.indices, AdaptiveRange(r.start, r.ncurrent + 1, r.nmax), indices...)
+    end
+    return b
+end
+
+"""
+    insert_sorted_at_index!(b::ConstructionBuffer{<:Any, 1}, val, index::Int)
+
+Insert the value `val` into the `Vector` view at index `index` of the one-dimensional buffer
+`b`, keeping the view sorted and free of duplicates (`val` is dropped if already stored). The
+view must already be sorted, which holds when it is filled exclusively through this function.
+
+Unlike [`push_at_index!`](@ref), the reservation for a view grows *geometrically* when it
+overflows, so repeatedly growing the same view is amortized O(length) copies instead of
+O(length^2 / sizehint).
+"""
+function insert_sorted_at_index!(b::ConstructionBuffer{<:Any, 1}, val, index::Int)
+    r = b.indices[index]
+    n = length(b.data)
+    if r.start == 0
+        # `index` not previously added, allocate new space for it at the end of `b.data`
+        resize!(b.data, n + b.sizehint)
+        @inbounds b.data[n + 1] = val
+        b.indices[index] = AdaptiveRange(n + 1, 1, b.sizehint)
+        return b
+    end
+    lo = r.start
+    hi = r.start + r.ncurrent - 1
+    # Ranged searchsortedfirst to avoid the heap-allocating view(b.data, lo:hi)
+    k = searchsortedfirst(b.data, val, lo, hi, Base.Order.Forward)
+    (k <= hi && @inbounds(b.data[k]) == val) && return b # already stored
+    if r.ncurrent < r.nmax
+        # Space left in the reservation: shift the tail and insert in place
+        @inbounds for i in hi:-1:k
+            b.data[i + 1] = b.data[i]
+        end
+        @inbounds b.data[k] = val
+        b.indices[index] = AdaptiveRange(r.start, r.ncurrent + 1, r.nmax)
+    else
+        # Reservation full: move the view to the end of `b.data` with a geometrically grown
+        # reservation, inserting `val` at its sorted position during the copy
+        newstart = n + 1
+        newmax = r.nmax + max(r.nmax, b.sizehint)
+        resize!(b.data, n + newmax)
+        krel = k - r.start
+        @inbounds for i in 0:(krel - 1)
+            b.data[newstart + i] = b.data[r.start + i]
+        end
+        @inbounds b.data[newstart + krel] = val
+        @inbounds for i in krel:(r.ncurrent - 1)
+            b.data[newstart + i + 1] = b.data[r.start + i]
+        end
+        b.indices[index] = AdaptiveRange(newstart, r.ncurrent + 1, newmax)
     end
     return b
 end

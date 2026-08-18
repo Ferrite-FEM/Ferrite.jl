@@ -10,9 +10,10 @@ arbitrary points of the domain together with a [`PointEvalHandler`](@ref).
 
 `PointValues` are reinitialized like other `CellValues`, but since the local reference
 coordinate of the "quadrature point" changes this needs to be passed to [`reinit!`](@ref),
-in addition to the element coordinates: `reinit!(pv, coords, local_coord)`. Alternatively,
-it can be reinitialized with a [`PointLocation`](@ref) when iterating a `PointEvalHandler`
-with a [`PointIterator`](@ref).
+in addition to the element coordinates: `reinit!(pv, coords, local_coord)`. For
+interpolations with non-identity mappings, the cell must also be passed:
+`reinit!(pv, cell, coords, local_coord)`. Alternatively, it can be reinitialized with a
+[`PointLocation`](@ref) when iterating a `PointEvalHandler` with a [`PointIterator`](@ref).
 
 For function/gradient evaluation, `PointValues` are used in the same way as
 `CellValues`, i.e. by using [`function_value`](@ref), [`function_gradient`](@ref), etc,
@@ -63,7 +64,16 @@ function_symmetric_gradient(pv::PointValues, u::AbstractVector, args...) =
 
 # reinit! on PointValues must first update N and dNdξ for the new "quadrature point"
 # and then call the regular reinit! for the wrapped CellValues to update dNdx
-function reinit!(pv::PointValues, x::AbstractVector{<:Vec{sdim}}, ξ::Vec{rdim}) where {sdim, rdim}
+@inline function reinit!(pv::PointValues, x::AbstractVector, ξ::Vec)
+    return reinit!(pv, nothing, x, ξ)
+end
+
+function reinit!(
+        pv::PointValues,
+        cell::Union{AbstractCell, Nothing},
+        x::AbstractVector{<:Vec{sdim}},
+        ξ::Vec{rdim},
+    ) where {sdim, rdim}
     # Update the quadrature point location
     qr_points = getpoints(pv.cv.qr)
     qr_points[1] = ξ
@@ -71,7 +81,7 @@ function reinit!(pv::PointValues, x::AbstractVector{<:Vec{sdim}}, ξ::Vec{rdim})
     precompute_values!(pv.cv.fun_values, qr_points)
     precompute_values!(pv.cv.geo_mapping, qr_points)
     # Regular reinit
-    reinit!(pv.cv, x)
+    reinit!(pv.cv, cell, x)
     return nothing
 end
 

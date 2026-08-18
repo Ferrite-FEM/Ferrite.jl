@@ -1,3 +1,8 @@
+# Imports for parallel (isolated) test execution:
+using StaticArrays
+using LinearAlgebra
+include(joinpath(@__DIR__, "test_utils.jl"))
+
 # Test that all values in the struct are equal,
 # but that bits-types are not aliased to eachother.
 function test_equal_but_unaliased(a::T, b::T) where {T}
@@ -22,9 +27,12 @@ end
             (Lagrange{RefTriangle, 4}(), QuadratureRule{RefTriangle}(2)),
             (Lagrange{RefTriangle, 5}(), QuadratureRule{RefTriangle}(2)),
             (Lagrange{RefHexahedron, 1}(), QuadratureRule{RefHexahedron}(2)),
+            (Lagrange{RefHexahedron, 3}(), QuadratureRule{RefHexahedron}(2)),
             (Serendipity{RefQuadrilateral, 2}(), QuadratureRule{RefQuadrilateral}(2)),
             (Lagrange{RefTriangle, 1}(), QuadratureRule{RefTriangle}(2)),
             (Lagrange{RefTetrahedron, 2}(), QuadratureRule{RefTetrahedron}(2)),
+            (Lagrange{RefTetrahedron, 3}(), QuadratureRule{RefTetrahedron}(2)),
+            (Lagrange{RefTetrahedron, 4}(), QuadratureRule{RefTetrahedron}(2)),
             (Lagrange{RefPrism, 2}(), QuadratureRule{RefPrism}(2)),
             (Lagrange{RefPyramid, 2}(), QuadratureRule{RefPyramid}(2)),
         )

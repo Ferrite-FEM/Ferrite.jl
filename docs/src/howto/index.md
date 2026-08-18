@@ -6,7 +6,7 @@ or build on top of, the tutorials and, therefore, some familiarity with Ferrite 
 
 ---
 
-#### [Post processing and visualization](postprocessing.md)
+#### [Postprocessing and visualization](postprocessing.md)
 
 This guide builds on top of [Tutorial 1: Heat equation](../tutorials/heat_equation.md) and
 discusses various post processing techniques with the goal of visualizing primary fields
@@ -18,11 +18,19 @@ Concretely, this guide answers:
 
 ---
 
-#### [Multi-threaded assembly](threaded_assembly.md)
+#### [Multithreaded assembly](threaded_assembly.md)
 
 This guide modifies [Tutorial 2: Linear elasticity](../tutorials/linear_elasticity.md) such
 that the program is using multi-threading to parallelize the assembly procedure. Concretely
 this shows how to use grid coloring and "scratch values" in order to use multi-threading
 without running into race-conditions.
+
+---
+
+#### [GPU assembly](gpu_assembly.md)
+
+This guide builds on top of [Tutorial 1: Heat equation](../tutorials/heat_equation.md) such
+that the program is using CUDA to parallelize the assembly procedure. Concretely
+this shows how to use grid coloring and the structure-of-arrays types in Ferrite.
 
 ---

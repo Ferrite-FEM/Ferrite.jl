@@ -27,7 +27,7 @@ apply_rhs!
 Ferrite.RHSData
 ```
 
-# Initial conditions
+## Initial conditions
 
 ```@docs
 apply_analytical!

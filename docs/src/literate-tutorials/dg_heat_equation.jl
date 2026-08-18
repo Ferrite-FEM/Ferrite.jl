@@ -1,6 +1,7 @@
 # # [Discontinuous Galerkin heat equation](@id tutorial-dg-heat-equation)
 #
-# ![](dg_heat_equation.png)
+# ![](dg_heat_equation-light.png)
+# ![](dg_heat_equation-dark.png)
 #
 # *Figure 1*: Temperature field on the unit square with an internal uniform heat source
 # solved with inhomogeneous Dirichlet boundary conditions on the left and right boundaries
@@ -164,10 +165,12 @@ dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
 
-# However, when generating the sparsity pattern we need to pass the topology and the cross-element coupling matrix when we're using
-# discontinuous interpolations. The cross-element coupling matrix is of size [1,1] in this case as
-# we have only one field and one DofHandler.
-K = allocate_matrix(dh, topology = topology, interface_coupling = trues(1, 1));
+# However, when generating the sparsity pattern we need to request the cross-element
+# coupling explicitly with the `interface_coupling` keyword argument when we're using
+# discontinuous interpolations (by default DoFs of neighboring cells are not coupled). The
+# cross-element coupling matrix is of size 1 × 1 in this case as we have only one field.
+# The topology is also required, for locating the interfaces.
+K = allocate_matrix(dh, interface_coupling = [true;;], topology = topology);
 
 # ### Boundary conditions
 # The Dirichlet boundary conditions are treated
@@ -204,9 +207,6 @@ close!(ch);
 
 function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
     n_basefuncs = getnbasefunctions(cellvalues)
-    ## Reset to 0
-    fill!(Ke, 0)
-    fill!(fe, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(cellvalues)
         ## Quadrature weight
@@ -229,8 +229,6 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues)
 end
 
 function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
-    ## Reset to 0
-    fill!(Ki, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(iv)
         ## Get the normal to facet A
@@ -256,8 +254,6 @@ function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
 end
 
 function assemble_boundary!(fe::Vector, fv::FacetValues)
-    ## Reset to 0
-    fill!(fe, 0)
     ## Loop over quadrature points
     for q_point in 1:getnquadpoints(fv)
         ## Get the normal to facet A
@@ -280,7 +276,11 @@ end
 # We define the function `assemble_global` to loop over all elements and internal facets
 # (interfaces), as well as the external facets involved in Neumann boundary conditions.
 
-function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, interfacevalues::InterfaceValues, K::SparseMatrixCSC, dh::DofHandler, order::Int, dim::Int)
+function assemble_global(
+        cellvalues::CellValues, facetvalues::FacetValues, interfacevalues::InterfaceValues,
+        K::SparseMatrixCSC, dh::DofHandler, topology::ExclusiveTopology,
+        order::Int, dim::Int
+    )
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
@@ -294,13 +294,15 @@ function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, inter
     for cell in CellIterator(dh)
         ## Reinitialize cellvalues for this cell
         reinit!(cellvalues, cell)
+        fill!(Ke, 0)
+        fill!(fe, 0)
         ## Compute volume integral contribution
         assemble_element!(Ke, fe, cellvalues)
         ## Assemble Ke and fe into K and f
         assemble!(assembler, celldofs(cell), Ke, fe)
     end
-    ## Loop over all interfaces
-    for ic in InterfaceIterator(dh)
+    ## Loop over all interfaces, reusing the topology constructed above
+    for ic in InterfaceIterator(dh, topology)
         ## Reinitialize interfacevalues for this interface
         reinit!(interfacevalues, ic)
         ## Calculate the characteristic size hₑ as the face diameter
@@ -308,6 +310,7 @@ function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, inter
         hₑ = getdiameter(interfacecoords)
         ## Calculate μ
         μ = (1 + order)^dim / hₑ
+        fill!(Ki, 0)
         ## Compute interface surface integrals contribution
         assemble_interface!(Ki, interfacevalues, μ)
         ## Assemble Ki into K
@@ -317,6 +320,7 @@ function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, inter
     for fc in FacetIterator(dh, ∂Ωₙ)
         ## Reinitialize facetvalues for this boundary facet
         reinit!(facetvalues, fc)
+        fill!(fe, 0)
         ## Compute boundary facet surface integrals contribution
         assemble_boundary!(fe, facetvalues)
         ## Assemble fe into f
@@ -324,7 +328,7 @@ function assemble_global(cellvalues::CellValues, facetvalues::FacetValues, inter
     end
     return K, f
 end
-K, f = assemble_global(cellvalues, facetvalues, interfacevalues, K, dh, order, dim);
+K, f = assemble_global(cellvalues, facetvalues, interfacevalues, K, dh, topology, order, dim);
 #md nothing # hide
 
 # ### Solution of the system

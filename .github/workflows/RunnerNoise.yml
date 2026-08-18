@@ -1,0 +1,127 @@
+# One-off experiment (manual dispatch only): measure how noisy each GitHub-hosted runner
+# type is for the benchmark suite, to pick the runner for Benchmarks.yml empirically.
+#
+# Each matrix job runs the suite `passes` times at the SAME commit via Tachometer's
+# per-revision runner (fresh worktree + subprocess + tuning per pass, exactly like a
+# production pass). Since the code is identical, any change Tachometer's policy would
+# flag is a false positive. The analyze job aggregates everything into a per-runner
+# noise profile in the workflow step summary; benchmark/runner-noise/analyze.jl can
+# also be rerun locally on the downloaded artifacts to try other tolerance policies.
+#
+# NOTE: workflow_dispatch only lists workflows that exist on the default branch, so
+# this file must land on master before it can be dispatched.
+name: RunnerNoise
+
+on:
+  workflow_dispatch:
+    inputs:
+      runners:
+        description: "JSON array of runner labels to profile"
+        default: '["ubuntu-latest", "ubuntu-24.04-arm", "macos-latest"]'
+      reps:
+        description: "Independent jobs per runner label (job-to-job variation)"
+        default: '5'
+      passes:
+        description: "Suite runs per job; each disjoint block of 4 simulates one nruns=2 comparison"
+        default: '8'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runner-noise
+  cancel-in-progress: false
+
+jobs:
+  # workflow_dispatch inputs cannot parameterize a matrix directly for the rep count,
+  # so a tiny setup job turns `reps` into a JSON list for fromJSON below.
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      reps: ${{ steps.mk.outputs.reps }}
+    steps:
+      - id: mk
+        env:
+          REPS: ${{ inputs.reps }}
+        run: echo "reps=$(seq -s, 1 "$REPS" | sed 's/.*/[&]/')" >> "$GITHUB_OUTPUT"
+
+  measure:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: ${{ fromJSON(inputs.runners) }}
+        rep: ${{ fromJSON(needs.plan.outputs.reps) }}
+    name: measure (${{ matrix.runner }} #${{ matrix.rep }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same source as Benchmarks.yml uses for the action; run_revision is called
+      # directly here (via collect.jl) instead of the compare entrypoint.
+      - uses: actions/checkout@v7
+        with:
+          repository: KristofferC/Tachometer.jl
+          ref: main
+          path: .tachometer-src
+
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v3
+
+      - name: Run the suite ${{ inputs.passes }} times at ${{ github.sha }}
+        env:
+          RUNNER_LABEL: ${{ matrix.runner }}
+          RUNNER_REP: ${{ matrix.rep }}
+          NOISE_PASSES: ${{ inputs.passes }}
+          NOISE_OUT: runner-noise-${{ matrix.runner }}-${{ matrix.rep }}.json
+        run: |
+          julia --color=yes -e '
+            using Pkg
+            Pkg.activate(; temp = true)
+            Pkg.develop(PackageSpec(path = ".tachometer-src"))
+            Pkg.add("JSON")
+            Pkg.instantiate()
+            include("benchmark/runner-noise/collect.jl")
+          '
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: runner-noise-${{ matrix.runner }}-${{ matrix.rep }}
+          path: runner-noise-*.json
+          retention-days: 30
+
+  analyze:
+    needs: measure
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: runner-noise-*
+          path: results
+          merge-multiple: true
+
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
+
+      - name: Aggregate into the step summary
+        run: |
+          julia --color=yes -e '
+            using Pkg
+            Pkg.activate(; temp = true)
+            Pkg.add("JSON")
+            include("benchmark/runner-noise/analyze.jl")
+          '
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: runner-noise-summary
+          path: summary.md
+          retention-days: 30

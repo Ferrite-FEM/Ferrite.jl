@@ -1,3 +1,7 @@
+# Imports for parallel (isolated) test execution:
+import SHA
+using SparseArrays
+
 @testset "AbstractGrid" begin
 
     struct SmallGrid{dim, N, C <: Ferrite.AbstractCell} <: Ferrite.AbstractGrid{dim}

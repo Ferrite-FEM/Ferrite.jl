@@ -37,6 +37,17 @@ function compare_patterns(p1, px...)
     return
 end
 
+# Compare the storage of SparseMatrixCSR
+function compare_matrices_csr(A1, Ax...)
+    @assert A1 isa SparseMatrixCSR
+    @assert length(Ax) > 0
+    @assert all(A -> A isa SparseMatrixCSR, Ax)
+    @test all(A -> size(A1) == size(A), Ax)
+    @test all(A -> A1.rowptr == A.rowptr, Ax)
+    @test all(A -> A1.colval == A.colval, Ax)
+    return
+end
+
 # Compare the storage of SparseMatrixCSC
 function compare_matrices(A1, Ax...)
     @assert A1 isa SparseMatrixCSC
@@ -49,7 +60,7 @@ function compare_matrices(A1, Ax...)
 end
 
 function is_stored(dsp::SparsityPattern, i, j)
-    return findfirst(k -> k == j, dsp.rows[i]) !== nothing
+    return findfirst(k -> k == j, Ferrite.eachrow(dsp, i)) !== nothing
 end
 
 @testset "SparsityPattern" begin
@@ -246,6 +257,11 @@ end
         add_sparsity_entries!(p, dh)
     end
     compare_patterns(ps...)
+    # The SparseMatrixCSR instantiation works for any pattern whose eachrow iterates sorted
+    # column indices; equal patterns give identical storage. This covers both row copy
+    # branches: AbstractVector rows (TestPattern, SparsityPattern) and the iteration
+    # fallback (BlockSparsityPattern's lazy rows).
+    compare_matrices_csr((allocate_matrix(SparseMatrixCSR{1, Float64, Int}, p) for p in ps)...)
 
     # DofHandler + ConstraintHandler
     ps = make_patterns(dh)
@@ -332,9 +348,13 @@ end
     for p in patterns
         @test_throws ErrorException add_sparsity_entries!(p, dh, ch_bad; keep_constrained = false)
     end
+    # interface_coupling: the topology is constructed automatically when not passed
+    sp_ic = add_sparsity_entries!(SparsityPattern(ndofs(dh), ndofs(dh)), dh; interface_coupling = trues(2, 2))
+    sp_ic_topo = add_sparsity_entries!(SparsityPattern(ndofs(dh), ndofs(dh)), dh; interface_coupling = trues(2, 2), topology = ExclusiveTopology(grid))
+    compare_patterns(sp_ic, sp_ic_topo)
 end
 
-@testset "FastSparsityPattern" begin
+@testset "SparsityPattern counting build" begin
     function fsp_test_create_dh(CT)
         RS = getrefshape(CT)
         dim = Ferrite.getrefdim(RS)
@@ -344,22 +364,166 @@ end
         add!(dh, :b, Lagrange{RS, 2}()^dim)
         return close!(dh)
     end
-    # Internal fast-path for supported cases
+    # The counting (count-presize marker fill) build is used for every SparsityPattern, so
+    # the reference for comparison is the generic AbstractSparsityPattern method, invoked
+    # explicitly. `seed!` optionally pre-populates the pattern before the build.
+    function fsp_test_build_generic(
+            dh, ch = nothing; seed! = identity, sp = init_sparsity_pattern(dh),
+            keep_constrained = true, coupling = nothing, interface_coupling = nothing, topology = nothing,
+        )
+        seed!(sp)
+        Base.@invoke add_sparsity_entries!(
+            sp::Ferrite.AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing};
+            keep_constrained, coupling, interface_coupling, topology
+        )
+        return sp
+    end
     for CT in (Line, Quadrilateral, Tetrahedron)
         dh = fsp_test_create_dh(CT)
         sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh)
-        fsp = Ferrite.FastSparsityPattern(dh)
+        sp_gen = fsp_test_build_generic(dh)
         K1 = allocate_matrix(sp)
-        K2 = allocate_matrix(fsp)
+        K2 = allocate_matrix(sp_gen)
+        K3 = allocate_matrix(dh)
         compare_matrices(K1, K2) # For CSC only
+        compare_matrices(K1, K3)
 
-        sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh)
-        fsp = Ferrite.FastSparsityPattern(dh)
         K1_csr = allocate_matrix(SparseMatrixCSR, sp)
-        K2_csr = allocate_matrix(SparseMatrixCSR, fsp)
+        K2_csr = allocate_matrix(SparseMatrixCSR, sp_gen)
+        K3_csr = allocate_matrix(SparseMatrixCSR, dh)
         K1_csr.nzval .= 1:length(K1_csr.nzval)
         K2_csr.nzval .= 1:length(K2_csr.nzval)
+        K3_csr.nzval .= 1:length(K3_csr.nzval)
         @test K1_csr == K2_csr
+        @test K1_csr == K3_csr
+    end
+    # Coupling and keep_constrained are handled during the counting build (masked/filtered
+    # candidate enumeration);
+    # compare against the generic path for the same arguments.
+    for CT in (Quadrilateral, Tetrahedron)
+        dh = fsp_test_create_dh(CT)
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:a, getfacetset(dh.grid, "left"), x -> 0))
+        close!(ch)
+        for kwargs in (
+                (; coupling = [true true; false true]),
+                (; coupling = [true false; false true]),
+                (; keep_constrained = false),
+                (; coupling = [true true; false true], keep_constrained = false),
+            )
+            sp_fast = add_sparsity_entries!(init_sparsity_pattern(dh), dh, ch; kwargs...)
+            sp_gen = fsp_test_build_generic(dh, ch; kwargs...)
+            compare_matrices(allocate_matrix(sp_fast), allocate_matrix(sp_gen))
+        end
+    end
+    # Full masks are normalized away before the build but must still be validated
+    # (dh has 2 fields, 3 components, 22 dofs/cell, so trues(4, 4) matches nothing)
+    let dh = fsp_test_create_dh(Quadrilateral)
+        sp() = init_sparsity_pattern(dh)
+        @test_throws ErrorException("coupling not square") add_sparsity_entries!(sp(), dh; coupling = [true true])
+        @test_throws ErrorException("could not create coupling") add_sparsity_entries!(sp(), dh; coupling = trues(4, 4))
+        topo = ExclusiveTopology(dh.grid)
+        @test_throws ErrorException("coupling not square") add_sparsity_entries!(sp(), dh; topology = topo, interface_coupling = [true true])
+    end
+    # Interface entries (topology) are reserved up front, filtered by interface_coupling. For a
+    # single-subdofhandler discretization the reservation is exact and doubles as the fill
+    # itself, i.e. no row relocations and no layered interface insertion. (Multiple
+    # subdofhandlers still take the layered path: the counting build's expanded masks are square
+    # per-subdofhandler and do not apply to a neighbor with a different dof layout;
+    # rectangular per-(sdh, sdh) masks in the walk would lift that, as a follow-up.)
+    let
+        grid = generate_grid(Quadrilateral, (5, 5))
+        dh = DofHandler(grid)
+        add!(dh, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        add!(dh, :b, DiscontinuousLagrange{RefQuadrilateral, 1}()^2)
+        close!(dh)
+        topo = ExclusiveTopology(grid)
+        for ic in (trues(2, 2), [false false; false true], [true true; false true])
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh; topology = topo, interface_coupling = ic)
+            sp_gen = fsp_test_build_generic(dh; topology = topo, interface_coupling = ic)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            # The reservation is exact for a fully discontinuous single-sdh discretization,
+            # asymmetric masks included
+            @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
+        end
+        # Two-phase build: cells first, then a second call layering the interface entries on
+        # the pre-populated pattern, must equal the one-shot build
+        sp_twophase = add_sparsity_entries!(init_sparsity_pattern(dh), dh)
+        add_sparsity_entries!(sp_twophase, dh; topology = topo, interface_coupling = trues(2, 2))
+        sp_oneshot = add_sparsity_entries!(init_sparsity_pattern(dh), dh; topology = topo, interface_coupling = trues(2, 2))
+        compare_matrices(allocate_matrix(sp_twophase), allocate_matrix(sp_oneshot))
+        # Mixed continuous/discontinuous fields: with the self-sufficient interface semantics
+        # the enumeration is exact for any continuity (single subdofhandler), so the direct
+        # fill and exact reservation apply here too.
+        dh2 = DofHandler(grid)
+        add!(dh2, :a, Lagrange{RefQuadrilateral, 1}())
+        add!(dh2, :b, DiscontinuousLagrange{RefQuadrilateral, 1}()^2)
+        close!(dh2)
+        for ic in (trues(2, 2), [false false; false true])
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh2), dh2; topology = topo, interface_coupling = ic)
+            sp_gen = fsp_test_build_generic(dh2; topology = topo, interface_coupling = ic)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
+        end
+        # Same-side interface blocks: with a restricted cell coupling the interface pass also
+        # provides masked pairs within each interface cell, so the own-cell candidates in the
+        # counting build must pass on the interface mask too.
+        for (cc, ic) in (
+                ([true false; false true], [false true; false false]),
+                ([true false; false true], trues(2, 2)),
+            )
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh2), dh2; coupling = cc, topology = topo, interface_coupling = ic)
+            sp_gen = fsp_test_build_generic(dh2; coupling = cc, topology = topo, interface_coupling = ic)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
+        end
+        # Multiple subdofhandlers: the direct interface fill must NOT trigger (the square
+        # coupling masks do not apply to cross-subdofhandler neighbors in the walk) and the
+        # layered path must match the generic one.
+        dh3 = DofHandler(grid)
+        sdh_a = SubDofHandler(dh3, Set(1:12))
+        add!(sdh_a, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        sdh_b = SubDofHandler(dh3, Set(13:25))
+        add!(sdh_b, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        close!(dh3)
+        let ic = trues(1, 1)
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh3), dh3; topology = topo, interface_coupling = ic)
+            sp_gen = fsp_test_build_generic(dh3; topology = topo, interface_coupling = ic)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+        end
+    end
+    # The counting build also covers pre-populated patterns (existing entries are kept verbatim and
+    # deduplicated against the new candidates) and patterns larger than ndofs(dh).
+    let
+        dh = fsp_test_create_dh(Quadrilateral)
+        seed! = function (sp)
+            Ferrite.add_entry!(sp, 3, Ferrite.getncols(sp)) # outside the cell pattern
+            Ferrite.add_entry!(sp, 7, 4) # inside the cell pattern (deduplicated)
+            return sp
+        end
+        for kwargs in ((;), (; coupling = [true true; false true]))
+            sp = add_sparsity_entries!(seed!(init_sparsity_pattern(dh)), dh; kwargs...)
+            sp_gen = fsp_test_build_generic(dh; seed!, kwargs...)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+        end
+        # Repeated add_sparsity_entries! is idempotent
+        sp_rep = add_sparsity_entries!(add_sparsity_entries!(init_sparsity_pattern(dh), dh), dh)
+        compare_matrices(allocate_matrix(sp_rep), allocate_matrix(add_sparsity_entries!(init_sparsity_pattern(dh), dh)))
+        # Pattern larger than ndofs: the extra rows/columns get diagonal-only entries
+        n = ndofs(dh) + 3
+        sp_big = add_sparsity_entries!(SparsityPattern(n, n), dh)
+        sp_big_gen = fsp_test_build_generic(dh; sp = SparsityPattern(n, n))
+        @test Ferrite.getnrows(sp_big) == n
+        compare_matrices(allocate_matrix(sp_big), allocate_matrix(sp_big_gen))
+        # Test with keep_constrained = false
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:a, getfacetset(dh.grid, "left"), x -> 0.0))
+        close!(ch)
+        sp_big_kc = add_sparsity_entries!(SparsityPattern(n, n), dh, ch; keep_constrained = false)
+        sp_big_kc_gen = SparsityPattern(n, n)
+        Ferrite.add_entry!(sp_big_kc_gen, 1, 1) # forces the generic branch
+        add_sparsity_entries!(sp_big_kc_gen, dh, ch; keep_constrained = false)
+        compare_matrices(allocate_matrix(sp_big_kc), allocate_matrix(sp_big_kc_gen))
     end
     # Test different number types (Int32, Float32)
     for Tv in (Float32, Float64)
@@ -384,5 +548,17 @@ end
         )
         K1 = allocate_matrix(MatrixType, dh)
         @test isa(K1, MatrixType)
+    end
+    # CSC/Symmetric instantiation reads rows without sorting (_eachrow_anyorder) and must
+    # give the same matrix for unsorted and sorted rows. Order matters: the first call must
+    # run while rows are still unsorted from the build.
+    let dh = fsp_test_create_dh(Quadrilateral)
+        sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh)
+        @test !sp.sorted
+        K = allocate_matrix(Symmetric{Float64, SparseMatrixCSC{Float64, Int}}, sp)
+        Ferrite._ensure_sorted!(sp)
+        S = allocate_matrix(Symmetric{Float64, SparseMatrixCSC{Float64, Int}}, sp)
+        @test K.data.colptr == S.data.colptr
+        @test K.data.rowval == S.data.rowval
     end
 end

@@ -1,3 +1,6 @@
+# Imports for parallel (isolated) test execution:
+using LinearAlgebra
+
 @testset "apply_analytical!" begin
 
     # Convenience helper functions

@@ -1,3 +1,8 @@
+# Imports for parallel (isolated) test execution:
+using LinearAlgebra
+using SparseArrays
+import Metis
+
 @testset "DofHandler construction" begin
     grid = generate_grid(Quadrilateral, (2, 1))
     dh = DofHandler(grid)
@@ -448,7 +453,7 @@ end
         return false
     end
     function is_stored(sparsity_pattern::SparsityPattern, i, j)
-        return findfirst(k -> k == j, sparsity_pattern.rows[i]) !== nothing
+        return findfirst(k -> k == j, Ferrite.eachrow(sparsity_pattern, i)) !== nothing
     end
 
     # Full coupling (default)
@@ -600,6 +605,13 @@ end
             true  true  true
             false  true  true
         ],
+        # Asymmetric coupling: entries in the (i-rows × j-cols) block are gated by
+        # coupling[i, j] alone, for cell and interface coupling alike
+        [
+            true   true   true
+            false  true   true
+            false  false  true
+        ],
 
         # Component coupling
         [
@@ -620,6 +632,13 @@ end
             true    true    true    true
             false    true    true    true
         ],
+        # Asymmetric component coupling
+        [
+            true     true     true     true
+            false    true     true     true
+            false    false    true     true
+            false    false    false    true
+        ],
     ]
     function is_stored(A, i, j)
         A = A isa Symmetric ? A.data : A
@@ -628,48 +647,64 @@ end
         end
         return false
     end
-    function _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, neighbors, is_cross_element)
+    ncopies(ip) = ip isa VectorizedInterpolation ? Ferrite.get_n_copies(ip) : 1
+    function _check_dofs(K, dh, sdh, cell_idx, coupling, interface_coupling, neighbors, is_cross_element, has_interface)
+        cooccur(i, j) = any(c -> i ∈ celldofs(dh, c) && j ∈ celldofs(dh, c), 1:getncells(dh.grid))
+        nfields = length(Ferrite.getfieldnames(dh))
+        # Index into the mask for (field, component): field-level masks (one row/col per
+        # field) are indexed by the field index, component-level masks by the component
+        # index. Note: this relies on the sdh field names being a prefix of the global
+        # field names, as noted for `check_coupling` below.
+        function mask_index(mask, sdh, field_idx, dim)
+            size(mask, 1) == nfields && return field_idx
+            return sum(Int[ncopies(sdh.field_interpolations[f]) for f in 1:(field_idx - 1)]) + dim
+        end
         for field1_idx in eachindex(sdh.field_names)
             i_dofs = dof_range(sdh, field1_idx)
-            ip1 = sdh.field_interpolations[field1_idx]
-            vdim[1] = typeof(ip1) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip1) : 1
-            for dim1 in 1:vdim[1]
+            vdim1 = ncopies(sdh.field_interpolations[field1_idx])
+            for dim1 in 1:vdim1
                 for cell2_idx in neighbors
                     sdh2 = dh.subdofhandlers[dh.cell_to_subdofhandler[cell2_idx]]
-                    coupling_idx[2] = 1
                     for field2_idx in eachindex(sdh2.field_names)
                         j_dofs = dof_range(sdh2, field2_idx)
-                        ip2 = sdh2.field_interpolations[field2_idx]
-                        vdim[2] = typeof(ip2) <: VectorizedInterpolation && size(coupling)[1] == 4 ? Ferrite.get_n_copies(ip2) : 1
-                        for dim2 in 1:vdim[2]
-                            i_dofs_v = i_dofs[dim1:vdim[1]:end]
-                            j_dofs_v = j_dofs[dim2:vdim[2]:end]
+                        vdim2 = ncopies(sdh2.field_interpolations[field2_idx])
+                        for dim2 in 1:vdim2
+                            cc = coupling[mask_index(coupling, sdh, field1_idx, dim1), mask_index(coupling, sdh2, field2_idx, dim2)]
+                            icc = interface_coupling[mask_index(interface_coupling, sdh, field1_idx, dim1), mask_index(interface_coupling, sdh2, field2_idx, dim2)]
+                            i_dofs_v = i_dofs[dim1:vdim1:end]
+                            j_dofs_v = j_dofs[dim2:vdim2:end]
                             for i_idx in i_dofs_v, j_idx in j_dofs_v
                                 i = celldofs(dh, cell_idx)[i_idx]
                                 j = celldofs(dh, cell2_idx)[j_idx]
-                                is_cross_element && (i ∈ celldofs(dh, cell2_idx) || j ∈ celldofs(dh, cell_idx)) && continue
-                                @test is_stored(K, i, j) == coupling[coupling_idx...]
+                                if is_cross_element
+                                    # The interface pass adds every masked pair within
+                                    # the union of the two cells' dofs; pairs that (also)
+                                    # co-occur in a cell get entries from the cell pass.
+                                    expected = icc || (cc && cooccur(i, j))
+                                else
+                                    # Same-cell pairs: from the cell pass, or from the
+                                    # same-side blocks of the interface pass if the cell
+                                    # has at least one interior facet.
+                                    expected = cc || (icc && has_interface)
+                                end
+                                @test is_stored(K, i, j) == expected
                             end
-                            coupling_idx[2] += 1
                         end
                     end
                 end
-                coupling_idx[1] += 1
             end
         end
     end
     function check_coupling(dh, topology, K, coupling, interface_coupling)
         for cell_idx in eachindex(getcells(dh.grid))
             sdh = dh.subdofhandlers[dh.cell_to_subdofhandler[cell_idx]]
-            coupling_idx = [1, 1]
-            interface_coupling_idx = [1, 1]
-            vdim = [1, 1]
-            # test inner coupling
-            _check_dofs(K, dh, sdh, cell_idx, coupling, coupling_idx, vdim, [cell_idx], false)
-            # test cross-element coupling
-            neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
+            neighborhood = Ferrite.get_facet_facet_neighborhood(topology, dh.grid)
             neighbors = [neighborhood[cell_idx, i] for i in 1:size(neighborhood, 2)]
-            _check_dofs(K, dh, sdh, cell_idx, interface_coupling, interface_coupling_idx, vdim, [i[1][1] for i in neighbors[.!isempty.(neighbors)]], true)
+            has_interface = any(!isempty, neighbors)
+            # test inner coupling
+            _check_dofs(K, dh, sdh, cell_idx, coupling, interface_coupling, [cell_idx], false, has_interface)
+            # test cross-element coupling
+            _check_dofs(K, dh, sdh, cell_idx, coupling, interface_coupling, [i[1][1] for i in neighbors[.!isempty.(neighbors)]], true, has_interface)
         end
     end
     grid = generate_grid(Quadrilateral, (2, 2))
@@ -689,6 +724,131 @@ end
     @test_throws ErrorException("coupling not square") allocate_matrix(dh; coupling = [true true])
     # @test_throws ErrorException("coupling not symmetric") allocate_matrix(dh; coupling=[true true; false true])
     @test_throws ErrorException("could not create coupling") allocate_matrix(dh; coupling = falses(100, 100))
+
+    # Orientation independence for asymmetric interface coupling: build the same two-cell
+    # DG mesh with both cell orderings and check that the coupled blocks follow
+    # interface_coupling[i, j] <=> entries in (rows of field i) × (columns of field j),
+    # independent of which cell the interface iterator visits first
+    grid0 = generate_grid(Triangle, (1, 1))
+    for cellorder in ([1, 2], [2, 1])
+        grid = Grid(getcells(grid0)[cellorder], grid0.nodes)
+        topology = ExclusiveTopology(grid)
+        dh = DofHandler(grid)
+        add!(dh, :u, DiscontinuousLagrange{RefTriangle, 1}())
+        add!(dh, :p, DiscontinuousLagrange{RefTriangle, 0}())
+        close!(dh)
+        # [p, u] = false: p test functions see no u trial functions from the neighbor
+        K = allocate_matrix(dh; coupling = trues(2, 2), topology = topology, interface_coupling = [true true; false true])
+        sdh = dh.subdofhandlers[1]
+        for (cell, nbr) in ((1, 2), (2, 1))
+            urows = celldofs(dh, cell)[dof_range(sdh, :u)]
+            prows = celldofs(dh, cell)[dof_range(sdh, :p)]
+            ucols = celldofs(dh, nbr)[dof_range(sdh, :u)]
+            pcols = celldofs(dh, nbr)[dof_range(sdh, :p)]
+            for i in urows, j in vcat(ucols, pcols)
+                @test is_stored(K, i, j)
+            end
+            for i in prows, j in ucols
+                @test !is_stored(K, i, j)
+            end
+            for i in prows, j in pcols
+                @test is_stored(K, i, j)
+            end
+        end
+    end
+
+    # Interface coupling must be self-sufficient: for every interface, entries exist for
+    # every masked (test dof, trial dof) pair within the union of the two cells' dofs
+    # (including dofs shared between the cells (continuous interpolations) and the same-side
+    # blocks) without relying on the cell coupling to provide them.
+    let
+        grid = generate_grid(Line, (2,))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefLine, 1}())
+        add!(dh, :p, Lagrange{RefLine, 1}())
+        close!(dh)
+        # celldofs: A = [1, 2, 3, 4] (u@n1, u@n2, p@n1, p@n2), B = [2, 5, 4, 6]
+        topology = ExclusiveTopology(grid)
+        cc = [true false; false true] # cell coupling: u-u, p-p only
+        ic = [false true; false false] # interface coupling: u rows, p columns
+        sp = Ferrite.add_sparsity_entries!(
+            init_sparsity_pattern(dh), dh;
+            coupling = cc, topology = topology, interface_coupling = ic
+        )
+        # Every u row (1, 2, 5) couples to every p column (3, 4, 6), including the
+        # shared dof 4 and the same-side pairs such as (1, 3)
+        @test sort(collect(Ferrite.eachrow(sp, 1))) == [1, 2, 3, 4, 6]
+        @test sort(collect(Ferrite.eachrow(sp, 2))) == [1, 2, 3, 4, 5, 6]
+        @test sort(collect(Ferrite.eachrow(sp, 5))) == [2, 3, 4, 5, 6]
+        # No p rows couple to u columns ([p, u] = false)
+        @test sort(collect(Ferrite.eachrow(sp, 3))) == [3, 4]
+        @test sort(collect(Ferrite.eachrow(sp, 4))) == [3, 4, 6]
+    end
+    # Assembly smoke test: ∫_Γ {{δu}} {{p}} dΓ produces nonzero values for shared dofs and
+    # same-side pairs; the pattern from restricted cell coupling + interface coupling
+    # must support assembling it
+    let
+        grid = generate_grid(Quadrilateral, (2, 1))
+        topology = ExclusiveTopology(grid)
+        dh = DofHandler(grid)
+        ip = Lagrange{RefQuadrilateral, 1}()
+        add!(dh, :u, ip)
+        add!(dh, :p, ip)
+        close!(dh)
+        cc = [true false; false true]
+        ic = [false true; false false]
+        K = allocate_matrix(dh; coupling = cc, topology = topology, interface_coupling = ic)
+        iv = InterfaceValues(FacetQuadratureRule{RefQuadrilateral}(2), ip)
+        sdh = dh.subdofhandlers[1]
+        drng_u = dof_range(sdh, :u)
+        drng_p = dof_range(sdh, :p)
+        ncdofs = ndofs_per_cell(dh)
+        assembler = start_assemble(K)
+        for interface in InterfaceIterator(dh, topology)
+            reinit!(iv, interface)
+            Ke = zeros(2 * ncdofs, 2 * ncdofs)
+            # Map interface shape function index (here-side 1:4, there-side 5:8) to the
+            # index in the stacked dof vector [celldofs(a); celldofs(b)]
+            stackedindex(i, drng) = i <= length(drng) ? drng[i] : ncdofs + drng[i - length(drng)]
+            for qp in 1:getnquadpoints(iv)
+                dΓ = getdetJdV(iv, qp)
+                for i in 1:getnbasefunctions(iv)
+                    δu = shape_value_average(iv, qp, i)
+                    for j in 1:getnbasefunctions(iv)
+                        p = shape_value_average(iv, qp, j)
+                        Ke[stackedindex(i, drng_u), stackedindex(j, drng_p)] += δu * p * dΓ
+                    end
+                end
+            end
+            # The stacked dof vector contains the shared (continuous) dofs twice, which
+            # the assembler does not support: accumulate the duplicated rows/columns onto
+            # the unique dofs before assembling
+            idofs = interfacedofs(interface)
+            udofs = unique(idofs)
+            uindex = [findfirst(==(d), udofs) for d in idofs]
+            Kc = zeros(length(udofs), length(udofs))
+            for i in axes(Ke, 1), j in axes(Ke, 2)
+                Kc[uindex[i], uindex[j]] += Ke[i, j]
+            end
+            # This throws a missing sparsity entry error if the pattern misses the
+            # shared-dof strips or the same-side blocks
+            assemble!(assembler, udofs, Kc)
+        end
+        # The trace of p at the shared nodes is nonzero on the facet, so the shared dof
+        # columns must have nonzero values in the rows of the u dofs on the facet
+        shared_u_dofs = intersect(celldofs(dh, 1)[drng_u], celldofs(dh, 2)[drng_u])
+        shared_p_dofs = intersect(celldofs(dh, 1)[drng_p], celldofs(dh, 2)[drng_p])
+        for i in shared_u_dofs, j in shared_p_dofs
+            @test K[i, j] > 0
+        end
+        # Same-side pairs: u rows on the facet couple to p columns away from the facet
+        # with value zero here ({{p}} has zero trace for interior dofs), but the entries
+        # must exist in the pattern
+        other_p_dofs = setdiff(celldofs(dh, 1)[drng_p], shared_p_dofs)
+        for i in shared_u_dofs, j in other_p_dofs
+            @test is_stored(K, i, j)
+        end
+    end
 
     # Test coupling with subdomains
     # Note: `check_coupling` works for this case only because the second domain has dofs from the first domain in order. Otherwise tests like in continuous ip are required.
@@ -796,4 +956,280 @@ end
     @test dofsshell[5:8] == [11, 20, 15, 19]
     #Shared face dof
     @test dofsshell[9] == 24
+end
+
+@testset "dof distribution on a mixed-dimensional shared face" begin
+    # A 2D cell can share its interior face dofs with a face of a 3D cell through
+    # SubDofHandlers. Both cells must associate every shared global dof with the same
+    # physical location, regardless of the 2D cell orientation or which SubDofHandler is
+    # visited first.
+    solid_grid = generate_grid(Hexahedron, (1, 1, 1))
+    solid = solid_grid.cells[1]
+    nodes = solid_grid.nodes
+    face = (4, 3, 7, 8)
+    shell_orientations = (
+        face,
+        (face[2], face[3], face[4], face[1]),
+        (face[3], face[4], face[1], face[2]),
+        (face[4], face[1], face[2], face[3]),
+        reverse(face),
+        (face[3], face[2], face[1], face[4]),
+        (face[2], face[1], face[4], face[3]),
+        (face[1], face[4], face[3], face[2]),
+    )
+
+    ip_solid = Lagrange{RefHexahedron, 3}()
+    ip_shell = Lagrange{RefQuadrilateral, 3}()
+    ipg_solid = Lagrange{RefHexahedron, 1}()
+    ipg_shell = Lagrange{RefQuadrilateral, 1}()
+    for shell_nodes in shell_orientations, shell_first in (false, true)
+        grid = Grid([solid, Quadrilateral(shell_nodes)], nodes)
+        dh = DofHandler(grid)
+        if shell_first
+            sdh_shell = SubDofHandler(dh, Set(2))
+            add!(sdh_shell, :u, ip_shell)
+            sdh_solid = SubDofHandler(dh, Set(1))
+            add!(sdh_solid, :u, ip_solid)
+        else
+            sdh_solid = SubDofHandler(dh, Set(1))
+            add!(sdh_solid, :u, ip_solid)
+            sdh_shell = SubDofHandler(dh, Set(2))
+            add!(sdh_shell, :u, ip_shell)
+        end
+        close!(dh)
+
+        dof_location = Dict{Int, Vec{3, Float64}}()
+        nclash = 0
+        for (cellnr, ip, ipg) in (
+                (1, ip_solid, ipg_solid),
+                (2, ip_shell, ipg_shell),
+            )
+            x = getcoordinates(grid, cellnr)
+            for (dof, ξ) in zip(celldofs(dh, cellnr), Ferrite.reference_coordinates(ip))
+                xdof = sum(Ferrite.reference_shape_value(ipg, ξ, k) * x[k] for k in eachindex(x))
+                loc = get!(dof_location, dof, xdof)
+                isapprox(loc, xdof; atol = 1.0e-12) || (nclash += 1)
+            end
+        end
+        @test nclash == 0
+        shared = intersect(Set(celldofs(dh, 1)), Set(celldofs(dh, 2)))
+        @test length(shared) == 16 # 4 vertex + 4 * 2 edge + 4 face dofs
+    end
+end
+
+@testset "canonical facedof index helpers" begin
+    # Brute-force geometric checks of the helpers used by Ferrite.permute_and_push! to
+    # adjust face dofs to the orientation of the local face: the local lattice point must
+    # map to the index of the canonical lattice point at the same location.
+
+    # Triangular faces: all 6 orientations of a face spanned by nodes (1, 2, 3). The
+    # position (scaled by q + 3) of the lattice point with sub-multi-index t relative to
+    # the face fc is given by the barycentric weights (t .+ 1) on the face vertices.
+    tri_positions = (Vec((0, 0)), Vec((1, 0)), Vec((0, 1)))
+    tri_point(t, fc) = (t[1] + 1) * tri_positions[fc[1]] + (t[2] + 1) * tri_positions[fc[2]] + (t[3] + 1) * tri_positions[fc[3]]
+    tri_faces = ((1, 2, 3), (2, 3, 1), (3, 1, 2), (1, 3, 2), (3, 2, 1), (2, 1, 3))
+    for q in 0:3, local_face in tri_faces
+        orientation = Ferrite.SurfaceOrientationInfo(local_face)
+        # Canonical enumeration of the lattice points for the sorted face (1, 2, 3)
+        canonical_points = [tri_point((t1, t2, q - t1 - t2), (1, 2, 3)) for t2 in 0:q for t1 in 0:(q - t2)]
+        cidxs = Int[]
+        for t2 in 0:q, t1 in 0:(q - t2)
+            x = tri_point((t1, t2, q - t1 - t2), local_face)
+            cidx = Ferrite._canonical_facedof_index_triangle(t1, t2, q, orientation)
+            push!(cidxs, cidx)
+            @test canonical_points[cidx] == x
+        end
+        @test sort(cidxs) == 1:length(canonical_points) # bijection
+    end
+
+    # Quadrilateral faces: all 8 orientations of a face spanned by nodes (1, 2, 3, 4). The
+    # position (scaled by (m + 1)²) of the interior lattice point (i, j) relative to the
+    # face fc follows from bilinear interpolation of the corners.
+    quad_positions = (Vec((0, 0)), Vec((1, 0)), Vec((1, 1)), Vec((0, 1)))
+    function quad_point(i, j, m, fc)
+        u, v, w = i + 1, j + 1, m + 1
+        return (w - u) * (w - v) * quad_positions[fc[1]] + u * (w - v) * quad_positions[fc[2]] +
+            u * v * quad_positions[fc[3]] + (w - u) * v * quad_positions[fc[4]]
+    end
+    quad_faces = (
+        (1, 2, 3, 4), (2, 3, 4, 1), (3, 4, 1, 2), (4, 1, 2, 3), # rotations
+        (1, 4, 3, 2), (4, 3, 2, 1), (3, 2, 1, 4), (2, 1, 4, 3), # reversed rotations
+    )
+    for m in 1:3, local_face in quad_faces
+        orientation = Ferrite.SurfaceOrientationInfo(local_face)
+        canonical_points = [quad_point(i, j, m, (1, 2, 3, 4)) for j in 0:(m - 1) for i in 0:(m - 1)]
+        cidxs = Int[]
+        for j in 0:(m - 1), i in 0:(m - 1)
+            x = quad_point(i, j, m, local_face)
+            cidx = Ferrite._canonical_facedof_index_quadrilateral(i, j, m, orientation)
+            push!(cidxs, cidx)
+            @test canonical_points[cidx] == x
+        end
+        @test sort(cidxs) == 1:length(canonical_points) # bijection
+    end
+end
+
+@testset "interior_facedofs_on_lattice opt-in" begin
+    # Permuting multiple dofs on a shared 3D face requires opting in to the lattice
+    # assumption; interpolations that have not opted in must error rather than silently
+    # produce a wrong (non-lattice) permutation.
+    @test Ferrite.interior_facedofs_on_lattice(Lagrange{RefTetrahedron, 4}())
+    @test Ferrite.interior_facedofs_on_lattice(Lagrange{RefTetrahedron, 4}()^3)
+    @test !Ferrite.interior_facedofs_on_lattice(Nedelec{RefTetrahedron, 1}()) # default
+
+    orientation = Ferrite.SurfaceOrientationInfo((2, 3, 1)) # a rotated triangular face
+    dofs = 1:1:3 # three interior face dofs, n_copies = 1
+    # rdim = 3, adjust = true, multiple dofs, not on lattice => error
+    @test_throws ErrorException Ferrite.permute_and_push!(Int[], dofs, orientation, true, false, 3, 3)
+    # On a lattice it permutes the three dofs without error
+    cell_dofs = Int[]
+    Ferrite.permute_and_push!(cell_dofs, dofs, orientation, true, true, 3, 3)
+    @test length(cell_dofs) == 3
+    # A lattice interpolation on a 2D cell uses the same canonical face ordering so it can
+    # share these dofs with a 3D face.
+    cell_dofs_2d = Int[]
+    Ferrite.permute_and_push!(cell_dofs_2d, dofs, orientation, true, true, 3, 2)
+    @test cell_dofs_2d == cell_dofs
+    # Non-lattice face dofs on a 2D cell retain their local ordering.
+    cell_dofs_2d_nonlattice = Int[]
+    Ferrite.permute_and_push!(cell_dofs_2d_nonlattice, dofs, orientation, true, false, 3, 2)
+    @test cell_dofs_2d_nonlattice == collect(dofs)
+end
+
+@testset "dof distribution on shared faces" begin
+    # Two cells sharing an entity must associate the same global dof with the same location
+    # on the entity, regardless of the relative orientation of the cells. For
+    # Lagrange{RefTetrahedron, 3} this requires adjusting multiple dofs per edge, and for
+    # Lagrange{RefTetrahedron, 4} additionally multiple dofs per face, see
+    # Ferrite.permute_and_push!.
+    all_permutations(t::NTuple{4, Int}) = [
+        (t[i], t[j], t[k], t[l]) for i in 1:4 for j in 1:4 for k in 1:4 for l in 1:4
+            if length(unique((i, j, k, l))) == 4
+    ]
+    nodes = Node.(
+        [
+            Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0)), Vec((0.0, 1.0, 0.0)),
+            Vec((0.0, 0.0, 1.0)), Vec((1.0, 1.0, 1.0)),
+        ]
+    )
+    ipg = Lagrange{RefTetrahedron, 1}() # geometric interpolation of Tetrahedron
+    for (ip, nshared) in (
+            (Lagrange{RefTetrahedron, 2}(), 6),  # 3 vertex + 3 * 1 edge dofs
+            (Lagrange{RefTetrahedron, 3}(), 10), # 3 vertex + 3 * 2 edge + 1 face dofs
+            (Lagrange{RefTetrahedron, 4}(), 15), # 3 vertex + 3 * 3 edge + 3 face dofs
+            (Lagrange{RefTetrahedron, 4}()^2, 30),
+        )
+        base_ip = ip isa VectorizedInterpolation ? ip.ip : ip
+        n_copies = ip isa VectorizedInterpolation ? Ferrite.get_n_copies(ip) : 1
+        ξs = Ferrite.reference_coordinates(base_ip)
+        # Loop over all orderings of the cell vertices for both cells. The cells share the
+        # face spanned by nodes (2, 3, 4).
+        for tet1 in all_permutations((1, 2, 3, 4)), tet2 in all_permutations((2, 3, 4, 5))
+            grid = Grid([Tetrahedron(tet1), Tetrahedron(tet2)], nodes)
+            dh = close!(add!(DofHandler(grid), :u, ip))
+            # Compute the location of each global dof from each cell and check consistency
+            dof_location = Dict{Int, Tuple{Vec{3, Float64}, Int}}()
+            nclash = 0
+            for cellnr in 1:2
+                x = getcoordinates(grid, cellnr)
+                cdofs = celldofs(dh, cellnr)
+                for (i, ξ) in pairs(ξs)
+                    xdof = sum(Ferrite.reference_shape_value(ipg, ξ, k) * x[k] for k in 1:length(x))
+                    for c in 1:n_copies
+                        dof = cdofs[(i - 1) * n_copies + c]
+                        loc = get!(dof_location, dof, (xdof, c))
+                        if !(isapprox(loc[1], xdof; atol = 1.0e-12) && loc[2] == c)
+                            nclash += 1
+                        end
+                    end
+                end
+            end
+            @test nclash == 0
+            # Check that the expected number of dofs are shared between the cells
+            shared = intersect(Set(celldofs(dh, 1)), Set(celldofs(dh, 2)))
+            @test length(shared) == nshared
+            @test ndofs(dh) == 2 * getnbasefunctions(ip) - nshared
+        end
+    end
+end
+
+@testset "dof distribution on shared faces (hexahedron)" begin
+    # Two hexahedra sharing a quadrilateral face must associate the same global dof with the
+    # same location on the face for any relative orientation of the cells. For
+    # Lagrange{RefHexahedron, 3} the shared face carries multiple interior dofs, exercising
+    # the quadrilateral branch of Ferrite.permute_and_push!.
+
+    # Centered coordinates of the 8 hex corners in Ferrite (reference) node ordering.
+    corner = (
+        (-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1),
+        (-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1),
+    )
+    col_perms = ((1, 2, 3), (1, 3, 2), (2, 1, 3), (2, 3, 1), (3, 1, 2), (3, 2, 1))
+    matvec(R, v) = ntuple(r -> sum(R[r][c] * v[c] for c in 1:3), 3)
+    det3(R) =
+        R[1][1] * (R[2][2] * R[3][3] - R[2][3] * R[3][2]) -
+        R[1][2] * (R[2][1] * R[3][3] - R[2][3] * R[3][1]) +
+        R[1][3] * (R[2][1] * R[3][2] - R[2][2] * R[3][1])
+    # All 24 proper rotations of the cube, as permutations of the corner slots that keep the
+    # (positively oriented) hexahedron valid.
+    rotations = NTuple{8, Int}[]
+    for cols in col_perms, s1 in (-1, 1), s2 in (-1, 1), s3 in (-1, 1)
+        s = (s1, s2, s3)
+        R = ntuple(r -> ntuple(c -> (c == cols[r] ? s[r] : 0), 3), 3)
+        det3(R) == 1 || continue
+        push!(rotations, ntuple(j -> findfirst(==(matvec(R, corner[j])), corner), 8))
+    end
+    @test length(rotations) == 24
+
+    # Two stacked unit cubes: the bottom cube (nodes 1-8) and the top cube (nodes 5-8 shared
+    # with the bottom cube, plus new nodes 9-12), sharing the z = 1 face.
+    nodes = Node.(
+        [
+            Vec((0.0, 0.0, 0.0)), Vec((1.0, 0.0, 0.0)), Vec((1.0, 1.0, 0.0)), Vec((0.0, 1.0, 0.0)),
+            Vec((0.0, 0.0, 1.0)), Vec((1.0, 0.0, 1.0)), Vec((1.0, 1.0, 1.0)), Vec((0.0, 1.0, 1.0)),
+            Vec((0.0, 0.0, 2.0)), Vec((1.0, 0.0, 2.0)), Vec((1.0, 1.0, 2.0)), Vec((0.0, 1.0, 2.0)),
+        ]
+    )
+    bottom = (1, 2, 3, 4, 5, 6, 7, 8)
+    top = (5, 6, 7, 8, 9, 10, 11, 12)
+    ipg = Lagrange{RefHexahedron, 1}() # geometric interpolation of Hexahedron
+    for (ip, nshared) in (
+            (Lagrange{RefHexahedron, 2}(), 9),  # 4 vertex + 4 * 1 edge + 1 face dofs
+            (Lagrange{RefHexahedron, 3}(), 16), # 4 vertex + 4 * 2 edge + 4 face dofs
+            (Lagrange{RefHexahedron, 3}()^2, 32),
+        )
+        base_ip = ip isa VectorizedInterpolation ? ip.ip : ip
+        n_copies = ip isa VectorizedInterpolation ? Ferrite.get_n_copies(ip) : 1
+        ξs = Ferrite.reference_coordinates(base_ip)
+        # Loop over all rotations of both cells (i.e. all relative orientations of the shared
+        # face).
+        for rot1 in rotations, rot2 in rotations
+            h1 = Hexahedron(ntuple(k -> bottom[rot1[k]], 8))
+            h2 = Hexahedron(ntuple(k -> top[rot2[k]], 8))
+            grid = Grid([h1, h2], nodes)
+            dh = close!(add!(DofHandler(grid), :u, ip))
+            # Compute the location of each global dof from each cell and check consistency
+            dof_location = Dict{Int, Tuple{Vec{3, Float64}, Int}}()
+            nclash = 0
+            for cellnr in 1:2
+                x = getcoordinates(grid, cellnr)
+                cdofs = celldofs(dh, cellnr)
+                for (i, ξ) in pairs(ξs)
+                    xdof = sum(Ferrite.reference_shape_value(ipg, ξ, k) * x[k] for k in 1:length(x))
+                    for c in 1:n_copies
+                        dof = cdofs[(i - 1) * n_copies + c]
+                        loc = get!(dof_location, dof, (xdof, c))
+                        if !(isapprox(loc[1], xdof; atol = 1.0e-12) && loc[2] == c)
+                            nclash += 1
+                        end
+                    end
+                end
+            end
+            @test nclash == 0
+            # Check that the expected number of dofs are shared between the cells
+            shared = intersect(Set(celldofs(dh, 1)), Set(celldofs(dh, 2)))
+            @test length(shared) == nshared
+            @test ndofs(dh) == 2 * getnbasefunctions(ip) - nshared
+        end
+    end
 end

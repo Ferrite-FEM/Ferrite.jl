@@ -9,7 +9,12 @@ defined on the reference cell, to the actual cell.
 
 The geometric mapping of a finite element from the reference coordinates to the real coordinates is shown in the following illustration.
 
-![mapping_figure](https://raw.githubusercontent.com/Ferrite-FEM/Ferrite.jl/gh-pages/assets/fe_mapping.svg)
+![Geometric mapping from the reference cell to the physical cell](./assets/fe_mapping-light.svg)
+![Geometric mapping from the reference cell to the physical cell](./assets/fe_mapping-dark.svg)
+
+Here, $\xi_i$ is reference coordinate $i$ and $x_i$ the corresponding real coordinate, while
+$\hat{\boldsymbol{\xi}}_\alpha$ and $\hat{\boldsymbol{x}}_\alpha$ are the reference and real
+positions of node $\alpha$.
 
 This mapping is given by the geometric shape functions, $\hat{N}_i^g(\boldsymbol{\xi})$, such that
 ```math
@@ -47,7 +52,7 @@ Second order gradients of the shape functions are computed as
 
 ```math
 \begin{align*}
-    \mathrm{grad}(\mathrm{grad}(N(\boldsymbol{x}))) = \frac{\mathrm{d}^2 N}{\mathrm{d}\boldsymbol{x}^2} = \boldsymbol{J}^{-T} \cdot \frac{\mathrm{d}^2\hat{N}}{\mathrm{d}\boldsymbol{\xi}^2} \cdot \boldsymbol{J}^{-1} -  \boldsymbol{J}^{-T} \cdot\mathrm{grad}(N) \cdot \boldsymbol{\mathcal{H}}  \cdot \boldsymbol{J}^{-1}
+    \mathrm{grad}(\mathrm{grad}(N(\boldsymbol{x}))) = \frac{\mathrm{d}^2 N}{\mathrm{d}\boldsymbol{x}^2} = \boldsymbol{J}^{-T} \cdot \left[\frac{\mathrm{d}^2\hat{N}}{\mathrm{d}\boldsymbol{\xi}^2} -  \mathrm{grad}(N) \cdot \boldsymbol{\mathcal{H}} \right]  \cdot \boldsymbol{J}^{-1}
 \end{align*}
 ```
 !!! details "Derivation"

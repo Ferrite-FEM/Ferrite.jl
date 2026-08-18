@@ -11,7 +11,7 @@ by the associated reference element.
 Ferrite.get_node_ids
 ```
 
-### Common utilities and definitions when working with grids internally.
+### Common utilities and definitions when working with grids internally
 
 First we have some topological queries on the element
 
@@ -40,6 +40,7 @@ Ferrite.sortedge_fast
 Ferrite.element_to_facet_transformation
 Ferrite.facet_to_element_transformation
 Ferrite.InterfaceOrientationInfo
+Ferrite.AffineInterfaceTransformation
 Ferrite.transform_interface_points!
 Ferrite.get_transformation_matrix
 ```

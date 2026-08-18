@@ -7,7 +7,8 @@ end                        #hide
 nothing                    #hide
 # # [Incompressible Navier-Stokes equations via DifferentialEquations.jl](@id tutorial-ins-ordinarydiffeq)
 #
-# ![nsdiffeq](nsdiffeq.gif)
+# ![nsdiffeq](ns_vs_diffeq-light.webp)
+# ![nsdiffeq](ns_vs_diffeq-dark.webp)
 #
 #
 # In this example we focus on a simple but visually appealing problem from
@@ -119,7 +120,7 @@ nothing                    #hide
 # The full program, without comments, can be found in the next [section](@ref ns_vs_diffeq-plain-program).
 
 # First we load Ferrite and some other packages we need
-using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, WriteVTK
+using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, VTKHDF
 
 # We do not need the complete SciML/DifferentialEquations suite. We load DiffEqBase, which
 # provides most of the ODE infrastructure (which can also handle DAEs in mass matrix form),
@@ -189,10 +190,10 @@ gmsh.model.mesh.generate(dim)
 grid = togrid()
 Gmsh.finalize();
 
-#  ### Function space
-#  To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
-#  We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
-#  linear pressure term is tested against a quadratic function.
+# ### Function space
+# To ensure stability we utilize the Taylor-Hood element pair Q2-Q1.
+# We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the
+# linear pressure term is tested against a quadratic function.
 ip_v = Lagrange{RefQuadrilateral, 2}()^dim
 qr = QuadratureRule{RefQuadrilateral}(4)
 ip_p = Lagrange{RefQuadrilateral, 1}()
@@ -556,8 +557,8 @@ end
 #     At the time of writing this [no Hessenberg index 2 initialization is implemented](https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019).
 #
 # To visualize the result we export the grid and our fields
-# to VTK-files, which can be viewed in [ParaView](https://www.paraview.org/)
-# by utilizing the corresponding pvd file.
+# to a single temporal VTKHDF file, which can be viewed in
+# [ParaView](https://www.paraview.org/).
 timestepper = Rodas5P(autodiff = AutoFiniteDiff(), step_limiter! = ferrite_limiter!);
 # timestepper = ImplicitEuler(nlsolve=NonlinearSolveAlg(OrdinaryDiffEq.NonlinearSolve.NewtonRaphson(autodiff=OrdinaryDiffEq.AutoFiniteDiff()); max_iter=50), step_limiter! = ferrite_limiter!) #src
 #NOTE!   This is left for future reference                                #src
@@ -584,14 +585,13 @@ integrator = init(
 # !!! note "Export of solution"
 #     Exporting interpolated solutions of problems containing mass matrices is currently broken.
 #     Thus, the `intervals` iterator is used. Note that `solve` holds all solutions in the memory.
-pvd = paraview_collection("vortex-street")
-for (step, (u, t)) in enumerate(intervals(integrator))
-    VTKGridFile("vortex-street-$step", dh) do vtk
+vtkhdf = VTKHDFGridFile("vortex-street.vtkhdf", dh; temporal = true)
+for (u, t) in intervals(integrator)
+    write_timestep(vtkhdf, t) do vtk
         write_solution(vtk, dh, u)
-        pvd[t] = vtk
     end
 end
-vtk_save(pvd);
+close(vtkhdf);
 
 
 using Test                                                                      #hide

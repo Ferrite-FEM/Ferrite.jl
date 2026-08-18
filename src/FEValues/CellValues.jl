@@ -58,6 +58,9 @@ struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
     fun_values::FV # FunctionValues
     geo_mapping::GM # GeometryMapping
     qr::QR         # QuadratureRule
+    # CellValues are only functional for `detT <: AbstractVector{<:Number}`.
+    # However, e.g. for GPU support, we allow AbstractMatrix{<:Number} to be passed, allowing this type to be used as a struct-of-arrays (SoA) type.
+    # See `soa_utils.jl` for the SoA transformation infrastructure.
     detJdV::detT   # AbstractVector{<:Number} or Nothing
 end
 function CellValues(
@@ -184,10 +187,10 @@ Constructing a `MultiFieldCellValues` for three fields, 2nd order interpolation 
 and 1st order interpolations for the pressure, `p`, and temperature, `T`.
 ```
 qr = QuadratureRule{RefQuadrilateral}(2)
-ip_geo = Lagrange{RefQuadrilateral,1}() # Optional
-ipu = Lagrange{RefQuadrilateral,2}()^2
-ipp = Lagrange{RefQuadrilateral,1}()
-ipT = Lagrange{RefQuadrilaterla,1}()
+ip_geo = Lagrange{RefQuadrilateral, 1}() # Optional
+ipu = Lagrange{RefQuadrilateral, 2}()^2
+ipp = Lagrange{RefQuadrilateral, 1}()
+ipT = Lagrange{RefQuadrilateral, 1}()
 cmv = MultiFieldCellValues(qr, (u = ipu, p = ipp, T = ipT), ip_geo)
 ```
 After calling [`reinit!`](@ref) on `cmv`, it can be used as, e.g.

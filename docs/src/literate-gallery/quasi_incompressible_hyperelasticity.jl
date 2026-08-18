@@ -1,6 +1,7 @@
-# # [Nearly Incompressible Hyperelasticity](@id tutorial-nearly-incompressible-hyperelasticity)
+# # [Nearly incompressible hyperelasticity](@id tutorial-nearly-incompressible-hyperelasticity)
 #
-# ![](quasi_incompressible_hyperelasticity.gif)
+# ![](quasi_incompressible_hyperelasticity-light.webp)
+# ![](quasi_incompressible_hyperelasticity-dark.webp)
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
@@ -72,7 +73,7 @@
 # ## Implementation
 # We now get to the actual code. First, we import the respective packages
 
-using Ferrite, Tensors, ProgressMeter, WriteVTK
+using Ferrite, Tensors, ProgressMeter, VTKHDF
 using BlockArrays, SparseArrays, LinearAlgebra
 
 # and the corresponding `struct` to store our material properties.
@@ -120,7 +121,7 @@ function Ψ(F, p, mp::NeoHooke)
     Ic = tr(tdot(F))
     J = det(F)
     Js = (λ + p + sqrt((λ + p)^2.0 + 4.0 * λ * μ)) / (2.0 * λ)
-    return p * (Js - J) + μ / 2 * (Ic - 3) - μ * log(Js) + λ / 2 * (Js - 1)^2
+    return p * (J - Js) + μ / 2 * (Ic - 3) - μ * log(Js) + λ / 2 * (Js - 1)^2
 end;
 
 # and it's derivatives (required in computing the jacobian and hessian respectively)
@@ -189,11 +190,9 @@ end;
 # The function to assemble the element stiffness matrix for each element in the mesh now has a block structure like in
 # `incompressible_elasticity`.
 function assemble_element!(Ke, fe, cell, cellvalues, mp, ue, pe)
-    ## Reinitialize cell values, and reset output arrays
+    ## Reinitialize cell values
     ublock, pblock = 1, 2
     reinit!(cellvalues, cell)
-    fill!(Ke, 0.0)
-    fill!(fe, 0.0)
 
     n_basefuncs_u = getnbasefunctions(cellvalues.u)
     n_basefuncs_p = getnbasefunctions(cellvalues.p)
@@ -239,8 +238,8 @@ function assemble_element!(Ke, fe, cell, cellvalues, mp, ue, pe)
                 Ke[BlockIndex((pblock, ublock), (i, j))] += ∇δuj ⊡ ∂²Ψ∂F∂p * δp * dΩ
             end
             for j in 1:n_basefuncs_p
-                δp = shape_value(cellvalues.p, qp, j)
-                Ke[BlockIndex((pblock, pblock), (i, j))] += δp * ∂²Ψ∂p² * δp * dΩ
+                δq = shape_value(cellvalues.p, qp, j)
+                Ke[BlockIndex((pblock, pblock), (i, j))] += δp * ∂²Ψ∂p² * δq * dΩ
             end
         end
     end
@@ -269,6 +268,8 @@ function assemble_global!(
         @assert size(global_dofs, 1) == nu + np # sanity check
         ue = w[global_dofsu] # displacement dofs for the current cell
         pe = w[global_dofsp] # pressure dofs for the current cell
+        fill!(ke, 0.0)
+        fill!(fe, 0.0)
         assemble_element!(ke, fe, cell, cellvalues, mp, ue, pe)
         assemble!(assembler, global_dofs, ke, fe)
     end
@@ -311,8 +312,8 @@ function solve(interpolation_u, interpolation_p)
     Δt = 0.1
     NEWTON_TOL = 1.0e-8
 
-    pvd = paraview_collection("hyperelasticity_incomp_mixed")
-    for (step, t) in enumerate(0.0:Δt:Tf)
+    vtkhdf = VTKHDFGridFile("hyperelasticity_incomp_mixed.vtkhdf", dh; temporal = true)
+    for t in 0.0:Δt:Tf
         ## Perform Newton iterations
         Ferrite.update!(dbc, t)
         apply!(w, dbc)
@@ -341,12 +342,11 @@ function solve(interpolation_u, interpolation_p)
         end
 
         ## Save the solution fields
-        VTKGridFile("hyperelasticity_incomp_mixed_$step", grid) do vtk
+        write_timestep(vtkhdf, t) do vtk
             write_solution(vtk, dh, w)
-            pvd[t] = vtk
         end
     end
-    vtk_save(pvd)
+    close(vtkhdf)
     vol_def = calculate_volume_deformed_mesh(w, dh, cellvalues)
     print("Deformed volume is $vol_def")
     return vol_def

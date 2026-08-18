@@ -1,9 +1,11 @@
-# # [Post processing and visualization](@id howto-postprocessing)
+# # [Postprocessing and visualization](@id howto-postprocessing)
 #
-# ![](heat_square_fluxes.png)
+# ![](postprocessing-light.png)
+# ![](postprocessing-dark.png)
 #
-# *Figure 1*: Heat flux computed from the solution to the heat equation on
-# the unit square, see previous example: [Heat equation](@ref tutorial-heat-equation).
+# *Figure 1*: Heat flux computed from the solution to the heat equation on the unit square,
+# coloured by magnitude with arrows for the direction. See the previous example:
+# [Heat equation](@ref tutorial-heat-equation).
 #
 #-
 #md # !!! tip
@@ -107,12 +109,13 @@ VTKGridFile("heat_equation_flux", grid) do vtk
 end;
 
 # ## Point evaluation
-# ![](heat_square_pointevaluation.png)
+# ![](postprocessing_cutline-light.png)
+# ![](postprocessing_cutline-dark.png)
 #
-# *Figure 2*: Visualization of the cut line where we want to compute
-# the temperature and heat flux.
+# *Figure 2*: The temperature field, with the cut line along which we want to compute
+# the temperature and heat flux drawn on top.
 
-# Consider a cut-line through the domain like the black line in *Figure 2* above.
+# Consider a cut-line through the domain like the one in *Figure 2* above.
 # We will evaluate the temperature and the heat flux distribution along a horizontal line.
 points = [Vec((x, 0.75)) for x in range(-1.0, 1.0, length = 101)];
 

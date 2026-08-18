@@ -108,6 +108,14 @@ export
     addcellset!,
     transform_coordinates!,
     generate_grid,
+    # Adaptive mesh refinement (AMR)
+    ForestBWG,
+    refine!,
+    refine_all!,
+    refine_and_coarsen!,
+    coarsen!,
+    balanceforest!,
+    creategrid,
 
     # Grid coloring
     create_coloring,
@@ -147,6 +155,7 @@ export
     collect_periodic_facets!,
     PeriodicFacetPair,
     AffineConstraint,
+    ConformityConstraint,
     update!,
     apply!,
     apply_rhs!,
@@ -175,6 +184,7 @@ export
 
     # exporting data
     VTKGridFile,
+    VTKHDFGridFile,
     write_solution,
     write_cell_data,
     write_projection,

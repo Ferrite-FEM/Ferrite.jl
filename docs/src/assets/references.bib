@@ -123,6 +123,36 @@ author = {Lin Mu and Junping Wang and Yanqiu Wang and Xiu Ye},
 keywords = {Discontinuous Galerkin, Finite element, Interior penalty, Second-order elliptic equations, Hybrid mesh},
 abstract = {This paper provides a theoretical foundation for interior penalty discontinuous Galerkin methods for second-order elliptic equations on very general polygonal or polyhedral meshes. The mesh can be composed of any polygons or polyhedra that satisfy certain shape regularity conditions characterized in a recent paper by two of the authors, Wang and Ye (2012) [11]. The usual H1-conforming finite element methods on such meshes are either very complicated or impossible to implement in practical computation. The interior penalty discontinuous Galerkin method provides a simple and effective alternative approach which is efficient and robust. Results with such general meshes have important application in computational sciences.}
 }
+@article{BWG2011,
+  title={p4est: Scalable algorithms for parallel adaptive mesh refinement on forests of octrees},
+  author={Burstedde, Carsten and Wilcox, Lucas C and Ghattas, Omar},
+  journal={SIAM Journal on Scientific Computing},
+  volume={33},
+  number={3},
+  pages={1103--1133},
+  year={2011},
+  publisher={SIAM}
+}
+@article{IBWG2015,
+  title={Recursive algorithms for distributed forests of octrees},
+  author={Isaac, Tobin and Burstedde, Carsten and Wilcox, Lucas C and Ghattas, Omar},
+  journal={SIAM Journal on Scientific Computing},
+  volume={37},
+  number={5},
+  pages={C497--C531},
+  year={2015},
+  publisher={SIAM}
+}
+@article{SSB2008,
+  title={Bottom-up construction and 2:1 balance refinement of linear octrees in parallel},
+  author={Sundar, Hari and Sampath, Rahul S and Biros, George},
+  journal={SIAM Journal on Scientific Computing},
+  volume={30},
+  number={5},
+  pages={2675--2708},
+  year={2008},
+  publisher={SIAM}
+}
 @article{Jin:1984:sgq,
   title = {Symmetric gaussian quadrature formulae for tetrahedronal regions},
   journal = {Computer Methods in Applied Mechanics and Engineering},
@@ -199,4 +229,54 @@ pages = {1--24},
 title = {{Inhomogeneous Dirichlet conditions in a priori and a posteriori finite element error analysis}},
 volume = {99},
 year = {2004}
+}
+@inproceedings{Settgast2023:plm,
+  author = {Settgast, R. and Tobin, W. and Dudouit, Y. and Castelletto, N. and Corbett, B. and Klevstov ,S.},
+  title = {{Performant Low-order Matrix-free Finite Element Kernels on
+  GPU Architectures}},
+  year = {2023},
+  booktitle = {SC23},
+  url = {https://sc23.supercomputing.org/proceedings/tech_poster/poster_files/rpost226s3-file3.pdf},
+}
+@article{Schussnig2025:mhf,
+  title={Matrix-free higher-order finite element methods for hyperelasticity},
+  author={Schussnig, Richard and Fehn, Niklas and Munch, Peter and Kronbichler, Martin},
+  journal={Computer Methods in Applied Mechanics and Engineering},
+  volume={435},
+  pages={117600},
+  year={2025},
+  publisher={Elsevier}
+}
+@article{Wichrowski2026:tmp,
+  title={Towards Matrix-Free Patch Smoothers for the Stokes Problem: Evaluating Local p-Multigrid Solvers},
+  author={Wichrowski, Micha{\l}},
+  journal={arXiv preprint arXiv:2601.13230},
+  year={2026}
+}
+@book{BofBreFor:2013:mfe,
+  title={Mixed Finite Element Methods and Applications},
+  author={Boffi, Daniele and Brezzi, Franco and Fortin, Michel},
+  series={Springer Series in Computational Mathematics},
+  volume={44},
+  publisher={Springer},
+  year={2013},
+  doi={10.1007/978-3-642-36519-5}
+}
+@book{Gatica2014,
+  title={A Simple Introduction to the Mixed Finite Element Method: Theory and Applications},
+  author={Gatica, Gabriel N.},
+  series={SpringerBriefs in Mathematics},
+  publisher={Springer},
+  year={2014},
+  doi={10.1007/978-3-319-03695-3}
+}
+@article{Coo:1974:itd,
+  title={Improved Two-Dimensional Finite Element},
+  author={Cook, Robert D.},
+  journal={Journal of the Structural Division},
+  volume={100},
+  number={9},
+  pages={1851--1863},
+  year={1974},
+  doi={10.1061/JSDEAG.0003877}
 }

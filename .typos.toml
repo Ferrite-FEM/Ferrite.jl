@@ -1,10 +1,16 @@
 [files]
 extend-exclude = ["*.svg", "*.toml"]
 
+[default.extend-identifiers]
+# Citation key for Boffi, Brezzi, Fortin (2013)
+BofBreFor = "BofBreFor"
+
 [default.extend-words]
 ue = "ue"
 ba = "ba"
 nd = "nd"
+OT = "OT"
+alo = "alo"
 
 [type.qrtables]
 extend-glob = ["**/gaussquad_*_table.jl", "**/generate_quadrature.jl"]

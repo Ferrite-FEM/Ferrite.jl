@@ -1,6 +1,7 @@
 # # [Von Mises plasticity](@id tutorial-plasticity)
 #
-# ![Shows the von Mises stress distribution in a cantilever beam.](plasticity.png)
+# ![Shows the von Mises stress distribution in a cantilever beam.](plasticity-light.png)
+# ![Shows the von Mises stress distribution in a cantilever beam.](plasticity-dark.png)
 #
 # *Figure 1.* A coarse mesh solution of a cantilever beam subjected to a load
 # causing plastic deformations. The initial yield limit is 200 MPa but due to
@@ -22,7 +23,7 @@
 # Also note that the theory of the model is not described here, instead one is
 # referred to standard textbooks on material modeling.
 #
-# To illustrate the use of the plasticity model, we setup and solve a FE-problem
+# To illustrate the use of the plasticity model, we setup and solve a finite element problem
 # consisting of a cantilever beam loaded at its free end. But first, we shortly
 # describe the parts of the implementation dealing with the material modeling.
 
@@ -135,8 +136,8 @@ function compute_stress_tangent(ϵ::SymmetricTensor{2, 3}, material::J2Plasticit
     end
 end
 
-# ## FE-problem
-# What follows are methods for assembling and solving the FE-problem.
+# ## Finite element problem
+# What follows are methods for assembling and solving the finite element problem.
 function create_values(interpolation)
     ## setup quadrature rules
     qr = QuadratureRule{RefTetrahedron}(2)
@@ -252,7 +253,7 @@ function doassemble_neumann!(r, dh, facetset, facetvalues, t)
     return r
 end
 
-# Define a function which solves the FE-problem.
+# Define a function which solves the finite element problem.
 function solve()
     ## Define material parameters
     E = 200.0e9  # [Pa]
@@ -357,7 +358,7 @@ function solve()
     return u_max, traction_magnitude
 end
 
-# Solve the FE-problem and for each time-step extract maximum displacement and
+# Solve the finite element problem and for each time-step extract maximum displacement and
 # the corresponding traction load. Also compute the limit-traction-load
 u_max, traction_magnitude = solve();
 

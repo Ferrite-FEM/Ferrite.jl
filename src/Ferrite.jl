@@ -8,7 +8,7 @@ using Base:
 using EnumX:
     EnumX, @enumx
 using LinearAlgebra:
-    LinearAlgebra, Symmetric, cholesky, det, norm, tr, mul!, normalize
+    LinearAlgebra, Symmetric, cholesky, cholesky!, det, ldiv!, norm, tr, mul!, normalize
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
@@ -26,36 +26,16 @@ using ForwardDiff:
 
 include("CollectionsOfViews.jl")
 using .CollectionsOfViews:
-    CollectionsOfViews, ArrayOfVectorViews, push_at_index!, ConstructionBuffer
+    CollectionsOfViews, AdaptiveRange, ArrayOfVectorViews, push_at_index!,
+    insert_sorted_at_index!, ConstructionBuffer
 
 include("exports.jl")
-
-
-"""
-    AbstractRefShape{refdim}
-
-Supertype for all reference shapes, with reference dimension `refdim`. Reference shapes are
-used to define grid cells, shape functions, and quadrature rules. Currently existing
-reference shapes are: [`RefLine`](@ref), [`RefTriangle`](@ref), [`RefQuadrilateral`](@ref),
-[`RefTetrahedron`](@ref), [`RefHexahedron`](@ref), [`RefPrism`](@ref), [`RefPyramid`](@ref).
-"""
-abstract type AbstractRefShape{refdim} end
-
-# See src/docs.jl for detailed documentation
-struct RefHypercube{refdim} <: AbstractRefShape{refdim} end
-struct RefSimplex{refdim} <: AbstractRefShape{refdim} end
-const RefLine = RefHypercube{1}
-const RefQuadrilateral = RefHypercube{2}
-const RefHexahedron = RefHypercube{3}
-const RefTriangle = RefSimplex{2}
-const RefTetrahedron = RefSimplex{3}
-struct RefPrism <: AbstractRefShape{3} end
-struct RefPyramid <: AbstractRefShape{3} end
+include("refshapes.jl")
 
 """
     Ferrite.getrefdim(RefShape::Type{<:AbstractRefShape})
 
-Get the dimension of the reference shape
+Get the dimension of the reference shape.
 """
 getrefdim(::Type{<:AbstractRefShape}) # To get correct doc filtering
 getrefdim(::Type{<:AbstractRefShape{rdim}}) where {rdim} = rdim
@@ -72,13 +52,17 @@ Abstract type which is used as identifier for faces, edges and vertices
 abstract type BoundaryIndex end
 
 """
-A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh
+    CellIndex(cellid::Int)
+
+A `CellIndex` wraps an Int and corresponds to a cell with that number in the mesh.
 """
 struct CellIndex
     idx::Int
 end
 
 """
+    FaceIndex(cellid::Int, faceid::Int)
+
 A `FaceIndex` wraps an (Int, Int) and defines a local face by pointing to a (cell, face).
 """
 struct FaceIndex <: BoundaryIndex
@@ -86,13 +70,17 @@ struct FaceIndex <: BoundaryIndex
 end
 
 """
-A `EdgeIndex` wraps an (Int, Int) and defines a local edge by pointing to a (cell, edge).
+    EdgeIndex(cellid::Int, edgeid::Int)
+
+An `EdgeIndex` wraps an (Int, Int) and defines a local edge by pointing to a (cell, edge).
 """
 struct EdgeIndex <: BoundaryIndex
     idx::Tuple{Int, Int} # cell and side
 end
 
 """
+    VertexIndex(cellid::Int, vertexid::Int)
+
 A `VertexIndex` wraps an (Int, Int) and defines a local vertex by pointing to a (cell, vert).
 """
 struct VertexIndex <: BoundaryIndex
@@ -100,6 +88,8 @@ struct VertexIndex <: BoundaryIndex
 end
 
 """
+    FacetIndex(cellid::Int, facetid::Int)
+
 A `FacetIndex` wraps an (Int, Int) and defines a local facet by pointing to a (cell, facet).
 """
 struct FacetIndex <: BoundaryIndex
@@ -110,7 +100,6 @@ const AbstractVecOrSet{T} = Union{AbstractSet{T}, AbstractVector{T}}
 const IntegerCollection = AbstractVecOrSet{<:Integer}
 
 include("utils.jl")
-include("PoolAllocator.jl")
 
 # Matrix/Vector utilities
 include("arrayutils.jl")
@@ -157,12 +146,27 @@ include("L2_projection.jl")
 
 # Export
 include("Export/VTK.jl")
+include("Export/VTKHDF.jl")
 
 # Point Evaluation
 include("PointEvalHandler.jl")
 
 # Other
+include("soa_utils.jl")
 include("deprecations.jl")
-include("docs.jl")
+
+# Adaptivity
+include("Adaptivity/AMR.jl")
+# `NonConformingGrid` is used inside Ferrite itself (`DofHandler`, `L2Projector`); the rest are
+# re-exported from `exports.jl` as the public AMR API.
+using .AMR: ForestBWG,
+    refine!,
+    refine_all!,
+    coarsen!,
+    refine_and_coarsen!,
+    balanceforest!,
+    creategrid,
+    ConformityConstraint,
+    NonConformingGrid
 
 end # module

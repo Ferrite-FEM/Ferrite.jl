@@ -85,6 +85,21 @@ using SparseArrays, LinearAlgebra
         @test K ≈ sparsecsr(I, J, V)
         @test f ≈ [4 / 3, 2.0, 1.0]
 
+        # Atomic accumulation gives identical results sequentially
+        Ka = allocate_matrix(SparseMatrixCSR, dh)
+        fa = zeros(3)
+        assembler = start_assemble(Ka, fa; atomic = true)
+        assemble!(assembler, [1, 2], ke, fe)
+        assemble!(assembler, [3, 2], ke, fe)
+        I = [1, 1, 2, 2, 2, 3, 3]
+        J = [1, 2, 1, 2, 3, 2, 3]
+        V = [-1.0, 1.0, 2.0, -2.0, 2.0, 1.0, -1.0]
+        @test Ka == sparsecsr(I, J, V)
+        @test fa == [1.0, 4.0, 1.0]
+        # Atomic accumulation is only supported for Float32/Float64 matrices
+        Kint = sparsecsr([1, 2], [1, 2], zeros(Int, 2))
+        @test_throws ArgumentError start_assemble(Kint; atomic = true)
+
         # CSRAssembler: assemble with different row and col dofs
         I = [1, 1, 4, 4, 6, 6]
         J = [1, 3, 1, 3, 1, 3]
@@ -114,6 +129,56 @@ using SparseArrays, LinearAlgebra
         @test_throws ArgumentError assemble!(assembler, rdofs, Ke, fe) # Not in sparsity pattern
         @test all(K[rdofs, cdofs] .== 2Ke)
         @test all(f[rdofs] .== 2fe)
+
+        # Dense row fast paths: rows with many stored entries compared to the number
+        # of local dofs are processed with binary search instead of the linear merge
+        # walk, and fully dense rows with direct indexing (see `_assemble_inner!` for
+        # `SparseMatrixCSR` in ext/FerriteSparseMatrixCSR.jl)
+        N = 40
+        dofs = [19, 40, 3] # intentionally unsorted
+        ratio = Ferrite.SPARSE_COLUMN_SEARCH_RATIO
+        entries = Set{Tuple{Int, Int}}((d1, d2) for d1 in dofs, d2 in dofs)
+        for i in 1:N # fully dense row (and column) 3
+            push!(entries, (3, i), (i, 3))
+        end
+        for i in 1:30 # row (and column) 19: dense enough for the binary search path
+            push!(entries, (19, i), (i, 19))
+        end
+        K = sparsecsr(first.(collect(entries)), last.(collect(entries)), zeros(length(entries)), N, N)
+        @test length(nzrange(K, 3)) == N                    # dense row fast path
+        @test length(nzrange(K, 19)) > ratio * length(dofs) # binary search fast path
+        @test length(nzrange(K, 40)) < ratio * length(dofs) # linear merge walk
+
+        f = zeros(N)
+        Ke = rand(3, 3)
+        Ke[1, 1] = 0 # exercise the iszero skip in the binary search path (entry (19, 19))
+        Ke[3, 2] = 0 # exercise the iszero skip in the dense row path (entry (3, 40))
+        fe = rand(3)
+        for atomic in (false, true)
+            a = start_assemble(K, f; atomic)
+            D = zeros(N, N)
+            F = zeros(N)
+            for _ in 1:2
+                assemble!(a, dofs, Ke, fe)
+                D[dofs, dofs] += Ke
+                F[dofs] += fe
+            end
+            @test Matrix(K) == D
+            @test f == F
+        end
+
+        # A local dof missing from a binary searched row is allowed when the local
+        # value is zero, and errors otherwise
+        dofs2 = [5, 19, 32] # columns 5 and 19 are stored in row 19, column 32 is not
+        Ke2 = zeros(3, 3)
+        Ke2[2, 1] = 1.0 # entry (19, 5)
+        Ke2[2, 2] = 2.0 # entry (19, 19)
+        a = start_assemble(K)
+        assemble!(a, dofs2, Ke2)
+        @test K[19, 5] == 1.0
+        @test K[19, 19] == 2.0
+        Ke2[2, 3] = 3.0 # entry (19, 32) is not in the sparsity pattern
+        @test_throws ErrorException assemble!(a, dofs2, Ke2)
 
         # Check if coupling works
         grid = generate_grid(Quadrilateral, (2, 2))

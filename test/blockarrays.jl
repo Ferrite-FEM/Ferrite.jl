@@ -39,7 +39,7 @@ using Ferrite, BlockArrays, SparseArrays, Test
     @test K == KB
 
     # Zeroing out in start_assemble
-    assembler = start_assemble(K, f)
+    assembler = start_assemble(K, f; atomic = false)
     @test iszero(K)
     @test iszero(f)
     block_assembler = start_assemble(KB, fB)
@@ -89,4 +89,24 @@ using Ferrite, BlockArrays, SparseArrays, Test
     fill!(K.nzval, 1)
     foreach(x -> fill!(x.nzval, 1), blocks(KB))
     @test K == KB
+end
+
+@testset "BlockAssembler with dense blocks" begin
+    # Dense blocks route through the generic matrix addindex! fallback
+    KB = BlockArray(zeros(4, 4), [2, 2], [2, 2])
+    fB = BlockArray(zeros(4), [2, 2])
+    assembler = start_assemble(KB, fB)
+    dofs = [1, 3]
+    ke = [1.0 2.0; 3.0 4.0]
+    fe = [5.0, 6.0]
+    assemble!(assembler, dofs, ke, fe)
+    D = zeros(4, 4)
+    D[dofs, dofs] = ke
+    g = zeros(4)
+    g[dofs] = fe
+    @test KB == D
+    @test fB == g
+    # Atomic assembly is not supported for dense blocks
+    atomic_assembler = start_assemble(KB, fB; atomic = true)
+    @test_throws ErrorException assemble!(atomic_assembler, dofs, ke, fe)
 end

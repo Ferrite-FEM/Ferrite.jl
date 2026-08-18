@@ -4,6 +4,10 @@ on:
   push:
     branches: ['master']
     tags: ['*']
+concurrency:
+  # Cancel in progress builds for PRs with new commits
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ startsWith(github.ref, 'refs/pull/') && 'pr' || github.sha }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 jobs:
   test:
     name: Julia ${{ matrix.julia-version }} - ${{ matrix.os }}
@@ -20,7 +24,7 @@ jobs:
           - os: macOS-latest
             julia-version: '1'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
         with:
           version: ${{ matrix.julia-version }}
@@ -38,7 +42,7 @@ jobs:
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: 'src,ext'
-      - uses: codecov/codecov-action@v6
+      - uses: codecov/codecov-action@v7
         with:
           files: lcov.info
           plugins: noop
