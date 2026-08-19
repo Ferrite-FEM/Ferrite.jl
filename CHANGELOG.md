@@ -55,6 +55,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - The documented contract of `Ferrite.eachrow(sp[, row])` for `AbstractSparsityPattern` now
    states that column indices are iterated in sorted order. ([#1397])
 
+### Performance
+ - Faster `ExclusiveTopology` construction (about 1.5x for hexahedral and 1.7x for
+   tetrahedral grids), `vertex_star_stencils` (roughly 30x), and `getneighborhood` with an
+   `EdgeIndex` (roughly 4x). ([#1466])
+
 ## [v1.6.0] - 2026-08-02
 
 ### Added
