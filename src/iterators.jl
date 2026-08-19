@@ -165,35 +165,100 @@ interface. The cache is updated for a new cell by calling `reinit!(cache, facet_
 **Struct fields of `InterfaceCache`**
  - `ic.a :: FacetCache`: facet cache for the first facet of the interface
  - `ic.b :: FacetCache`: facet cache for the second facet of the interface
- - `ic.dofs :: Vector{Int}`: global dof ids for the interface (union of `ic.a.dofs` and `ic.b.dofs`)
+ - `ic.dofs :: Vector{Int}`: global dof ids for the interface in the *stacked* layout
+   `[celldofs(ic.a); celldofs(ic.b)]`. Note that this is a concatenation, not a union: a
+   dof carried by both cells (e.g. for an interpolation with dofs on the shared facet)
+   appears once per side.
 
 **Methods with `InterfaceCache`**
  - `reinit!(cache::InterfaceCache, facet_a::FacetIndex, facet_b::FacetIndex)`: reinitialize the cache for a new interface
- - `interfacedofs(ic)`: get the global dof ids of the interface
+ - `interfacedofs(ic)`: get the global dof ids of the interface in the stacked layout
+ - `unique_interfacedofs(ic)`: get the duplicate-free global dof ids of the interface
+ - `nstacked_interface_dofs(ic)` / `nunique_interface_dofs(ic)`: sizes of the two layouts
+ - `dof_range(ic, field)`: positions of a field's dofs in the stacked layout
+ - `condense_interface!(buf, ic, Ke, fe)`: condense a stacked local system onto the unique
+   dofs for assembly
+
+!!! note "Lifetime"
+    Vectors returned by the accessors above are *borrowed* cache storage: they are valid
+    only until the next `reinit!` of the cache (e.g. the next iteration of an
+    [`InterfaceIterator`](@ref)), must not be mutated, and must be copied before storing.
 
 See also [`InterfaceIterator`](@ref).
 """
-struct InterfaceCache{FC <: FacetCache}
-    a::FC
-    b::FC
-    dofs::Vector{Int}
+mutable struct InterfaceCache{FC <: FacetCache}
+    const a::FC
+    const b::FC
+    const dofs::Vector{Int}               # stacked layout: [celldofs(a); celldofs(b)]
+    const unique_dofs::Vector{Int}        # first-occurrence order: celldofs(a) ++ (b-only)
+    const stacked_to_unique::Vector{Int}  # length(dofs): stacked index -> unique index
+    any_shared::Bool                      # length(unique_dofs) != length(dofs)
+    sdh_index_a::Int                      # SubDofHandler index of each side, 0 if unknown
+    sdh_index_b::Int
 end
 
 function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler})
     fc_a = FacetCache(gridordh)
     fc_b = FacetCache(gridordh)
-    return InterfaceCache(fc_a, fc_b, Int[])
+    return InterfaceCache(fc_a, fc_b, Int[], Int[], Int[], false, 0, 0)
 end
+
+# The DofHandler backing the cache (`nothing` for grid-only caches)
+_interface_dofhandler(ic::InterfaceCache) = _parent_dofhandler(ic.a.cc.dh)
+_parent_dofhandler(::Nothing) = nothing
+_parent_dofhandler(dh::DofHandler) = dh
+_parent_dofhandler(sdh::SubDofHandler) = sdh.dh
 
 function reinit!(cache::InterfaceCache, facet_a::BoundaryIndex, facet_b::BoundaryIndex)
     reinit!(cache.a, facet_a)
     reinit!(cache.b, facet_b)
-    resize!(cache.dofs, length(celldofs(cache.a)) + length(celldofs(cache.b)))
-    for (i, d) in pairs(cache.a.dofs)
+    dofs_a = celldofs(cache.a)
+    dofs_b = celldofs(cache.b)
+    n_a = length(dofs_a)
+    n_b = length(dofs_b)
+    resize!(cache.dofs, n_a + n_b)
+    resize!(cache.unique_dofs, n_a + n_b)
+    resize!(cache.stacked_to_unique, n_a + n_b)
+    # Here side: first-occurrence ordering makes this an identity prefix
+    for (i, d) in pairs(dofs_a)
         cache.dofs[i] = d
+        cache.unique_dofs[i] = d
+        cache.stacked_to_unique[i] = i
     end
-    for (i, d) in pairs(cache.b.dofs)
-        cache.dofs[i + length(cache.a.dofs)] = d
+    # There side: dedup against the here side by actual global dof equality (each side is
+    # internally unique, so only cross-side comparisons are needed). Note that whether dofs
+    # can be shared is a property of dof placement (which entities carry dofs), not of the
+    # interpolation's conformity, so this scan can not be gated on e.g. `conformity`:
+    # nonconforming interpolations such as `CrouzeixRaviart` share facet dofs too.
+    n_unique = n_a
+    for (i, d) in pairs(dofs_b)
+        cache.dofs[n_a + i] = d
+        shared_at = 0
+        for j in 1:n_a
+            if dofs_a[j] == d
+                shared_at = j
+                break
+            end
+        end
+        if shared_at == 0
+            n_unique += 1
+            cache.unique_dofs[n_unique] = d
+            cache.stacked_to_unique[n_a + i] = n_unique
+        else
+            cache.stacked_to_unique[n_a + i] = shared_at
+        end
+    end
+    resize!(cache.unique_dofs, n_unique)
+    cache.any_shared = n_unique != n_a + n_b
+    # Record which SubDofHandler each side belongs to (0 when constructed from a Grid or
+    # when the DofHandler is not defined on the cell)
+    dh = _interface_dofhandler(cache)
+    if dh === nothing
+        cache.sdh_index_a = 0
+        cache.sdh_index_b = 0
+    else
+        cache.sdh_index_a = dh.cell_to_subdofhandler[cellid(cache.a)]
+        cache.sdh_index_b = dh.cell_to_subdofhandler[cellid(cache.b)]
     end
     return cache
 end
@@ -210,9 +275,140 @@ function reinit!(iv::InterfaceValues, ic::InterfaceCache)
     )
 end
 
+"""
+    interfacedofs(ic::InterfaceCache) -> Vector{Int}
+
+Return the global dof ids of the interface in the *stacked* layout
+`[celldofs(ic.a); celldofs(ic.b)]`. This is a concatenation, not a union: a dof carried by
+both cells appears once per side, matching the basis layout of [`InterfaceValues`](@ref).
+Local interface matrices/vectors computed in this layout must be condensed onto the unique
+dofs before assembly when any dof is shared, see [`condense_interface!`](@ref).
+
+The returned vector is borrowed cache storage, valid until the next `reinit!` of the cache.
+"""
 interfacedofs(ic::InterfaceCache) = ic.dofs
-dof_range(ic::InterfaceCache, field::Symbol) = (dof_range(ic.a.cc.dh, field), dof_range(ic.b.cc.dh, field) .+ length(celldofs(ic.a)))
+
+"""
+    unique_interfacedofs(ic::InterfaceCache) -> Vector{Int}
+
+Return the duplicate-free global dof ids of the interface, ordered by first occurrence in
+[`interfacedofs`](@ref) (i.e. `celldofs(ic.a)` followed by the dofs unique to
+`celldofs(ic.b)`).
+
+The returned vector is borrowed cache storage, valid until the next `reinit!` of the cache.
+"""
+unique_interfacedofs(ic::InterfaceCache) = ic.unique_dofs
+
+"""
+    nstacked_interface_dofs(ic::InterfaceCache) -> Int
+
+Return the size of the *stacked* interface dof layout, `length(interfacedofs(ic))`. This is
+the size of the local matrix/vector that interface kernels fill, matching the number of
+basis functions of [`InterfaceValues`](@ref). See also
+[`nunique_interface_dofs`](@ref), [`max_nstacked_interface_dofs`](@ref).
+"""
+nstacked_interface_dofs(ic::InterfaceCache) = length(ic.dofs)
+
+"""
+    nunique_interface_dofs(ic::InterfaceCache) -> Int
+
+Return the number of unique global dofs of the interface,
+`length(unique_interfacedofs(ic))`. This is the size of the condensed system scattered by
+`assemble!`. Equal to [`nstacked_interface_dofs`](@ref) when no dof is shared between the
+two cells.
+"""
+nunique_interface_dofs(ic::InterfaceCache) = length(ic.unique_dofs)
+
+"""
+    is_shared(ic::InterfaceCache, i::Int) -> Bool
+
+Return whether the dof at stacked index `i` (cf. [`interfacedofs`](@ref)) is also carried
+by the cell on the other side of the interface. Intended for checks and tests, not for hot
+loops.
+"""
+function is_shared(ic::InterfaceCache, i::Int)
+    d = ic.dofs[i]
+    other = i <= length(celldofs(ic.a)) ? celldofs(ic.b) : celldofs(ic.a)
+    return d in other
+end
+
 getcoordinates(ic::InterfaceCache) = (getcoordinates(ic.a), getcoordinates(ic.b))
+
+"""
+    InterfaceDofRange
+
+Return type of [`dof_range(::InterfaceCache, ::Symbol)`](@ref): the positions of a field's
+dofs in the *stacked* interface layout, as an `AbstractVector{Int}`. Index `i` runs over
+the field's basis functions in the [`InterfaceValues`](@ref) ordering (here side first,
+then there side); the value is the corresponding row/column of the stacked local matrix.
+
+The two sides are also available as contiguous ranges through the fields `r.here` and
+`r.there` (the latter shifted to point into the stacked layout), which is the form the
+`function_value`/`function_gradient` evaluation methods accept.
+"""
+struct InterfaceDofRange <: AbstractVector{Int}
+    here::UnitRange{Int}    # the field's block in celldofs(a)
+    there::UnitRange{Int}   # the field's block in celldofs(b), shifted by ndofs_per_cell(a)
+end
+Base.size(r::InterfaceDofRange) = (length(r.here) + length(r.there),)
+Base.IndexStyle(::Type{InterfaceDofRange}) = IndexLinear()
+@inline function Base.getindex(r::InterfaceDofRange, i::Int)
+    @boundscheck checkbounds(r, i)
+    nh = length(r.here)
+    return i <= nh ? @inbounds(r.here[i]) : @inbounds(r.there[i - nh])
+end
+
+"""
+    dof_range(ic::InterfaceCache, field::Symbol) -> InterfaceDofRange
+
+Return the positions of `field`'s dofs in the *stacked* interface layout (cf.
+[`interfacedofs`](@ref)), as an [`InterfaceDofRange`](@ref). Valid after `reinit!` of the
+cache, also when the two cells belong to different `SubDofHandler`s.
+
+Fields that exist on only one side of the interface are not supported and throw an error.
+
+!!! note
+    This method previously returned a `Tuple` of the two side-local ranges. The two ranges
+    are now available as `r.here` and `r.there` of the returned object.
+"""
+function dof_range(ic::InterfaceCache, field::Symbol)
+    dh = _interface_dofhandler(ic)
+    if dh === nothing
+        error("this InterfaceCache was constructed from a Grid: no dof information available")
+    end
+    if ic.sdh_index_a == 0 || ic.sdh_index_b == 0
+        error("the DofHandler is not defined on both cells of the interface")
+    end
+    sdh_a = dh.subdofhandlers[ic.sdh_index_a]
+    sdh_b = dh.subdofhandlers[ic.sdh_index_b]
+    if _find_field(sdh_a, field) === nothing || _find_field(sdh_b, field) === nothing
+        error(
+            "field :$field is not present on both cells of the interface (fields on the " *
+                "here side: $(sdh_a.field_names), on the there side: $(sdh_b.field_names)). " *
+                "Interfaces where a field exists on only one side are not supported."
+        )
+    end
+    here = dof_range(sdh_a, field)
+    there = dof_range(sdh_b, field) .+ ndofs_per_cell(sdh_a)
+    return InterfaceDofRange(here, there)
+end
+
+# Evaluation methods accepting an InterfaceDofRange: unpack into the existing two-range
+# methods (`InterfaceValues` stays dof-agnostic; the range is just an index container).
+for func in (:function_value, :function_gradient, :function_symmetric_gradient)
+    @eval begin
+        function $(func)(iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange; here::Bool)
+            return $(func)(iv, q_point, u, r.here, r.there; here = here)
+        end
+    end
+end
+for func in (:function_value_average, :function_gradient_average, :function_value_jump, :function_gradient_jump)
+    @eval begin
+        function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector, r::InterfaceDofRange)
+            return $(func)(iv, qp, u, r.here, r.there)
+        end
+    end
+end
 
 ####################
 ## Grid iterators ##

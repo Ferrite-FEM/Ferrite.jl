@@ -285,7 +285,10 @@ function assemble_global(
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
-    Ki = zeros(n_basefuncs * 2, n_basefuncs * 2)
+    ## Allocate the local interface matrix. `max_nstacked_interface_dofs` bounds the size
+    ## of the stacked interface system `[celldofs(here); celldofs(there)]` over all
+    ## interfaces (here simply twice the number of dofs of a cell).
+    Ki = zeros(max_nstacked_interface_dofs(dh), max_nstacked_interface_dofs(dh))
     ## Allocate global force vector f
     f = zeros(ndofs(dh))
     ## Create an assembler
