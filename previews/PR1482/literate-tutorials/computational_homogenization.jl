@@ -143,8 +143,6 @@
 # \bar{\boldsymbol{\varepsilon}} \cdot [\boldsymbol{x}^+ - \boldsymbol{x}^-].
 # ```
 #
-# **Neumann boundary conditions**
-#  TODO
 # **Homogenization of effective properties**
 #
 # In general it is necessary to compute the homogenized stress and the stiffness on the fly,
@@ -215,10 +213,6 @@ isfile(meshfile) || Downloads.download(Ferrite.asset_url(meshfile), meshfile)
 
 grid = togrid(meshfile)
 
-# We manually add a vertex set with a corner node
-corner_min, corner_max = Ferrite.bounding_box(grid)
-addvertexset!(grid, "min_corner", x -> x ≈ corner_min)
-addvertexset!(grid, "max_corner", x -> x ≈ corner_max)
 # Next we construct the interpolation and quadrature rule, and combining them into
 # cellvalues as usual:
 
@@ -227,22 +221,10 @@ ip = Lagrange{RefTriangle, 1}()^dim
 qr = QuadratureRule{RefTriangle}(2)
 cellvalues = CellValues(qr, ip);
 
-# Analogously, we can construct an `AlgebraicVariable` and `AlgebraicValues` for the unknown global variable $\bar σ$ used in the Neumann problem:
-ae = AlgebraicVariable{SymmetricTensor{2, 2}}()
-algebraicvalues = AlgebraicValues(ae);
-
 # We define a dof handler with a displacement field `:u`:
 dh = DofHandler(grid)
 add!(dh, :u, ip)
 close!(dh);
-
-# For Neumann boundary conditions, we also have to add an algebraic variable
-dh_neumann = DofHandler(grid)
-add!(dh_neumann, :u, ip)
-add!(dh_neumann, :λ, ae)
-close!(dh_neumann);
-
-dofhandlers = (dirichlet = dh, periodic = dh, neumann = dh_neumann);
 
 # Now we need to define boundary conditions. As discussed earlier we will solve the problem
 # using (i) homogeneous Dirichlet boundary conditions, and (ii) periodic Dirichlet boundary
@@ -251,7 +233,7 @@ dofhandlers = (dirichlet = dh, periodic = dh, neumann = dh_neumann);
 # define the condition that the field, `:u`, should have both components prescribed to `0`
 # on the full boundary:
 
-ch_dirichlet = ConstraintHandler(dofhandlers.dirichlet)
+ch_dirichlet = ConstraintHandler(dh)
 dirichlet = Dirichlet(
     :u,
     union(getfacetset.(Ref(grid), ["left", "right", "top", "bottom"])...),
@@ -260,6 +242,7 @@ dirichlet = Dirichlet(
 )
 add!(ch_dirichlet, dirichlet)
 close!(ch_dirichlet)
+update!(ch_dirichlet, 0.0)
 
 # For periodic boundary conditions we use the [`PeriodicDirichlet`](@ref) constraint type,
 # which is very similar to the `Dirichlet` type, but instead of a passing a facetset we pass
@@ -267,7 +250,7 @@ close!(ch_dirichlet)
 # boundary. In this example the `"left"` and `"bottom"` boundaries are mirrors, and the
 # `"right"` and `"top"` boundaries are the images.
 
-ch_periodic = ConstraintHandler(dofhandlers.periodic);
+ch_periodic = ConstraintHandler(dh);
 periodic = PeriodicDirichlet(
     :u,
     ["left" => "right", "bottom" => "top"],
@@ -275,15 +258,7 @@ periodic = PeriodicDirichlet(
 )
 add!(ch_periodic, periodic)
 close!(ch_periodic)
-
-# For Neumann boundary conditions, we constrain the fluctuation field via traction forces, and therefore only need to apply Dirichlet BCs to remove rigid body motion.
-
-ch_neumann = ConstraintHandler(dofhandlers.neumann);
-neumann_bc1 = Dirichlet(:u, getvertexset(grid, "min_corner"), (x, t) -> Vec((0.0, 0.0)))
-neumann_bc2 = Dirichlet(:u, getvertexset(grid, "max_corner"), (x, t) -> 0.0, [1])
-add!(ch_neumann, neumann_bc1)
-add!(ch_neumann, neumann_bc2)
-close!(ch_neumann)
+update!(ch_periodic, 0.0)
 
 # This will now constrain any degrees of freedom located on the mirror boundaries to
 # the matching degree of freedom on the image boundaries. Internally this will create
@@ -298,27 +273,17 @@ close!(ch_neumann)
 #
 # To simplify things we group the constraint handlers into a named tuple
 
-ch = (dirichlet = ch_dirichlet, periodic = ch_periodic, neumann = ch_neumann);
+ch = (dirichlet = ch_dirichlet, periodic = ch_periodic);
 
 # We can now construct the sparse matrix. Note that, since we are using affine constraints,
 # which need to modify the matrix sparsity pattern in order to account for the constraint
 # equations, we construct the matrix for the periodic case by passing both the dof handler
-# and the constraint handler. For the sparse matrix in the Neumann problem, we also have
-# to define the coupling between the displacement field and the Lagrange multipliers.
-# We do this by passing the fields we want to couple to `CellCoupling`.
-
-neumann_coupling = CellCoupling(1:getncells(grid); algebraic_coupling = ((:u, :λ), (:λ, :λ)));
-
-K_dirichlet = allocate_matrix(dofhandlers.dirichlet)
-K_periodic = allocate_matrix(dofhandlers.periodic, ch.periodic)
-K_neumann = allocate_matrix(dofhandlers.neumann; algebraic_couplings = (neumann_coupling,))
+# and the constraint handler.
 
 K = (
-    dirichlet = K_dirichlet,
-    periodic = K_periodic,
-    neumann = K_neumann,
+    dirichlet = allocate_matrix(dh),
+    periodic = allocate_matrix(dh, ch.periodic),
 );
-
 
 # We define the fourth order elasticity tensor for the matrix material, and define the
 # inclusions to have 10 times higher stiffness
@@ -347,7 +312,7 @@ Ei = 10 * Em;
 # we want to solve the system 3 times, once for each macroscopic strain component, we
 # assemble 3 right-hand-sides.
 
-function assemble_kuu!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
+function doassemble!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ, Ei, Em)
 
     n_basefuncs = getnbasefunctions(cellvalues)
     ndpc = ndofs_per_cell(dh)
@@ -355,10 +320,11 @@ function assemble_kuu!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandle
     fe = zeros(ndpc, length(εᴹ))
     f = zeros(ndofs(dh), length(εᴹ))
     assembler = start_assemble(K)
+    inclusions = getcellset(dh.grid, "inclusions")
 
     for cell in CellIterator(dh)
 
-        E = cellid(cell) in getcellset(dh.grid, "inclusions") ? Ei : Em
+        E = cellid(cell) in inclusions ? Ei : Em
         reinit!(cellvalues, cell)
         fill!(Ke, 0)
         fill!(fe, 0)
@@ -385,50 +351,12 @@ function assemble_kuu!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandle
     return f
 end;
 
-# For the problem statement with Neumann boundary conditions, we must additionally assemble
-# TODO, explain this more.
-function assemble_kuσ!(cv_u::CellValues, av_σ::AlgebraicValues, K::SparseMatrixCSC, dh::DofHandler)
-
-    #Get the dof indices for the lagrange parameters
-    λdofs = algebraic_dofs(dh, :λ)
-    ndpc = ndofs_per_cell(dh)
-    n_basefuncs = getnbasefunctions(cellvalues)
-    nλdofs = length(λdofs)
-    Ke = zeros(ndpc, nλdofs)
-    assembler = start_assemble(K, fillzero = false)
-
-    for cell in CellIterator(dh)
-        reinit!(cv_u, cell)
-        fill!(Ke, 0.0)
-
-        for q_point in 1:getnquadpoints(cv_u)
-            dΩ = getdetJdV(cv_u, q_point)
-            for i in 1:n_basefuncs
-                δεi = shape_symmetric_gradient(cv_u, q_point, i)
-                for j in 1:nλdofs
-                    δσj = algebraic_basis_value(av_σ, j)
-                    Ke[i, j] += (δεi ⊡ δσj) * dΩ
-                end
-            end
-        end
-        cdofs = celldofs(cell)
-        assemble!(assembler, cdofs, λdofs, Ke)
-        assemble!(assembler, λdofs, cdofs, Ke')
-    end
-    return
-end;
 # We can now assemble the system. The assembly function modifies the matrix in-place, but
 # return the right hand side(s) which we collect in another named tuple.
 
-f_dirichlet = assemble_kuu!(cellvalues, K.dirichlet, dofhandlers.dirichlet, εᴹ)
-f_periodic = assemble_kuu!(cellvalues, K.periodic, dofhandlers.periodic, εᴹ)
-f_neumann = assemble_kuu!(cellvalues, K.neumann, dofhandlers.neumann, εᴹ)
-assemble_kuσ!(cellvalues, algebraicvalues, K.neumann, dofhandlers.neumann)
-
 rhs = (
-    dirichlet = f_dirichlet,
-    periodic = f_periodic,
-    neumann = f_neumann,
+    dirichlet = doassemble!(cellvalues, K.dirichlet, dh, εᴹ, Ei, Em),
+    periodic = doassemble!(cellvalues, K.periodic, dh, εᴹ, Ei, Em),
 );
 
 # The next step is to solve the systems. Since application of boundary conditions, using
@@ -443,12 +371,10 @@ rhs = (
 rhsdata = (
     dirichlet = get_rhs_data(ch.dirichlet, K.dirichlet),
     periodic = get_rhs_data(ch.periodic, K.periodic),
-    neumann = get_rhs_data(ch.neumann, K.neumann),
 )
 
 apply!(K.dirichlet, ch.dirichlet)
 apply!(K.periodic, ch.periodic)
-apply!(K.neumann, ch.neumann)
 
 # We can now solve the problem(s). Note that we only use `apply_rhs!` in the loops below.
 # The boundary conditions are already applied to the matrix above, so we only need to
@@ -457,7 +383,6 @@ apply!(K.neumann, ch.neumann)
 u = (
     dirichlet = Vector{Float64}[],
     periodic = Vector{Float64}[],
-    neumann = Vector{Float64}[],
 )
 
 for i in 1:size(rhs.dirichlet, 2)
@@ -476,28 +401,22 @@ for i in 1:size(rhs.periodic, 2)
     push!(u.periodic, u_i)                             # Save the solution vector
 end
 
-for i in 1:size(rhs.neumann, 2)
-    rhs_i = @view rhs.neumann[:, i]                   # Extract this RHS
-    apply_rhs!(rhsdata.neumann, rhs_i, ch.neumann)    # Apply BC
-    u_i = K.neumann \ rhs_i      # Solve
-    apply!(u_i, ch.neumann)                           # Apply BC on the solution
-    push!(u.neumann, u_i)                             # Save the solution vector
-end
-
 # When the solution(s) are known we can compute the averaged stress,
 # ``\bar{\boldsymbol{\sigma}}`` in the RVE. We define a function that does this, and also
 # returns the von Mises stress in every quadrature point for visualization.
 
-function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
+function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ, Ei, Em)
     σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
     σ̄Ω = zero(SymmetricTensor{2, 2})
     Ω = 0.0 # Total volume
+    inclusions = getcellset(dh.grid, "inclusions")
     for cell in CellIterator(dh)
-        E = cellid(cell) in getcellset(dh.grid, "inclusions") ? Ei : Em
+        E = cellid(cell) in inclusions ? Ei : Em
         reinit!(cellvalues, cell)
+        ue = u[celldofs(cell)]
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
-            εμ = function_symmetric_gradient(cellvalues, q_point, u[celldofs(cell)])
+            εμ = function_symmetric_gradient(cellvalues, q_point, ue)
             σ = E ⊡ (εᴹ + εμ)
             σvM_qpdata[q_point, cellid(cell)] = sqrt(3 / 2 * dev(σ) ⊡ dev(σ))
             Ω += dΩ # Update total volume
@@ -513,35 +432,26 @@ end;
 σ̄ = (
     dirichlet = SymmetricTensor{2, 2}[],
     periodic = SymmetricTensor{2, 2}[],
-    neumann = SymmetricTensor{2, 2}[],
 )
 σ = (
     dirichlet = Vector{Float64}[],
     periodic = Vector{Float64}[],
-    neumann = Vector{Float64}[],
 )
 
 projector = L2Projector(ip, grid)
 
 for i in 1:3
-    σ_qp, σ̄_i = compute_stress(cellvalues, dofhandlers.dirichlet, u.dirichlet[i], εᴹ[i])
+    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.dirichlet[i], εᴹ[i], Ei, Em)
     proj = project(projector, σ_qp, qr)
     push!(σ.dirichlet, proj)
     push!(σ̄.dirichlet, σ̄_i)
 end
 
 for i in 1:3
-    σ_qp, σ̄_i = compute_stress(cellvalues, dofhandlers.periodic, u.periodic[i], εᴹ[i])
+    σ_qp, σ̄_i = compute_stress(cellvalues, dh, u.periodic[i], εᴹ[i], Ei, Em)
     proj = project(projector, σ_qp, qr)
     push!(σ.periodic, proj)
     push!(σ̄.periodic, σ̄_i)
-end
-
-for i in 1:3
-    σ_qp, σ̄_i = compute_stress(cellvalues, dofhandlers.neumann, u.neumann[i], εᴹ[i])
-    proj = project(projector, σ_qp, qr)
-    push!(σ.neumann, proj)
-    push!(σ̄.neumann, σ̄_i)
 end
 
 # The remaining thing is to compute the homogenized stiffness. As mentioned in the
@@ -575,16 +485,6 @@ E_periodic = SymmetricTensor{4, 2}() do i, j, k, l
     end
 end
 
-E_neumann = SymmetricTensor{4, 2}() do i, j, k, l
-    if k == l == 1
-        σ̄.neumann[1][i, j]
-    elseif k == l == 2
-        σ̄.neumann[2][i, j]
-    else
-        σ̄.neumann[3][i, j]
-    end
-end
-
 # We can check that the results are what we expect, namely that the stiffness with Dirichlet
 # boundary conditions is higher than when using periodic boundary conditions, and that
 # the Reuss assumption is a lower bound, and the Voigt assumption an upper bound. We first
@@ -593,9 +493,10 @@ end
 function matrix_volume_fraction(grid, cellvalues)
     V = 0.0 # Total volume
     Vm = 0.0 # Volume of the matrix
+    inclusions = getcellset(grid, "inclusions")
     for c in CellIterator(grid)
         reinit!(cellvalues, c)
-        is_matrix = !(cellid(c) in getcellset(grid, "inclusions"))
+        is_matrix = !(cellid(c) in inclusions)
         for qp in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, qp)
             V += dΩ
@@ -617,7 +518,7 @@ E_reuss = inv(vm * inv(Em) + (1 - vm) * inv(Ei));
 # E_\mathrm{Voigt}``. A simple thing to compare are the eigenvalues of the tensors. Here
 # we look at the first eigenvalue:
 
-ev = (first ∘ eigvals).((E_reuss, E_neumann, E_periodic, E_dirichlet, E_voigt))
+ev = (first ∘ eigvals).((E_reuss, E_periodic, E_dirichlet, E_voigt))
 @test issorted(ev) #src
 round.(ev; digits = -8)
 
@@ -636,9 +537,6 @@ VTKGridFile("homogenization", dh) do vtk
         ## Periodic
         write_solution(vtk, dh, uM + u.periodic[i], "_periodic_$i")
         write_projection(vtk, projector, σ.periodic[i], "σvM_periodic_$i")
-        ## Neumann. Note, we are only interested in the resulting displacement, not the Lagrange parameters.
-        write_solution(vtk, dh, uM + u.neumann[i][1:ndofs(dh)], "_neumann$i")
-        write_projection(vtk, projector, σ.neumann[i], "σvM_neumann_$i")
     end
 end;
 
@@ -647,6 +545,7 @@ function homogenize_test(u::Matrix, dh, cv, E_incl, E_mat)                     #
     ĒΩ = zero(SymmetricTensor{4, 2})                                           #src
     Ω = 0.0                                                                    #src
     ue = zeros(ndofs_per_cell(dh), 3)                                          #src
+    inclusions = getcellset(dh.grid, "inclusions")                             #src
     for cell in CellIterator(dh)                                               #src
         reinit!(cv, cell)                                                      #src
         for (localdof, globaldof) in enumerate(celldofs(cell))                 #src
@@ -654,7 +553,7 @@ function homogenize_test(u::Matrix, dh, cv, E_incl, E_mat)                     #
                 ue[localdof, i] = u[globaldof, i]                              #src
             end                                                                #src
         end                                                                    #src
-        E = cellid(cell) in getcellset(dh.grid, "inclusions") ? E_incl : E_mat #src
+        E = cellid(cell) in inclusions ? E_incl : E_mat                        #src
         for qp in 1:getnquadpoints(cv)                                         #src
             dΩ = getdetJdV(cv, qp)                                             #src
             Ω += dΩ                                                            #src
@@ -676,7 +575,6 @@ end                                                                            #
 
 @test homogenize_test(reduce(hcat, u.dirichlet), dh, cellvalues, Ei, Em) ≈ E_dirichlet #src
 @test homogenize_test(reduce(hcat, u.periodic), dh, cellvalues, Ei, Em) ≈ E_periodic #src
-@test homogenize_test(reduce(hcat, u.neumann), dh, cellvalues, Ei, Em) ≈ E_neumann #src
 
 #md # ## [Plain program](@id homogenization-plain-program)
 #md #
