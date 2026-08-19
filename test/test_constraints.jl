@@ -1,6 +1,41 @@
 # Imports for parallel (isolated) test execution:
 using LinearAlgebra, SparseArrays, Logging
 
+# Minimal atomic assembler used to verify that `apply_assemble!` propagates its atomic
+# mode into the non-local constraint condensation before regular assembly.
+struct AtomicApplyAssembler{M, V} <: Ferrite.AbstractAssembler{Float64}
+    K::M
+    f::V
+end
+struct AtomicProbeArray{N} <: AbstractArray{Float64, N}
+    data::Array{Float64, N}
+    atomics::Vector{Bool}
+end
+AtomicProbeArray(data::Array{Float64, N}) where {N} = AtomicProbeArray{N}(data, Bool[])
+Base.size(A::AtomicProbeArray) = size(A.data)
+Base.getindex(A::AtomicProbeArray, I...) = getindex(A.data, I...)
+Base.setindex!(A::AtomicProbeArray, v, I...) = setindex!(A.data, v, I...)
+
+Ferrite.matrix_handle(a::AtomicApplyAssembler) = a.K
+Ferrite.vector_handle(a::AtomicApplyAssembler) = a.f
+Ferrite._is_atomic(::AtomicApplyAssembler) = true
+function Ferrite.assemble!(
+        ::AtomicApplyAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix,
+        ::AbstractVector
+    )
+    return
+end
+function Ferrite.addindex!(A::AtomicProbeArray{1}, v::Float64, i::Int, ::Val{atomic} = Val(false)) where {atomic}
+    push!(A.atomics, atomic)
+    A.data[i] += v
+    return A
+end
+function Ferrite.addindex!(A::AtomicProbeArray{2}, v::Float64, i::Int, j::Int, ::Val{atomic} = Val(false)) where {atomic}
+    push!(A.atomics, atomic)
+    A.data[i, j] += v
+    return A
+end
+
 # misc constraint tests
 
 @testset "constructors and error checking" begin
@@ -1619,6 +1654,27 @@ end # testset
         end
     end
 end # testset
+
+@testset "atomic local constraint condensation" begin
+    grid = generate_grid(Line, (2,))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefLine, 1}())
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint(1, [3 => 1.0], 0.0))
+    close!(ch)
+
+    dofs = celldofs(dh, 1)
+    K = AtomicProbeArray(zeros(3, 3))
+    f = AtomicProbeArray(zeros(3))
+    assembler = AtomicApplyAssembler(K, f)
+    apply_assemble!(assembler, ch, dofs, ones(2, 2), ones(2))
+
+    @test !isempty(K.atomics)
+    @test !isempty(f.atomics)
+    @test all(K.atomics)
+    @test all(f.atomics)
+end
 
 @testset "Sparsity pattern without constrained dofs" begin
     grid = generate_grid(Triangle, (5, 5))

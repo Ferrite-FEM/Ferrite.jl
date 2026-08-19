@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
  - Atomic assembly support for BlockAssembler. ([#1452])
+ - `apply_assemble!` now respects the assembler's atomic mode when non-local affine
+   constraints write directly to the global matrix and vector. ([#1465])
  - `add_sparsity_entries!` (and thereby `allocate_matrix`) now guarantees that passing
    `interface_coupling` adds the requested interface entries: the `topology` keyword
    argument is now optional and, when not passed, constructed from the grid (previously
