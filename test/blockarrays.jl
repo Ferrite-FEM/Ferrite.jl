@@ -1,6 +1,11 @@
 using Ferrite, BlockArrays, SparseArrays, LinearAlgebra, Test
+import SparseMatricesCSR: SparseMatrixCSR
 
-@testset "BlockArrays.jl extension" begin
+# The constraint application interface is implemented per block type, so everything below is
+# run for both of the sparse formats Ferrite ships with.
+const BLOCK_TYPES = ("CSC" => SparseMatrixCSC{Float64, Int}, "CSR" => SparseMatrixCSR{1, Float64, Int})
+
+@testset "BlockArrays.jl extension ($blockname blocks)" for (blockname, BT) in BLOCK_TYPES
     grid = generate_grid(Triangle, (10, 10))
 
     dh = DofHandler(grid)
@@ -24,7 +29,7 @@ using Ferrite, BlockArrays, SparseArrays, LinearAlgebra, Test
     # TODO: allocate_matrix(BlockMatrix, ...) should work and default to field blocking
     bsp = BlockSparsityPattern([2nd, 1nd])
     add_sparsity_entries!(bsp, dh, ch)
-    KB = allocate_matrix(BlockMatrix, bsp)
+    KB = allocate_matrix(BlockMatrix{Float64, Matrix{BT}}, bsp)
     @test KB isa BlockMatrix
     @test blocksize(KB) == (2, 2)
     @test size(KB[Block(1), Block(1)]) == (2nd, 2nd)
@@ -102,7 +107,7 @@ using Ferrite, BlockArrays, SparseArrays, LinearAlgebra, Test
     block_sizes = [nfree, npres]
     bsp = BlockSparsityPattern(block_sizes)
     add_sparsity_entries!(bsp, dh, ch)
-    KB = allocate_matrix(BlockMatrix, bsp)
+    KB = allocate_matrix(BlockMatrix{Float64, Matrix{BT}}, bsp)
     @test blocksize(KB) == (2, 2)
     @test size(KB[Block(1), Block(1)]) == (nfree, nfree)
     @test size(KB[Block(2), Block(1)]) == (npres, nfree)
@@ -114,7 +119,7 @@ using Ferrite, BlockArrays, SparseArrays, LinearAlgebra, Test
     @test K == KB
 end
 
-@testset "BlockAssembler with atomic accumulation" begin
+@testset "BlockAssembler with atomic accumulation ($blockname blocks)" for (blockname, BT) in BLOCK_TYPES
     grid = generate_grid(Triangle, (10, 10))
     dh = DofHandler(grid)
     ip = Lagrange{RefTriangle, 1}()
@@ -134,7 +139,7 @@ end
 
     bsp = BlockSparsityPattern([2nd, 1nd])
     add_sparsity_entries!(bsp, dh, ch)
-    allocate_block_matrix() = allocate_matrix(BlockMatrix, bsp)
+    allocate_block_matrix() = allocate_matrix(BlockMatrix{Float64, Matrix{BT}}, bsp)
 
     # Deterministic fake element contributions computed from the dofs
     element_matrix(dofs) = [sin(i * j / 100) for i in dofs, j in dofs]

@@ -31,11 +31,49 @@ using SparseArrays, LinearAlgebra
         @test K1 == K2
         @test f0 ≈ f1
         @test f1 ≈ f2
-        # Error for affine constraints
+        # Affine constraints are condensed just like for the CSC matrix. The sparsity pattern
+        # has to hold the fill-in, so allocate it through the constraint handler.
         ch = ConstraintHandler(dh)
         add!(ch, AffineConstraint(1, [3 => 1.0], 1.0))
         close!(ch)
-        @test_throws ErrorException("condensation of ::SparseMatrixCSR{1, Float64, Int64} matrix not supported") apply!(K2, f2, ch)
+        Kc = allocate_matrix(dh, ch)
+        Kr = allocate_matrix(SparseMatrixCSR, dh, ch)
+        ac = start_assemble(Kc)
+        ar = start_assemble(Kr)
+        ke = [1.0 2.0; 3.0 4.0]
+        for dofs in ([1, 2], [3, 2])
+            assemble!(ac, dofs, ke)
+            assemble!(ar, dofs, ke)
+        end
+        @test Kc ≈ Kr
+        fc = collect(1.0:3.0)
+        fr = collect(1.0:3.0)
+        apply!(Kc, fc, ch)
+        apply!(Kr, fr, ch)
+        @test Kc ≈ Kr
+        @test fc ≈ fr
+        # ... but the symmetric case still is not supported
+        @test_throws ErrorException("condensation of ::Symmetric matrix not supported") apply!(Symmetric(Kr), fr, ch)
+    end
+
+    @testset "addindex!(::SparseMatrixCSR,...)" begin
+        I = [1, 1, 2, 3]
+        J = [1, 3, 2, 3]
+        K = sparsecsr(I, J, zeros(4))
+        Ferrite.addindex!(K, 1.0, 1, 3)
+        Ferrite.addindex!(K, 2.0, 1, 3)
+        @test K[1, 3] == 3.0
+        # Zeros short-circuit before the pattern lookup, also outside the pattern
+        Ferrite.addindex!(K, 0.0, 2, 3)
+        @test K[2, 3] == 0.0
+        # Writing outside the pattern is an error, and the same one as for CSC
+        @test_throws Ferrite.SparsityError Ferrite.addindex!(K, 1.0, 2, 3)
+        @test_throws BoundsError Ferrite.addindex!(K, 1.0, 4, 1)
+        # Atomic accumulation gives identical results sequentially
+        Ka = sparsecsr(I, J, zeros(4))
+        Ferrite.addindex!(Ka, 1.0, 1, 3, Val(true))
+        Ferrite.addindex!(Ka, 2.0, 1, 3, Val(true))
+        @test Ka[1, 3] == K[1, 3]
     end
 
     @testset "assembly integration" begin

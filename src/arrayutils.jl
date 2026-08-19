@@ -119,6 +119,25 @@ function fillzero!(A::AbstractVecOrMat{T}) where {T}
     return fill!(A, zero(T))
 end
 
+"""
+    Ferrite.minor_indices(K::AbstractSparseMatrix)
+
+For a sparse matrix that stores the entries of one index contiguously ("the major"), return the
+vector of the *other* index ("the minor") of every stored entry, parallel to `nonzeros(K)`. This
+is `rowvals(K)` for column-compressed storage (CSC) and `colvals(K)` for row-compressed storage
+(CSR).
+
+This is an internal helper shared by the CSC and CSR implementations of the constraint
+application interface (see the devdocs on assembly); it is *not* part of that interface. A format
+that does not store scalar entries in flat arrays parallel to `nonzeros` -- a blocked format such
+as BSR, for instance -- simply does not define it, and implements the interface functions
+directly.
+"""
+function minor_indices end
+
+minor_indices(K::AbstractSparseMatrixCSC) = rowvals(K)
+
+
 ##################################
 ## SparseArrays.SparseMatrixCSC ##
 ##################################
