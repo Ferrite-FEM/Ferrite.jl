@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 424" width="430" height="424">
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+        orient="auto-start-reverse"><path d="M0,0.6 L10,5 L0,9.4 z" fill="#dfe4ea"/></marker>
+<pattern id="hatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+<line x1="0" y1="0" x2="0" y2="7" stroke="#98a2b0" stroke-width="1.1"/></pattern>
+</defs>
+<rect x="165.0" y="250.0" width="100.0" height="100.0" rx="0" fill="#00c9a0" fill-opacity="0.18" stroke="none" stroke-width="2.0"/>
+<rect x="65.0" y="150.0" width="100.0" height="100.0" rx="0" fill="#00c9a0" fill-opacity="0.18" stroke="none" stroke-width="2.0"/>
+<rect x="265.0" y="150.0" width="100.0" height="100.0" rx="0" fill="#00c9a0" fill-opacity="0.18" stroke="none" stroke-width="2.0"/>
+<rect x="165.0" y="50.0" width="100.0" height="100.0" rx="0" fill="#00c9a0" fill-opacity="0.18" stroke="none" stroke-width="2.0"/>
+<rect x="65.0" y="250.0" width="100.0" height="100.0" rx="0" fill="#56b4e9" fill-opacity="0.18" stroke="none" stroke-width="2.0"/>
+<rect x="265.0" y="250.0" width="100.0" height="100.0" rx="0" fill="#56b4e9" fill-opacity="0.18" stroke="none" stroke-width="2.0"/>
+<rect x="65.0" y="50.0" width="100.0" height="100.0" rx="0" fill="#56b4e9" fill-opacity="0.18" stroke="none" stroke-width="2.0"/>
+<rect x="265.0" y="50.0" width="100.0" height="100.0" rx="0" fill="#56b4e9" fill-opacity="0.18" stroke="none" stroke-width="2.0"/>
+<rect x="165.0" y="150.0" width="100.0" height="100.0" rx="0" fill="url(#hatch)" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<line x1="65.0" y1="350.0" x2="65.0" y2="50.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<line x1="165.0" y1="350.0" x2="165.0" y2="50.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<line x1="265.0" y1="350.0" x2="265.0" y2="50.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<line x1="365.0" y1="350.0" x2="365.0" y2="50.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<line x1="65.0" y1="350.0" x2="365.0" y2="350.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<line x1="65.0" y1="250.0" x2="365.0" y2="250.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<line x1="65.0" y1="150.0" x2="365.0" y2="150.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<line x1="65.0" y1="50.0" x2="365.0" y2="50.0" stroke="#dfe4ea" stroke-width="2.0" stroke-linecap="round"/>
+<rect x="101.0" y="289.5" width="28.0" height="21.0" rx="10.5" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="115.0" y="305.25" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">1</text>
+<rect x="201.0" y="289.5" width="28.0" height="21.0" rx="10.5" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="215.0" y="305.25" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">2</text>
+<rect x="301.0" y="289.5" width="28.0" height="21.0" rx="10.5" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="315.0" y="305.25" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">3</text>
+<rect x="101.0" y="189.5" width="28.0" height="21.0" rx="10.5" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="115.0" y="205.25" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">4</text>
+<rect x="201.0" y="189.5" width="28.0" height="21.0" rx="10.5" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="215.0" y="205.25" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">5</text>
+<rect x="301.0" y="189.5" width="28.0" height="21.0" rx="10.5" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="315.0" y="205.25" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">6</text>
+<rect x="101.0" y="89.5" width="28.0" height="21.0" rx="10.5" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="115.0" y="105.25" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">7</text>
+<rect x="201.0" y="89.5" width="28.0" height="21.0" rx="10.5" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="215.0" y="105.25" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">8</text>
+<rect x="301.0" y="89.5" width="28.0" height="21.0" rx="10.5" fill="#e69f00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="315.0" y="105.25" fill="#12171c" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">9</text>
+<rect x="40.0" y="397.0" width="14.0" height="14.0" rx="0" fill="url(#hatch)" fill-opacity="1" stroke="#dfe4ea" stroke-width="1.2"/>
+<text x="62.0" y="409.0" fill="#98a2b0" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" font-style="normal" text-anchor="start">the cell</text>
+<rect x="140.0" y="397.0" width="14.0" height="14.0" rx="0" fill="#00c9a0" fill-opacity="0.3" stroke="#00c9a0" stroke-width="1.2"/>
+<text x="162.0" y="409.0" fill="#98a2b0" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" font-style="normal" text-anchor="start">edge neighbors</text>
+<rect x="272.0" y="397.0" width="14.0" height="14.0" rx="0" fill="#56b4e9" fill-opacity="0.3" stroke="#56b4e9" stroke-width="1.2"/>
+<text x="294.0" y="409.0" fill="#98a2b0" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" font-style="normal" text-anchor="start">vertex neighbors</text>
+</svg>
