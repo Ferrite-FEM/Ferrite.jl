@@ -182,6 +182,11 @@ function _presize_buffer(rowlen::Vector{Int}, sizehint::Int)
     return ConstructionBuffer{Int, 1}(indices, data, sizehint)
 end
 
+# Split `1:n` into at most `nthreads()` contiguous chunks of at least `minchunk` items.
+function _task_chunks(n::Int, minchunk::Int = 1000)
+    return Iterators.partition(1:n, max(minchunk, cld(n, Threads.nthreads())))
+end
+
 # Hot-path guard: kept tiny so that it inlines into callers; the actual sorting is out of
 # line in _sort_pattern! and only runs when the pattern is unsorted.
 @inline function _ensure_sorted!(sp::SparsityPattern)
@@ -192,11 +197,7 @@ end
 # Sort each row's slice in place (rows are already deduplicated). Rows are disjoint slices of
 # `data`, so they can be sorted in parallel by chunking the rows over tasks.
 @noinline function _sort_pattern!(sp::SparsityPattern)
-    nrows = getnrows(sp)
-    # One chunk per thread (rows have similar cost so no load balancing is needed), but at
-    # least 1000 rows per chunk so that small patterns don't spawn useless tasks.
-    chunksize = max(1000, cld(nrows, Threads.nthreads()))
-    @sync for rowrange in Iterators.partition(1:nrows, chunksize)
+    @sync for rowrange in _task_chunks(getnrows(sp))
         Threads.@spawn _sort_rows!(sp, rowrange)
     end
     sp.sorted = true
@@ -237,16 +238,14 @@ function _build_pattern!(
         cell_dofs, nrows, couplings !== nothing || interface_couplings !== nothing
     )
     rowlen = zeros(Int, nrows)
-    marker = zeros(Int, getncols(sp))
     cell_to_sdh = dh.cell_to_subdofhandler
-    _visit_row_candidates!(
-        rowlen, nothing, nothing, marker, row_to_cells, row_to_localidx, cell_dofs,
+    _visit_row_candidates_chunked!(
+        rowlen, nothing, nothing, getncols(sp), row_to_cells, row_to_localidx, cell_dofs,
         cell_to_sdh, couplings, isconstrained, neighbor_cells, interface_couplings, oldbuffer
     )
     buffer = _presize_buffer(rowlen, sp.buffer.sizehint)
-    fill!(marker, 0)
-    _visit_row_candidates!(
-        rowlen, buffer.data, buffer.indices, marker, row_to_cells, row_to_localidx, cell_dofs,
+    _visit_row_candidates_chunked!(
+        rowlen, buffer.data, buffer.indices, getncols(sp), row_to_cells, row_to_localidx, cell_dofs,
         cell_to_sdh, couplings, isconstrained,
         fill_interfaces ? neighbor_cells : nothing, fill_interfaces ? interface_couplings : nothing,
         oldbuffer
@@ -898,6 +897,75 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityP
     return S
 end
 
+# SparsityPattern: the counting transpose parallelized by chunking the rows: each chunk
+# counts its rows' columns into a private histogram, and the serial combine converts the
+# histograms in place into per-(chunk, column) write cursors so that the chunks scatter
+# into disjoint slots in serial (ascending row) order, keeping each column sorted.
+function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern, sym::Bool) where {Tv, Ti}
+    nrows, ncols = getnrows(sp), getncols(sp)
+    # The serial cursor conversion costs O(nchunks * ncols) while the parallel phases gain
+    # ~ nstored / nchunks, so cap the chunk count at the optimum, ~ sqrt(average column
+    # length) -- more chunks than that make the transpose slower.
+    nstored = 0
+    @inbounds for row in 1:nrows
+        nstored += sp.buffer.indices[row].ncurrent
+    end
+    maxchunks = max(1, isqrt(cld(nstored, max(ncols, 1))))
+    chunks = collect(_task_chunks(nrows, max(1000, cld(nrows, maxchunks))))
+    # 1. Count the columns of each chunk's rows into a chunk-private histogram
+    hists = Vector{Vector{Ti}}(undef, length(chunks))
+    @sync for (ci, rowrange) in enumerate(chunks)
+        Threads.@spawn begin
+            hists[$ci] = _count_csc_columns_chunk(Ti, sp, $rowrange, sym)
+        end
+    end
+    # 2. Setup colptr and convert each histogram in place into the chunk's write cursors
+    colptr = Vector{Ti}(undef, ncols + 1)
+    nzptr = one(Ti)
+    @inbounds for col in 1:ncols
+        colptr[col] = nzptr
+        for hist in hists
+            count = hist[col]
+            hist[col] = nzptr
+            nzptr += count
+        end
+    end
+    colptr[ncols + 1] = nzptr
+    nnz = Int(nzptr) - 1
+    # 3. Allocate rowval and nzval now that nnz is known and populate rowval
+    rowval = Vector{Ti}(undef, nnz)
+    nzval = zeros(Tv, nnz)
+    @sync for (ci, rowrange) in enumerate(chunks)
+        Threads.@spawn _fill_csc_rowval_chunk!(rowval, hists[ci], sp, rowrange, sym)
+    end
+    # The last chunk's cursors must have ended at the start of the next column
+    @assert isempty(hists) || all(col -> hists[end][col] == colptr[col + 1], 1:ncols)
+    return SparseMatrixCSC(nrows, ncols, colptr, rowval, nzval)
+end
+
+function _count_csc_columns_chunk(::Type{Ti}, sp::SparsityPattern, rowrange::UnitRange{Int}, sym::Bool) where {Ti}
+    hist = zeros(Ti, getncols(sp))
+    @inbounds for row in rowrange
+        for col in _row_view(sp, row)
+            sym && row > col && continue
+            hist[col] += one(Ti)
+        end
+    end
+    return hist
+end
+
+function _fill_csc_rowval_chunk!(rowval::Vector{Ti}, hist::Vector{Ti}, sp::SparsityPattern, rowrange::UnitRange{Int}, sym::Bool) where {Ti}
+    @inbounds for row in rowrange
+        for col in _row_view(sp, row)
+            sym && row > col && continue
+            k = hist[col]
+            rowval[k] = row
+            hist[col] = k + one(Ti)
+        end
+    end
+    return
+end
+
 # Build the cell -> global dofs map as an ArrayOfVectorViews (a compact copy of the
 # DofHandler's cell dof storage).
 function create_celldofs(dh::DofHandler)
@@ -989,6 +1057,30 @@ function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int, build_lo
     return row_to_cells, row_to_localidx
 end
 
+# Chunk the rows of a count/fill pass over tasks. Each task gets its own column marker
+# (the only shared mutable state); per-row results are independent of the chunking since
+# the row stamps are globally unique.
+function _visit_row_candidates_chunked!(
+        rowlen::Vector{Int}, data::Union{Nothing, Vector{Int}}, indices::Union{Nothing, Vector{AdaptiveRange}},
+        ncols::Int, row_to_cells::ArrayOfVectorViews, row_to_localidx::Union{Nothing, ArrayOfVectorViews},
+        cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
+        couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
+        neighbor_cells::Union{Nothing, ArrayOfVectorViews}, interface_couplings::Union{Nothing, Vector{Matrix{Bool}}},
+        oldbuffer::Union{Nothing, ConstructionBuffer{Int, 1}} = nothing,
+    )
+    @sync for rowrange in _task_chunks(length(rowlen))
+        Threads.@spawn begin
+            marker = zeros(Int, ncols) # per-task scratch
+            _visit_row_candidates!(
+                rowlen, data, indices, marker, $rowrange, row_to_cells, row_to_localidx,
+                cell_dofs, cell_to_sdh, couplings, isconstrained, neighbor_cells, interface_couplings,
+                oldbuffer
+            )
+        end
+    end
+    return
+end
+
 # Count (data === nothing) or fill (data/indices from the presized buffer) the per-row
 # candidate columns: the diagonal,
 # plus for every incident cell the cell's dofs, filtered by the (expanded) coupling mask and, for
@@ -996,7 +1088,7 @@ end
 # identically; both go through this function to guarantee that.
 function _visit_row_candidates!(
         rowlen::Vector{Int}, data::Union{Nothing, Vector{Int}}, indices::Union{Nothing, Vector{AdaptiveRange}},
-        marker::Vector{Int}, row_to_cells::ArrayOfVectorViews, row_to_localidx::Union{Nothing, ArrayOfVectorViews},
+        marker::Vector{Int}, rowrange::UnitRange{Int}, row_to_cells::ArrayOfVectorViews, row_to_localidx::Union{Nothing, ArrayOfVectorViews},
         cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
         couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
         neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
@@ -1005,7 +1097,7 @@ function _visit_row_candidates!(
     )
     counting = data === nothing
     ncols = length(marker) # marker has one slot per column
-    @inbounds for row in 1:length(rowlen)
+    @inbounds for row in rowrange
         start = counting ? 0 : indices[row].start
         p = 0
         # The diagonal is always stored when the column exists (the pattern may have more
