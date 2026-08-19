@@ -127,14 +127,12 @@ function _algebraic_basis_value(::Type{V}, c, ::Type{T}) where {V, T}
     return _reconstruct_value(V, comp -> comp == c ? one(T) : zero(T))
 end
 
-# Reconstruct the typed value of `v`: component `k` reads `a[dofs[k]]`.
-function _reconstruct_algebraic_value(v::AlgebraicVariable{V}, a::AbstractVector{T}, dofs::AbstractVector{Int}) where {V, T}
-    comps = v.components
-    coefficient = function (c)
-        k = findfirst(==(c), comps)::Int # canonical indices are always found
-        return a[dofs[k]]
-    end
-    return _reconstruct_value(V, coefficient)
+# Reconstruct the typed value of `v`: component `k` reads `a[dofs[k]]`. The components
+# tuple is ordered like the Tensors.jl data storage, so the value is built directly from
+# the data tuple.
+function _reconstruct_algebraic_value(v::AlgebraicVariable{V, N}, a::AbstractVector, dofs::AbstractVector{Int}) where {V, N}
+    V === ScalarValueShape && return a[dofs[1]]
+    return V(ntuple(k -> a[dofs[k]], Val(N)))
 end
 
 _reconstruct_value(::Type{ScalarValueShape}, coefficient::F) where {F} = coefficient(1)

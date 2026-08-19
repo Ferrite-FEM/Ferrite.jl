@@ -346,16 +346,17 @@ end
 
 function _add_coupling_entries!(sp::AbstractSparsityPattern, dh::DofHandler, c::AbstractCoupling, ch::Union{ConstraintHandler, Nothing}, keep_constrained::Bool)
     _validate_coupling_fields(dh, c)
+    isconstrained = keep_constrained ? nothing : _isconstrained_by_dof(ch, getnrows(sp))
     if c isa AlgebraicCoupling
         info = _local_layout_info(dh, nothing, c.fields, c.coupling)
         dofs = _augmented_dofs!(Int[], dh, Int[], info)
-        _add_block_entries!(sp, dofs, info.algebraic_blocks, ch, keep_constrained)
+        _add_block_entries!(sp, dofs, info.algebraic_blocks, isconstrained)
         return sp
     end
     # A facet term uses all dofs of the adjacent cell, so it suffices to visit each
     # adjacent cell once.
     cells = c isa FacetCoupling ? _adjacent_cells(dh, c.facets) : c.cells
-    return _add_cell_coupling_entries!(sp, dh, cells, c.fields, c.coupling, ch, keep_constrained)
+    return _add_cell_coupling_entries!(sp, dh, cells, c.fields, c.coupling, isconstrained)
 end
 
 # The unique cells adjacent to `facets`, with bounds checking.
@@ -375,7 +376,7 @@ end
 function _add_cell_coupling_entries!(
         sp::AbstractSparsityPattern, dh::DofHandler, cells::OrderedSet{Int},
         fields::Vector{Symbol}, coupling::Matrix{Bool},
-        ch::Union{ConstraintHandler, Nothing}, keep_constrained::Bool,
+        isconstrained::Union{Nothing, Vector{Bool}},
     )
     isempty(cells) && return sp
     ncells = getncells(get_grid(dh))
@@ -389,6 +390,11 @@ function _add_cell_coupling_entries!(
     layout_infos = Vector{Union{Nothing, LocalLayoutInfo}}(nothing, length(dh.subdofhandlers))
     cc = CellCache(dh, UpdateFlags(nodes = false, coords = false, dofs = true))
     dofs = Int[]
+    # Rows of algebraic test dofs receive columns from every visited cell and can grow
+    # dense; their columns are collected across the cell loop and inserted in bulk (sorted
+    # and deduplicated), since eager sorted insertion of scattered columns is quadratic in
+    # the row length.
+    collected_cols = Dict{Int, Vector{Int}}()
     firstcell = true
     for cellid in cells
         1 <= cellid <= ncells || error("cell index $cellid is out of bounds (the grid has $ncells cells)")
@@ -402,12 +408,32 @@ function _add_cell_coupling_entries!(
         end
         reinit!(cc, cellid)
         _augmented_dofs!(dofs, dh, celldofs(cc), info)
-        _add_block_entries!(sp, dofs, info.cell_blocks, ch, keep_constrained)
+        for (ri, rj) in info.cell_blocks
+            if first(ri) > info.n_cell_dofs
+                for i in ri
+                    cols = get!(Vector{Int}, collected_cols, dofs[i])
+                    for j in rj
+                        push!(cols, dofs[j])
+                    end
+                end
+            else
+                _add_block_entries!(sp, dofs, (ri, rj), isconstrained)
+            end
+        end
         if firstcell
             # The algebraic-only blocks reference the same global dofs for every cell, so
             # adding them for one cell suffices
-            _add_block_entries!(sp, dofs, info.algebraic_blocks, ch, keep_constrained)
+            _add_block_entries!(sp, dofs, info.algebraic_blocks, isconstrained)
             firstcell = false
+        end
+    end
+    for (row, cols) in collected_cols
+        isconstrained !== nothing && isconstrained[row] && continue
+        sort!(cols)
+        unique!(cols)
+        for col in cols
+            isconstrained !== nothing && isconstrained[col] && continue
+            add_entry!(sp, row, col)
         end
     end
     return sp
@@ -417,17 +443,26 @@ end
 function _add_block_entries!(
         sp::AbstractSparsityPattern, dofs::AbstractVector{Int},
         blocks::Vector{NTuple{2, UnitRange{Int}}},
-        ch::Union{ConstraintHandler, Nothing}, keep_constrained::Bool,
+        isconstrained::Union{Nothing, Vector{Bool}},
     )
-    for (ri, rj) in blocks
-        for i in ri
-            row = dofs[i]
-            !keep_constrained && haskey(ch.dofmapping, row) && continue
-            for j in rj
-                col = dofs[j]
-                !keep_constrained && haskey(ch.dofmapping, col) && continue
-                add_entry!(sp, row, col)
-            end
+    for block in blocks
+        _add_block_entries!(sp, dofs, block, isconstrained)
+    end
+    return
+end
+
+function _add_block_entries!(
+        sp::AbstractSparsityPattern, dofs::AbstractVector{Int},
+        (ri, rj)::NTuple{2, UnitRange{Int}},
+        isconstrained::Union{Nothing, Vector{Bool}},
+    )
+    for i in ri
+        row = dofs[i]
+        isconstrained !== nothing && isconstrained[row] && continue
+        for j in rj
+            col = dofs[j]
+            isconstrained !== nothing && isconstrained[col] && continue
+            add_entry!(sp, row, col)
         end
     end
     return
