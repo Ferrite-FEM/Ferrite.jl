@@ -451,6 +451,31 @@ Get the spatial dimension of the grid, corresponding to the vector dimension of 
 getspatialdim(::AbstractGrid{sdim}) where {sdim} = sdim
 
 """
+    grid_epoch(grid::AbstractGrid) -> Int
+
+The grid's current *epoch* — an integer identifying its refinement state. Static grids
+return `0`, meaning "not epoch-tracked". Mutable/adaptive grids (e.g.
+`Ferrite.AMR.ForestBWG`) return a value `>= 1` that is incremented by every mutating
+operation; a [`DofHandler`](@ref) records this value at [`close!`](@ref) and errors when
+used against a grid whose epoch has since changed (see [`reclose!`](@ref)).
+
+Downstream code may use this value as an invalidation key for caches derived from the grid
+state. Internal-but-stable API.
+"""
+grid_epoch(::AbstractGrid) = 0
+
+"""
+    has_hanging_nodes(grid::AbstractGrid) -> Bool
+
+Trait: whether the grid can contain hanging (constrained, non-conforming) nodes. `false`
+for conforming grids; `true` for non-conforming ones (e.g. `Ferrite.AMR.ForestBWG` and
+`Ferrite.AMR.NonConformingGrid`). A `DofHandler` retains its entity → dof maps after
+[`close!`](@ref) exactly when this holds, so that conformity (hanging-node) constraints can
+be built from them.
+"""
+has_hanging_nodes(::AbstractGrid) = false
+
+"""
     get_reference_dimension(grid::AbstractGrid) -> Union{Int, Symbol}
     get_reference_dimension(grid::AbstractGrid, cellid::Int) -> Int
 
@@ -487,11 +512,11 @@ Whereas the last option tries to call a `cellset` of the `grid`. `Collection` ca
 """
 @inline getcells(grid::AbstractGrid) = grid.cells
 @inline getcells(grid::AbstractGrid, v::Union{Integer, AbstractVector{<:Integer}}) = grid.cells[v]
-@inline getcells(grid::AbstractGrid, setname::String) = grid.cells[collect(getcellset(grid, setname))]
+@inline getcells(grid::AbstractGrid, setname::String) = getcells(grid)[collect(getcellset(grid, setname))]
 "Returns the number of cells in the `<:AbstractGrid`."
-@inline getncells(grid::AbstractGrid) = length(grid.cells)
+@inline getncells(grid::AbstractGrid) = length(getcells(grid))
 "Returns the celltype of the `<:AbstractGrid`."
-@inline getcelltype(grid::AbstractGrid) = eltype(grid.cells)
+@inline getcelltype(grid::AbstractGrid) = eltype(getcells(grid))
 @inline getcelltype(grid::AbstractGrid, i::Integer) = typeof(getcells(grid, i))
 
 """
@@ -505,15 +530,15 @@ to a Node.
 """
 @inline getnodes(grid::AbstractGrid) = grid.nodes
 @inline getnodes(grid::AbstractGrid, v::Union{Integer, AbstractVector{<:Integer}}) = grid.nodes[v]
-@inline getnodes(grid::AbstractGrid, setname::String) = grid.nodes[collect(getnodeset(grid, setname))]
+@inline getnodes(grid::AbstractGrid, setname::String) = getnodes(grid)[collect(getnodeset(grid, setname))]
 "Returns the number of nodes in the grid."
-@inline getnnodes(grid::AbstractGrid) = length(grid.nodes)
+@inline getnnodes(grid::AbstractGrid) = length(getnodes(grid))
 "Returns the number of nodes of the `i`-th cell."
 function nnodes_per_cell(grid::AbstractGrid)
     if !isconcretetype(getcelltype(grid))
         error("There are different celltypes in the `grid`. Use `nnodes_per_cell(grid, cellid::Integer)` instead")
     end
-    return nnodes(first(grid.cells))
+    return nnodes(first(getcells(grid)))
 end
 @inline nnodes_per_cell(grid::AbstractGrid, i::Integer) = nnodes(getcells(grid, i))
 

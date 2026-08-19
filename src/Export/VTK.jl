@@ -31,15 +31,19 @@ struct VTKGridFile{VTK <: WriteVTK.DatasetFile}
     cellnodes::Union{Vector{UnitRange{Int}}, Nothing}
     node_mapping::Union{Vector{Int}, Nothing}
 end
-function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
-    for sdh in dh.subdofhandlers
-        for ip in sdh.field_interpolations
-            if !isa(conformity(ip), H1Conformity)
-                return VTKGridFile(filename, get_grid(dh); write_discontinuous = true, kwargs...)
-            end
-        end
+# Shared by this entry point and the VTKHDF extension's counterpart: guard against a
+# stale (pre-`reclose!`) handler and decide whether any field forces discontinuous
+# output — one body, so a future conformity type or guard refinement lands in both.
+function _vtk_discontinuous(dh::DofHandler)
+    _check_epoch(dh)
+    for sdh in dh.subdofhandlers, ip in sdh.field_interpolations
+        isa(conformity(ip), H1Conformity) || return true
     end
-    return VTKGridFile(filename, get_grid(dh); kwargs...)
+    return false
+end
+
+function VTKGridFile(filename::String, dh::DofHandler; kwargs...)
+    return VTKGridFile(filename, get_grid(dh); write_discontinuous = _vtk_discontinuous(dh), kwargs...)
 end
 function VTKGridFile(filename::String, grid::AbstractGrid; write_discontinuous = false, kwargs...)
     vtk, cellnodes, node_mapping = create_vtk_grid(filename, grid, write_discontinuous; kwargs...)

@@ -10,14 +10,7 @@ import Ferrite: write_solution, write_projection, write_cell_data, write_node_da
 using VTKHDF: VTKHDF, vtkhdf_grid, VTKPointData, VTKCellData
 
 function Ferrite.VTKHDFGridFile(filename::String, dh::DofHandler; kwargs...)
-    for sdh in dh.subdofhandlers
-        for ip in sdh.field_interpolations
-            if !isa(conformity(ip), H1Conformity)
-                return VTKHDFGridFile(filename, get_grid(dh); write_discontinuous = true, kwargs...)
-            end
-        end
-    end
-    return VTKHDFGridFile(filename, get_grid(dh); kwargs...)
+    return VTKHDFGridFile(filename, get_grid(dh); write_discontinuous = Ferrite._vtk_discontinuous(dh), kwargs...)
 end
 
 function Ferrite.VTKHDFGridFile(filename::String, grid::AbstractGrid; write_discontinuous = false, kwargs...)

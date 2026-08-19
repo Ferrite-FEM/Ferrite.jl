@@ -20,6 +20,13 @@ This grid serves as an entry point for non-intrusive adaptive grid libraries.
 !!! note
     A grid produced by [`creategrid`](@ref Ferrite.AMR.creategrid) only carries the `cellsets`
     and `facetsets` of the base grid; its `nodesets` and `vertexsets` are empty.
+
+!!! warning "Deprecated"
+    `NonConformingGrid` is deprecated in favour of using the [`ForestBWG`](@ref) directly as
+    the grid: the forest answers all `AbstractGrid` queries for its current refinement state,
+    a `DofHandler` built on it detects staleness after refinement, and [`reclose!`](@ref)
+    re-distributes the dofs. `NonConformingGrid` (and [`creategrid`](@ref
+    Ferrite.AMR.creategrid)) keep working during the transition but will be removed.
 """
 mutable struct NonConformingGrid{dim, C <: Ferrite.AbstractCell, T <: Real, CIT} <: Ferrite.AbstractGrid{dim}
     cells::Vector{C}
@@ -50,6 +57,11 @@ end
 # Must be qualified: `get_coordinate_type` is not exported from Ferrite, so an unqualified
 # definition here would create a separate `AMR.get_coordinate_type` instead of extending it.
 Ferrite.get_coordinate_type(::NonConformingGrid{dim, C, T}) where {dim, C, T} = Vec{dim, T}
+
+Ferrite.has_hanging_nodes(::NonConformingGrid) = true
+
+# See the docstring at `conformity_info(::ForestBWG)` in forest.jl.
+conformity_info(g::NonConformingGrid) = g.conformity_info
 
 function Base.show(io::IO, ::MIME"text/plain", grid::NonConformingGrid)
     print(io, "$(typeof(grid)) with $(getncells(grid)) ")

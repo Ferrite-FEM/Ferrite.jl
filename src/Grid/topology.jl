@@ -453,7 +453,7 @@ _getneighborhood(::Val{3}, top, grid, facetindex::FacetIndex, include_self) = ge
 Computes the stencils induced by the edge connectivity of the vertices.
 """
 function vertex_star_stencils(top::ExclusiveTopology, grid::Grid)
-    cells = grid.cells
+    cells = getcells(grid)
     stencil_table = ArrayOfVectorViews(VertexIndex[], (getnnodes(grid),); sizehint = 10) do buf
         # Vertex Connectivity
         for (global_vertexid, cellset) in enumerate(top.vertex_to_cell)

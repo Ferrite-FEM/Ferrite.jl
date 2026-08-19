@@ -10,9 +10,52 @@
 #   materialization                `creategrid` (Lnodes numbering) and `facetskeleton`
 
 """
-    ForestBWG{dim, C <: OctreeBWG, T <: Real} <: Ferrite.AbstractGrid{dim}
+    ForestSnapshot{dim, C <: AbstractCell, T}
+
+The materialized (fine) grid of a [`ForestBWG`](@ref) at one refinement state: the cells and
+nodes produced by the [`creategrid`](@ref Ferrite.AMR.creategrid) pipeline, the hanging-node
+constraints (`conformity_info`, see [`conformity_info`](@ref Ferrite.AMR.conformity_info)) and
+the reconstructed `facetsets`/`cellsets`. Owned by the forest's [`MaterializedForest`](@ref)
+cache box — never read its fields from downstream code; go through the `AbstractGrid`
+accessors on the forest (`getcells`, `getnodes`, `getfacetset`, …) and
+[`conformity_info`](@ref Ferrite.AMR.conformity_info) instead.
+"""
+struct ForestSnapshot{dim, C <: Ferrite.AbstractCell, T}
+    cells::Vector{C}
+    nodes::Vector{Node{dim, T}}
+    conformity_info::Dict{Int, Vector{Int}}   # hanging node -> masters (until Phase 2)
+    facetsets::Dict{String, OrderedSet{Ferrite.FacetIndex}}
+    cellsets::Dict{String, OrderedSet{Int}}
+end
+
+"""
+    MaterializedForest{dim, C <: AbstractCell, T}
+
+The mutable cache box inside the (immutable) [`ForestBWG`](@ref): the current `epoch` (bumped
+by every mutator — `refine!`, `coarsen!`, `refine_and_coarsen!`, `refine_all!`,
+`balanceforest!`) and the lazily materialized [`ForestSnapshot`](@ref) of that epoch
+(`nothing` while stale/empty; filled on demand by `_materialized`).
+"""
+mutable struct MaterializedForest{dim, C <: Ferrite.AbstractCell, T}
+    epoch::Int
+    state::Union{Nothing, ForestSnapshot{dim, C, T}}
+end
+
+MaterializedForest{dim, C, T}() where {dim, C <: Ferrite.AbstractCell, T} =
+    MaterializedForest{dim, C, T}(1, nothing)
+
+"""
+    ForestBWG{dim, C <: OctreeBWG, T <: Real, MC <: AbstractCell} <: Ferrite.AbstractGrid{dim}
 `p4est` adaptive grid implementation based on [BWG2011](@citet)
 and [IBWG2015](@citet).
+
+The forest *is* the grid: it subtypes `AbstractGrid` and answers all grid queries
+(`getcells`, `getnodes`, `getfacetset`, `getcoordinates`, …) for its **current** refinement
+state through a lazily materialized, epoch-guarded snapshot (see [`MaterializedForest`](@ref)).
+Pass the forest directly to `DofHandler`, `ConstraintHandler` and VTK export; after
+`refine!`/`coarsen!`/`balanceforest!` a closed `DofHandler` errors on use until
+[`reclose!`](@ref) is called. `MC` is the materialized cell type (`Quadrilateral` in 2D,
+`Hexahedron` in 3D).
 
 ## Constructor
     ForestBWG(grid::AbstractGrid{dim}, b) where dim
@@ -26,7 +69,7 @@ that [`creategrid`](@ref Ferrite.AMR.creategrid) uses to identify nodes across t
 An out-of-range `b` therefore throws a `DomainError` rather than silently producing a grid with
 wrongly merged nodes.
 """
-struct ForestBWG{dim, C <: OctreeBWG, T <: Real} <: Ferrite.AbstractGrid{dim}
+struct ForestBWG{dim, C <: OctreeBWG, T <: Real, MC <: Ferrite.AbstractCell} <: Ferrite.AbstractGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim, T}}
     # Sets
@@ -36,6 +79,23 @@ struct ForestBWG{dim, C <: OctreeBWG, T <: Real} <: Ferrite.AbstractGrid{dim}
     vertexsets::Dict{String, OrderedSet{Ferrite.VertexIndex}}
     #Topology
     topology::ExclusiveTopology
+    # Epoch-guarded materialization cache (the facade state, see MaterializedForest)
+    mcache::MaterializedForest{dim, MC, T}
+end
+
+# The materialized cell type is a pure function of the dimension.
+_materialized_celltype(::Val{2}) = Quadrilateral
+_materialized_celltype(::Val{3}) = Hexahedron
+
+function ForestBWG(
+        cells::Vector{C}, nodes::Vector{Node{dim, T}}, cellsets, nodesets, facetsets,
+        vertexsets, topology::ExclusiveTopology
+    ) where {dim, C <: OctreeBWG, T}
+    MC = _materialized_celltype(Val(dim))
+    return ForestBWG{dim, C, T, MC}(
+        cells, nodes, cellsets, nodesets, facetsets, vertexsets, topology,
+        MaterializedForest{dim, MC, T}()
+    )
 end
 
 function ForestBWG(grid::Ferrite.AbstractGrid{dim}, b = DEFAULT_MAXLEVEL[dim]) where {dim}
@@ -44,7 +104,7 @@ function ForestBWG(grid::Ferrite.AbstractGrid{dim}, b = DEFAULT_MAXLEVEL[dim]) w
     @assert isconcretetype(C)
     @assert (C == Quadrilateral && dim == 2) || (C == Hexahedron && dim == 3)
     topology = ExclusiveTopology(grid)
-    cells = OctreeBWG.(grid.cells, b)
+    cells = OctreeBWG.(cells, b)
     nodes = getnodes(grid)
     cellsets = Ferrite.getcellsets(grid)
     nodesets = Ferrite.getnodesets(grid)
@@ -52,6 +112,67 @@ function ForestBWG(grid::Ferrite.AbstractGrid{dim}, b = DEFAULT_MAXLEVEL[dim]) w
     vertexsets = Ferrite.getvertexsets(grid)
     return ForestBWG(cells, nodes, cellsets, nodesets, facetsets, vertexsets, topology)
 end
+
+"""
+    grid_epoch(forest::ForestBWG) -> Int
+
+The forest's current refinement epoch — the **invalidation key** of the materialization
+facade. Every mutator ([`refine!`](@ref Ferrite.AMR.refine!), [`refine_all!`](@ref
+Ferrite.AMR.refine_all!), [`coarsen!`](@ref Ferrite.AMR.coarsen!),
+[`refine_and_coarsen!`](@ref Ferrite.AMR.refine_and_coarsen!), [`balanceforest!`](@ref
+Ferrite.AMR.balanceforest!)) increments it; pure grid queries never change it. Always `>= 1`
+(conforming grids return `0` from the [`Ferrite.grid_epoch`](@ref) fallback, meaning "not
+epoch-tracked").
+
+Downstream code may cache anything derived from the forest's grid state (cells, nodes,
+dof-distributions, plot data, …) keyed on this value: the cache is valid exactly as long as
+`grid_epoch(forest)` is unchanged. This accessor is internal-but-stable API — it will keep
+working across releases, but is deliberately not exported.
+"""
+Ferrite.grid_epoch(forest::ForestBWG) = forest.mcache.epoch
+
+# Invalidate the facade: bump the epoch and drop the snapshot. Called by every mutator.
+function _invalidate!(forest::ForestBWG)
+    mc = forest.mcache
+    mc.epoch += 1
+    mc.state = nothing
+    return
+end
+
+"""
+    _materialized(forest::ForestBWG) -> ForestSnapshot
+
+The materialized snapshot of the forest's current refinement state, building it on demand
+(the [`creategrid`](@ref Ferrite.AMR.creategrid) pipeline) and caching it in the forest's
+[`MaterializedForest`](@ref) box until the next mutator invalidates it. All `AbstractGrid`
+accessor overrides on `ForestBWG` go through this. Requires a 2:1-balanced forest, like
+`creategrid`.
+"""
+@inline function _materialized(forest::ForestBWG)
+    state = forest.mcache.state
+    if state === nothing
+        state = _materialize_snapshot(forest)
+        forest.mcache.state = state
+    end
+    return state
+end
+
+Ferrite.has_hanging_nodes(::ForestBWG) = true
+
+"""
+    conformity_info(forest::ForestBWG) -> Dict{Int, Vector{Int}}
+    conformity_info(grid::NonConformingGrid)
+
+The hanging-node constraints of the materialized grid: a mapping from each hanging (slave)
+node id to its 2 (edge midpoint) or 4 (3D face center) master node ids, in the node numbering
+of the materialized grid (`getnodes(forest)`). For the forest this materializes on demand and
+reflects the current refinement state. This accessor is the supported way for downstream code
+to read conformity information — never reach into snapshot or grid fields directly.
+
+The layout will change once hanging edges/faces are exposed as entities for higher-order
+fields — see the warning in the AMR devdocs.
+"""
+conformity_info(forest::ForestBWG) = _materialized(forest).conformity_info
 
 function Ferrite.get_facet_facet_neighborhood(g::ForestBWG{dim}) where {dim}
     return Ferrite._get_facet_facet_neighborhood(g.topology, Val(dim))
@@ -108,6 +229,7 @@ function refine_all!(forest::ForestBWG, l)
         resize!(leaves, length(refined))
         copyto!(leaves, refined)
     end
+    _invalidate!(forest)
     return
 end
 
@@ -130,7 +252,9 @@ function refine!(forest::ForestBWG, cellid::Integer)
         prev_nleaves_k = nleaves_k
         nleaves_k += length(forest.cells[k].leaves)
     end
-    return refine_octant!(forest.cells[k], forest.cells[k].leaves[cellid - prev_nleaves_k])
+    refine_octant!(forest.cells[k], forest.cells[k].leaves[cellid - prev_nleaves_k])
+    _invalidate!(forest)
+    return
 end
 
 """
@@ -199,6 +323,7 @@ function refine!(forest::ForestBWG, cellids::AbstractVector{<:Integer})
         end
         offset += n
     end
+    _invalidate!(forest)
     return
 end
 
@@ -292,6 +417,8 @@ function _apply_refine_coarsen!(forest::ForestBWG, cmarked::AbstractVector{<:Int
         end
         offset += n
     end
+    # one bump for the whole logical mutation, however many trees it rewrote
+    _invalidate!(forest)
     return
 end
 
@@ -401,6 +528,7 @@ function _coarsen_all!(forest::ForestBWG)
             end
         end
     end
+    _invalidate!(forest)
     return
 end
 
@@ -415,23 +543,22 @@ function Ferrite.getncells(grid::ForestBWG)
 end
 
 """
-    getcells(forest::ForestBWG) -> Vector{OctantBWG}
+    getleaves(forest::ForestBWG) -> Vector{OctantBWG}
 
 Collect the leaf octants of all trees of `forest` into a single vector, in ascending cell id
-order (tree by tree, Morton order within each tree) — i.e. the octant `getcells(forest)[i]`
-materializes into cell `i` of [`creategrid`](@ref Ferrite.AMR.creategrid)`(forest)`.
+order (tree by tree, Morton order within each tree) — i.e. the octant `getleaves(forest)[i]`
+materializes into cell `i` of the forest's grid facade (`getcells(forest)[i]`).
 
 !!! warning "Allocates on every call"
     This materializes a fresh vector of all leaves each time it is called — `O(n)` in the
     number of cells. Call it once and reuse the result instead of calling it inside loops.
 
-The returned octants live in the coordinate system of their respective tree, so the scalar
-`getcells(forest, cellid)` from the `AbstractGrid` interface is deliberately not supported
-(an octant is not interpretable without its tree) and throws instead of falling back to
-`forest.cells[cellid]`, which would inconsistently return a whole tree. Take
-`forest.cells[k].leaves` for tree-local work.
+The returned octants live in the coordinate system of their respective tree; take
+`forest.cells[k].leaves` for tree-local work. (This used to be `getcells(forest)`, which now
+returns the materialized `Quadrilateral`/`Hexahedron` cells per the `AbstractGrid`
+interface.)
 """
-function Ferrite.getcells(forest::ForestBWG{dim, C}) where {dim, C}
+function getleaves(forest::ForestBWG{dim, C}) where {dim, C}
     ncells = getncells(forest)
     nnodes = 2^dim
     cellvector = Vector{OctantBWG{dim, nnodes, eltype(C)}}(undef, ncells)
@@ -446,14 +573,59 @@ function Ferrite.getcells(forest::ForestBWG{dim, C}) where {dim, C}
     return cellvector
 end
 
-# Block the generic `getcells(grid, i) = grid.cells[i]` fallback: `forest.cells` are trees,
-# not cells, so it would silently return a whole tree while `getcells(forest)` returns leaves.
-function Ferrite.getcells(forest::ForestBWG, cellid::Union{Int, AbstractVector{Int}})
-    throw(ArgumentError("getcells(forest, cellid) is not supported: a leaf octant is not interpretable without its tree. Use getcells(forest) for all leaves, or forest.cells[k].leaves for tree-local work."))
+# --- AbstractGrid accessor overrides -------------------------------------------------------
+#
+# Ferrite's `AbstractGrid` fallbacks are field-based (`getcells(g) = g.cells`, …), and
+# `forest.cells` holds the *trees* (octrees), `forest.nodes` the *macro* nodes. Every
+# accessor that would touch those fields is therefore overridden to answer from the
+# materialized snapshot of the current refinement state instead. `getncells` stays the
+# cheap tree-sum (it is called inside `balanceforest!` while the forest is mid-mutation
+# and must not materialize).
+Ferrite.getcells(forest::ForestBWG) = _materialized(forest).cells
+Ferrite.getcells(forest::ForestBWG, v::Union{Integer, AbstractVector{<:Integer}}) = _materialized(forest).cells[v]
+# getcells(forest, setname), getnnodes and get_node_coordinate(forest, n) are the generic
+# AbstractGrid fallbacks, which compose through the overrides above.
+# All trees materialize into one concrete cell type (`MC`), independent of `i`.
+Ferrite.getcelltype(::ForestBWG{<:Any, <:Any, <:Any, MC}) where {MC} = MC
+Ferrite.getcelltype(::ForestBWG{<:Any, <:Any, <:Any, MC}, i::Integer) where {MC} = MC
+
+Ferrite.getnodes(forest::ForestBWG) = _materialized(forest).nodes
+Ferrite.getnodes(forest::ForestBWG, v::Union{Integer, AbstractVector{<:Integer}}) = _materialized(forest).nodes[v]
+Ferrite.get_coordinate_type(::ForestBWG{dim, <:Any, T}) where {dim, T} = Vec{dim, T}
+Ferrite.get_coordinate_eltype(::ForestBWG{<:Any, <:Any, T}) where {T} = T
+
+Ferrite.getcellset(forest::ForestBWG, setname::String) = _materialized(forest).cellsets[setname]
+Ferrite.getcellsets(forest::ForestBWG) = _materialized(forest).cellsets
+Ferrite.getfacetset(forest::ForestBWG, setname::String) = _materialized(forest).facetsets[setname]
+Ferrite.getfacetsets(forest::ForestBWG) = _materialized(forest).facetsets
+# Node/vertex-set reconstruction is a known gap (as for `creategrid`): the macro sets kept
+# in `forest.nodesets`/`forest.vertexsets` are indexed against the *macro* grid and would be
+# wrong ids on the materialized grid, so the facade reports no node/vertex sets at all.
+Ferrite.getnodesets(::ForestBWG) = Dict{String, OrderedSet{Int}}()
+Ferrite.getnodeset(forest::ForestBWG, setname::String) = Ferrite.getnodesets(forest)[setname]
+Ferrite.getvertexsets(::ForestBWG) = Dict{String, OrderedSet{Ferrite.VertexIndex}}()
+Ferrite.getvertexset(forest::ForestBWG, setname::String) = Ferrite.getvertexsets(forest)[setname]
+
+# `ExclusiveTopology` of the materialized grid is wrong on hanging meshes (facet neighbours
+# across a hanging interface are not 1:1), and the field-based construction would read the
+# trees; error instead of silently producing a broken topology.
+function Ferrite.ExclusiveTopology(::ForestBWG)
+    error(
+        "ExclusiveTopology(forest::ForestBWG) is not supported: the topology of the " *
+            "materialized grid is ill-defined on non-conforming meshes. Use " *
+            "`Ferrite.AMR.facetskeleton(forest)` for facet-interface iteration instead."
+    )
 end
-# All trees share one octree type (the `ForestBWG` constructor requires a concrete,
-# uniform cell type), so the celltype does not depend on `i`.
-Ferrite.getcelltype(grid::ForestBWG, i::Int) = eltype(grid.cells)
+
+# The transform would mutate cached snapshot nodes in place and be silently lost on the next
+# rematerialization; transforming the tree corners instead is future work.
+function Ferrite.transform_coordinates!(::ForestBWG, ::Function)
+    error(
+        "transform_coordinates!(forest::ForestBWG, f) is not supported: the transform " *
+            "would be lost on the next rematerialization. Transform the base grid before " *
+            "constructing the ForestBWG instead."
+    )
+end
 
 """
     _treecorners(forest::ForestBWG{dim}, k::Integer) -> NTuple{2^dim, Vec{dim}}
@@ -1004,6 +1176,9 @@ function balanceforest!(forest::ForestBWG{dim}) where {dim}
             end
         end
     end
+    # Conservatively invalidate even when no cell was added: `balancetree` rebuilds the
+    # per-tree leaf lists, so "no count change" is not proof of "no change".
+    _invalidate!(forest)
     return
 end
 
@@ -2349,10 +2524,30 @@ Pipeline:
 Requires a 2:1-balanced forest (see [`balanceforest!`](@ref)) — balance is what guarantees
 hanging vertices are simple feature midpoints with non-hanging masters, and it is checked (an
 unbalanced forest leaves element vertices without node ids, which raises an error).
+
+!!! note "The facade makes this call unnecessary"
+    A `ForestBWG` now answers all `AbstractGrid` queries itself through an internal,
+    epoch-guarded materialization cache running this very pipeline — pass the forest
+    directly to `DofHandler`/`ConstraintHandler`/`VTKGridFile` and use [`reclose!`](@ref)
+    after refinement. `creategrid` remains as a thin wrapper for the transition; the
+    returned grid is a detached copy that does **not** track later refinements.
 """
-function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
+function creategrid(forest::ForestBWG)
+    snap = _materialize_snapshot(forest)
+    return NonConformingGrid(
+        snap.cells, snap.nodes;
+        conformity_info = snap.conformity_info,
+        facetsets = snap.facetsets,
+        cellsets = snap.cellsets,
+    )
+end
+
+# The `creategrid` pipeline body, emitting the facade's cache entry. Built fresh on every
+# call (never returns the cached snapshot), so `creategrid`'s result shares no state with
+# the facade.
+function _materialize_snapshot(forest::ForestBWG{dim, C, T}) where {dim, C, T}
     node_map = dim == 2 ? node_map₂ : node_map₃
-    celltype = dim == 2 ? Quadrilateral : Hexahedron
+    celltype = _materialized_celltype(Val(dim))
     NV = 2^dim
     ncells = getncells(forest)
     ntrees = length(forest.cells)
@@ -2402,11 +2597,10 @@ function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
             final_of_prov[E[m3[2], m3[1]]], final_of_prov[E[m4[2], m4[1]]],
         ]
     end
-    return NonConformingGrid(
-        cells, Node.(nodecoords);
-        conformity_info = hnodes,
-        facetsets = reconstruct_facetsets(forest),
-        cellsets = reconstruct_cellsets(forest),
+    MC = _materialized_celltype(Val(dim))
+    return ForestSnapshot{dim, MC, T}(
+        cells, Node.(nodecoords), hnodes,
+        reconstruct_facetsets(forest), reconstruct_cellsets(forest),
     )
 end
 
