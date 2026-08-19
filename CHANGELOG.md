@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    assembler was created with `atomic = true`. Previously these writes were always
    non-atomic, which is a data race when assembling concurrently without grid coloring. This
    affects all assemblers. ([#1486])
+ - `Ferrite.addindex!` is now implemented for `SparseMatrixCSR`. Previously it fell back to the
+   generic `AbstractMatrix` method, which does a redundant second lookup, reports writes outside
+   the sparsity pattern as an `ArgumentError` instead of a `Ferrite.SparsityError`, and throws
+   for atomic accumulation. ([#1486])
  - `add_sparsity_entries!` (and thereby `allocate_matrix`) now guarantees that passing
    `interface_coupling` adds the requested interface entries: the `topology` keyword
    argument is now optional and, when not passed, constructed from the grid (previously
@@ -35,13 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Atomic assembly (`start_assemble(K, f; atomic = true)`) now supports `Float16` and
    `Complex` of `Float16`/`Float32`/`Float64` as value types, in addition to `Float32`
    and `Float64`. ([#1474])
- - `apply!` and `apply_zero!` now work for a `BlockMatrix` with blocks in CSC
-   storage (as created by `allocate_matrix(BlockMatrix, ::BlockSparsityPattern)`), including
-   condensation of affine constraints. Previously constraints could only be applied to a
-   blocked system with `apply_assemble!`. As part of this, `apply!` and `apply_zero!`
-   dispatch on `AbstractMatrix` rather than `AbstractSparseMatrix`, so a custom matrix format
-   is supported as soon as it dispatches the internal interface documented in the devdocs on
-   assembly. ([#1486])
+ - `apply!` and `apply_zero!` now work for a `BlockMatrix`, including condensation of affine
+   constraints. Previously constraints could only be applied to a blocked system with
+   `apply_assemble!`. Blocks in either of the sparse formats Ferrite supports (`SparseMatrixCSC`
+   and `SparseMatrixCSR`) work, and so does any custom format implementing the internal
+   interface documented in the devdocs on assembly -- that interface is now phrased in terms of
+   explicit constraint data and index offsets, so the same methods serve a matrix on its own and
+   as a block of a blocked matrix, and the BlockArrays extension contains no format specific
+   code. As part of this, `apply!` and `apply_zero!` dispatch on `AbstractMatrix` rather than
+   `AbstractSparseMatrix`. ([#1486])
+ - `apply!` on a `SparseMatrixCSR` now supports affine constraints, which previously threw
+   `"condensation of ::SparseMatrixCSR{...} matrix not supported"`. ([#1486])
 
 ### Performance
  - `create_coloring` is significantly faster: the incidence matrix construction and the

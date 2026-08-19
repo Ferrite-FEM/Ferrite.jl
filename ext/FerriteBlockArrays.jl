@@ -6,10 +6,8 @@ using BlockArrays: Block, BlockArray, BlockIndex, BlockMatrix, BlockVector, bloc
     blockaxes, blockindex, blocks, findblockindex, undef_blocks
 using Ferrite:
     Ferrite, BlockSparsityPattern, ConstraintHandler, addindex!, allocate_matrix, assemble!,
-    fillzero!, DofCoefficients, _add_inhomogeneities_cols!, _condense_column!,
-    _condense_rhs_column!, _is_atomic, _zero_out_columns!, _zero_out_rows!,
-    coefficients_for_dof
-using SparseArrays: AbstractSparseMatrixCSC, SparseMatrixCSC
+    fillzero!, DofCoefficients, _is_atomic
+using SparseArrays: SparseMatrixCSC
 
 
 ##############################
@@ -132,13 +130,11 @@ Ferrite._is_atomic(::BlockAssembler{<:Any, <:Any, <:Any, atomic}) where {atomic}
 ## Application of constraints (see `Ferrite.apply!`)  ##
 ########################################################
 
-# `Ferrite.apply!` itself is generic over the matrix type; what a blocked matrix has to
-# provide are the hooks below. Every block is a sparse matrix in CSC storage (that is what
-# `allocate_matrix` produces above), so each hook is a loop over the blocks that delegates to
-# the corresponding Ferrite kernel with block local indices. Blocks in another storage format
-# fall back to Ferrite's generic methods, which error rather than silently running a dense
-# algorithm.
-const SparseBlockMatrix = BlockMatrix{<:Any, <:AbstractMatrix{<:AbstractSparseMatrixCSC}}
+# `Ferrite.apply!` is generic over the matrix type; what a blocked matrix has to provide are the
+# hooks below. Each is a loop over the blocks that slices the constraint data down to the block
+# and forwards to the *same* interface function on the block, so this file knows nothing about
+# how a block stores its entries -- supporting a new format is a matter of implementing that
+# interface for it, with no change here. See the devdocs on assembly for the interface.
 
 # The global index range of block `B` along axis `d`.
 blockrange(K::BlockMatrix, d::Int, B::Block{1}) = axes(K, d)[B]
@@ -152,24 +148,32 @@ function prescribed_range(prescribed_dofs::AbstractVector{<:Integer}, rng::Abstr
     return lo:hi
 end
 
-function Ferrite.zero_out_columns!(K::SparseBlockMatrix, ch::ConstraintHandler)
+# The prescribed dofs inside the index range `rng`, renumbered to be local to it.
+function local_prescribed_dofs(prescribed_dofs::AbstractVector{<:Integer}, rng::AbstractUnitRange)
+    return prescribed_dofs[prescribed_range(prescribed_dofs, rng)] .- (first(rng) - 1)
+end
+
+function Ferrite.zero_out_columns!(K::BlockMatrix, ch::ConstraintHandler)
     for Bj in blockaxes(K, 2)
         cols = blockrange(K, 2, Bj)
-        idxs = prescribed_range(ch.prescribed_dofs, cols)
-        isempty(idxs) && continue
-        local_dofs = ch.prescribed_dofs[idxs] .- (first(cols) - 1)
+        local_dofs = local_prescribed_dofs(ch.prescribed_dofs, cols)
+        mask = view(ch.isconstrained, cols)
+        isempty(local_dofs) && continue
         for Bi in blockaxes(K, 1)
-            _zero_out_columns!(@view(K[Bi, Bj]), local_dofs)
+            Ferrite.zero_out_columns!(@view(K[Bi, Bj]), local_dofs, mask)
         end
     end
     return
 end
 
-function Ferrite.zero_out_rows!(K::SparseBlockMatrix, ch::ConstraintHandler)
+function Ferrite.zero_out_rows!(K::BlockMatrix, ch::ConstraintHandler)
     for Bi in blockaxes(K, 1)
-        isconstrained = view(ch.isconstrained, blockrange(K, 1, Bi))
+        rows = blockrange(K, 1, Bi)
+        local_dofs = local_prescribed_dofs(ch.prescribed_dofs, rows)
+        mask = view(ch.isconstrained, rows)
+        isempty(local_dofs) && continue
         for Bj in blockaxes(K, 2)
-            _zero_out_rows!(@view(K[Bi, Bj]), isconstrained)
+            Ferrite.zero_out_rows!(@view(K[Bi, Bj]), local_dofs, mask)
         end
     end
     return
@@ -177,7 +181,7 @@ end
 
 # Compute "f -= K*inhomogeneities" block by block. The generic fallback would go through
 # LinearAlgebra's scalar indexing matvec for a BlockMatrix, which is O(ndofs^2).
-function Ferrite.add_inhomogeneities!(f::AbstractVector, K::SparseBlockMatrix, ch::ConstraintHandler)
+function Ferrite.add_inhomogeneities!(f::AbstractVector, K::BlockMatrix, ch::ConstraintHandler)
     for Bj in blockaxes(K, 2)
         cols = blockrange(K, 2, Bj)
         idxs = prescribed_range(ch.prescribed_dofs, cols)
@@ -186,15 +190,16 @@ function Ferrite.add_inhomogeneities!(f::AbstractVector, K::SparseBlockMatrix, c
         inhomogeneities = view(ch.inhomogeneities, idxs)
         for Bi in blockaxes(K, 1)
             fi = view(f, blockrange(K, 1, Bi))
-            _add_inhomogeneities_cols!(fi, @view(K[Bi, Bj]), local_dofs, inhomogeneities, false)
+            Ferrite.add_inhomogeneities!(fi, @view(K[Bi, Bj]), local_dofs, inhomogeneities)
         end
     end
     return f
 end
 
-# Condense K := (C' * K * C) and f := (C' * f). The blocks are visited in the order of the
-# global dofs, so the entries are traversed exactly like in the `SparseMatrixCSC` version.
-function Ferrite._condense!(K::SparseBlockMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false) where {T, Ti}
+# Condense K := (C' * K * C) and f := (C' * f). Each block condenses its own stored entries
+# into `K`, in whichever order suits its storage; the rhs is condensed once at the end, which
+# is what makes the block (and within-block) traversal order irrelevant.
+function Ferrite._condense!(K::BlockMatrix, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false) where {T, Ti}
     condense_f = !(length(f) == 0)
     condense_f && @assert(length(f) == size(K, 1))
 
@@ -206,22 +211,13 @@ function Ferrite._condense!(K::SparseBlockMatrix, f::AbstractVector, dofcoeffici
     end
 
     for Bj in blockaxes(K, 2)
-        cols = blockrange(K, 2, Bj)
-        coloffset = first(cols) - 1
-        for localcol in 1:length(cols)
-            col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, localcol + coloffset)
-            for Bi in blockaxes(K, 1)
-                rowoffset = first(blockrange(K, 1, Bi)) - 1
-                _condense_column!(
-                    K, @view(K[Bi, Bj]), localcol, rowoffset, coloffset,
-                    col_coeffs, dofcoefficients, dofmapping,
-                )
-            end
-            if col_coeffs !== nothing && condense_f
-                _condense_rhs_column!(f, localcol + coloffset, col_coeffs)
-            end
+        coloffset = first(blockrange(K, 2, Bj)) - 1
+        for Bi in blockaxes(K, 1)
+            rowoffset = first(blockrange(K, 1, Bi)) - 1
+            Ferrite.condense_into!(K, @view(K[Bi, Bj]), rowoffset, coloffset, dofcoefficients, dofmapping)
         end
     end
+    condense_f && Ferrite._condense_rhs_columns!(f, dofcoefficients, dofmapping)
     return
 end
 
