@@ -379,6 +379,12 @@ function _add_cell_coupling_entries!(
     )
     isempty(cells) && return sp
     ncells = getncells(get_grid(dh))
+    # CellCache construction requires a SubDofHandler; fail like the per-cell check would
+    if isempty(dh.subdofhandlers)
+        cellid = first(cells)
+        1 <= cellid <= ncells || error("cell index $cellid is out of bounds (the grid has $ncells cells)")
+        error("cell $cellid does not belong to any SubDofHandler")
+    end
     # Layout metadata is computed for each SubDofHandler on first encounter
     layout_infos = Vector{Union{Nothing, LocalLayoutInfo}}(nothing, length(dh.subdofhandlers))
     cc = CellCache(dh, UpdateFlags(nodes = false, coords = false, dofs = true))

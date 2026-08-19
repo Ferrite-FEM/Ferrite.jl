@@ -63,11 +63,26 @@ _index_space(::Type{SymmetricTensor{2, dim}}) where {dim} = _checked_dims(Symmet
 _index_space(::Type{Tensor{4, dim}}) where {dim} = _checked_dims(Tensor{4, dim}, dim, 4)
 _index_space(::Type{SymmetricTensor{4, dim}}) where {dim} = _checked_dims(SymmetricTensor{4, dim}, dim, 4)
 function _index_space(::Type{V}) where {V}
-    if V isa Type && V <: AbstractTensor && isconcretetype(V)
-        error(
-            "AlgebraicVariable value shapes must not fix the coefficient scalar type: " *
-                "use e.g. `AlgebraicVariable{$(V.name.wrapper){$(join(V.parameters[1:2], ", "))}}()` instead of `AlgebraicVariable{$(V)}()`."
-        )
+    if V isa Type && V <: AbstractTensor
+        params = Base.unwrap_unionall(V).parameters
+        if length(params) >= 3 && params[1] isa Int && params[2] isa Int && !(params[3] isa TypeVar)
+            order, dim = params[1], params[2]
+            # Suggest the corresponding free-scalar spelling, but only if that spelling is
+            # itself a supported shape (order-1 tensors are only supported as `Vec`)
+            shape = if order == 1 && !(V <: SymmetricTensor)
+                "Vec{$dim}"
+            elseif order == 2 || order == 4
+                "$(nameof(V)){$order, $dim}"
+            else
+                nothing
+            end
+            if shape !== nothing
+                error(
+                    "AlgebraicVariable value shapes must not fix the coefficient scalar type: " *
+                        "use `AlgebraicVariable{$(shape)}()` instead of `AlgebraicVariable{$(V)}()`."
+                )
+            end
+        end
     end
     error(
         "unsupported value shape `$(V)` for AlgebraicVariable. Supported shapes are " *
