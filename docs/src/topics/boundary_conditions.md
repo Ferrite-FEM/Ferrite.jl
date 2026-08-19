@@ -335,6 +335,10 @@ apply_analytical!(u, dh, :p, x -> ρ * g * x[2])
 
 See also [Transient heat equation](@ref tutorial-transient-heat-equation) for one example.
 
+For fields with H(div) or H(curl) interpolations (e.g. `RaviartThomas` and `Nedelec`),
+whose degrees of freedom are not nodal function values, use the projection-based
+[`project_analytical!`](@ref) instead.
+
 !!! note "Consistency"
     `apply_analytical!` does not enforce consistency of the applied solution with the system
     of equations. Some problems, like for example differential-algebraic systems of

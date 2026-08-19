@@ -44,6 +44,7 @@ export
     shape_curl,
     function_value,
     function_gradient,
+    function_hessian,
     function_symmetric_gradient,
     function_divergence,
     function_curl,
@@ -134,6 +135,7 @@ export
     DofOrder,
     evaluate_at_grid_nodes,
     apply_analytical!,
+    project_analytical!,
 
     # Sparsity pattern
     # AbstractSparsityPattern,

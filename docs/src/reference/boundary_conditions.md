@@ -13,6 +13,7 @@ ConstraintHandler
 Dirichlet
 ProjectedDirichlet
 PeriodicDirichlet
+AffineConstraint
 collect_periodic_facets
 collect_periodic_facets!
 add!
@@ -31,4 +32,5 @@ Ferrite.RHSData
 
 ```@docs
 apply_analytical!
+project_analytical!
 ```

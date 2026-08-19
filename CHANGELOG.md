@@ -91,6 +91,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    Vincent, 2015). This is the same family of rules already used for `RefPrism` and
    `RefPyramid`, and extends tetrahedral quadrature beyond the previous maximum order 5 of
    the Keast rules. ([#1389])
+ - `function_hessian` is now exported (`shape_hessian` already was). ([#1394])
+ - New function `project_analytical!`: the projection-based counterpart to `apply_analytical!`
+   for interpolations whose dofs are not nodal function values, currently H(div)
+   (`RaviartThomas`, `BrezziDouglasMarini`) and 2D H(curl) (`Nedelec`) interpolations. The dof
+   values are determined by L2 projection of the analytical function's normal/tangential trace
+   on each facet (the same projection as `ProjectedDirichlet`), followed by a cell-local L2 fit
+   for interior dofs. The keyword `qr_order` allows overriding the default quadrature order.
+   ([#1394])
  - New interpolations `Lagrange{RefTetrahedron, 3}`, `Lagrange{RefTetrahedron, 4}` and
    `Lagrange{RefHexahedron, 3}`. ([#1343])
  - Dof distribution now supports interpolations with multiple nodal dofs on faces shared
@@ -169,6 +177,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    threw an error. ([#1434])
  - `show` of a `PointEvalHandler` for which no points were found no longer throws.
    ([#1434])
+ - `evaluate_at_grid_nodes` (and thus `write_solution`) now returns correct values for
+   interpolations with non-identity mappings by calling `reinit!` internally. ([#1394])
+ - `Dirichlet` conditions on a nodeset and `PeriodicDirichlet` now throw an error for
+   interpolations they are not implemented for yet (e.g. `Nedelec` and `RaviartThomas`,
+   whose dofs are not nodal function values) instead of silently computing wrong values.
+   `apply_analytical!` does the same, referring to the new `project_analytical!` for
+   H(div)/H(curl) interpolations. ([#1394])
 
 ### Performance
  - The point search in `PointEvalHandler` no longer searches candidate cells more than once
@@ -1396,6 +1411,7 @@ poking into Ferrite internals:
 [#1388]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1388
 [#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
 [#1393]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1393
+[#1394]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1394
 [#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414
 [#1415]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1415
 [#1417]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1417
