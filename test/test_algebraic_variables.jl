@@ -104,7 +104,7 @@ end
     add!(dh, :u, Lagrange{RefQuadrilateral, 1}())
     add!(dh, :p0, AlgebraicVariable())
     close!(dh)
-    @test Ferrite.has_algebraic_variables(dh)
+    @test Ferrite._find_algebraic_variable(dh, :p0) !== nothing
     # The descriptor owns its entity set: mutating the input set afterwards has no effect
     myset = OrderedCollections.OrderedSet{FacetIndex}(getfacetset(grid, "right"))
     cpl = FacetCoupling(myset; algebraic_coupling = ((:u, :p0),))

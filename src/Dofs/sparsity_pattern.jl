@@ -351,19 +351,14 @@ function add_sparsity_entries!(
         error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
     end
     _check_coupling_kwarg(coupling)
+    keep_constrained || _check_keep_constrained_args(dh, ch)
     # Add all entries
     add_diagonal_entries!(sp)
-    add_cell_entries!(sp, dh, ch; keep_constrained, coupling)
+    _add_cell_entries!(sp, dh, ch, keep_constrained, _coupling_to_local_dof_coupling(dh, coupling))
     if interface_coupling !== nothing
         add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
     end
-    # Coupling descriptor entries must be added before the constraint entries since
-    # constraint expansion depends on all pre-existing structural entries.
-    _add_algebraic_coupling_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
-    if ch !== nothing
-        add_constraint_entries!(sp, ch; keep_constrained)
-    end
-    return sp
+    return _add_post_cell_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
 end
 
 # Specialized method for the concrete SparsityPattern.
@@ -399,6 +394,16 @@ function add_sparsity_entries!(
     end
     oldbuffer = isempty(sp.buffer.data) ? nothing : sp.buffer
     _build_pattern!(sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings; oldbuffer)
+    return _add_post_cell_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
+end
+
+# Layers applied after the cell entries, shared by the add_sparsity_entries! methods.
+# Coupling descriptor entries must be added before the constraint entries since constraint
+# expansion depends on all pre-existing structural entries.
+function _add_post_cell_entries!(
+        sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
+        @nospecialize(algebraic_couplings), keep_constrained::Bool,
+    )
     _add_algebraic_coupling_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
     ch !== nothing && add_constraint_entries!(sp, ch; keep_constrained)
     return sp
@@ -468,7 +473,7 @@ end
 
 # Argument checking for methods with `keep_constrained = false`
 function _check_keep_constrained_args(dh::DofHandler, ch::Union{ConstraintHandler, Nothing})
-    ch === nothing && error("must pass ConstraintHandler when `keep_constrained = true`")
+    ch === nothing && error("must pass ConstraintHandler when `keep_constrained = false`")
     isclosed(ch) || error("the ConstraintHandler must be closed")
     ch.dh === dh || error("the DofHandler and the ConstraintHandler's DofHandler must be the same")
     return

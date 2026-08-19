@@ -201,8 +201,9 @@ DofOrder.ComponentWise
 
 function compute_renumber_permutation(dh::DofHandler, _, order::DofOrder.ComponentWise)
     # Note: This assumes fields have the same dimension regardless of subdomain
-    field_dims = map(fieldname -> n_components(dh, fieldname), dh.field_names)
     combined_dims = _combined_variable_dims(dh)
+    # Spatial-field components form the prefix; algebraic components follow
+    field_dims = combined_dims[1:length(dh.field_names)]
     target_blocks = if isempty(order.target_blocks)
         collect(Int, 1:sum(combined_dims; init = 0))
     else

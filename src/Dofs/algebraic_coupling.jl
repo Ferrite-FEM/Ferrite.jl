@@ -282,7 +282,6 @@ end
 # Normalize the `algebraic_couplings` keyword (a single descriptor, a named tuple, or any
 # other iterable) to an iterable of descriptors; the caller validates the elements.
 _iterate_algebraic_couplings(c::AbstractCoupling) = (c,)
-_iterate_algebraic_couplings(cs::NamedTuple) = values(cs)
 function _iterate_algebraic_couplings(cs)
     if !applicable(Base.iterate, cs)
         error("cannot interpret `algebraic_couplings = $(repr(cs))`: expected coupling descriptors (`CellCoupling`, `FacetCoupling`, `AlgebraicCoupling`) or an iterable of them")
@@ -336,11 +335,7 @@ function add_coupling_entries!(
     if getnrows(sp) < ndofs(dh) || getncols(sp) < ndofs(dh)
         error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
     end
-    if !keep_constrained
-        ch === nothing && error("must pass ConstraintHandler when `keep_constrained = false`")
-        isclosed(ch) || error("the ConstraintHandler must be closed")
-        ch.dh === dh || error("the DofHandler and the ConstraintHandler's DofHandler must be the same")
-    end
+    keep_constrained || _check_keep_constrained_args(dh, ch)
     return _add_coupling_entries!(sp, dh, coupling, ch, keep_constrained)
 end
 

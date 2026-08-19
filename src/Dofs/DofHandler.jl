@@ -312,21 +312,16 @@ n_components(dh::DofHandler, name::Symbol) = n_components(dh, find_field(dh, nam
 # Algebraic variables #
 #######################
 
-# Other AbstractDofHandler implementations do not support algebraic variables.
-has_algebraic_variables(dh::DofHandler) = !isempty(dh.algebraic_names)
-has_algebraic_variables(::AbstractDofHandler) = false
-
-_is_algebraic_variable_name(dh::DofHandler, name::Symbol) = name in dh.algebraic_names
-_is_algebraic_variable_name(::AbstractDofHandler, ::Symbol) = false
-
-# Index of the algebraic variable `name` in the registries, or `nothing`.
+# Index of the algebraic variable `name` in the registries, or `nothing`. Other
+# AbstractDofHandler implementations do not support algebraic variables.
 function _find_algebraic_variable(dh::DofHandler, name::Symbol)
     return findfirst(x -> x === name, dh.algebraic_names)
 end
+_find_algebraic_variable(::AbstractDofHandler, ::Symbol) = nothing
 
 # Throw if `name` is an algebraic variable, for operations that require a spatial field.
 function _check_not_algebraic_variable(dh::AbstractDofHandler, name::Symbol, what::String)
-    if _is_algebraic_variable_name(dh, name)
+    if _find_algebraic_variable(dh, name) !== nothing
         error(
             ":$name is an algebraic variable, not a spatial field, and $what requires a spatial field. " *
                 "Algebraic variables are accessed with e.g. `algebraic_dofs(dh, :$name)` and `algebraic_value(dh, a, :$name)`."
