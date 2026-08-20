@@ -9,11 +9,19 @@ function checkquadpoint(fe_v::AbstractValues, qp::Int)
     return nothing
 end
 
+# Whether apply_mapping! for the given mapping requires the cell as input, e.g. to look up
+# the orientation of entities. Defaults to true as the safe option for new mappings.
+mapping_needs_cell(::Any) = true
+mapping_needs_cell(::IdentityMapping) = false
+
+# Same as mapping_needs_cell, but for apply_dof_transformation!.
+dof_transformation_needs_cell(::Any) = true
+dof_transformation_needs_cell(::NoDofTransformation) = false
+dof_transformation_needs_cell(::DiagonalDofTransformation) = false # J suffices (its sign handles the orientation)
+
 @inline function reinit_needs_cell(fe_values::AbstractValues)
-    # TODO: Might need better logic for this, but for current implementations this
-    # is ok. If someone implements a non-identity mapping that doesn't require the cell
-    # as input, this is only a slight performance issue in some cases.
-    return !isa(mapping_type(get_fun_values(fe_values)), IdentityMapping)
+    fv = get_fun_values(fe_values)
+    return mapping_needs_cell(mapping_type(fv)) || dof_transformation_needs_cell(dof_transformation(fv))
 end
 
 @noinline function throw_incompatible_dof_length(length_ue, n_base_funcs)
@@ -48,14 +56,21 @@ function ValuesUpdateFlags(
         ip_fun::Interpolation, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
     ) where {update_gradients, update_hessians, update_detJdV}
     FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
-    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), update_detJdV)
+    GeoDiffOrder = max(
+        required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder),
+        required_geo_diff_order(dof_transformation(ip_fun)),
+        update_detJdV,
+    )
     return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
 end
 function ValuesUpdateFlags( # For MultiFieldCellValues
         ip_fun::NamedTuple, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
     ) where {update_gradients, update_hessians, update_detJdV}
     FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
-    GeoDiffOrder = max(maximum(ip -> required_geo_diff_order(mapping_type(ip), FunDiffOrder), ip_fun), update_detJdV)
+    GeoDiffOrder = max(
+        maximum(ip -> max(required_geo_diff_order(mapping_type(ip), FunDiffOrder), required_geo_diff_order(dof_transformation(ip))), ip_fun),
+        update_detJdV,
+    )
     return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
 end
 
@@ -68,7 +83,8 @@ end
 Update the `CellValues`, `MultiFieldCellValues`, or `FacetValues` object for a cell or
 facet with cell coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
-For interpolations with non-identity mappings, the current `cell` is also required.
+For interpolations whose mapping requires it (e.g. the Piola mappings), the current `cell`
+is also required.
 """
 reinit!
 
