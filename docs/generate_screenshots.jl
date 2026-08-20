@@ -39,6 +39,7 @@ const EXAMPLES = Dict(
     "stokes-flow" => "literate-tutorials/stokes-flow.jl",
     "computational_homogenization" => "literate-tutorials/computational_homogenization.jl",
     "linear_shell" => "literate-tutorials/linear_shell.jl",
+    "euler_bernoulli_beam" => "literate-tutorials/euler_bernoulli_beam.jl",
     # Time-stepping examples rendered as animations (write a .pvd collection).
     "transient_heat" => "literate-tutorials/transient_heat_equation.jl",
     "elastodynamics" => "literate-tutorials/elastodynamics.jl",
@@ -52,11 +53,27 @@ const EXAMPLES = Dict(
     "topology_optimization" => "literate-gallery/topology_optimization.jl",
 )
 
+# Examples plotted with Plots.jl instead of ParaView: their POSTRUN hook writes
+# the -light/-dark variants itself and they are excluded from the pvbatch call.
+const JULIA_RENDERED = Set(["euler_bernoulli_beam"])
+
 # Extra code evaluated in the example's module after running it, e.g. to
 # re-run at a finer mesh resolution for a smoother figure than the (cheap)
 # default the example uses.
 const POSTRUN = Dict(
     "stokes-flow" => :(main(0.02)),
+    "euler_bernoulli_beam" => quote
+        for (variant, fg) in (("light", "#000000"), ("dark", "#e5e5e5"))
+            thumb = Plots.plot(
+                x_fe, w_fe; label = "FE solution", color = 1, linewidth = 2,
+                foreground_color = fg, background_color = :transparent, size = (800, 600),
+            )
+            Plots.plot!(thumb, w_ana; xlims = (0, L), label = "analytic", color = fg, linestyle = :dash)
+            Plots.scatter!(thumb, node_x, evaluate_at_grid_nodes(dh, u, :w); label = "nodal values", color = 1)
+            Plots.plot!(thumb; xlabel = "x", ylabel = "deflection w", legend = :topleft)
+            Plots.savefig(thumb, joinpath($(joinpath(@__DIR__, "screenshot-assets")), "euler_bernoulli_beam-$variant.png"))
+        end
+    end,
 )
 
 # Output file basenames (before the -light/-dark suffix) each scene renders;
@@ -111,6 +128,16 @@ render_only = "--render-only" in ARGS
 selected = filter(a -> !startswith(a, "--"), ARGS)
 isempty(selected) && (selected = collect(keys(EXAMPLES)))
 
+# Julia-rendered examples have no data files to re-render from: skip them with
+# --render-only (also excludes them from --upload, which would upload stale files).
+if render_only
+    skipped = filter(in(JULIA_RENDERED), selected)
+    if !isempty(skipped)
+        @warn "--render-only skips Julia-rendered examples: $(join(skipped, ", "))"
+        filter!(!in(JULIA_RENDERED), selected)
+    end
+end
+
 mkpath(DATADIR)
 mkpath(OUTDIR)
 
@@ -128,7 +155,10 @@ if !render_only
     end
 end
 
-run(`pvbatch $(joinpath(DOCS, "screenshots.py")) $DATADIR $OUTDIR $selected`)
+pv_selected = filter(!in(JULIA_RENDERED), selected)
+if !isempty(pv_selected)
+    run(`pvbatch $(joinpath(DOCS, "screenshots.py")) $DATADIR $OUTDIR $pv_selected`)
+end
 @info "screenshots written to $OUTDIR"
 
 if "--upload" in ARGS

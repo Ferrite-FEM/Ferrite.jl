@@ -35,7 +35,7 @@ fetch_assets(
                 "heat_equation", "linear_elasticity", "incompressible_elasticity",
                 "hyperelasticity", "plasticity", "computational_homogenization",
                 "stokes-flow", "dg_heat_equation", "linear_shell",
-                "linear_elasticity_stress", "elastodynamics_modes",
+                "linear_elasticity_stress", "elastodynamics_modes", "euler_bernoulli_beam",
             ], ".png"
         ),
         variants(["transient_heat", "elastodynamics", "porous_media", "ns_vs_diffeq", "reactive_surface"], ".webp"),
