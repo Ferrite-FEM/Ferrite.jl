@@ -225,8 +225,7 @@ function _build_pattern!(
         couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing,
         isconstrained::Union{Nothing, Vector{Bool}} = nothing,
         neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
-        interface_couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing;
-        fill_interfaces::Bool = false,
+        interface_couplings::Union{Nothing, Matrix{Matrix{Bool}}} = nothing;
         oldbuffer::Union{Nothing, ConstructionBuffer{Int, 1}} = nothing,
     )
     nrows = getnrows(sp)
@@ -246,9 +245,7 @@ function _build_pattern!(
     buffer = _presize_buffer(rowlen, sp.buffer.sizehint)
     _visit_row_candidates_chunked!(
         rowlen, buffer.data, buffer.indices, getncols(sp), row_to_cells, row_to_localidx, cell_dofs,
-        cell_to_sdh, couplings, isconstrained,
-        fill_interfaces ? neighbor_cells : nothing, fill_interfaces ? interface_couplings : nothing,
-        oldbuffer
+        cell_to_sdh, couplings, isconstrained, neighbor_cells, interface_couplings, oldbuffer
     )
     sp.buffer = buffer
     sp.sorted = false
@@ -358,11 +355,10 @@ end
 
 # Specialized method for the concrete SparsityPattern.
 # This builds the pattern in bulk: cell entries (including the diagonal, respecting
-# `coupling` and `keep_constrained`) and any pre-existing entries are exactly counted, the
-# buffer is presized in one allocation, and rows are filled with a marker-dedup append.
-# Interface entries (interface_coupling) are reserved for (and, when the enumeration is
-# exact, filled by) the same passes; otherwise they and the constraints layer on afterwards
-# through add_entry!.
+# `coupling` and `keep_constrained`), interface entries (interface_coupling), and any
+# pre-existing entries are exactly counted, the buffer is presized in one allocation, and
+# rows are filled with a marker-dedup append. Only the constraint entries layer on
+# afterwards through add_entry!.
 function add_sparsity_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
         keep_constrained::Bool = true,
@@ -374,13 +370,9 @@ function add_sparsity_entries!(
     if getnrows(sp) < ndofs(dh) || getncols(sp) < ndofs(dh)
         error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
     end
-    interfaces_filled = false
     keep_constrained || _check_keep_constrained_args(dh, ch)
     couplings = _coupling_to_local_dof_coupling(dh, coupling)
     isconstrained = keep_constrained ? nothing : _isconstrained_by_dof(ch, getnrows(sp))
-    # With interface entries coming (added below), reserve row space for them up front so
-    # they land in place instead of relocating rows. When the reservation enumeration is
-    # provably exact it doubles as the insertion itself (see _visit_row_candidates!).
     if interface_coupling === nothing
         neighbor_cells = interface_couplings = nothing
     else
@@ -388,15 +380,10 @@ function add_sparsity_entries!(
             topology = ExclusiveTopology(get_grid(dh))
         end
         neighbor_cells = create_cell_to_neighbors(dh.grid, topology)
-        interface_couplings = _coupling_to_local_dof_coupling(dh, interface_coupling)
-        interfaces_filled = _can_fill_interfaces_directly(dh)
+        interface_couplings = _interface_coupling_to_local_dof_couplings(dh, interface_coupling)
     end
     oldbuffer = isempty(sp.buffer.data) ? nothing : sp.buffer
-    _build_pattern!(
-        sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings;
-        fill_interfaces = interfaces_filled, oldbuffer
-    )
-    interface_coupling !== nothing && !interfaces_filled && add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
+    _build_pattern!(sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings; oldbuffer)
     ch !== nothing && add_constraint_entries!(sp, ch; keep_constrained)
     return sp
 end
@@ -442,14 +429,6 @@ function _check_keep_constrained_args(dh::DofHandler, ch::Union{ConstraintHandle
     isclosed(ch) || error("the ConstraintHandler must be closed")
     ch.dh === dh || error("the DofHandler and the ConstraintHandler's DofHandler must be the same")
     return
-end
-
-# For now the counting passes cannot fill interface entries directly with multiple SubDofHandlers (the expanded
-# coupling masks are per-sdh and do not apply to a neighbor with a different dof layout);
-# the enumeration still (over)counts cross-sdh neighbors so the reservation covers what
-# add_interface_entries! inserts afterwards.
-function _can_fill_interfaces_directly(dh::DofHandler)
-    return length(dh.subdofhandlers) == 1
 end
 
 # Boolean mask for whether the row is constrained or not
@@ -651,6 +630,22 @@ function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatri
     ]
 end
 
+# Expand the interface coupling to one rectangular mask per (SubDofHandler, SubDofHandler)
+# pair: entry (k, l) has rows in sdh k's local dof layout and columns in sdh l's, so the
+# candidate walk can gate a facet neighbor in any subdofhandler (the diagonal entries are
+# the square per-sdh masks used for the same-side blocks). As above, nothing/full masks
+# normalize to `nothing` = no restriction.
+_interface_coupling_to_local_dof_couplings(::DofHandler, ::Nothing) = nothing
+function _interface_coupling_to_local_dof_couplings(dh::DofHandler, coupling::AbstractMatrix{Bool})
+    _check_coupling_dims(dh, coupling)
+    all(coupling) && return nothing
+    sdhs = dh.subdofhandlers
+    return Matrix{Bool}[
+        _coupling_to_local_dof_coupling(dh, coupling, sdh_row, sdh_col)
+            for sdh_row in sdhs, sdh_col in sdhs
+    ]
+end
+
 # Compute a rectangular coupling matrix of size
 # (ndofs_per_cell(sdh_row) × ndofs_per_cell(sdh_col)) where the rows are local dof indices
 # in `sdh_row`'s layout and the columns local dof indices in `sdh_col`'s layout. With
@@ -822,7 +817,6 @@ function _add_interface_entries!(
         # TODO: This looks like it can be optimized for the common case where
         #       the cells are in the same subdofhandler
         sdhs_idx = dh.cell_to_subdofhandler[cellid.([ic.a, ic.b])]
-        sdhs = dh.subdofhandlers[sdhs_idx]
         # An interface integral is assembled over the stacked dof vector
         # [dofs(ic.a); dofs(ic.b)] and its local matrix can be dense within every field
         # block allowed by the mask (including the same-side blocks, since jump/average
@@ -835,8 +829,11 @@ function _add_interface_entries!(
         # produced by the cell pass, or by neighboring interfaces, are deduplicated by
         # `add_entry!`.
         for row_i in 1:2, col_i in 1:2
-            sdh = sdhs[row_i]
-            sdh2 = sdhs[col_i]
+            # A cell not covered by any subdofhandler has no dofs and contributes no
+            # pairs; the other side's same-side combination is still added.
+            (sdhs_idx[row_i] == 0 || sdhs_idx[col_i] == 0) && continue
+            sdh = dh.subdofhandlers[sdhs_idx[row_i]]
+            sdh2 = dh.subdofhandlers[sdhs_idx[col_i]]
             row_dofs = celldofs(row_i == 1 ? ic.a : ic.b)
             col_dofs = celldofs(col_i == 1 ? ic.a : ic.b)
             coupling_sdh = get!(couplings, (sdhs_idx[row_i], sdhs_idx[col_i])) do
@@ -1065,7 +1062,7 @@ function _visit_row_candidates_chunked!(
         ncols::Int, row_to_cells::ArrayOfVectorViews, row_to_localidx::Union{Nothing, ArrayOfVectorViews},
         cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
         couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
-        neighbor_cells::Union{Nothing, ArrayOfVectorViews}, interface_couplings::Union{Nothing, Vector{Matrix{Bool}}},
+        neighbor_cells::Union{Nothing, ArrayOfVectorViews}, interface_couplings::Union{Nothing, Matrix{Matrix{Bool}}},
         oldbuffer::Union{Nothing, ConstructionBuffer{Int, 1}} = nothing,
     )
     @sync for rowrange in _task_chunks(length(rowlen))
@@ -1092,7 +1089,7 @@ function _visit_row_candidates!(
         cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
         couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
         neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
-        interface_couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing,
+        interface_couplings::Union{Nothing, Matrix{Matrix{Bool}}} = nothing,
         oldbuffer::Union{Nothing, ConstructionBuffer{Int, 1}} = nothing,
     )
     counting = data === nothing
@@ -1135,15 +1132,14 @@ function _visit_row_candidates!(
                 dofs = cell_dofs[cnr]
                 mask = couplings === nothing ? nothing : couplings[cell_to_sdh[cnr]]
                 # Same-side interface blocks: for a cell that participates in an interface,
-                # add_interface_entries! also inserts the pairs the interface mask allows
-                # within the cell itself, where `interface_couplings === nothing` means no
-                # restriction (nothing/full mask), i.e. every pair. The own cell is always in
-                # its own subdofhandler, so the square mask applies even with multiple
-                # subdofhandlers. A candidate therefore passes if either the cell coupling or
-                # the interface coupling allows it.
+                # interface_coupling also allows pairs within the cell itself, where
+                # `interface_couplings === nothing` means no restriction (nothing/full
+                # mask), i.e. every pair. The own cell pairs rows and columns in the same
+                # layout, so the diagonal (square) mask applies. A candidate therefore
+                # passes if either the cell coupling or the interface coupling allows it.
                 on_interface = neighbor_cells !== nothing && !isempty(neighbor_cells[cnr])
                 imask = on_interface && interface_couplings !== nothing ?
-                    interface_couplings[cell_to_sdh[cnr]] : nothing
+                    interface_couplings[cell_to_sdh[cnr], cell_to_sdh[cnr]] : nothing
                 li = lidxs === nothing ? 0 : lidxs[k]
                 for j in 1:length(dofs)
                     mask === nothing || mask[li, j] || (on_interface && (imask === nothing || imask[li, j])) || continue
@@ -1156,32 +1152,28 @@ function _visit_row_candidates!(
                     end
                 end
             end
-            # Interface entries, cross blocks: visit the dofs of facet-neighbor cells, filtered
-            # by the expanded interface_coupling mask. add_interface_entries! inserts (row, col)
-            # across an interface iff the mask couples them with the row cell as the test
-            # (first) index -- exactly `imask[li, j]` seen from this row; both orientations of
-            # every interface are covered here because every row visits all facet-neighbors of
-            # all its cells (the same-side blocks are covered by the own-cell loop above). For a
-            # neighbor in a different subdofhandler the square mask's local indices do not apply
-            # (other layout, possibly other size), so all of its dofs are counted unmasked -- a
-            # deliberate over-count that only costs reservation slack (the direct fill is gated
-            # to a single subdofhandler by _can_fill_interfaces_directly). In the count pass this
-            # reserves what add_interface_entries! inserts (loose only under the unmasked
-            # cross-sdh fallback); over-reservation only leaves slack, never wrong entries. The
-            # fill pass receives `neighbor_cells` only when the enumeration is provably exact
-            # (see _can_fill_interfaces_directly), in which case the interface entries are
-            # emitted here directly and add_interface_entries! is skipped.
+            # Interface entries, cross blocks: visit the dofs of facet-neighbor cells,
+            # filtered by the expanded interface_coupling mask. The interface coupling
+            # allows (row, col) across an interface iff the mask couples them with the row
+            # cell as the test (first) index -- exactly `imask[li, j]` seen from this row,
+            # where the rectangular per-(sdh, sdh) expansion pairs the row cell's local
+            # layout with the neighbor's, so the lookup is well-defined for a neighbor in
+            # any subdofhandler; both orientations of every interface are covered here
+            # because every row visits all facet-neighbors of all its cells (the same-side
+            # blocks are covered by the own-cell loop above). This enumerates the interface
+            # entries exactly, so the count pass reserves and the fill pass inserts them
+            # here directly.
             if neighbor_cells !== nothing
                 for k in 1:length(cells)
                     cnr = cells[k]
                     li = lidxs === nothing ? 0 : lidxs[k]
                     for nbc in neighbor_cells[cnr]
+                        # A neighbor not covered by any subdofhandler has no dofs (and no
+                        # mask entry): nothing to add
+                        cell_to_sdh[nbc] == 0 && continue
                         nbdofs = cell_dofs[nbc]
-                        imask = if interface_couplings !== nothing && cell_to_sdh[nbc] == cell_to_sdh[cnr]
-                            interface_couplings[cell_to_sdh[cnr]]
-                        else
-                            nothing
-                        end
+                        imask = interface_couplings === nothing ? nothing :
+                            interface_couplings[cell_to_sdh[cnr], cell_to_sdh[nbc]]
                         for j in 1:length(nbdofs)
                             imask === nothing || imask[li, j] || continue
                             col = nbdofs[j]
