@@ -192,6 +192,7 @@ mutable struct InterfaceCache{FC <: FacetCache}
     const dofs::Vector{Int}               # stacked layout: [celldofs(a); celldofs(b)]
     const unique_dofs::Vector{Int}        # first-occurrence order: celldofs(a) ++ (b-only)
     const stacked_to_unique::Vector{Int}  # length(dofs): stacked index -> unique index
+    unique_map_valid::Bool                # unique_dofs/stacked_to_unique/any_shared current?
     any_shared::Bool                      # length(unique_dofs) != length(dofs)
     sdh_index_a::Int                      # SubDofHandler index of each side, 0 if unknown
     sdh_index_b::Int
@@ -200,7 +201,7 @@ end
 function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler})
     fc_a = FacetCache(gridordh)
     fc_b = FacetCache(gridordh)
-    return InterfaceCache(fc_a, fc_b, Int[], Int[], Int[], false, 0, 0)
+    return InterfaceCache(fc_a, fc_b, Int[], Int[], Int[], false, false, 0, 0)
 end
 
 # The DofHandler backing the cache (`nothing` for grid-only caches)
@@ -217,12 +218,43 @@ function reinit!(cache::InterfaceCache, facet_a::BoundaryIndex, facet_b::Boundar
     n_a = length(dofs_a)
     n_b = length(dofs_b)
     resize!(cache.dofs, n_a + n_b)
+    for (i, d) in pairs(dofs_a)
+        cache.dofs[i] = d
+    end
+    for (i, d) in pairs(dofs_b)
+        cache.dofs[n_a + i] = d
+    end
+    # The stacked -> unique dof map is built lazily by the accessors that need it
+    # (unique_interfacedofs, nunique_interface_dofs, condense_interface!, ...), so that
+    # loops which never use it -- e.g. existing raw discontinuous-Galerkin assembly and
+    # the sparsity pattern construction -- do not pay for building it.
+    cache.unique_map_valid = false
+    # Record which SubDofHandler each side belongs to (0 when constructed from a Grid or
+    # when the DofHandler is not defined on the cell)
+    dh = _interface_dofhandler(cache)
+    if dh === nothing
+        cache.sdh_index_a = 0
+        cache.sdh_index_b = 0
+    else
+        cache.sdh_index_a = dh.cell_to_subdofhandler[cellid(cache.a)]
+        cache.sdh_index_b = dh.cell_to_subdofhandler[cellid(cache.b)]
+    end
+    return cache
+end
+
+# Build unique_dofs / stacked_to_unique / any_shared for the current interface, at most
+# once per reinit!.
+function _ensure_unique_interface_map!(cache::InterfaceCache)
+    cache.unique_map_valid && return cache
+    dofs_a = celldofs(cache.a)
+    dofs_b = celldofs(cache.b)
+    n_a = length(dofs_a)
+    n_b = length(dofs_b)
     resize!(cache.unique_dofs, n_a + n_b)
     resize!(cache.stacked_to_unique, n_a + n_b)
     # Here side: first-occurrence ordering makes this an identity prefix
-    for (i, d) in pairs(dofs_a)
-        cache.dofs[i] = d
-        cache.unique_dofs[i] = d
+    for i in 1:n_a
+        cache.unique_dofs[i] = dofs_a[i]
         cache.stacked_to_unique[i] = i
     end
     # There side: dedup against the here side by actual global dof equality (each side is
@@ -232,7 +264,6 @@ function reinit!(cache::InterfaceCache, facet_a::BoundaryIndex, facet_b::Boundar
     # nonconforming interpolations such as `CrouzeixRaviart` share facet dofs too.
     n_unique = n_a
     for (i, d) in pairs(dofs_b)
-        cache.dofs[n_a + i] = d
         shared_at = 0
         for j in 1:n_a
             if dofs_a[j] == d
@@ -250,16 +281,7 @@ function reinit!(cache::InterfaceCache, facet_a::BoundaryIndex, facet_b::Boundar
     end
     resize!(cache.unique_dofs, n_unique)
     cache.any_shared = n_unique != n_a + n_b
-    # Record which SubDofHandler each side belongs to (0 when constructed from a Grid or
-    # when the DofHandler is not defined on the cell)
-    dh = _interface_dofhandler(cache)
-    if dh === nothing
-        cache.sdh_index_a = 0
-        cache.sdh_index_b = 0
-    else
-        cache.sdh_index_a = dh.cell_to_subdofhandler[cellid(cache.a)]
-        cache.sdh_index_b = dh.cell_to_subdofhandler[cellid(cache.b)]
-    end
+    cache.unique_map_valid = true
     return cache
 end
 
@@ -293,18 +315,24 @@ interfacedofs(ic::InterfaceCache) = ic.dofs
 
 Return the duplicate-free global dof ids of the interface, ordered by first occurrence in
 [`interfacedofs`](@ref) (i.e. `celldofs(ic.a)` followed by the dofs unique to
-`celldofs(ic.b)`).
+`celldofs(ic.b)`). When no dof is shared between the two cells this is `interfacedofs(ic)`
+itself (the identical vector).
 
-The returned vector is borrowed cache storage, valid until the next `reinit!` of the cache.
+Valid after `reinit!` of the cache; the first call after a `reinit!` builds the
+stacked-to-unique dof map. The returned vector is borrowed cache storage, valid until the
+next `reinit!`.
 """
-unique_interfacedofs(ic::InterfaceCache) = ic.unique_dofs
+function unique_interfacedofs(ic::InterfaceCache)
+    _ensure_unique_interface_map!(ic)
+    return ic.any_shared ? ic.unique_dofs : ic.dofs
+end
 
 """
     nstacked_interface_dofs(ic::InterfaceCache) -> Int
 
 Return the size of the *stacked* interface dof layout, `length(interfacedofs(ic))`. This is
 the size of the local matrix/vector that interface kernels fill, matching the number of
-basis functions of [`InterfaceValues`](@ref). See also
+basis functions of [`InterfaceValues`](@ref). Valid after `reinit!` of the cache. See also
 [`nunique_interface_dofs`](@ref), [`max_nstacked_interface_dofs`](@ref).
 """
 nstacked_interface_dofs(ic::InterfaceCache) = length(ic.dofs)
@@ -316,15 +344,21 @@ Return the number of unique global dofs of the interface,
 `length(unique_interfacedofs(ic))`. This is the size of the condensed system scattered by
 `assemble!`. Equal to [`nstacked_interface_dofs`](@ref) when no dof is shared between the
 two cells.
+
+Valid after `reinit!` of the cache; the first call after a `reinit!` builds the
+stacked-to-unique dof map.
 """
-nunique_interface_dofs(ic::InterfaceCache) = length(ic.unique_dofs)
+function nunique_interface_dofs(ic::InterfaceCache)
+    _ensure_unique_interface_map!(ic)
+    return length(ic.unique_dofs)
+end
 
 """
     is_shared(ic::InterfaceCache, i::Int) -> Bool
 
 Return whether the dof at stacked index `i` (cf. [`interfacedofs`](@ref)) is also carried
-by the cell on the other side of the interface. Intended for checks and tests, not for hot
-loops.
+by the cell on the other side of the interface. Valid after `reinit!` of the cache.
+Intended for checks and tests, not for hot loops.
 """
 function is_shared(ic::InterfaceCache, i::Int)
     d = ic.dofs[i]

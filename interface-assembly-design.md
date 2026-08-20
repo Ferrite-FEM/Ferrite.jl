@@ -6,12 +6,21 @@ between the two neighboring cells.
 
 **Revision status.** This is the post-review revision. The previous draft (published as a
 [gist](https://gist.github.com/fredrikekre/c8e251895240eaac24cef71c4b107ff8)) presented four
-options (A / B / B′ / C) and recommended B′; the external review
-(`INTERFACE_ASSEMBLY_DESIGN_REVIEW.md`, 2026-08-19) requested substantial changes. This
-revision adopts the review's correctness blockers in full and lands on **revised Option B as
-v1** — stacked kernels, condensation at an explicit boundary that leaves the assemblers
-untouched — with **Option C as an opt-in v2**. A and B′ are recorded as rejected in the
-appendix, and the review's decision checklist is answered at the end.
+options (A / B / B′ / C) and recommended B′; the external design review (2026-08-19)
+requested substantial changes. This revision adopts the review's correctness blockers in
+full and lands on **revised Option B as v1** — stacked kernels, condensation at an explicit
+boundary that leaves the assemblers untouched — with **Option C as an opt-in v2**. A and B′
+are recorded as rejected in the appendix, and the review's decision checklist is answered
+at the end.
+
+The **second review round** (2026-08-21) approved
+this architecture with targeted changes, all incorporated here and in the implementation:
+the corrected `2 * maximum` allocation bound (§3.1 — the implementation already had it),
+lazy unique-map construction (§3.2), explicit construction-mode semantics (§3.4), the
+condensation-buffer contract (§3.5), the fast-path identity and per-path lifetime rules
+(§3.6), the per-task threading rule (§3.7), and precise performance language (§4.4). The
+one deliberate deviation is §3.3: `dof_range(ic, field)` keeps its name with the new return
+type — see the recorded maintainer decision in the checklist.
 
 ## Problem
 
@@ -131,16 +140,29 @@ mutable struct InterfaceCache{FC <: FacetCache}
     const dofs::Vector{Int}               # stacked [a.dofs; b.dofs] (existing)
     const unique_dofs::Vector{Int}        # first-occurrence order: a.dofs ++ (b-only)
     const stacked_to_unique::Vector{Int}  # length(dofs); the map T as indices
+    unique_map_valid::Bool                # lazily built, see below
     any_shared::Bool                      # derived: length(unique_dofs) != length(dofs)
     sdh_index_a::Int                      # SubDofHandler index of each side (reinit!)
     sdh_index_b::Int
 end
 ```
 
-- `reinit!` sets `sdh_index_a/b` from `dh.cell_to_subdofhandler` and **always** rebuilds
-  `unique_dofs`/`stacked_to_unique` from actual global-dof equality: identity prefix for
-  `1:n_a`, then each `b` dof tested against `a.dofs` only (each side is internally unique) —
-  O(n_a·n_b) with tiny n. No conformity gate (Key facts). `any_shared` is derived.
+- `reinit!` fills only the stacked `dofs` and `sdh_index_a/b` (from
+  `dh.cell_to_subdofhandler`) and marks the unique map dirty. **The map is built lazily**,
+  at most once per interface, by `_ensure_unique_interface_map!(ic)`, which the accessors
+  that need it call (`unique_interfacedofs`, `nunique_interface_dofs`,
+  `condense_interface!`). Loops that never request the map — existing raw DG assembly and
+  the sparsity-pattern construction (which iterates interfaces) — therefore keep their
+  current `reinit!` cost (updated review §3.2).
+- The map build compares actual global-dof equality: identity prefix for `1:n_a`, then each
+  `b` dof tested against `a.dofs` only (each side is internally unique) — O(n_a·n_b). No
+  conformity gate (Key facts). `any_shared` is derived during the build.
+- **Construction modes** (updated review §3.4): grid-only caches keep empty dof vectors and
+  maps, `sdh_index_a/b == 0`, and dof-dependent accessors (`dof_range`) throw a targeted
+  "constructed from a Grid" error. A `DofHandler` not covering a cell yields
+  `sdh_index == 0` for that side and `dof_range` rejects the interface. A cache constructed
+  from a `SubDofHandler` resolves dof information through `sdh.dh` and keeps the existing
+  domain restriction (both cells must belong to the sub-handler's cellset).
 - **First-occurrence ordering invariant**: `unique_dofs` starts with `a.dofs` verbatim, so
   `stacked_to_unique[1:n_a]` is the identity; only the there side gets holes. Deterministic,
   independent of global dof numbering, pinned by tests.
@@ -167,9 +189,9 @@ helper for assembly.
 
 ### `src/Dofs/DofHandler.jl`
 
-| Signature                                | Essence                                                                                                                                                                                                                                    |
-|------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `max_nstacked_interface_dofs(dh) -> Int` | Allocation bound for the **stacked** space (and therefore for both spaces): sum of the two largest `ndofs_per_cell` over sdhs. May overestimate when the two largest sdhs never neighbor — documented as a bound. Requires `isclosed(dh)`. |
+| Signature                                | Essence                                                                                                                                                                                                                                                                                                                                                                     |
+|------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `max_nstacked_interface_dofs(dh) -> Int` | Allocation bound for the **stacked** space (and therefore for both spaces): `2 * maximum(ndofs_per_cell, dh.subdofhandlers)` — the two neighboring cells may both belong to the largest sdh, so a "sum of the two largest distinct sdhs" would undersize same-subdomain interfaces (updated review §3.1). May overestimate; documented as a bound. Requires `isclosed(dh)`. |
 
 ## Condensation boundary
 
@@ -188,14 +210,32 @@ condense_interface!(buf, ic, Ke, fe) -> (udofs, Kc, fc)
 
 - Computes `Kc = Tᵀ Ke T` and `fc = Tᵀ fe` as `Kc[m[i], m[j]] += Ke[i, j]`,
   `fc[m[i]] += fe[i]` with `m = ic.stacked_to_unique` — `T` is never materialized.
-- `udofs === unique_interfacedofs(ic)`; `Kc`/`fc` are views into `buf`. All three are borrowed
-  (lifetime rule above).
-- **Fast path**: when `!ic.any_shared`, returns `(interfacedofs(ic), Ke, fe)` unchanged — no
-  copy, so pure DG pays nothing. (Correct because stacked == unique then.)
+- **Identity rule** (both paths): `udofs === unique_interfacedofs(ic)`, and
+  `unique_interfacedofs(ic)` itself returns `interfacedofs(ic)` (the identical vector) when
+  no dof is shared.
+- **Pass-through path**: when `!ic.any_shared`, `Kc === Ke` / `fc === fe` are returned
+  without copying. Precise performance claims (updated review §4.4): *no copy* on this
+  path, *no changes to the generic assembler hot loop*, and — with the lazy map — *raw DG
+  loops never build the map*; not "zero overhead" (the call itself branches and returns a
+  tuple).
+- **Per-path lifetime**: condensed `Kc`/`fc` alias buffer storage and are overwritten by
+  the next `condense_interface!` with the same buffer; pass-through outputs alias the
+  caller's own arrays and follow *their* lifetime (buffer reuse does not invalidate them);
+  dof vectors alias cache storage and are invalidated by the next `reinit!`.
+- **Buffer contract** (updated review §3.5): `Ke`/`fe` must match the stacked size
+  (`DimensionMismatch` otherwise) and use one-based indexing; they must not alias the
+  buffer's storage (`ArgumentError`, e.g. a previous call's output passed back in); the
+  active output region is zeroed on every call (correct across shrinking/growing interface
+  sizes); storage grows on demand; values are stored with ordinary assignment conversion
+  (lossy eltype combinations fail with the usual conversion error).
+- **Threading rule** (updated review §3.7): one `InterfaceAssemblyBuffer` and one
+  `InterfaceCache`/iterator per concurrent task, even under atomic assembly. Sharing a
+  buffer between tasks is unsupported.
 - **Eltype is the user's choice**, which settles the AD story: the buffer is constructed with
   whatever `T` the local operator has (`Float64`, a `Dual`, …), independent of the cache's
   coordinate eltype and of the assembler. Differentiating a stacked residual and condensing
-  the resulting stacked Jacobian is the supported, boring path.
+  the resulting stacked Jacobian is the supported, boring path. Hoist one buffer per eltype
+  outside the interface loop.
 
 Assembly is then the plain existing call — **no assembler struct or hot-path changes, no new
 `assemble!` methods**:
@@ -420,8 +460,9 @@ way and defaults to the full mask.
   `shape_*`/`function_*` semantics, `[[v]] = v_there − v_here`. No new evaluation API in v1.
 - `interfacedofs(ic)`, `InterfaceIterator`, `reinit!(iv, ic)` — same names, same behavior
   (only the `interfacedofs` docstring is corrected).
-- Every existing DG kernel and assembly loop works verbatim; adopting the condense boundary is
-  optional for pure DG (pass-through, zero overhead).
+- Every existing DG kernel and assembly loop works verbatim; adopting the condense boundary
+  is optional for pure DG (no-copy pass-through; the lazy map means raw loops also keep
+  their current `reinit!` cost).
 - Sparsity-pattern machinery — unchanged.
 - Assembler structs, `start_assemble`, the generic `assemble!` hot loop, both extensions —
   unchanged except the error-path diagnostic.
@@ -568,11 +609,14 @@ diagnostics naming a method it deletes, §2.6), which are moot with the rejectio
 3. Duplicate detection from actual global ids: **yes**, on every `reinit!`; no conformity gate.
 4. Both sizes named explicitly: **yes** — `nstacked_interface_dofs` / `nunique_interface_dofs`;
    the allocation bound is named for the stacked space it bounds.
-5. `dof_range(ic, field)` semantics: **changed, deliberately** (deviation from the review's
-   recommendation, decided by the maintainer): the tuple method is undocumented/near-unused/
+5. `dof_range(ic, field)` semantics: **changed, deliberately** (maintainer decision,
+   reaffirmed against updated review §3.3 after considering `dof_ranges` /
+   `interface_dof_range` alternatives — the object is *used* as a single range, so the
+   singular name is semantically right): the tuple method is undocumented/near-unused/
    broken for multi-sdh, and under the stacked v1 the new return is genuinely range-like.
-   CHANGELOG breaking entry names the silent-destructuring hazard and the `(r.here, r.there)`
-   port.
+   Shipped as an explicitly declared breaking change (CHANGELOG names the
+   silent-destructuring hazard and the `(r.here, r.there)` port); the release that includes
+   it must carry a version boundary that permits the break.
 6. Missing-side fields: **rejected in v1** with an explicit error; support deferred to a real
    one-sided design.
 7. Sparsity relying on exact cancellation: **no** — full mask default; smaller masks justified
@@ -586,7 +630,7 @@ diagnostics naming a method it deletes, §2.6), which are moot with the rejectio
 
 ## References
 
-- Review: `INTERFACE_ASSEMBLY_DESIGN_REVIEW.md` (2026-08-19).
+- External design reviews: 2026-08-19 (four-option draft) and 2026-08-21 (this revision).
 - Previous draft: the four-option gist
   (https://gist.github.com/fredrikekre/c8e251895240eaac24cef71c4b107ff8).
 - Issue: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1433 (incl. the `InterfaceDofs`
