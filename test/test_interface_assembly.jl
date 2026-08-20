@@ -314,7 +314,7 @@ end
         P_penalty_kernel!(Ke, ic)
         # The u dofs are shared even though the form never touches them: condensation is
         # still required (the stacked scatter vector contains duplicates)
-        @test ic.any_shared
+        @test nunique_interface_dofs(ic) < nstacked_interface_dofs(ic)
         udofs, Kc = condense_interface!(buf, ic, Ke)
         @test length(udofs) < n
         # The condensed u rows/columns are structural zeros
@@ -507,6 +507,120 @@ end
     assemble!(asm2, udofs, Kc_copy, fc_copy)
     @test Matrix(K1) ≈ Matrix(K2)
     @test f1 ≈ f2
+end
+
+@testset "Lazy map, construction modes, aliasing, sizing bound" begin
+    # Lazy unique-map construction: reinit! must not build the map, so loops that never
+    # use it (raw DG assembly, sparsity construction) do not pay for it
+    grid = generate_grid(Quadrilateral, (2, 1))
+    topology = ExclusiveTopology(grid)
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+    for ic in InterfaceIterator(dh, topology)
+        @test !ic.unique_map_valid # not built by reinit!
+    end
+    ic = first(InterfaceIterator(dh, topology))
+    @test !ic.unique_map_valid
+    udofs = unique_interfacedofs(ic) # first accessor builds it
+    @test ic.unique_map_valid
+    # Identity rule: condense returns unique_interfacedofs(ic) (the same object), on both
+    # the condensing and the pass-through path
+    buf = InterfaceAssemblyBuffer{Float64}(max_nstacked_interface_dofs(dh))
+    n = nstacked_interface_dofs(ic)
+    ud2, Kc = condense_interface!(buf, ic, rand(n, n))
+    @test ud2 === udofs === unique_interfacedofs(ic)
+    dhdg = DofHandler(grid)
+    add!(dhdg, :u, DiscontinuousLagrange{RefQuadrilateral, 1}())
+    close!(dhdg)
+    icdg = first(InterfaceIterator(dhdg, topology))
+    Ke = rand(8, 8)
+    uddg, Kdg = condense_interface!(buf, icdg, Ke)
+    @test uddg === unique_interfacedofs(icdg) === interfacedofs(icdg)
+    @test Kdg === Ke
+    # Aliasing: views into the buffer's storage (e.g. outputs of a previous call) must not
+    # be passed back as input, even when the sizes happen to match
+    bad_K = reshape(view(buf.Kc, 1:(n * n)), n, n)
+    @test_throws ArgumentError condense_interface!(buf, ic, bad_K)
+    bad_f = view(buf.fc, 1:n)
+    @test_throws ArgumentError condense_interface!(buf, ic, rand(n, n), bad_f)
+    # (undersized previous outputs are caught by the dimension check instead)
+    @test_throws DimensionMismatch condense_interface!(buf, ic, Kc)
+
+    # Grid-only cache/iterator: no dof information, empty maps, targeted errors
+    icg = first(InterfaceIterator(grid, topology))
+    @test isempty(interfacedofs(icg))
+    @test nstacked_interface_dofs(icg) == 0
+    @test nunique_interface_dofs(icg) == 0
+    @test_throws ErrorException dof_range(icg, :u)
+
+    # SubDofHandler-constructed cache: dof information resolves through sdh.dh. The cache
+    # keeps the existing domain restriction: both cells must belong to the sub-handler.
+    grid2x1 = generate_grid(Quadrilateral, (3, 1))
+    dh2 = DofHandler(grid2x1)
+    ip = Lagrange{RefQuadrilateral, 1}()
+    sdh1 = SubDofHandler(dh2, Set([1, 2]))
+    add!(sdh1, :u, ip)
+    sdh2 = SubDofHandler(dh2, Set(3))
+    add!(sdh2, :u, ip)
+    close!(dh2)
+    ics = InterfaceCache(sdh1)
+    reinit!(ics, FacetIndex(1, 2), FacetIndex(2, 4)) # interface within sdh1's cellset
+    @test interfacedofs(ics) == [celldofs(dh2, 1); celldofs(dh2, 2)]
+    r = dof_range(ics, :u)
+    @test r.here == dof_range(sdh1, :u)
+    @test r.there == dof_range(sdh1, :u) .+ ndofs_per_cell(sdh1)
+    @test interfacedofs(ics)[r] == [celldofs(dh2, 1); celldofs(dh2, 2)]
+
+    # DofHandler not covering all cells: reject dof_range for interfaces into the
+    # uncovered subdomain
+    dh3 = DofHandler(grid)
+    sdh3 = SubDofHandler(dh3, Set(1)) # cell 2 uncovered
+    add!(sdh3, :u, ip)
+    close!(dh3)
+    ic3 = InterfaceCache(dh3)
+    reinit!(ic3, FacetIndex(1, 2), FacetIndex(2, 4))
+    @test ic3.sdh_index_b == 0
+    err = try dof_range(ic3, :u); nothing; catch e; e; end
+    @test err isa ErrorException
+    @test occursin("not defined on both cells", err.msg)
+
+    # max_nstacked_interface_dofs must bound same-subdomain interfaces of the largest
+    # SubDofHandler (2 * maximum, not the sum of the two largest distinct handlers)
+    grid3 = generate_grid(Quadrilateral, (3, 1))
+    topo3 = ExclusiveTopology(grid3)
+    dh4 = DofHandler(grid3)
+    big = SubDofHandler(dh4, Set([1, 2])) # cells 1-2: large sdh with an internal interface
+    add!(big, :u, Lagrange{RefQuadrilateral, 2}())
+    add!(big, :p, Lagrange{RefQuadrilateral, 1}())
+    small = SubDofHandler(dh4, Set(3)) # cell 3: strictly smaller sdh
+    add!(small, :u, Lagrange{RefQuadrilateral, 2}())
+    close!(dh4)
+    @test ndofs_per_cell(big) > ndofs_per_cell(small)
+    bound = max_nstacked_interface_dofs(dh4)
+    # 2 * maximum: the big-big interface (cells 1-2) needs more than
+    # ndofs_per_cell(big) + ndofs_per_cell(small) (the "sum of the two largest distinct
+    # handlers" would undersize it)
+    @test bound == 2 * ndofs_per_cell(big)
+    @test bound > ndofs_per_cell(big) + ndofs_per_cell(small)
+    buf4 = InterfaceAssemblyBuffer{Float64}() # undersized on purpose: grows on demand
+    sizes = Int[]
+    for pass in 1:2 # two passes: buffer reused with both increasing and decreasing sizes
+        for ic4 in InterfaceIterator(dh4, topo3)
+            ns = nstacked_interface_dofs(ic4)
+            push!(sizes, ns)
+            @test ns <= bound
+            # Buffer reuse across differently-sized interfaces: the active region is
+            # re-zeroed, the result matches the explicit congruence transform every time
+            Ke4 = rand(ns, ns)
+            fe4 = rand(ns)
+            _, Kc4, fc4 = condense_interface!(buf4, ic4, Ke4, fe4)
+            T = duplication_map(ic4)
+            @test Matrix(Kc4) ≈ T' * Ke4 * T
+            @test collect(fc4) ≈ T' * fe4
+        end
+    end
+    @test length(sizes) == 4 && length(unique(sizes)) == 2 # two interfaces, two sizes
 end
 
 @testset "AD: stacked residual -> condensed Jacobian" begin

@@ -489,8 +489,16 @@ end
 Scratch storage for [`condense_interface!`](@ref). The element type `T` should match the
 element type of the local matrix/vector to be condensed (e.g. a dual number type when the
 local matrix is produced by automatic differentiation); it is deliberately independent of
-both the `InterfaceCache` and the assembler. `max_ndofs` (e.g.
-[`max_nstacked_interface_dofs`](@ref)) presizes the storage; the buffer grows as needed.
+both the `InterfaceCache` and the assembler. Values are stored with ordinary assignment
+conversion, so a lossy element type combination fails with the usual conversion error.
+`max_ndofs` (e.g. [`max_nstacked_interface_dofs`](@ref)) presizes the storage; the buffer
+grows as needed.
+
+!!! note "Threading"
+    The buffer is mutable scratch: each concurrent task needs its own
+    `InterfaceAssemblyBuffer` (and its own `InterfaceCache`/`InterfaceIterator`), even when
+    the global assembler uses atomic accumulation. Sharing one buffer between tasks is not
+    supported.
 """
 struct InterfaceAssemblyBuffer{T}
     Kc::Vector{T}
@@ -517,16 +525,26 @@ supplied by the kernel — a kernel that weights the two copies of a shared dof 
 documentation on interface assembly for the weighting rules.
 
 When the interface has no shared dofs (e.g. pure discontinuous interpolations) the inputs
-are returned unchanged, without copying.
+`Ke`/`fe` are returned unchanged, without copying.
 
-The returned dof vector, matrix, and vector are *borrowed* storage (from the cache and the
-buffer): valid until the next `reinit!` of the cache or the next `condense_interface!`
-call with the same buffer, must not be mutated, and must be copied before storing.
+On both paths the returned dof vector is `unique_interfacedofs(ic)` (the identical object).
+The lifetime of the outputs depends on the path:
+- the dof vector is borrowed cache storage, valid until the next `reinit!` of the cache;
+- a condensed `Kc`/`fc` is borrowed buffer storage, overwritten by the next
+  `condense_interface!` call with the same buffer;
+- on the no-sharing pass-through, `Kc === Ke` and `fc === fe` follow the lifetime of the
+  caller's own arrays (reuse of the buffer does not invalidate them).
+Borrowed outputs must not be mutated and must be copied before storing.
+
+`Ke` and `fe` must use one-based indexing and must not alias the buffer's storage (e.g. a
+`Kc` returned from a previous call must not be passed back in).
 """
 function condense_interface!(
         buf::InterfaceAssemblyBuffer, ic::InterfaceCache,
         Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing
     )
+    Base.require_one_based_indexing(Ke)
+    fe === nothing || Base.require_one_based_indexing(fe)
     ns = nstacked_interface_dofs(ic)
     if size(Ke) != (ns, ns)
         throw(DimensionMismatch("size(Ke) = $(size(Ke)) does not match the stacked interface size ($ns, $ns)"))
@@ -534,12 +552,18 @@ function condense_interface!(
     if fe !== nothing && length(fe) != ns
         throw(DimensionMismatch("length(fe) = $(length(fe)) does not match the stacked interface size $ns"))
     end
+    if _array_root(Ke) === buf.Kc || _array_root(Ke) === buf.fc ||
+            (fe !== nothing && (_array_root(fe) === buf.Kc || _array_root(fe) === buf.fc))
+        throw(ArgumentError("the input matrix/vector aliases the buffer's storage (e.g. the output of a previous condense_interface! call): pass the original stacked local matrix/vector instead"))
+    end
+    _ensure_unique_interface_map!(ic)
+    udofs = unique_interfacedofs(ic)
     if !ic.any_shared
         # No shared dofs: stacked == unique, pass the inputs through without copying
-        return fe === nothing ? (interfacedofs(ic), Ke) : (interfacedofs(ic), Ke, fe)
+        return fe === nothing ? (udofs, Ke) : (udofs, Ke, fe)
     end
     m = ic.stacked_to_unique
-    nu = nunique_interface_dofs(ic)
+    nu = length(ic.unique_dofs)
     length(buf.Kc) < nu * nu && resize!(buf.Kc, nu * nu)
     Kc = reshape(view(buf.Kc, 1:(nu * nu)), nu, nu)
     fill!(Kc, zero(eltype(Kc)))
@@ -549,15 +573,19 @@ function condense_interface!(
             Kc[m[i], mj] += Ke[i, j]
         end
     end
-    fe === nothing && return unique_interfacedofs(ic), Kc
+    fe === nothing && return udofs, Kc
     length(buf.fc) < nu && resize!(buf.fc, nu)
     fc = view(buf.fc, 1:nu)
     fill!(fc, zero(eltype(fc)))
     @inbounds for i in 1:ns
         fc[m[i]] += fe[i]
     end
-    return unique_interfacedofs(ic), Kc, fc
+    return udofs, Kc, fc
 end
+
+# Root array behind (nested) views/reshapes, for the aliasing check above
+_array_root(A::Union{SubArray, Base.ReshapedArray}) = _array_root(parent(A))
+_array_root(A::AbstractArray) = A
 
 ## assemble! with local condensation ##
 

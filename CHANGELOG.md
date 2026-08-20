@@ -18,7 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    update such code to `r = dof_range(ic, field)` with `r.here`/`r.there`. The new method
    also works when the two cells belong to different `SubDofHandler`s (the old method
    errored for any `DofHandler` with more than one `SubDofHandler`); fields that exist on
-   only one side of the interface are rejected with an error. ([#1433])
+   only one side of the interface are rejected with an error. This is an intentional
+   breaking change of an exported method, and the release including it must carry a version
+   boundary that permits it. ([#1433])
 
 ### Fixes
  - Atomic assembly support for BlockAssembler. ([#1452])
@@ -47,7 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `condense_interface!(buf::InterfaceAssemblyBuffer, ic, Ke, fe)`, after which the
    ordinary `assemble!` (and `apply_assemble!` for constrained problems) applies. For
    interfaces without shared dofs (e.g. pure discontinuous Galerkin) `condense_interface!`
-   is a no-copy pass-through, and existing code is unaffected. New supporting API:
+   is a no-copy pass-through; the stacked-to-unique dof map is built lazily on first use
+   after `reinit!`, so existing loops that never use it (raw DG assembly, sparsity
+   construction) keep their current `reinit!` cost. New supporting API:
    `unique_interfacedofs(ic)`, `nstacked_interface_dofs(ic)`, `nunique_interface_dofs(ic)`,
    `max_nstacked_interface_dofs(dh)` (allocation bound for local interface
    matrices/vectors), and `is_shared(ic, i)`. Assembling with a dof vector containing
