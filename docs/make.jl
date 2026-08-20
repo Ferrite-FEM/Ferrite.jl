@@ -38,12 +38,15 @@ bibtex_plugin = CitationBibliography(
     style = :numeric
 )
 
+codeblocks_plugin = CodeBlocks(
+    line_counter = :named,
+)
+
 # Build documentation.
 @timeit dto "makedocs" makedocs(
     format = Documenter.HTML(
         assets = [
             "assets/custom.css",
-            "assets/citations.css",
             "assets/favicon.ico",
         ],
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
@@ -123,7 +126,7 @@ bibtex_plugin = CitationBibliography(
     ],
     plugins = [
         bibtex_plugin,
-        CodeBlocks(),
+        codeblocks_plugin,
     ]
 )
 
