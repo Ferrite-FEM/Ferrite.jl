@@ -300,7 +300,7 @@ Initialize an empty [`SparsityPattern`](@ref) with `ndofs(dh)` rows and `ndofs(d
 function init_sparsity_pattern(
         dh::DofHandler;
         # TODO: What is a good estimate for nnz_per_row?
-        nnz_per_row::Int = 2 * ndofs_per_cell(dh.subdofhandlers[1]), # FIXME
+        nnz_per_row::Int = isempty(dh.subdofhandlers) ? 8 : 2 * ndofs_per_cell(dh.subdofhandlers[1]), # FIXME
     )
     sp = SparsityPattern(ndofs(dh), ndofs(dh); nnz_per_row = nnz_per_row)
     return sp
@@ -315,16 +315,24 @@ end
         keep_constrained::Bool = true,
         coupling = nothing,
         interface_coupling = nothing,
+        algebraic_couplings = (),
     )
 
 Convenience method for doing the common task of calling [`add_cell_entries!`](@ref),
-[`add_interface_entries!`](@ref), and [`add_constraint_entries!`](@ref), depending on what
-arguments are passed:
+[`add_interface_entries!`](@ref), [`add_coupling_entries!`](@ref), and
+[`add_constraint_entries!`](@ref), depending on what arguments are passed:
  - `add_cell_entries!` is always called
  - `add_interface_entries!` is called if `interface_coupling` is provided (i.e. not
    `nothing`). Passing `topology` is optional, but recommended for performance reasons
    (see [`add_interface_entries!`](@ref)).
+ - `add_coupling_entries!` is called for every coupling descriptor in `algebraic_couplings`
+   (a [`CellCoupling`](@ref), [`FacetCoupling`](@ref), or [`AlgebraicCoupling`](@ref), or
+   any iterable of them, e.g. a named tuple)
  - `add_constraint_entries!` is called if the ConstraintHandler is provided
+
+Note that `coupling` controls the ordinary cell entries and keeps its meaning, while
+`algebraic_couplings` only *adds* structural entries: the resulting pattern is the union of
+all contributions.
 
 For more details about arguments and keyword arguments, see the respective functions.
 """
@@ -332,44 +340,46 @@ function add_sparsity_entries!(
         sp::AbstractSparsityPattern, dh::DofHandler,
         ch::Union{ConstraintHandler, Nothing} = nothing;
         keep_constrained::Bool = true,
-        coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
+        coupling = nothing,
         interface_coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
         topology = nothing,
+        algebraic_couplings = (),
     )
     # Argument checking
     isclosed(dh) || error("the DofHandler must be closed")
     if getnrows(sp) < ndofs(dh) || getncols(sp) < ndofs(dh)
         error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
     end
+    _check_coupling_kwarg(coupling)
+    keep_constrained || _check_keep_constrained_args(dh, ch)
     # Add all entries
     add_diagonal_entries!(sp)
-    add_cell_entries!(sp, dh, ch; keep_constrained, coupling)
+    _add_cell_entries!(sp, dh, ch, keep_constrained, _coupling_to_local_dof_coupling(dh, coupling))
     if interface_coupling !== nothing
         add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
     end
-    if ch !== nothing
-        add_constraint_entries!(sp, ch; keep_constrained)
-    end
-    return sp
+    return _add_post_cell_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
 end
 
 # Specialized method for the concrete SparsityPattern.
 # This builds the pattern in bulk: cell entries (including the diagonal, respecting
 # `coupling` and `keep_constrained`), interface entries (interface_coupling), and any
 # pre-existing entries are exactly counted, the buffer is presized in one allocation, and
-# rows are filled with a marker-dedup append. Only the constraint entries layer on
-# afterwards through add_entry!.
+# rows are filled with a marker-dedup append. Only the coupling descriptor entries and the
+# constraint entries layer on afterwards through add_entry!.
 function add_sparsity_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
         keep_constrained::Bool = true,
-        coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
+        coupling = nothing,
         interface_coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
         topology = nothing,
+        algebraic_couplings = (),
     )
     isclosed(dh) || error("the DofHandler must be closed")
     if getnrows(sp) < ndofs(dh) || getncols(sp) < ndofs(dh)
         error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
     end
+    _check_coupling_kwarg(coupling)
     keep_constrained || _check_keep_constrained_args(dh, ch)
     couplings = _coupling_to_local_dof_coupling(dh, coupling)
     isconstrained = keep_constrained ? nothing : _isconstrained_by_dof(ch, getnrows(sp))
@@ -384,8 +394,45 @@ function add_sparsity_entries!(
     end
     oldbuffer = isempty(sp.buffer.data) ? nothing : sp.buffer
     _build_pattern!(sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings; oldbuffer)
+    return _add_post_cell_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
+end
+
+# Layers applied after the cell entries, shared by the add_sparsity_entries! methods.
+# Coupling descriptor entries must be added before the constraint entries since constraint
+# expansion depends on all pre-existing structural entries.
+function _add_post_cell_entries!(
+        sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
+        @nospecialize(algebraic_couplings), keep_constrained::Bool,
+    )
+    _add_algebraic_coupling_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
     ch !== nothing && add_constraint_entries!(sp, ch; keep_constrained)
     return sp
+end
+
+# Validate the `algebraic_couplings` keyword and add the entries of each descriptor.
+function _add_algebraic_coupling_entries!(
+        sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
+        @nospecialize(algebraic_couplings), keep_constrained::Bool,
+    )
+    for descriptor in _iterate_algebraic_couplings(algebraic_couplings)
+        descriptor isa AbstractCoupling || error("`algebraic_couplings` must contain coupling descriptors (`CellCoupling`, `FacetCoupling`, `AlgebraicCoupling`), got $(repr(descriptor))")
+        add_coupling_entries!(sp, dh, descriptor, ch; keep_constrained)
+    end
+    return sp
+end
+
+# Catch coupling descriptors passed to `coupling` instead of `algebraic_couplings`.
+function _check_coupling_kwarg(coupling)
+    coupling === nothing && return
+    iscoupling = coupling isa AbstractCoupling ||
+        (coupling isa Union{Tuple, NamedTuple, AbstractVector} && any(x -> x isa AbstractCoupling, coupling))
+    if iscoupling
+        error("coupling descriptors (`CellCoupling`, `FacetCoupling`, `AlgebraicCoupling`) must be passed to the `algebraic_couplings` keyword argument, not to `coupling`")
+    end
+    if !(coupling isa AbstractMatrix{Bool})
+        throw(ArgumentError("`coupling` must be an `AbstractMatrix{Bool}`, got $(repr(coupling))"))
+    end
+    return
 end
 
 """
@@ -413,8 +460,9 @@ described by the DofHandler `dh`.
 function add_cell_entries!(
         sp::AbstractSparsityPattern,
         dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
-        keep_constrained::Bool = true, coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
+        keep_constrained::Bool = true, coupling = nothing,
     )
+    _check_coupling_kwarg(coupling)
     # Expand coupling from nfields x nfields to ndofs_per_cell x ndofs_per_cell
     # (nothing and full masks expand to nothing = no restriction).
     # TODO: Perhaps this can be done in the loop over SubDofHandlers instead.
@@ -425,7 +473,7 @@ end
 
 # Argument checking for methods with `keep_constrained = false`
 function _check_keep_constrained_args(dh::DofHandler, ch::Union{ConstraintHandler, Nothing})
-    ch === nothing && error("must pass ConstraintHandler when `keep_constrained = true`")
+    ch === nothing && error("must pass ConstraintHandler when `keep_constrained = false`")
     isclosed(ch) || error("the ConstraintHandler must be closed")
     ch.dh === dh || error("the DofHandler and the ConstraintHandler's DofHandler must be the same")
     return
@@ -695,6 +743,8 @@ function _add_cell_entries!(
         sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
         keep_constrained::Bool, coupling::Union{Vector{<:AbstractMatrix{Bool}}, Nothing},
     )
+    # A DofHandler without spatial fields (no SubDofHandlers) has no cell entries
+    isempty(dh.subdofhandlers) && return sp
     # Add all connections between dofs for every cell while filtering based
     # on a) constraints, and b) field/dof coupling.
     cc = CellCache(dh)

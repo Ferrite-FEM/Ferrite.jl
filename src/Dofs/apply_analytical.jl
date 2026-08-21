@@ -31,6 +31,7 @@ function apply_analytical!(
         cellset = 1:getncells(get_grid(dh))
     )
 
+    _check_not_algebraic_variable(dh, fieldname, "`apply_analytical!`")
     fieldname ∉ getfieldnames(dh) && error("The fieldname $fieldname was not found in the dof handler")
     ip_geos = _geometric_interpolations(dh)
 

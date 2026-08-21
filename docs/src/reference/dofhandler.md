@@ -16,6 +16,22 @@ add!(::SubDofHandler, ::Symbol, ::Interpolation)
 close!(::DofHandler)
 ```
 
+## Algebraic variables and coupling descriptors
+
+See the topic section on [Algebraic variables](@ref topic-algebraic-variables).
+
+```@docs
+AlgebraicVariable
+AlgebraicValues
+add!(::DofHandler, ::Symbol, ::AlgebraicVariable)
+algebraic_dofs
+algebraic_value
+algebraic_basis_value
+CellCoupling
+FacetCoupling
+AlgebraicCoupling
+```
+
 ## DoF renumbering
 ```@docs
 renumber!

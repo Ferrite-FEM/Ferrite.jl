@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    both keyword arguments behave exactly as before. ([#1468])
 
 ### Added
+ - Added mesh-free [`AlgebraicVariable`s](https://ferrite-fem.github.io/Ferrite.jl/dev/topics/algebraic_variables/)
+   and coupling descriptors for small global unknowns such as Lagrange multipliers and
+   homogenized quantities. See the documentation for details. ([#1422])
  - `ExclusiveTopology` now supports grids with mixed reference dimensions (e.g. a 3D grid
    containing both `Hexahedron` and `Quadrilateral` cells). Mixed-dimensional connections
    are stored in `vertex_vertex_neighbor`, `edge_edge_neighbor`, and `face_face_neighbor`
@@ -65,6 +68,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Faster `ExclusiveTopology` construction (about 1.5x for hexahedral and 1.7x for
    tetrahedral grids), `vertex_star_stencils` (roughly 30x), and `getneighborhood` with an
    `EdgeIndex` (roughly 4x). ([#1466])
+
+### Documentation
+ - New tutorial: Stress-driven computational homogenization, where the macroscopic
+   strain is an unknown algebraic variable and the prescribed average stress acts as
+   the load, including a blocked-matrix Schur complement solve of the coupled system.
+   ([#1396])
+ - The Stokes flow tutorial now also implements the boundary mean value constraint by
+   retaining the Lagrange multiplier as an algebraic variable, as an alternative to
+   eliminating it with an `AffineConstraint`. ([#1422])
 
 ## [v1.6.0] - 2026-08-02
 
@@ -1398,6 +1410,7 @@ poking into Ferrite internals:
 [#1381]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1381
 [#1382]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1382
 [#1384]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1384
+[#1396]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1396
 [#1387]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1387
 [#1388]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1388
 [#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
@@ -1408,6 +1421,7 @@ poking into Ferrite internals:
 [#1417]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1417
 [#1420]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1420
 [#1421]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1421
+[#1422]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1422
 [#1423]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1423
 [#1426]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1426
 [#1428]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1428
