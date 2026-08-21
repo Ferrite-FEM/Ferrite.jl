@@ -9,6 +9,11 @@ discretization — vertex diagonals excluded), `:sharp` (`A_n ∪ A_f²`, contin
 exist but only discontinuous ones cross interfaces), `:product` (a continuous field
 crosses, or grid-only API). Mode selection is automatic in `create_coloring(dh, ...)`.
 
+**Post-implementation refactor:** all coloring code now lives in `src/coloring.jl`
+(moved from `src/Grid/coloring.jl`), included *after* the `Dofs/*` files, so the
+include-order workaround mentioned below (dof-based method in `ConstraintHandler.jl`)
+no longer applies.
+
 *Draft for iteration — now implemented. Companion to the WorkStream exploration
 (see `WORKSTREAM.md`); coloring is the only threading strategy that needs conflict
 analysis at all (atomic and the pipeline are immune).*
