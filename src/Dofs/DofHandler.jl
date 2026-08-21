@@ -389,10 +389,10 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
             if n_components(ip) != n_components(_ip)
                 error("Field :$name has a different number of components in another SubDofHandler. Use a different field name.")
             end
+            _check_shared_dof_functionals(name, ip, _ip)
             if getorder(ip) != getorder(_ip)
                 @warn "Field :$name uses a different interpolation order in another SubDofHandler."
             end
-            # TODO: warn if interpolation type is not the same?
         end
     end
 
@@ -406,6 +406,46 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
     push!(sdh.field_names, name)
     push!(sdh.field_interpolations, ip)
     return sdh
+end
+
+# Check that a field with the same name in two SubDofHandlers uses compatible dof
+# functionals on entity classes that can be shared between cells, i.e. classes with
+# dimension below the reference dimension of at least one of the cell types (this
+# includes the cell-interior "face" dofs of a 2D cell embedded in 3D, which share
+# facedict entries with a neighboring volume cell's face dofs). Dof distribution reuses
+# entity dofs positionally with the reusing cell's own layout, so mismatching functionals
+# or counts would silently alias unrelated dofs.
+function _check_shared_dof_functionals(name::Symbol, ip::Interpolation, _ip::Interpolation)
+    base, _base = get_base_interpolation(ip), get_base_interpolation(_ip)
+    n_copies = ip isa VectorizedInterpolation ? get_n_copies(ip) : 1
+    _n_copies = _ip isa VectorizedInterpolation ? get_n_copies(_ip) : 1
+    max_rdim = max(getrefdim(base), getrefdim(_base))
+    for (class, entity_dim, entity_functionals) in (
+            ("vertices", 0, vertexdof_functionals),
+            ("edges", 1, edgedof_functionals),
+            ("faces", 2, facedof_functionals),
+        )
+        entity_dim < max_rdim || continue
+        sigs = unique(filter(!isempty, collect(entity_functionals(base))))
+        _sigs = unique(filter(!isempty, collect(entity_functionals(_base))))
+        # An entity carrying dofs from only one of the interpolations is never shared
+        (isempty(sigs) || isempty(_sigs)) && continue
+        compatible = if length(sigs) == 1 && length(_sigs) == 1
+            n_copies == _n_copies && sigs[1] == _sigs[1]
+        else
+            # Entity-heterogeneous layouts can only be compared positionally
+            getrefshape(base) === getrefshape(_base) && n_copies == _n_copies &&
+                collect(entity_functionals(base)) == collect(entity_functionals(_base))
+        end
+        if !compatible
+            error(
+                "Field :$name is shared between SubDofHandlers with incompatible dof functionals " *
+                    "on $class: $(Tuple(sigs)) × $n_copies copies vs $(Tuple(_sigs)) × $_n_copies copies. " *
+                    "Shared entities would receive dofs with conflicting physical meaning. Use a different field name."
+            )
+        end
+    end
+    return
 end
 
 """

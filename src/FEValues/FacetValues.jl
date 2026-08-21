@@ -188,19 +188,25 @@ mutable struct BCValues{Tv, Ti}
     current_entity::Ti
 end
 
-BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}) =
-    BCValues(Float64, func_interpol, geom_interpol, boundary_type)
-BCValues(::Type{Tv}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex}) where {Tv, dim, refshape <: AbstractRefShape{dim}} =
-    BCValues(Tv, Int64, func_interpol, geom_interpol, boundary_type)
-function BCValues(::Type{Tv}, ::Type{Ti}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex}) where {Tv, Ti, dim, refshape <: AbstractRefShape{dim}}
+BCValues(func_interpol::Interpolation, geom_interpol::Interpolation, boundary_type::Type{<:BoundaryIndex}, functional = nothing) =
+    BCValues(Float64, func_interpol, geom_interpol, boundary_type, functional)
+BCValues(::Type{Tv}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex}, functional = nothing) where {Tv, dim, refshape <: AbstractRefShape{dim}} =
+    BCValues(Tv, Int64, func_interpol, geom_interpol, boundary_type, functional)
+function BCValues(::Type{Tv}, ::Type{Ti}, func_interpol::Interpolation{refshape}, geom_interpol::Interpolation{refshape}, boundary_type::Type{<:BoundaryIndex}, functional = nothing) where {Tv, Ti, dim, refshape <: AbstractRefShape{dim}}
     # set up quadrature rules for each boundary entity with dof-positions
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
+    # `functional === nothing` means no filtering; the filter must mirror the one in
+    # `_local_facet_dofs_for_bc` to keep dof lists and quadrature points index-aligned
+    functionals = functional === nothing ? nothing : dof_functionals(func_interpol)
 
     qrs = QuadratureRule{refshape, Vector{Tv}, Vector{Vec{dim, Tv}}}[]
     for boundarydofs in dirichlet_boundarydof_indices(boundary_type)(func_interpol)
         dofcoords = Vec{dim, Tv}[]
         for boundarydof in boundarydofs
+            if functionals !== nothing
+                matches_functional(functional, functionals[boundarydof]) || continue
+            end
             push!(dofcoords, interpolation_coords[boundarydof])
         end
         qrf = QuadratureRule{refshape}(fill(Tv(NaN), length(dofcoords)), dofcoords) # weights will not be used

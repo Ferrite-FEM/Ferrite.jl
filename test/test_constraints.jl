@@ -81,6 +81,33 @@ using LinearAlgebra, SparseArrays, Logging
     @test_throws ErrorException("components [2, 3] not within range of field :v (2 dimension(s))") add!(ConstraintHandler(dh), pdbc)
 end
 
+@testset "Dirichlet functional selector" begin
+    grid = generate_grid(Triangle, (2, 2))
+    Γ = getfacetset(grid, "left")
+    dh = DofHandler(grid)
+    add!(dh, :s, Lagrange{RefTriangle, 1}())
+    close!(dh)
+    # default functional (PointValue) gives unchanged behavior
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:s, Γ, x -> 1.0))
+    close!(ch)
+    update!(ch, 0.0)
+    @test length(ch.prescribed_dofs) == 3
+    @test all(ch.inhomogeneities .== 1.0)
+    # selecting a functional the boundary dofs do not have
+    ch = ConstraintHandler(dh)
+    @test_throws ErrorException add!(ch, Dirichlet(:s, Γ, x -> 0.0; functional = PointDerivative))
+    # moment dofs cannot be prescribed with Dirichlet
+    dhq = DofHandler(grid)
+    add!(dhq, :q, RaviartThomas{RefTriangle, 1}())
+    close!(dhq)
+    ch = ConstraintHandler(dhq)
+    @test_throws ErrorException add!(ch, Dirichlet(:q, Γ, x -> 0.0; functional = NormalMoment))
+    # nodesets require purely nodal interpolations
+    ch = ConstraintHandler(dhq)
+    @test_throws ArgumentError add!(ch, Dirichlet(:q, Set(1:3), x -> 0.0))
+end
+
 @testset "node bc" begin
     grid = generate_grid(Triangle, (1, 1))
     addnodeset!(grid, "nodeset", x -> x[2] == -1 || x[1] == -1)

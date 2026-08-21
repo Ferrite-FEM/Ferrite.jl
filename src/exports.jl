@@ -23,6 +23,15 @@ export
     getnbasefunctions,
     getrefshape,
 
+    # Dof functionals
+    DofFunctional,
+    PointValue,
+    PointDerivative,
+    IntegralMoment,
+    NormalMoment,
+    TangentialMoment,
+    InteriorMoment,
+
     # Quadrature
     QuadratureRule,
     FacetQuadratureRule,
