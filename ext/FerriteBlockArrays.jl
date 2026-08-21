@@ -69,7 +69,8 @@ Ferrite.matrix_handle(ba::BlockAssembler) = ba.K
 Ferrite.vector_handle(ba::BlockAssembler) = ba.f
 
 # See src/assembler.jl for the `@constprop` annotation (concrete return type for literal `atomic`).
-Base.@constprop :aggressive function Ferrite.start_assemble(K::BlockMatrix, f; fillzero::Bool = true, atomic::Bool = false)
+# As for the other formats, `f` may be left out to assemble the matrix only.
+Base.@constprop :aggressive function Ferrite.start_assemble(K::BlockMatrix{Tv}, f::AbstractVector = Tv[]; fillzero::Bool = true, atomic::Bool = false) where {Tv}
     Ferrite._check_atomic_eltype(atomic, eltype(K))
     fillzero && (fillzero!(K); fillzero!(f))
     return BlockAssembler{eltype(K), typeof(K), typeof(f), atomic}(K, f, BlockIndex{1}[])
@@ -78,7 +79,7 @@ end
 # Split into the block and the local index
 splindex(idx::BlockIndex{1}) = (block(idx), blockindex(idx))
 
-function Ferrite.assemble!(assembler::BlockAssembler, dofs::AbstractVector{<:Integer}, ke::AbstractMatrix, fe::AbstractVector)
+function Ferrite.assemble!(assembler::BlockAssembler, dofs::AbstractVector{<:Integer}, ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
     atomic = Val(_is_atomic(assembler))
 
     K = assembler.K
@@ -86,9 +87,10 @@ function Ferrite.assemble!(assembler::BlockAssembler, dofs::AbstractVector{<:Int
     blockindices = assembler.blockindices
 
     @assert blockaxes(K, 1) == blockaxes(K, 2)
-    @assert axes(K, 1) == axes(K, 2) == axes(f, 1)
+    @assert axes(K, 1) == axes(K, 2)
+    @assert fe === nothing || axes(f, 1) == axes(K, 1)
     @boundscheck checkbounds(K, dofs, dofs)
-    @boundscheck checkbounds(f, dofs)
+    @boundscheck fe === nothing || checkbounds(f, dofs)
 
     # Update the cached the block indices
     resize!(blockindices, length(dofs))
@@ -107,16 +109,18 @@ function Ferrite.assemble!(assembler::BlockAssembler, dofs::AbstractVector{<:Int
     end
 
     # Assemble vector entries
-    if blockaxes(f, 1) == blockaxes(K, 1)
-        # If f::BlockVector with the same axes the same blockindex cache can be used...
-        @inbounds for (i, blockindex_i) in pairs(blockindices)
-            Bi, li = splindex(blockindex_i)
-            fB = @view f[Bi]
-            addindex!(fB, fe[i], li, atomic)
+    if fe !== nothing
+        if blockaxes(f, 1) == blockaxes(K, 1)
+            # If f::BlockVector with the same axes the same blockindex cache can be used...
+            @inbounds for (i, blockindex_i) in pairs(blockindices)
+                Bi, li = splindex(blockindex_i)
+                fB = @view f[Bi]
+                addindex!(fB, fe[i], li, atomic)
+            end
+        else
+            # ... otherwise, use regular indexing in fallback assemble!
+            @inbounds assemble!(f, dofs, fe, atomic)
         end
-    else
-        # ... otherwise, use regular indexing in fallback assemble!
-        @inbounds assemble!(f, dofs, fe, atomic)
     end
     return
 end
