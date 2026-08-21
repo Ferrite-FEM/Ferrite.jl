@@ -119,6 +119,42 @@ const BLOCK_TYPES = ("CSC" => SparseMatrixCSC{Float64, Int}, "CSR" => SparseMatr
     @test K == KB
 end
 
+@testset "BlockAssembler matrix only ($blockname blocks)" for (blockname, BT) in BLOCK_TYPES
+    # Both `f` and `fe` are optional, as for the CSC and CSR assemblers, so that a matrix only
+    # sweep works the same way for a blocked system.
+    grid = generate_grid(Triangle, (4, 4))
+    dh = DofHandler(grid)
+    ip = Lagrange{RefTriangle, 1}()
+    add!(dh, :u, ip^2)
+    add!(dh, :p, ip)
+    close!(dh)
+    renumber!(dh, DofOrder.FieldWise())
+    nd = ndofs(dh) ÷ 3
+
+    bsp = BlockSparsityPattern([2nd, 1nd])
+    add_sparsity_entries!(bsp, dh)
+    KB = allocate_matrix(BlockMatrix{Float64, Matrix{BT}}, bsp)
+    K = allocate_matrix(dh)
+
+    assembler = start_assemble(K)
+    block_assembler = start_assemble(KB)
+    @test isempty(Ferrite.vector_handle(block_assembler))
+    for cc in CellIterator(dh)
+        dofs = celldofs(cc)
+        ke = [sin(i * j / 10) for i in dofs, j in dofs]
+        assemble!(assembler, dofs, ke)
+        assemble!(block_assembler, dofs, ke)
+    end
+    @test K ≈ KB
+
+    # Omitting `fe` leaves the vector alone also when the assembler was given one
+    fB = similar(KB, axes(KB, 1))
+    fill!(fB, 1)
+    npc = ndofs_per_cell(dh)
+    assemble!(start_assemble(KB, fB; fillzero = false), celldofs(dh, 1), zeros(npc, npc))
+    @test all(isone, fB)
+end
+
 @testset "BlockMatrix affine constraints across blocks ($blockname blocks)" for (blockname, BT) in BLOCK_TYPES
     # The periodic constraint in the fixture above lives entirely inside the :u block, so it
     # never exercises a coefficient that maps a dof of one block onto a dof of another. Here
