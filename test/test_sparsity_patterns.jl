@@ -477,9 +477,10 @@ end
             compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
             @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
         end
-        # Multiple subdofhandlers: the direct interface fill must NOT trigger (the square
-        # coupling masks do not apply to cross-subdofhandler neighbors in the walk) and the
-        # layered path must match the generic one.
+        # Multiple subdofhandlers: the rectangular per-(sdh, sdh) mask expansions make the
+        # interface enumeration exact for cross-subdofhandler neighbors too, so the counting
+        # build inserts the interface entries directly (exact reservation, no slack) and
+        # must match the generic path.
         dh3 = DofHandler(grid)
         sdh_a = SubDofHandler(dh3, Set(1:12))
         add!(sdh_a, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
@@ -490,6 +491,36 @@ end
             sp = add_sparsity_entries!(init_sparsity_pattern(dh3), dh3; topology = topo, interface_coupling = ic)
             sp_gen = fsp_test_build_generic(dh3; topology = topo, interface_coupling = ic)
             compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
+        end
+        # ... also with different fields per subdofhandler and a restricted (asymmetric)
+        # interface_coupling: the cross-sdh masks are rectangular (different local layouts
+        # on the two sides) and the mask is sized by the fields of the full DofHandler.
+        dh4 = DofHandler(grid)
+        sdh_c = SubDofHandler(dh4, Set(1:12))
+        add!(sdh_c, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        add!(sdh_c, :b, DiscontinuousLagrange{RefQuadrilateral, 1}()^2)
+        sdh_d = SubDofHandler(dh4, Set(13:25))
+        add!(sdh_d, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        close!(dh4)
+        for ic in ([true true; false false], [true false; true true], trues(2, 2))
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh4), dh4; topology = topo, interface_coupling = ic)
+            sp_gen = fsp_test_build_generic(dh4; topology = topo, interface_coupling = ic)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
+        end
+        # ... also with cells not covered by any subdofhandler adjacent to covered cells:
+        # an uncovered neighbor has no dofs and contributes no interface entries, but the
+        # covered side's same-side interface block is still added.
+        dh5 = DofHandler(grid)
+        sdh_e = SubDofHandler(dh5, Set(1:12))
+        add!(sdh_e, :a, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        close!(dh5)
+        let ic = trues(1, 1)
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh5), dh5; topology = topo, interface_coupling = ic)
+            sp_gen = fsp_test_build_generic(dh5; topology = topo, interface_coupling = ic)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            @test sum(r -> r.nmax, sp.buffer.indices) == sum(length, Ferrite.eachrow(sp))
         end
     end
     # The counting build also covers pre-populated patterns (existing entries are kept verbatim and
@@ -520,10 +551,45 @@ end
         add!(ch, Dirichlet(:a, getfacetset(dh.grid, "left"), x -> 0.0))
         close!(ch)
         sp_big_kc = add_sparsity_entries!(SparsityPattern(n, n), dh, ch; keep_constrained = false)
-        sp_big_kc_gen = SparsityPattern(n, n)
-        Ferrite.add_entry!(sp_big_kc_gen, 1, 1) # forces the generic branch
-        add_sparsity_entries!(sp_big_kc_gen, dh, ch; keep_constrained = false)
+        sp_big_kc_gen = fsp_test_build_generic(dh, ch; sp = SparsityPattern(n, n), keep_constrained = false)
         compare_matrices(allocate_matrix(sp_big_kc), allocate_matrix(sp_big_kc_gen))
+    end
+    # Multi-chunk builds: enough rows (> 1000, the minimum chunk size) that the chunked
+    # passes and instantiations span several tasks when the test runs with threads. All
+    # combinations must match the generic path exactly, and repeated builds be identical.
+    let
+        grid = generate_grid(Hexahedron, (6, 6, 6))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefHexahedron, 2}())
+        add!(dh, :v, Lagrange{RefHexahedron, 1}()^3)
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:u, getfacetset(grid, "left"), x -> 0.0))
+        close!(ch)
+        topo = ExclusiveTopology(grid)
+        for kwargs in (
+                (;),
+                (; coupling = [true true; false true]),
+                (; keep_constrained = false),
+                (; interface_coupling = trues(2, 2), topology = topo),
+                (; coupling = [true true; false true], interface_coupling = [true false; true true], topology = topo, keep_constrained = false),
+            )
+            sp = add_sparsity_entries!(init_sparsity_pattern(dh), dh, ch; kwargs...)
+            sp_gen = fsp_test_build_generic(dh, ch; kwargs...)
+            sp_again = add_sparsity_entries!(init_sparsity_pattern(dh), dh, ch; kwargs...)
+            compare_patterns(sp, sp_gen, sp_again)
+            compare_matrices(allocate_matrix(sp), allocate_matrix(sp_gen))
+            compare_matrices_csr(
+                allocate_matrix(SparseMatrixCSR{1, Float64, Int}, sp),
+                allocate_matrix(SparseMatrixCSR{1, Float64, Int}, sp_gen),
+            )
+        end
+        # Oversized pattern at multi-chunk scale (extra rows are diagonal-only and never
+        # constrained)
+        n = ndofs(dh) + 3
+        sp_big = add_sparsity_entries!(SparsityPattern(n, n), dh, ch; keep_constrained = false)
+        sp_big_gen = fsp_test_build_generic(dh, ch; sp = SparsityPattern(n, n), keep_constrained = false)
+        compare_matrices(allocate_matrix(sp_big), allocate_matrix(sp_big_gen))
     end
     # Test different number types (Int32, Float32)
     for Tv in (Float32, Float64)

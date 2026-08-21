@@ -13,6 +13,7 @@ ConstraintHandler
 Dirichlet
 ProjectedDirichlet
 PeriodicDirichlet
+AffineConstraint
 collect_periodic_facets
 collect_periodic_facets!
 add!

@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    generic `AbstractMatrix` method, which does a redundant second lookup, reports writes outside
    the sparsity pattern as an `ArgumentError` instead of a `Ferrite.SparsityError`, and throws
    for atomic accumulation. ([#1489])
+ - `add_interface_entries!` (and thereby `interface_coupling` builds) no longer errors for
+   grids where some cells are not covered by any `SubDofHandler`: an uncovered cell has no
+   dofs and contributes no interface entries, but the covered side of such an interface
+   still gets its same-side entries. ([#1490])
  - `add_sparsity_entries!` (and thereby `allocate_matrix`) now guarantees that passing
    `interface_coupling` adds the requested interface entries: the `topology` keyword
    argument is now optional and, when not passed, constructed from the grid (previously
@@ -27,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    both keyword arguments behave exactly as before. ([#1468])
 
 ### Added
+ - Added mesh-free [`AlgebraicVariable`s](https://ferrite-fem.github.io/Ferrite.jl/dev/topics/algebraic_variables/)
+   and coupling descriptors for small global unknowns such as Lagrange multipliers and
+   homogenized quantities. See the documentation for details. ([#1422])
  - `ExclusiveTopology` now supports grids with mixed reference dimensions (e.g. a 3D grid
    containing both `Hexahedron` and `Quadrilateral` cells). Mixed-dimensional connections
    are stored in `vertex_vertex_neighbor`, `edge_edge_neighbor`, and `face_face_neighbor`
@@ -64,7 +71,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `keep_constrained = false` are used) and 10-25x for builds with `interface_coupling`
    (e.g. DG), at roughly half the peak memory use. This applies to all entry points
    (`allocate_matrix`, `add_sparsity_entries!`, ...) and the resulting patterns and
-   matrices are unchanged. ([#1397])
+   matrices are unchanged. ([#1397], [#1490])
+ - Building a `SparsityPattern` and instantiating a `SparseMatrixCSC` or `SparseMatrixCSR`
+   from it is now multithreaded. ([#1481])
 
 ### Internal changes
  - `SparsityPattern` has been rewritten: all rows are now stored in a single contiguous
@@ -74,6 +83,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    been removed. ([#1397])
  - The documented contract of `Ferrite.eachrow(sp[, row])` for `AbstractSparsityPattern` now
    states that column indices are iterated in sorted order. ([#1397])
+
+### Performance
+ - Faster `ExclusiveTopology` construction (about 1.5x for hexahedral and 1.7x for
+   tetrahedral grids), `vertex_star_stencils` (roughly 30x), and `getneighborhood` with an
+   `EdgeIndex` (roughly 4x). ([#1466])
+
+### Documentation
+ - New tutorial: Stress-driven computational homogenization, where the macroscopic
+   strain is an unknown algebraic variable and the prescribed average stress acts as
+   the load, including a blocked-matrix Schur complement solve of the coupled system.
+   ([#1396])
+ - The Stokes flow tutorial now also implements the boundary mean value constraint by
+   retaining the Lagrange multiplier as an algebraic variable, as an alternative to
+   eliminating it with an `AffineConstraint`. ([#1422])
 
 ## [v1.6.0] - 2026-08-02
 
@@ -1407,24 +1430,29 @@ poking into Ferrite internals:
 [#1381]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1381
 [#1382]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1382
 [#1384]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1384
+[#1396]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1396
 [#1387]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1387
 [#1388]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1388
 [#1389]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1389
 [#1393]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1393
+[#1397]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1397
 [#1414]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1414
 [#1415]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1415
 [#1417]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1417
 [#1420]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1420
 [#1421]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1421
+[#1422]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1422
 [#1423]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1423
 [#1426]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1426
 [#1428]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1428
-[#1397]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1397
 [#1432]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1432
 [#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
-[#1468]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1468
 [#1438]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1438
 [#1452]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1452
+[#1466]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1466
+[#1468]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1468
 [#1474]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1474
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
+[#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
+[#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490

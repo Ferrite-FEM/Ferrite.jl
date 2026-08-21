@@ -186,16 +186,44 @@ function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsi
     for (row, colidxs) in enumerate(Ferrite.eachrow(sp))
         rowptr[row + 1] = rowptr[row] + length(colidxs)
     end
-    nnz = rowptr[end] - 1
+    nnz = Int(rowptr[end]) - 1
     # 2. Allocate colval and nzval now that nnz is known
     colval = Vector{Ti}(undef, nnz)
     nzval = zeros(Tv, nnz)
-    # 3. Populate colval row by row
+    # 3. Populate colval
+    _fill_colval!(colval, rowptr, sp)
+    return SparseMatrixCSR{1}(nrows, Ferrite.getncols(sp), rowptr, colval, nzval)
+end
+
+# Generic AbstractSparsityPattern: the interface only promises whole-pattern row iteration
+# (rows may be lazy generators, and implementations need not support concurrent row
+# access), so the rows are copied serially in iteration order.
+function _fill_colval!(colval::Vector, rowptr::Vector, sp::AbstractSparsityPattern)
     k = 1
     for colidxs in Ferrite.eachrow(sp)
         k = _copyto!(colval, k, colidxs)
     end
-    return SparseMatrixCSR{1}(nrows, Ferrite.getncols(sp), rowptr, colval, nzval)
+    # The copy pass must consume exactly the row lengths that built rowptr
+    @assert k == rowptr[end]
+    return
+end
+
+# SparsityPattern: the rows are random-access views of disjoint slices, so each chunk of
+# rows is copied concurrently into its disjoint slice of colval.
+function _fill_colval!(colval::Vector{Ti}, rowptr::Vector{Ti}, sp::Ferrite.SparsityPattern) where {Ti}
+    Ferrite._ensure_sorted!(sp)
+    @sync for rowrange in Ferrite._task_chunks(Ferrite.getnrows(sp))
+        Threads.@spawn _fill_colval_chunk!(colval, rowptr, sp, rowrange)
+    end
+    return
+end
+
+function _fill_colval_chunk!(colval::Vector{Ti}, rowptr::Vector{Ti}, sp::Ferrite.SparsityPattern, rowrange::UnitRange{Int}) where {Ti}
+    @inbounds for row in rowrange
+        colidxs = Ferrite._row_view(sp, row)
+        copyto!(colval, Int(rowptr[row]), colidxs, 1, length(colidxs))
+    end
+    return
 end
 
 end

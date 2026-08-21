@@ -118,6 +118,21 @@ function neighbor_index_sum(top::ExclusiveTopology)
     return acc
 end
 
+# getneighborhood through the EdgeIndex path for every edge of every cell. For cells with
+# reference dimension 3 only the exclusive edge neighborhood is stored, so the full
+# neighborhood is recomputed for each query.
+function edge_neighborhood_sweep(top, grid)
+    acc = 0
+    for c in 1:getncells(grid)
+        for e in 1:Ferrite.nedges(getcells(grid, c))
+            for n in getneighborhood(top, grid, EdgeIndex(c, e))
+                acc += n[1] + n[2]
+            end
+        end
+    end
+    return acc
+end
+
 # getneighborhood for every facet of the (precomputed) facet skeleton: the FacetIndex
 # query path, as used e.g. when assembling over interior facets (see issue #1019).
 function skeleton_neighborhood_sweep(top, grid, skeleton)

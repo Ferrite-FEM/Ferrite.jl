@@ -477,6 +477,42 @@ def scene_computational_homogenization():
            res=[1600, 950], pan_y=-0.12)
 
 
+# --- stress_driven_homogenization: von Mises stress on the RVE deformed by
+# the total displacement (macroscopic + fluctuation) that results from the
+# prescribed macroscopic shear stress
+@scene("stress_driven_homogenization")
+def scene_stress_driven_homogenization():
+    view = new_view()
+    r = OpenDataFile(datadir + "/stress_driven_homogenization.vtu")
+    w = warp(r, "u_total", 4.0)  # ~3.6% average shear strain, exaggerated to be visible
+    calc = Calculator(Input=w)  # GPa: the raw Pa values need exponent labels
+    calc.AttributeType = "Cell Data"
+    calc.ResultArrayName = "vonMisesGPa"
+    calc.Function = "vonMises/1e9"
+    d = surface(calc, view, edges=False)
+    lut = colorbar(d, view, ("CELLS", "vonMisesGPa"), title="von Mises [GPa]",
+                   fmt="%.0f")
+    # clamp the colour range: a few stress-concentration cells between nearly
+    # touching inclusions would otherwise wash out the scale
+    lut.RescaleTransferFunction(0.0, 4.0)
+    # overlay the undeformed outline as the reference that makes the
+    # (exaggerated) macroscopic strain visible; the wiggles of the deformed
+    # boundary are the periodic fluctuation field
+    lift = Transform(Input=r)  # lift slightly towards the camera so the
+    lift.Transform.Translate = [0.0, 0.0, 0.001]  # outline is not z-fought
+    outline = FeatureEdges(Input=ExtractSurface(Input=lift))  # needs polydata
+    outline.BoundaryEdges = 1
+    outline.FeatureEdges = 0
+    outline.ManifoldEdges = 0
+    outline.NonManifoldEdges = 0
+    od = Show(outline, view)
+    od.Representation = "Surface"
+    od.ColorArrayName = [None, ""]
+    od.AmbientColor = od.DiffuseColor = [0.5, 0.5, 0.5]
+    od.LineWidth = 3.0
+    finish(view, "stress_driven_homogenization", twod=True, zoom=0.9)
+
+
 # --- linear_shell: deflected shell coloured by displacement magnitude
 @scene("linear_shell")
 def scene_linear_shell():
