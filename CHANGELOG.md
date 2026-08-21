@@ -47,9 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    explicit constraint data and index offsets, so the same methods serve a matrix on its own and
    as a block of a blocked matrix, and the BlockArrays extension contains no format specific
    code. As part of this, `apply!` and `apply_zero!` dispatch on `AbstractMatrix` rather than
-   `AbstractSparseMatrix`. ([#1486])
+   `AbstractSparseMatrix`. ([#1489])
  - `apply!` on a `SparseMatrixCSR` now supports affine constraints, which previously threw
-   `"condensation of ::SparseMatrixCSR{...} matrix not supported"`. ([#1486])
+   `"condensation of ::SparseMatrixCSR{...} matrix not supported"`. ([#1489])
 
 ### Performance
  - `create_coloring` is significantly faster: the incidence matrix construction and the
@@ -1448,4 +1448,4 @@ poking into Ferrite internals:
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
-[#1486]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1486
+[#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489

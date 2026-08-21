@@ -1,7 +1,5 @@
 module FerriteBlockArrays
 
-using BlockArrays: BlockArray, BlockIndex, BlockMatrix, BlockVector, block, blockaxes,
-    blockindex, blocks, findblockindex
 using BlockArrays: Block, BlockArray, BlockIndex, BlockMatrix, BlockVector, block,
     blockaxes, blockindex, blocks, findblockindex, undef_blocks
 using Ferrite:
@@ -179,18 +177,18 @@ function Ferrite.zero_out_rows!(K::BlockMatrix, ch::ConstraintHandler)
     return
 end
 
-# Compute "f -= K*inhomogeneities" block by block. The generic fallback would go through
-# LinearAlgebra's scalar indexing matvec for a BlockMatrix, which is O(ndofs^2).
-function Ferrite.add_inhomogeneities!(f::AbstractVector, K::BlockMatrix, ch::ConstraintHandler)
+# Compute "f -= K*g" block by block. The generic fallback would go through LinearAlgebra's
+# scalar indexing matvec for a BlockMatrix, which is O(ndofs^2).
+function Ferrite.add_inhomogeneities!(f::AbstractVector, K::BlockMatrix, columns::AbstractVector{<:Integer}, inhomogeneities::AbstractVector)
     for Bj in blockaxes(K, 2)
         cols = blockrange(K, 2, Bj)
-        idxs = prescribed_range(ch.prescribed_dofs, cols)
+        idxs = prescribed_range(columns, cols)
         isempty(idxs) && continue
-        local_dofs = ch.prescribed_dofs[idxs] .- (first(cols) - 1)
-        inhomogeneities = view(ch.inhomogeneities, idxs)
+        local_dofs = columns[idxs] .- (first(cols) - 1)
+        local_inhomogeneities = view(inhomogeneities, idxs)
         for Bi in blockaxes(K, 1)
             fi = view(f, blockrange(K, 1, Bi))
-            Ferrite.add_inhomogeneities!(fi, @view(K[Bi, Bj]), local_dofs, inhomogeneities)
+            Ferrite.add_inhomogeneities!(fi, @view(K[Bi, Bj]), local_dofs, local_inhomogeneities)
         end
     end
     return f
