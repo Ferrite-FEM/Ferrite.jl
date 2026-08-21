@@ -93,6 +93,18 @@ end
     Most examples make use of Dirichlet boundary conditions, for example [Heat
     Equation](@ref tutorial-heat-equation).
 
+### Constraining dofs by kind
+
+Some interpolations have dofs representing more than one kind of quantity (see
+[Dof functionals](@ref dof-functionals)). By default a `Dirichlet` condition constrains the dofs
+representing function values ([`PointValue`](@ref)); the `functional` keyword selects
+other kinds. For example, for a Hermite-type interpolation with both value and derivative
+dofs, the derivative can be prescribed with
+
+```julia
+dbc = Dirichlet(:w, getfacetset(grid, "left"), Returns(0.0); functional = PointDerivative)
+```
+
 ## ProjectedDirichlet
 Some interpolations don't have nodal support points:
 ``H(\mathrm{curl})`` interpolations, e.g., `Nedelec`, are associated to edges and faces,

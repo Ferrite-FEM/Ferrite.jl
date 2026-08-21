@@ -1,6 +1,6 @@
 # abstract type Constraint end
 """
-    Dirichlet(u::Symbol, ∂Ω::AbstractVecOrSet, f::Function, components = nothing)
+    Dirichlet(u::Symbol, ∂Ω::AbstractVecOrSet, f::Function, components = nothing; functional = PointValue)
 
 Create a Dirichlet boundary condition on `u` on the `∂Ω` part of
 the boundary. `f` is a function of the form `f(x)` or `f(x, t)`
@@ -8,6 +8,18 @@ where `x` is the spatial coordinate and `t` is the current time,
 and returns the prescribed value. `components` specify the components
 of `u` that are prescribed by this condition. By default all components
 of `u` are prescribed.
+
+`functional` selects which dofs the condition constrains, for interpolations whose dofs
+represent more than one kind of [`Ferrite.DofFunctional`](@ref) (cf.
+[`Ferrite.dof_functionals`](@ref)). The default, [`PointValue`](@ref), constrains the
+dofs whose value is the function value at the dof location. Pass a `DofFunctional`
+subtype to constrain all dofs of that family, or an instance to constrain exactly
+matching dofs, e.g. `functional = PointDerivative` for all derivative dofs of a
+Hermite-type interpolation. Note that all matched dofs at a location are prescribed the
+same value `f(x, t)`, so a family selector matching several distinct dofs (e.g. both
+``\\partial_x`` and ``\\partial_y`` derivative dofs at a vertex) is typically only
+meaningful for homogeneous conditions; prescribe distinct values with one condition per
+exact functional, e.g. `functional = PointDerivative((1, 0))`.
 
 The set, `∂Ω`, can be an `AbstractSet` or `AbstractVector` with elements of
 type [`FacetIndex`](@ref), [`FaceIndex`](@ref), [`EdgeIndex`](@ref), [`VertexIndex`](@ref),
@@ -43,11 +55,12 @@ struct Dirichlet # <: Constraint
     facets::OrderedSet{T} where {T <: Union{Int, FacetIndex, FaceIndex, EdgeIndex, VertexIndex}}
     field_name::Symbol
     components::Vector{Int} # components of the field
+    functional::Union{Type{<:DofFunctional}, DofFunctional} # which dofs to constrain (cf. dof_functionals)
     local_facet_dofs::Vector{Int}
     local_facet_dofs_offset::Vector{Int}
 end
-function Dirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function, components = nothing)
-    return Dirichlet(f, convert_to_orderedset(facets), field_name, __to_components(components), Int[], Int[])
+function Dirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function, components = nothing; functional::Union{Type{<:DofFunctional}, DofFunctional} = PointValue)
+    return Dirichlet(f, convert_to_orderedset(facets), field_name, __to_components(components), functional, Int[], Int[])
 end
 
 # components=nothing is default and means that all components should be constrained
@@ -275,6 +288,9 @@ function Base.show(io::IO, ::MIME"text/plain", ch::ConstraintHandler)
         print(io, "  BCs:")
         for dbc in ch.dbcs
             print(io, "\n    ", "Field: ", dbc.field_name, ", ", "Components: ", dbc.components)
+            if !(dbc.functional === PointValue || dbc.functional === PointValue())
+                print(io, ", ", "Functional: ", dbc.functional)
+            end
         end
     end
     return
@@ -403,7 +419,7 @@ end
 # Dirichlet on (facet|face|edge|vertex)set
 function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfacets::AbstractVecOrSet{Index}, interpolation::Interpolation, field_dim::Int, offset::Int, bcvalue::BCValues, _) where {Index <: BoundaryIndex}
     local_facet_dofs, local_facet_dofs_offset =
-        _local_facet_dofs_for_bc(interpolation, field_dim, dbc.components, offset, dirichlet_boundarydof_indices(eltype(bcfacets)))
+        _local_facet_dofs_for_bc(interpolation, field_dim, dbc.components, offset, dirichlet_boundarydof_indices(eltype(bcfacets)), dbc.functional)
     copy!(dbc.local_facet_dofs, local_facet_dofs)
     copy!(dbc.local_facet_dofs_offset, local_facet_dofs_offset)
 
@@ -428,14 +444,23 @@ end
 
 # Calculate which local dof index live on each facet:
 # facet `i` have dofs `local_facet_dofs[local_facet_dofs_offset[i]:local_facet_dofs_offset[i+1]-1]
-function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F = dirichlet_facetdof_indices) where {F}
+function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F = dirichlet_facetdof_indices, functional = nothing) where {F}
     @assert issorted(components)
+    # `functional === nothing` means no filtering (the PeriodicDirichlet and
+    # ProjectedDirichlet callers); the filter must mirror the one in `BCValues` to keep
+    # the dof list and the pseudo quadrature points index-aligned
+    functionals = functional === nothing ? nothing : dof_functionals(interpolation)
     local_facet_dofs = Int[]
     local_facet_dofs_offset = Int[1]
     for (_, facet) in enumerate(boundaryfunc(interpolation))
-        for fdof in facet, d in 1:field_dim
-            if d in components
-                push!(local_facet_dofs, (fdof - 1) * field_dim + d + offset)
+        for fdof in facet
+            if functionals !== nothing
+                matches_functional(functional, functionals[fdof]) || continue
+            end
+            for d in 1:field_dim
+                if d in components
+                    push!(local_facet_dofs, (fdof - 1) * field_dim + d + offset)
+                end
             end
         end
         push!(local_facet_dofs_offset, length(local_facet_dofs) + 1)
@@ -989,14 +1014,33 @@ function add!(ch::ConstraintHandler{<:Any, Tv, Ti}, dbc::Dirichlet) where {Tv, T
         end
         # Create BCValues for coordinate evaluation at dof-locations
         EntityType = eltype(dbc.facets) # (Facet|Face|Edge|Vertex)Index
+        fs = dof_functionals(interpolation)
         if EntityType <: Integer
+            # The node idx -> local dof idx assumption in the nodeset _add! below only
+            # holds for purely nodal interpolations
+            if !(all(f -> f isa PointValue, fs) && matches_functional(dbc.functional, PointValue()))
+                throw(ArgumentError("Dirichlet conditions on a nodeset are only supported for interpolations whose dofs are all point values (got $(interpolation) with functional = $(dbc.functional)); use a facetset or vertexset instead."))
+            end
             # BCValues are just dummy for nodesets so set to FacetIndex
             EntityType = FacetIndex
+        else
+            # Validate the selector against the dofs on the constrained boundary
+            # entities (the same enumeration BCValues and _add! use)
+            boundarydofs = dirichlet_boundarydof_indices(EntityType)(interpolation)
+            used_entities = unique(entityidx for (_, entityidx) in filtered_set)
+            matched = unique(fs[i] for e in used_entities for i in boundarydofs[e] if matches_functional(dbc.functional, fs[i]))
+            if isempty(matched)
+                available = unique(fs[i] for e in used_entities for i in boundarydofs[e])
+                error("interpolation $(interpolation) for field :$(dbc.field_name) has no dofs matching functional $(dbc.functional) on the constrained boundary entities (available functionals: $(join(available, ", ")))")
+            end
+            if any(f -> f isa IntegralMoment, matched)
+                error("dofs with integral moment functionals cannot be prescribed with `Dirichlet`; use `ProjectedDirichlet` instead")
+            end
         end
         CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
-        bcvalues = BCValues(Tv, Ti, interpolation, geometric_interpolation(CT), EntityType)
+        bcvalues = BCValues(Tv, Ti, interpolation, geometric_interpolation(CT), EntityType, dbc.functional)
         # Recreate the Dirichlet(...) struct with the filtered set and call internal add!
-        filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components)
+        filtered_dbc = Dirichlet(dbc.field_name, filtered_set, dbc.f, components; functional = dbc.functional)
         _add!(
             ch, filtered_dbc, filtered_dbc.facets, interpolation, n_comp,
             field_offset(sdh, field_idx), bcvalues, sdh.cellset,
