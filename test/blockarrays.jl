@@ -119,6 +119,63 @@ const BLOCK_TYPES = ("CSC" => SparseMatrixCSC{Float64, Int}, "CSR" => SparseMatr
     @test K == KB
 end
 
+@testset "BlockMatrix affine constraints across blocks ($blockname blocks)" for (blockname, BT) in BLOCK_TYPES
+    # The periodic constraint in the fixture above lives entirely inside the :u block, so it
+    # never exercises a coefficient that maps a dof of one block onto a dof of another. Here
+    # a :p dof is constrained to :u dofs and a :u dof to a :p dof, so condensation has to move
+    # contributions between blocks in both directions.
+    grid = generate_grid(Triangle, (4, 4))
+    dh = DofHandler(grid)
+    ip = Lagrange{RefTriangle, 1}()
+    add!(dh, :u, ip^2)
+    add!(dh, :p, ip)
+    close!(dh)
+    renumber!(dh, DofOrder.FieldWise())
+    nd = ndofs(dh) ÷ 3 # :u occupies 1:2nd (block 1), :p occupies 2nd .+ (1:nd) (block 2)
+
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint(2nd + 1, [1 => 0.4, 2 => 0.3], 1.2)) # a :p dof from :u dofs
+    add!(ch, AffineConstraint(3, [2nd + 2 => 0.5], -0.7))          # a :u dof from a :p dof
+    close!(ch)
+    update!(ch, 0)
+
+    K = allocate_matrix(dh, ch)
+    f = zeros(ndofs(dh))
+    bsp = BlockSparsityPattern([2nd, 1nd])
+    add_sparsity_entries!(bsp, dh, ch)
+    KB = allocate_matrix(BlockMatrix{Float64, Matrix{BT}}, bsp)
+    fB = similar(KB, axes(KB, 1))
+
+    assembler = start_assemble(K, f)
+    block_assembler = start_assemble(KB, fB)
+    npc = ndofs_per_cell(dh)
+    for cc in CellIterator(dh)
+        dofs = celldofs(cc)
+        ke = [sin(i * j / 10) for i in dofs, j in dofs]
+        fe = [cos(i) for i in dofs]
+        assemble!(assembler, dofs, ke, fe)
+        assemble!(block_assembler, dofs, ke, fe)
+    end
+    @test K ≈ KB
+    @test f ≈ fB
+
+    # The condensed free block must equal the explicit C' * K * C and C' * (f - K * g)
+    C, g = Ferrite.create_constraint_matrix(ch)
+    Kref = C' * K * C
+    fref = C' * (f - K * g)
+    fdofs = Ferrite.free_dofs(ch)
+    apply!(K, f, ch)
+    apply!(KB, fB, ch)
+    @test K ≈ KB
+    @test f ≈ fB
+    @test KB[fdofs, fdofs] ≈ Kref
+    @test fB[fdofs] ≈ fref
+    @test K \ f ≈ KB \ fB
+
+    # ... but condensing a Symmetric blocked matrix is unsupported, as for the plain formats
+    @test_throws ErrorException("condensation of ::Symmetric matrix not supported") apply_zero!(Symmetric(KB), fB, ch)
+end
+
 @testset "BlockAssembler with atomic accumulation ($blockname blocks)" for (blockname, BT) in BLOCK_TYPES
     grid = generate_grid(Triangle, (10, 10))
     dh = DofHandler(grid)

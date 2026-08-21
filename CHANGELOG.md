@@ -13,11 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    constraints reaching outside of the element (e.g. `PeriodicDirichlet`) atomically when the
    assembler was created with `atomic = true`. Previously these writes were always
    non-atomic, which is a data race when assembling concurrently without grid coloring. This
-   affects all assemblers. ([#1486])
+   affects all assemblers. ([#1489])
  - `Ferrite.addindex!` is now implemented for `SparseMatrixCSR`. Previously it fell back to the
    generic `AbstractMatrix` method, which does a redundant second lookup, reports writes outside
    the sparsity pattern as an `ArgumentError` instead of a `Ferrite.SparsityError`, and throws
-   for atomic accumulation. ([#1486])
+   for atomic accumulation. ([#1489])
  - `add_sparsity_entries!` (and thereby `allocate_matrix`) now guarantees that passing
    `interface_coupling` adds the requested interface entries: the `topology` keyword
    argument is now optional and, when not passed, constructed from the grid (previously
@@ -47,9 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    explicit constraint data and index offsets, so the same methods serve a matrix on its own and
    as a block of a blocked matrix, and the BlockArrays extension contains no format specific
    code. As part of this, `apply!` and `apply_zero!` dispatch on `AbstractMatrix` rather than
-   `AbstractSparseMatrix`. ([#1486])
+   `AbstractSparseMatrix`. ([#1489])
  - `apply!` on a `SparseMatrixCSR` now supports affine constraints, which previously threw
-   `"condensation of ::SparseMatrixCSR{...} matrix not supported"`. ([#1486])
+   `"condensation of ::SparseMatrixCSR{...} matrix not supported"`. ([#1489])
 
 ### Performance
  - `create_coloring` is significantly faster: the incidence matrix construction and the
@@ -1427,4 +1427,4 @@ poking into Ferrite internals:
 [#1452]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1452
 [#1474]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1474
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
-[#1486]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1486
+[#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489

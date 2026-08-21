@@ -115,10 +115,9 @@ function Ferrite.zero_out_columns!(K::SparseMatrixCSR{1}, ::AbstractVector{<:Int
 end
 
 # The prescribed columns are minors here, so they are spread over all rows and every stored
-# entry has to be visited; the inhomogeneities are scattered into a dense vector for lookup.
+# entry has to be visited.
 function Ferrite.add_inhomogeneities!(f::AbstractVector, K::SparseMatrixCSR{1}, columns::AbstractVector{<:Integer}, inhomogeneities::AbstractVector)
-    g = Ferrite._dense_inhomogeneities(eltype(K), columns, inhomogeneities, size(K, 2))
-    return Ferrite._add_inhomogeneities_minors!(f, K, g)
+    return Ferrite._add_inhomogeneities_minors!(f, K, columns, inhomogeneities)
 end
 
 function Ferrite.condense_into!(
