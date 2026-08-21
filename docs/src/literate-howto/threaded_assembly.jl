@@ -161,6 +161,10 @@ nothing # hide
 #  - `fe::Vector`: the local vector
 #  - `assembler`: the assembler (which needs to be duplicated because it contains buffers
 #    that are modified during the call to `assemble!`)
+#
+# The same rule applies to interface assembly: each task needs its own `InterfaceCache`
+# (or `InterfaceIterator`) and its own [`InterfaceAssemblyBuffer`](@ref) for
+# [`condense_interface!`](@ref), even when the global assembler uses atomic accumulation.
 struct ScratchData{CC, CV, T, A}
     cell_cache::CC
     cellvalues::CV

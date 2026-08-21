@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Next] - xxxx-xx-xx
 
+### Breaking changes
+ - `dof_range(ic::InterfaceCache, field)` now returns a `Ferrite.InterfaceDofRange` — an
+   `AbstractVector{Int}` mapping a field's interface basis index (here side first, then
+   there side, matching `InterfaceValues`) to the corresponding position in the stacked
+   local matrix — instead of a `Tuple` of the two side-local ranges. The two ranges are
+   available as `r.here` and `r.there` of the returned object. **Warning:** code that
+   destructured the old return value, `r_here, r_there = dof_range(ic, field)`, silently
+   binds the first two *elements* of the new return value instead of the two ranges —
+   update such code to `r = dof_range(ic, field)` with `r.here`/`r.there`. The new method
+   also works when the two cells belong to different `SubDofHandler`s (the old method
+   errored for any `DofHandler` with more than one `SubDofHandler`); fields that exist on
+   only one side of the interface are rejected with an error. This is an intentional
+   breaking change of an exported method, and the release including it must carry a version
+   boundary that permits it. ([#1433])
+
 ### Fixes
  - Atomic assembly support for BlockAssembler. ([#1452])
  - `add_interface_entries!` (and thereby `interface_coupling` builds) no longer errors for
@@ -25,6 +40,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Added mesh-free [`AlgebraicVariable`s](https://ferrite-fem.github.io/Ferrite.jl/dev/topics/algebraic_variables/)
    and coupling descriptors for small global unknowns such as Lagrange multipliers and
    homogenized quantities. See the documentation for details. ([#1422])
+ - Interface assembly now supports fields with dofs that are shared between the two cells
+   of an interface (e.g. continuous interpolations, but also H(div)/H(curl) and
+   nonconforming interpolations such as `CrouzeixRaviart` with facet dofs). Local
+   interface matrices/vectors are computed in the stacked layout as before (matching the
+   duplicated basis of `InterfaceValues`) and condensed onto the unique dofs at an
+   explicit boundary before assembly with the new
+   `condense_interface!(buf::InterfaceAssemblyBuffer, ic, Ke, fe)`, after which the
+   ordinary `assemble!` (and `apply_assemble!` for constrained problems) applies. For
+   interfaces without shared dofs (e.g. pure discontinuous Galerkin) `condense_interface!`
+   is a no-copy pass-through; the stacked-to-unique dof map is built lazily on first use
+   after `reinit!`, so existing loops that never use it (raw DG assembly, sparsity
+   construction) keep their current `reinit!` cost. New supporting API:
+   `unique_interfacedofs(ic)`, `nstacked_interface_dofs(ic)`, `nunique_interface_dofs(ic)`,
+   `max_nstacked_interface_dofs(dh)` (allocation bound for local interface
+   matrices/vectors), and `is_shared(ic, i)`. Assembling with a dof vector containing
+   duplicated entries (previously a confusing "missing sparsity pattern entry" error, or
+   silent on some storage layouts) now throws an error message that identifies the
+   duplicated dofs and points to `condense_interface!`. ([#1433])
  - `ExclusiveTopology` now supports grids with mixed reference dimensions (e.g. a 3D grid
    containing both `Hexahedron` and `Quadrilateral` cells). Mixed-dimensional connections
    are stored in `vertex_vertex_neighbor`, `edge_edge_neighbor`, and `face_face_neighbor`
@@ -1426,6 +1459,7 @@ poking into Ferrite internals:
 [#1426]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1426
 [#1428]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1428
 [#1432]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1432
+[#1433]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1433
 [#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
 [#1438]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1438
 [#1452]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1452

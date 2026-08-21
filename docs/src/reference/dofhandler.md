@@ -57,3 +57,14 @@ FacetIterator
 InterfaceCache
 InterfaceIterator
 ```
+
+## Interface dofs
+```@docs
+interfacedofs
+unique_interfacedofs
+nstacked_interface_dofs
+nunique_interface_dofs
+max_nstacked_interface_dofs
+is_shared
+Ferrite.InterfaceDofRange
+```

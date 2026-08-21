@@ -296,7 +296,10 @@ include(joinpath(@__DIR__, "test_utils.jl"))
         add!(dh, :_p, ip_p)
         close!(dh)
         ic = first(InterfaceIterator(dh))
-        @test dof_range(ic, :p) == (9:12, 25:28)
+        r = dof_range(ic, :p)
+        @test r isa Ferrite.InterfaceDofRange
+        @test (r.here, r.there) == (9:12, 25:28) # previously the return value itself
+        @test r == [9:12; 25:28]
     end
     # Test copy
     iv = InterfaceValues(FacetQuadratureRule{RefQuadrilateral}(2), DiscontinuousLagrange{RefQuadrilateral, 1}())

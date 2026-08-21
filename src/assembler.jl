@@ -413,7 +413,7 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
                 else
                     # No entry exists in the global matrix for this row, which is allowed
                     # as long as the value which would have been inserted is zero.
-                    iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol)
+                    iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol, sortedrowdofs)
                     lo = R
                 end
             end
@@ -440,7 +440,7 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
             else # Krow > Kerow_dof
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
-                iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol)
+                iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol, sortedrowdofs)
                 # Advance the local matrix row pointer
                 ri += 1
             end
@@ -448,7 +448,7 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
         # Make sure that remaining entries in this column of the local matrix are all zero
         for i in ri:maxlookups
             if !iszero(Ke[rowpermutation[i], Kecol])
-                _missing_sparsity_pattern_error(sortedrowdofs[i], Kcol)
+                _missing_sparsity_pattern_error(sortedrowdofs[i], Kcol, sortedrowdofs)
             end
         end
         current_col += 1
@@ -456,15 +456,136 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
     return
 end
 
-function _missing_sparsity_pattern_error(Krow::Integer, Kcol::Integer)
+function _missing_sparsity_pattern_error(Krow::Integer, Kcol::Integer, sorteddofs::Union{AbstractVector{<:Integer}, Nothing} = nothing)
     msg = "You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), " *
         "$(Kcol)] is missing in the sparsity pattern. Make sure you have called `K = " *
         "allocate_matrix(dh)` or `K = allocate_matrix(dh, ch)` if you " *
         "have affine constraints. This error might also happen if you are using " *
         "the assembler in a threaded assembly loop (you need to create one " *
         "`assembler` for each task)."
+    if sorteddofs !== nothing && _has_duplicates_sorted(sorteddofs)
+        msg *= " Note: the dof index vector passed to `assemble!` contains duplicated " *
+            "entries. This happens in interface assembly when a field has dofs that are " *
+            "shared between the two cells (e.g. a continuous interpolation): the local " *
+            "matrix must then be condensed onto the unique dofs before assembly, see " *
+            "`condense_interface!`. (The reported entry may nevertheless also be " *
+            "genuinely missing from the sparsity pattern.)"
+    end
     throw(ErrorException(msg))
 end
+
+function _has_duplicates_sorted(sorteddofs::AbstractVector{<:Integer})
+    for i in 2:length(sorteddofs)
+        sorteddofs[i] == sorteddofs[i - 1] && return true
+    end
+    return false
+end
+
+## Interface assembly: condensation of stacked local matrices onto unique dofs ##
+
+"""
+    InterfaceAssemblyBuffer{T}(max_ndofs::Int = 0)
+
+Scratch storage for [`condense_interface!`](@ref). The element type `T` should match the
+element type of the local matrix/vector to be condensed (e.g. a dual number type when the
+local matrix is produced by automatic differentiation); it is deliberately independent of
+both the `InterfaceCache` and the assembler. Values are stored with ordinary assignment
+conversion, so a lossy element type combination fails with the usual conversion error.
+`max_ndofs` (e.g. [`max_nstacked_interface_dofs`](@ref)) presizes the storage; the buffer
+grows as needed.
+
+!!! note "Threading"
+    The buffer is mutable scratch: each concurrent task needs its own
+    `InterfaceAssemblyBuffer` (and its own `InterfaceCache`/`InterfaceIterator`), even when
+    the global assembler uses atomic accumulation. Sharing one buffer between tasks is not
+    supported.
+"""
+struct InterfaceAssemblyBuffer{T}
+    Kc::Vector{T}
+    fc::Vector{T}
+end
+function InterfaceAssemblyBuffer{T}(max_ndofs::Int = 0) where {T}
+    return InterfaceAssemblyBuffer{T}(Vector{T}(undef, max_ndofs * max_ndofs), Vector{T}(undef, max_ndofs))
+end
+
+"""
+    condense_interface!(buf::InterfaceAssemblyBuffer, ic::InterfaceCache, Ke::AbstractMatrix) -> (udofs, Kc)
+    condense_interface!(buf::InterfaceAssemblyBuffer, ic::InterfaceCache, Ke::AbstractMatrix, fe::AbstractVector) -> (udofs, Kc, fc)
+
+Condense a local interface matrix `Ke` (and optionally vector `fe`), computed in the
+*stacked* layout of [`interfacedofs`](@ref), onto the unique interface dofs, such that the
+result can be assembled with the ordinary `assemble!(assembler, udofs, Kc, fc)` (or
+`apply_assemble!(assembler, ch, udofs, Kc, fc)` for constrained problems).
+
+With `T` the map from unique to stacked dofs, this computes `Kc = Tᵀ Ke T` and
+`fc = Tᵀ fe`: the two stacked copies of a dof shared between the cells are summed onto its
+single unique position. Note that condensation *preserves* the local bilinear/linear form
+supplied by the kernel — a kernel that weights the two copies of a shared dof incorrectly
+(e.g. summing raw side values of a continuous field) is not repaired by it. See the
+documentation on interface assembly for the weighting rules.
+
+When the interface has no shared dofs (e.g. pure discontinuous interpolations) the inputs
+`Ke`/`fe` are returned unchanged, without copying.
+
+On both paths the returned dof vector is `unique_interfacedofs(ic)` (the identical object).
+The lifetime of the outputs depends on the path:
+- the dof vector is borrowed cache storage, valid until the next `reinit!` of the cache;
+- a condensed `Kc`/`fc` is borrowed buffer storage, overwritten by the next
+  `condense_interface!` call with the same buffer;
+- on the no-sharing pass-through, `Kc === Ke` and `fc === fe` follow the lifetime of the
+  caller's own arrays (reuse of the buffer does not invalidate them).
+Borrowed outputs must not be mutated and must be copied before storing.
+
+`Ke` and `fe` must use one-based indexing and must not alias the buffer's storage (e.g. a
+`Kc` returned from a previous call must not be passed back in).
+"""
+function condense_interface!(
+        buf::InterfaceAssemblyBuffer, ic::InterfaceCache,
+        Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing
+    )
+    Base.require_one_based_indexing(Ke)
+    fe === nothing || Base.require_one_based_indexing(fe)
+    ns = nstacked_interface_dofs(ic)
+    if size(Ke) != (ns, ns)
+        throw(DimensionMismatch("size(Ke) = $(size(Ke)) does not match the stacked interface size ($ns, $ns)"))
+    end
+    if fe !== nothing && length(fe) != ns
+        throw(DimensionMismatch("length(fe) = $(length(fe)) does not match the stacked interface size $ns"))
+    end
+    if _array_root(Ke) === buf.Kc || _array_root(Ke) === buf.fc ||
+            (fe !== nothing && (_array_root(fe) === buf.Kc || _array_root(fe) === buf.fc))
+        throw(ArgumentError("the input matrix/vector aliases the buffer's storage (e.g. the output of a previous condense_interface! call): pass the original stacked local matrix/vector instead"))
+    end
+    _ensure_unique_interface_map!(ic)
+    udofs = unique_interfacedofs(ic)
+    if !ic.any_shared
+        # No shared dofs: stacked == unique, pass the inputs through without copying
+        return fe === nothing ? (udofs, Ke) : (udofs, Ke, fe)
+    end
+    m = ic.stacked_to_unique
+    nu = length(ic.unique_dofs)
+    length(buf.Kc) < nu * nu && resize!(buf.Kc, nu * nu)
+    Kc = reshape(view(buf.Kc, 1:(nu * nu)), nu, nu)
+    fill!(Kc, zero(eltype(Kc)))
+    @inbounds for j in 1:ns
+        mj = m[j]
+        for i in 1:ns
+            Kc[m[i], mj] += Ke[i, j]
+        end
+    end
+    fe === nothing && return udofs, Kc
+    length(buf.fc) < nu && resize!(buf.fc, nu)
+    fc = view(buf.fc, 1:nu)
+    fill!(fc, zero(eltype(fc)))
+    @inbounds for i in 1:ns
+        fc[m[i]] += fe[i]
+    end
+    return udofs, Kc, fc
+end
+
+# Root array behind (nested) views/reshapes, for the aliasing check above
+_array_root(A::Union{SubArray, Base.ReshapedArray}) = _array_root(parent(A))
+_array_root(A::AbstractArray) = A
 
 ## assemble! with local condensation ##
 
@@ -487,6 +608,12 @@ When the keyword argument `apply_zero` is `true` all inhomogeneities are set to 
 [`apply!`](@ref) vs [`apply_zero!`](@ref)).
 
 Note that this method is destructive since it modifies `local_matrix` and `local_vector`.
+
+!!! note
+    `global_dofs` must not contain duplicated entries: the constraint condensation assumes
+    a one-to-one map between local indices and global dofs. For interface assembly with
+    fields that share dofs between the two cells, condense the stacked local system with
+    [`condense_interface!`](@ref) first and pass the result to this function.
 """
 function apply_assemble!(
         assembler::AbstractAssembler, ch::ConstraintHandler,

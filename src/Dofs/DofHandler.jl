@@ -239,6 +239,23 @@ ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell
 ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell # for compatibility with DofHandler
 
 """
+    max_nstacked_interface_dofs(dh::DofHandler) -> Int
+
+Return an upper bound for [`nstacked_interface_dofs`](@ref) over all interfaces of the
+grid, computed as `2 * maximum(ndofs_per_cell, dh.subdofhandlers)` (the two neighboring
+cells may both belong to the `SubDofHandler` with the most dofs per cell). Since the
+stacked size also bounds [`nunique_interface_dofs`](@ref), this can be used to size local
+interface matrices/vectors and [`InterfaceAssemblyBuffer`](@ref)s.
+
+The bound may overestimate, e.g. when the cells of the largest `SubDofHandler` never
+neighbor each other; the exact per-interface size is `nstacked_interface_dofs(ic)`.
+"""
+function max_nstacked_interface_dofs(dh::DofHandler)
+    isclosed(dh) || error("DofHandler must be closed")
+    return 2 * maximum(ndofs_per_cell, dh.subdofhandlers)
+end
+
+"""
     celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
 
 Store the degrees of freedom that belong to cell `i` in `global_dofs`.
