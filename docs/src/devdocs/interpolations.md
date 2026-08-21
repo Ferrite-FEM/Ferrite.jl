@@ -47,6 +47,31 @@ Ferrite.mapping_type
 Ferrite.get_direction
 ```
 
+#### Implementing dof functionals
+Every local dof carries a [`Ferrite.DofFunctional`](@ref) describing its physical meaning,
+queryable with [`Ferrite.dof_functionals`](@ref). Scalar interpolations default to
+all-[`PointValue`](@ref) (correct for nodal bases) and MUST override the method if some
+dofs are not plain point evaluations; interpolations subtyping `VectorInterpolation`
+directly (e.g. `RaviartThomas`) have no fallback and must always define it.
+
+The functional identifies *what* a dof is, never *where* it is located -- geometry stays
+in `reference_coordinates` and the entity dof-index functions -- so that functionals can
+be compared between cells sharing an entity. This comparison is used when a field is
+shared between `SubDofHandler`s: entities that can be shared between cells (vertices,
+edges, and faces in 3D grids) must carry the same dof functional signature in all
+subdomains, otherwise `add!` errors instead of silently aliasing unrelated dofs. Note
+that the moment functionals do not encode the weight function or normalization
+convention, so equal signatures from different interpolation families do not guarantee
+identical functionals.
+
+```@docs; canonical=false
+Ferrite.DofFunctional
+Ferrite.dof_functionals
+```
+```@docs
+Ferrite.matches_functional
+```
+
 #### Interpolations that cannot be constructed from their type
 For interpolations, `ip`, for which `ip == typeof(ip)()` is false (or doesn't work), the following must be implemented manually
 ```@docs

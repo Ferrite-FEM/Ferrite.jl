@@ -167,5 +167,11 @@ using LinearAlgebra
         mdh = testdh_subdomains(2, 1, 1)
         @test_throws ErrorException apply_analytical!(zeros(ndofs(mdh)), mdh, :v, x -> 0.0)  # Missing field
         @test_throws ErrorException apply_analytical!(zeros(ndofs(mdh)), mdh, :u, x -> 0.0)  # Should be f(x)::Vec{2}
+
+        # Non-nodal interpolations (dofs that are not point values) are not supported
+        rtdh = DofHandler(generate_grid(Triangle, (2, 2)))
+        add!(rtdh, :q, RaviartThomas{RefTriangle, 1}())
+        close!(rtdh)
+        @test_throws ErrorException apply_analytical!(zeros(ndofs(rtdh)), rtdh, :q, x -> zero(Vec{2}))
     end
 end
