@@ -22,6 +22,11 @@
 # ![](helmholtz-light.png)
 # ![](helmholtz-dark.png)
 #
+# [[*Figure 1*](@ref tutorial-helmholtz-figure-1)](@id tutorial-helmholtz-figure-1):
+# Finite element solution ``u`` of the Helmholtz
+# equation on the square domain, with Dirichlet conditions on ``\Gamma_1`` (top and right
+# boundary) and Neumann conditions on ``\Gamma_2`` (bottom and left boundary).
+#
 # We will use the following weak formulation:
 # ```math
 # \int_\Omega \nabla δu \cdot \nabla u \, d\Omega
