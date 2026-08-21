@@ -1,6 +1,7 @@
 # # [Stokes flow](@id tutorial-stokes-flow)
 #
-# **Keywords**: *periodic boundary conditions, multiple fields, mean value constraint*
+# **Keywords**: *periodic boundary conditions, multiple fields, mean value constraint,
+# algebraic variables*
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
@@ -86,7 +87,10 @@
 # and a third equation ``\delta\lambda \int_{\Gamma} p\ \mathrm{d}\Gamma = 0`` so that we
 # can solve for ``\lambda``. However, since we in this case are not interested in computing
 # ``\lambda``, and since the constraint is linear, we can directly embed this constraint
-# using an `AffineConstraint` in Ferrite.
+# using an `AffineConstraint` in Ferrite. Both alternatives are implemented in this
+# tutorial: the main program uses the `AffineConstraint`, and the
+# [last section](@ref stokes-multiplier) shows the Lagrange multiplier variant, where
+# ``\lambda`` is added as an *algebraic variable*.
 #
 # After FE discretization we obtain a linear system of the form
 # ``\underline{\underline{K}}\ \underline{a} = \underline{f}``, where
@@ -447,7 +451,7 @@ end
 # We now have all the puzzle pieces, and just need to define the main function, which puts
 # them all together.
 
-function check_mean_constraint(dh, fvp, u)                                  #src
+function check_mean_constraint(dh, fvp, u; atol = 1.0e-16)                  #src
     ## All external boundaries                                              #src
     set = union(                                                            #src
         getfacetset(dh.grid, "Γ1"), getfacetset(dh.grid, "Γ2"),             #src
@@ -467,7 +471,7 @@ function check_mean_constraint(dh, fvp, u)                                  #src
             Γ += dΓ                                                         #src
         end                                                                 #src
     end                                                                     #src
-    @test ∫pdΓ / Γ ≈ 0.0 atol = 1.0e-16                                     #src
+    @test ∫pdΓ / Γ ≈ 0.0 atol = atol                                        #src
     return                                                                  #src
 end                                                                         #src
 
@@ -537,6 +541,144 @@ end
 main()
 
 # The resulting magnitude of the velocity field is visualized in *Figure 1*.
+
+# ## [Alternative: retaining the Lagrange multiplier](@id stokes-multiplier)
+#
+# As discussed in the introduction, the mean value constraint can also be enforced by
+# keeping the Lagrange multiplier ``\lambda`` as an unknown -- the note above shows the
+# resulting block system. We implement this variant too, since it is a good illustration
+# of [algebraic variables](@ref topic-algebraic-variables): ``\lambda`` is a single
+# scalar unknown without spatial variation, which is exactly what an
+# [`AlgebraicVariable`](@ref) declares. In contrast to the `AffineConstraint`, this
+# approach also generalizes to constraints where the multiplier cannot be eliminated
+# (e.g. nonlinear constraints), or where its value is of interest.
+#
+# We add the multiplier to the `DofHandler` and declare where it couples: a
+# [`FacetCoupling`](@ref) over the boundary facets declares the
+# ``\underline{\underline{C}}_p`` and ``\underline{\underline{C}}_p^\mathrm{T}`` blocks
+# in the sparsity pattern (the tuple form of `algebraic_coupling` couples both
+# directions).
+
+function setup_multiplier_dofs(grid, ipu, ipp)
+    dh = DofHandler(grid)
+    add!(dh, :u, ipu)
+    add!(dh, :p, ipp)
+    add!(dh, :λ, AlgebraicVariable())
+    close!(dh)
+    ## All external boundaries
+    Γ = union(
+        getfacetset(grid, "Γ1"), getfacetset(grid, "Γ2"),
+        getfacetset(grid, "Γ3"), getfacetset(grid, "Γ4"),
+    )
+    coupling = FacetCoupling(Γ; algebraic_coupling = (:p, :λ))
+    return dh, Γ, coupling
+end
+#md nothing #hide
+
+# The boundary conditions are the same as before, except that the mean value constraint
+# is gone -- enforcing it is now the job of the multiplier equation:
+
+function setup_multiplier_constraints(dh)
+    ch = ConstraintHandler(dh)
+    R = rotation_tensor(π / 2)
+    periodic_faces = collect_periodic_facets(dh.grid, "Γ3", "Γ1", x -> R ⋅ x)
+    add!(ch, PeriodicDirichlet(:u, periodic_faces, R, [1, 2]))
+    Γ24 = union(getfacetset(dh.grid, "Γ2"), getfacetset(dh.grid, "Γ4"))
+    add!(ch, Dirichlet(:u, Γ24, (x, t) -> [0, 0], [1, 2]))
+    close!(ch)
+    update!(ch, 0)
+    return ch
+end
+#md nothing #hide
+
+# The cell assembly is completely unchanged: the multiplier dofs are not part of
+# `celldofs`, so `assemble_system!` from above is reused as is. What remains are the
+# multiplier terms, ``\lambda \int_{\Gamma} \delta p\ \mathrm{d}\Gamma`` and
+# ``\delta\lambda \int_{\Gamma} p\ \mathrm{d}\Gamma``, assembled in a loop over the
+# boundary facets where the local system is augmented with the multiplier dof: since it
+# is a global dof, its number (from [`algebraic_dofs`](@ref)) is simply appended after
+# the cell dofs, once, outside the loop, and only the cell dofs are refreshed per facet.
+# Compare with `setup_mean_constraint` above: it is the same integral, but assembled
+# directly into the matrix blocks instead of being turned into an `AffineConstraint`.
+# (The augmented local matrix also contains (zero) entries coupling `:u` and `:λ`, which
+# is fine: assembling an explicit zero into an entry that is missing from the sparsity
+# pattern is allowed.)
+
+function assemble_multiplier_terms!(assembler, dh, fvp, Γ)
+    n = ndofs_per_cell(dh)
+    dofs = Vector{Int}(undef, n + 1)
+    dofs[n + 1] = only(algebraic_dofs(dh, :λ))
+    range_p = dof_range(dh, :p)
+    λdof = n + 1 # local index of the multiplier
+    Ke = zeros(n + 1, n + 1)
+    fe = zeros(n + 1)
+    for facet in FacetIterator(dh, Γ)
+        reinit!(fvp, facet)
+        copyto!(dofs, celldofs(facet)) # refresh the first n entries
+        fill!(Ke, 0)
+        for qp in 1:getnquadpoints(fvp)
+            dΓ = getdetJdV(fvp, qp)
+            for (i, I) in pairs(range_p)
+                Cip = shape_value(fvp, qp, i) * dΓ
+                Ke[I, λdof] += Cip
+                Ke[λdof, I] += Cip
+            end
+        end
+        assemble!(assembler, dofs, Ke, fe)
+    end
+    return
+end
+#md nothing #hide
+
+# The main program for this variant follows the same steps as before. The coupling
+# descriptor is passed to `allocate_matrix` with the `algebraic_couplings` keyword, and
+# the multiplier terms are assembled into the same matrix as the cell contributions
+# (note `fillzero = false`, since the second assembler must not zero out the already
+# assembled cell contributions).
+
+function main_multiplier(h = 0.05)
+    grid = setup_grid(h)
+    ipu = Lagrange{RefTriangle, 2}()^2
+    ipp = Lagrange{RefTriangle, 1}()
+    dh, Γ, coupling = setup_multiplier_dofs(grid, ipu, ipp)
+    ipg = Lagrange{RefTriangle, 1}()
+    cvu, cvp, fvp = setup_fevalues(ipu, ipp, ipg)
+    ch = setup_multiplier_constraints(dh)
+    coupling_matrix = [true true; true false] # no coupling between pressure test/trial functions
+    K = allocate_matrix(dh, ch; coupling = coupling_matrix, algebraic_couplings = coupling)
+    f = zeros(ndofs(dh))
+    ## Assemble the cell contributions (unchanged) and the multiplier terms
+    assemble_system!(K, f, dh, cvu, cvp)
+    assembler = start_assemble(K, f; fillzero = false)
+    assemble_multiplier_terms!(assembler, dh, fvp, Γ)
+    ## Apply boundary conditions and solve
+    apply!(K, f, ch)
+    a = K \ f
+    apply!(a, ch)
+
+    ## Check the result against the AffineConstraint variant. Here the mean constraint  #src
+    ## holds to solver precision only (it is a residual row of K \ f, not enforced      #src
+    ## algebraically like the AffineConstraint), hence the looser tolerance.            #src
+    if h == 0.05                                     #src
+        check_L2(dh, cvu, cvp, a)                    #src
+        check_mean_constraint(dh, fvp, a; atol = 1.0e-12) #src
+    end                                              #src
+
+    ## Return the multiplier value
+    return algebraic_value(dh, a, :λ)
+end
+#md nothing #hide
+
+# Running this gives the same velocity and pressure fields as the main program (which
+# the tests of this tutorial verify), and, now that we solve for it, we can also
+# inspect the multiplier value:
+
+λ = main_multiplier()
+
+# The multiplier vanishes (up to solver precision), as it must: testing the mass balance
+# equation with the constant ``\delta p = 1`` shows that ``\lambda = \frac{1}{|\Gamma|}
+# \int_{\Gamma} \boldsymbol{u} \cdot \boldsymbol{n}\ \mathrm{d}\Gamma``, i.e. the net
+# flux out of the domain, which is zero by the boundary conditions.
 
 #md # ## [Plain program](@id stokes-flow-plain-program)
 #md #
