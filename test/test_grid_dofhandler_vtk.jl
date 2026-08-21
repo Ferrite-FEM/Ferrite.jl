@@ -872,10 +872,14 @@ end
 
     @testset "paraview_collection" begin
         grid = generate_grid(Triangle, (2, 2))
-        celldata = rand(getncells(grid))
+        celldata1 = rand(getncells(grid))
+        celldata2 = [rand(Tensor{2, 3}) for _ in 1:getncells(grid)]
+        celldata3 = [rand(SymmetricTensor{2, 3}) for _ in 1:getncells(grid)]
         pvd = WriteVTK.paraview_collection("collection")
         vtk1 = VTKGridFile("file1", grid)
-        @test write_cell_data(vtk1, celldata, "celldata") === vtk1
+        @test write_cell_data(vtk1, celldata1, "celldata1") === vtk1
+        @test write_cell_data(vtk1, celldata2, "celldata2") === vtk1
+        @test write_cell_data(vtk1, celldata3, "celldata3") === vtk1
         @assert isopen(vtk1.vtk)
         pvd[0.5] = vtk1
         @test !isopen(vtk1.vtk) # Should be closed when adding it
