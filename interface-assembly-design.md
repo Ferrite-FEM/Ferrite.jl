@@ -476,6 +476,76 @@ exported.)
 
 ---
 
+# GPU translation
+
+GPU support for interface assembly is **not part of v1**. This section records how the
+design maps onto Ferrite's existing (experimental) GPU assembly model — per-worker scratch
+objects, host-precomputed work lists, a device assembler, and a matrix-free element-storage
+variant (see the GPU how-to and `ext/FerriteKAExt/`) — because the analysis *strengthens*
+the two central v1 decisions rather than constraining them:
+
+**The condensation boundary needs no device-assembler port.** Because v1 leaves the
+assembler structs and hot path untouched, a GPU interface kernel condenses per work item
+and then calls the *same* `assemble!(assembler, udofs, Kc)` the device cell path already
+uses (`DeviceCSCAssembler` + `distribute_to_workers`). Had condensation lived inside the
+assemblers, every device assembler would have needed its own port.
+
+**Condensed dofs are duplicate-free, so atomic assembly works without interface coloring.**
+Cell coloring does not transfer to interfaces (two interfaces conflict through any shared
+dof of their four cells, a denser coloring problem); with `atomic = true` and unique
+`udofs`, no coloring is required. Coloring remains a determinism-preserving alternative if
+an interface coloring is ever implemented.
+
+**The stacked layout is matrix-free-native — condensation vanishes there.** In the
+element-storage variant, the interface analogue stores the *stacked* `Ke` per interface and
+applies
+
+```julia
+y[sdofs] .+= Ke * u[sdofs]   # sdofs = interfacedofs(ic), duplicates and all
+```
+
+(with atomic scatter). The gather `u_s = T u_u` and the scatter `Tᵀ(·)` compute the
+congruence transform implicitly: the operator applied is exactly `Tᵀ Ke T`, and duplicated
+indices are harmless in gather/scatter. The stacked local operator is therefore directly
+the right stored object for GPU matrix-free application; `condense_interface!` is only ever
+needed at the explicit sparse-matrix boundary.
+
+**Per-worker buffers and the threading rule carry over.** One `InterfaceAssemblyBuffer` per
+worker is the GPU analogue of the how-to's worker-major `Kes`/`fes` arrays (coalescing-
+friendly views), matching the documented one-buffer-per-task rule. `InterfaceDofRange` is
+isbits (two `UnitRange`s) and kernel-passable as a value.
+
+**Two v1 design points dissolve rather than port:**
+- The *lazy* unique map is a CPU-loop optimization; on GPU the maps are static data
+  (topology + dof layout) and would be precomputed on the host once for all interfaces and
+  uploaded SoA (flat arrays + offsets). The accessor-behind-cache design permits that
+  without API change.
+- `dof_range(ic, field)` is host code (`Symbol` lookup, throwing errors): hoisted outside
+  the kernel for a single `SubDofHandler` (loop-invariant, the cell-assembly idiom) or
+  precomputed per sdh pair otherwise.
+
+**Adaptability hygiene in the v1 code** (small, behavior-neutral on CPU; the `CellCache`
+template shows the pattern — fully parametric array fields, scalar state as one-element
+arrays, `Adapt.@adapt_structure` then just works):
+1. `InterfaceCache` (and `FacetCache`) currently hardcode `Vector{Int}` storage and mutable
+   scalar fields — parametrize like `CellCache` (also enables the how-to's `Int32` dofs).
+2. `reinit!`/`_ensure_unique_interface_map!` `resize!` unconditionally — guard with
+   `_isresizable` and presize fixed storage with `max_nstacked_interface_dofs` (which earns
+   its keep as the presize bound), tracking sizes explicitly.
+3. `condense_interface!` grows the buffer on demand — for non-resizable storage this must
+   become an `ArgumentError` naming the required capacity (grow when resizable, require
+   capacity otherwise).
+
+**Orthogonal prerequisites, outside this proposal:** a host-precomputed device work list of
+facet pairs per color (the interface analogue of the cell-id color vectors — static and
+cheap; the dynamic neighborhood lookup in `InterfaceIterator` is host-only but never needed
+on device), `Adapt` rules for `FacetValues`/`InterfaceValues` including the interface
+orientation/transformation handling in `reinit!` (the actual porting effort), and the
+device constraint application (`apply_assemble!` inherits the general GPU constraint
+status).
+
+---
+
 # v2: merged interface basis (`MergedInterfaceValues`, opt-in)
 
 deal.II-style: one local index per unique field dof, so duplicated-basis double counting is
