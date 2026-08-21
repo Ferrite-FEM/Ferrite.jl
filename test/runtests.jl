@@ -1,6 +1,11 @@
 using Ferrite
 using ParallelTestRunner
 
+if isdefined(Test, :detect_closure_boxes)
+    @test isempty(Test.detect_closure_boxes(Ferrite))
+end
+
+include("test_utils.jl")
 const TESTDIR = @__DIR__
 
 # `find_tests` auto-discovers every `.jl` file in `test/` (recursively). Each is
