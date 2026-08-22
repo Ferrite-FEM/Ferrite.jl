@@ -65,6 +65,29 @@
 # roughly the same number of elements. The workstream algorithm is the default one since it
 # in general results in more balanced colors. For unstructured grids the greedy algorithm
 # can result in colors with very few elements, for example.
+#
+# !!! note "Interface (DG) assembly and constraints"
+#     The default coloring ensures that cells with the same color share no *nodes*, which
+#     makes concurrent assembly safe only for cell-local assembly of continuous fields.
+#     If the assembly loop also writes to other dofs the conflicts must be declared when
+#     creating the coloring:
+#      - for interface terms (e.g. DG assembly with `InterfaceValues`, which writes to
+#        dofs of the neighboring cell) pass `interface_coupling` to [`create_coloring`](@ref),
+#        preferably via the `DofHandler` method (`create_coloring(dh; interface_coupling)`)
+#        which uses the interpolations to compute the smallest safe set of colors;
+#      - when constraints are condensed during assembly ([`apply_assemble!`](@ref)/
+#        [`apply_local!`](@ref)) with affine constraints such as [`PeriodicDirichlet`](@ref),
+#        cells on opposite sides of the domain write to the same master dofs and conflict
+#        even though they share no nodes: pass the constraint handler via
+#        `create_coloring(dh, ch)`;
+#      - conflicts that Ferrite cannot infer can be declared with the `extra_conflicts`
+#        keyword argument.
+#     See the [`create_coloring`](@ref) documentation for details. Note that the
+#     [atomic assembly](@ref howto-threaded-assembly-atomic) approach below does not need
+#     any of this analysis for the *assembly* writes, since atomic additions are safe
+#     regardless of which cells are processed concurrently (constraint condensation with
+#     `apply_assemble!` is however not atomic, so for that the coloring approach is
+#     required).
 
 using Ferrite, SparseArrays
 
