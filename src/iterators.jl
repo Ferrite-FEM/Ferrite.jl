@@ -326,10 +326,12 @@ end
 """
     InterfaceIterator(grid::Grid, [topology::ExclusiveTopology])
     InterfaceIterator(dh::AbstractDofHandler, [topology::ExclusiveTopology])
+    InterfaceIterator(grid::Grid, set::AbstractVector{NTuple{2, FacetIndex}})
+    InterfaceIterator(dh::AbstractDofHandler, set::AbstractVector{NTuple{2, FacetIndex}})
 
-Create an `InterfaceIterator` to conveniently iterate over all the interfaces in a
-grid. The elements of the iterator are [`InterfaceCache`](@ref)s which are properly
-`reinit!`ialized. See [`InterfaceCache`](@ref) for more details.
+Create an `InterfaceIterator` to conveniently iterate over all, or a subset, of the
+interfaces in a grid. The elements of the iterator are [`InterfaceCache`](@ref)s which
+are properly `reinit!`ialized. See [`InterfaceCache`](@ref) for more details.
 Looping over an `InterfaceIterator`, i.e.:
 ```julia
 for ic in InterfaceIterator(grid, topology)
@@ -348,14 +350,19 @@ for facet in facetskeleton(topology, grid)
     # ...
 end
 ```
+The methods taking an explicit `set` of interfaces -- pairs of facets `(facet_here,
+facet_there)` -- iterate exactly the given interfaces, analogously to passing a cellset
+to [`CellIterator`](@ref). This is useful e.g. for iterating one color from
+[`create_interface_coloring`](@ref).
 !!! warning
     `InterfaceIterator` is stateful and should not be used for things other than `for`-looping
     (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
 """
-struct InterfaceIterator{IC <: InterfaceCache, G <: AbstractGrid, TopologyType <: AbstractTopology}
+struct InterfaceIterator{IC <: InterfaceCache, G <: AbstractGrid, TopologyType <: Union{AbstractTopology, Nothing}, SetType <: Union{AbstractVector{NTuple{2, FacetIndex}}, Nothing}}
     cache::IC
     grid::G
     topology::TopologyType
+    set::SetType
 end
 
 function InterfaceIterator(
@@ -363,11 +370,31 @@ function InterfaceIterator(
         topology::ExclusiveTopology = ExclusiveTopology(gridordh isa Grid ? gridordh : get_grid(gridordh))
     )
     grid = gridordh isa Grid ? gridordh : get_grid(gridordh)
-    return InterfaceIterator(InterfaceCache(gridordh), grid, topology)
+    return InterfaceIterator(InterfaceCache(gridordh), grid, topology, nothing)
+end
+
+function InterfaceIterator(
+        gridordh::Union{Grid, AbstractDofHandler},
+        set::AbstractVector{NTuple{2, FacetIndex}}
+    )
+    grid = gridordh isa Grid ? gridordh : get_grid(gridordh)
+    return InterfaceIterator(InterfaceCache(gridordh), grid, nothing, set)
 end
 
 # Iterator interface
 @inline function Base.iterate(ii::InterfaceIterator, i::Integer)
+    # Iteration over an explicit set of interfaces (the branch is compile-time since
+    # `ii.set` is concretely typed)
+    if ii.set !== nothing
+        i > length(ii.set) && return nothing
+        facet_a, facet_b = ii.set[i]
+        reinit!(ii.cache, facet_a, facet_b)
+        return ii.cache, i + 1
+    end
+    # Iteration over all interfaces from the topology
+    return _iterate_all_interfaces(ii, i)
+end
+@inline function _iterate_all_interfaces(ii::InterfaceIterator, i::Integer)
     neighborhood = get_facet_facet_neighborhood(ii.topology, ii.grid) # TODO: This could be moved to InterfaceIterator constructor (potentially type-instable for non-union or mixed grids)
     skeleton = facetskeleton(ii.topology, ii.grid)
     while i <= length(skeleton)

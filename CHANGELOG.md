@@ -30,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    both keyword arguments behave exactly as before. ([#1468])
 
 ### Added
+ - New function `create_interface_coloring` for coloring the *interfaces* of a grid,
+   for multithreading assembly loops over interfaces (e.g. interface terms in DG
+   methods). Each color is a vector of facet pairs which can be iterated with the new
+   `InterfaceIterator(grid_or_dh, set)` methods, analogous to passing a cellset to
+   `CellIterator`. For purely discontinuous discretizations (`discontinuous = true`)
+   two interfaces conflict only if they share a cell, resulting in very few colors.
+   ([#1501])
  - Added mesh-free [`AlgebraicVariable`s](https://ferrite-fem.github.io/Ferrite.jl/dev/topics/algebraic_variables/)
    and coupling descriptors for small global unknowns such as Lagrange multipliers and
    homogenized quantities. See the documentation for details. ([#1422])
@@ -1454,4 +1461,5 @@ poking into Ferrite internals:
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
+[#1501]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1501
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489

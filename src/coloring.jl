@@ -8,6 +8,27 @@ end
 _sorted_cellvec(cellset::AbstractUnitRange{Int}) = cellset
 _sorted_cellvec(cellset) = unique!(sort!(collect(Int, cellset)))
 
+# Sort the gathered candidates and append them, deduplicated, to `buf`, counting into
+# `colcount[cellid]`. The candidate list must not contain `cellid` itself.
+function _append_candidates_sorted_unique!(buf, colcount, candidates, cellid)
+    # QuickSort sorts in-place without allocations. The default algorithm dispatches
+    # to counting/radix sort which allocates a workspace on each call so we use QuickSort
+    # which performs better here.
+    sort!(candidates; alg = QuickSort)
+    # A candidate may occur multiple times (e.g. a neighbor sharing k nodes with the cell
+    # occurs k times). After sorting, duplicates are adjacent and can be skipped by
+    # comparing with the previous entry (a unique! fused with the counting).
+    prev = 0
+    for cell_neighbour in candidates
+        if cell_neighbour != prev
+            push!(buf, cell_neighbour)
+            colcount[cellid] += 1
+            prev = cell_neighbour
+        end
+    end
+    return buf
+end
+
 function _gather_neighbor_chunk!(colcount, grid, cellvec, chunk, nodeptr, nodecells)
     buf = Int[]
     candidates = Int[]
@@ -23,35 +44,13 @@ function _gather_neighbor_chunk!(colcount, grid, cellvec, chunk, nodeptr, nodece
                 cell_neighbour == cellid || push!(candidates, cell_neighbour)
             end
         end
-        # QuickSort sorts in-place without allocations. The default algorithm dispatches
-        # to counting/radix sort which allocates a workspace on each call so we use QuickSort
-        # which performs better here.
-        sort!(candidates; alg = QuickSort)
-        # Each per-node cell list in nodecells is duplicate-free, but candidates
-        # concatenates the lists of all nodes of this cell, so a neighbor sharing k nodes
-        # with the cell occurs k times. After sorting, duplicates are adjacent and can be
-        # skipped by comparing with the previous entry (a unique! fused with the counting).
-        prev = 0
-        for cell_neighbour in candidates
-            if cell_neighbour != prev
-                push!(buf, cell_neighbour)
-                colcount[cellid] += 1
-                prev = cell_neighbour
-            end
-        end
+        _append_candidates_sorted_unique!(buf, colcount, candidates, cellid)
     end
     return buf
 end
 
-# Incidence matrix for element connections in the grid
-function create_incidence_matrix(grid::AbstractGrid, cellset = 1:getncells(grid))
-    ncells = getncells(grid)
-    cellvec = _sorted_cellvec(cellset)
-    if isempty(cellvec)
-        return SparseArrays.spzeros(Bool, Int, ncells, ncells)
-    end
-
-    # Map from node id to the cells in the cellset containing it, in CSR-like form.
+# Map from node id to the cells in `cellvec` containing it, in CSR-like form.
+function _build_node_to_cell_map(grid::AbstractGrid, cellvec)
     nnodes = getnnodes(grid)
     nodeptr = zeros(Int, nnodes + 1)
     nodeptr[1] = 1
@@ -71,32 +70,54 @@ function create_incidence_matrix(grid::AbstractGrid, cellset = 1:getncells(grid)
             cursor[v] += 1
         end
     end
+    return nodeptr, nodecells
+end
 
-    # For each cell, gather the unique cells sharing at least one node with it.
-    # Since `cellvec` is sorted, each chunk corresponds to a contiguous range of
-    # columns in the CSC structure, so the chunk buffers can be computed in
-    # parallel and afterwards concatenated to form rowval.
+# Run `gather!(counts, chunk) -> buf` over contiguous chunks of `cellvec` in parallel and
+# assemble the per-chunk buffers into a CSR-like (ptr, adj) structure over all cells.
+# Since `cellvec` is sorted and the chunks are contiguous, each chunk's buffer is a
+# contiguous range of the output, which makes the result independent of the number of
+# threads.
+function _chunked_gather!(gather!::F, ncells::Int, cellvec) where {F}
     chunks = collect(_color_chunks(length(cellvec), Threads.nthreads()))
-    colcount = zeros(Int, ncells)
+    counts = zeros(Int, ncells)
     buffers = Vector{Vector{Int}}(undef, length(chunks))
     @sync for (ci, chunk) in enumerate(chunks)
         Threads.@spawn begin
-            buffers[$ci] = _gather_neighbor_chunk!(colcount, grid, cellvec, $chunk, nodeptr, nodecells)
+            buffers[$ci] = gather!(counts, $chunk)
         end
     end
-
-    colptr = Vector{Int}(undef, ncells + 1)
-    colptr[1] = 1
+    ptr = Vector{Int}(undef, ncells + 1)
+    ptr[1] = 1
     for c in 1:ncells
-        colptr[c + 1] = colptr[c] + colcount[c]
+        ptr[c + 1] = ptr[c] + counts[c]
     end
-    rowval = Vector{Int}(undef, colptr[end] - 1)
-    @assert length(rowval) == sum(length, buffers; init = 0)
+    adj = Vector{Int}(undef, ptr[end] - 1)
+    @assert length(adj) == sum(length, buffers; init = 0)
     # This loop is trivially parallelizable but it is just a memcpy so there is no
     # measurable speedup from doing so.
     for (ci, chunk) in enumerate(chunks)
         buf = buffers[ci]
-        copyto!(rowval, colptr[cellvec[first(chunk)]], buf, 1, length(buf))
+        copyto!(adj, ptr[cellvec[first(chunk)]], buf, 1, length(buf))
+    end
+    return ptr, adj
+end
+
+# Incidence matrix for element connections in the grid
+function create_incidence_matrix(grid::AbstractGrid, cellset = 1:getncells(grid))
+    ncells = getncells(grid)
+    cellvec = _sorted_cellvec(cellset)
+    if isempty(cellvec)
+        return SparseArrays.spzeros(Bool, Int, ncells, ncells)
+    end
+
+    nodeptr, nodecells = _build_node_to_cell_map(grid, cellvec)
+
+    # For each cell, gather the unique cells sharing at least one node with it. The
+    # chunked gather makes the result independent of the number of threads (see
+    # `_chunked_gather!`).
+    colptr, rowval = _chunked_gather!(ncells, cellvec) do counts, chunk
+        _gather_neighbor_chunk!(counts, grid, cellvec, chunk, nodeptr, nodecells)
     end
     nzval = fill(true, length(rowval))
     return SparseMatrixCSC(ncells, ncells, colptr, rowval, nzval)
@@ -307,6 +328,10 @@ The resulting colors can be visualized using [`Ferrite.write_cell_colors`](@ref)
 """
 function create_coloring(g::AbstractGrid, cellset = 1:getncells(g); alg::ColoringAlgorithm.T = ColoringAlgorithm.WorkStream)
     incidence_matrix = create_incidence_matrix(g, cellset)
+    return _color_incidence_matrix(incidence_matrix, cellset, alg)
+end
+
+function _color_incidence_matrix(incidence_matrix, cellset, alg::ColoringAlgorithm.T)
     if alg === ColoringAlgorithm.WorkStream
         return workstream_coloring(incidence_matrix, cellset)
     elseif alg === ColoringAlgorithm.Greedy
@@ -314,4 +339,172 @@ function create_coloring(g::AbstractGrid, cellset = 1:getncells(g); alg::Colorin
     else
         error("impossible")
     end
+end
+
+######################
+# Interface coloring #
+######################
+
+# Enumerate the interfaces of the grid -- pairs of facets `(facet_here, facet_there)` --
+# restricted to interfaces where both cells are in the cellset, in the same order as
+# `InterfaceIterator` visits them.
+function _enumerate_interfaces(grid::AbstractGrid, topology, cellvec)
+    neighborhood = get_facet_facet_neighborhood(topology, grid)
+    interfaces = NTuple{2, FacetIndex}[]
+    for facet_a in facetskeleton(topology, grid)
+        neighbors = neighborhood[facet_a[1], facet_a[2]]
+        isempty(neighbors) && continue
+        length(neighbors) > 1 && error("multiple neighboring facets not supported yet")
+        facet_b = neighbors[1]
+        (insorted(facet_a[1], cellvec) && insorted(facet_b[1], cellvec)) || continue
+        # Canonicalize to FacetIndex: depending on the grid dimension the skeleton and
+        # neighborhood are in terms of e.g. EdgeIndex.
+        push!(interfaces, (FacetIndex(facet_a[1], facet_a[2]), FacetIndex(facet_b[1], facet_b[2])))
+    end
+    return interfaces
+end
+
+# Map from cell id to the ids (indices into `interfaces`) of the interfaces incident to
+# it, in CSR-like form. Since interfaces are enumerated in order the per-cell lists are
+# sorted.
+function _cell_to_interface_map(ncells::Int, interfaces)
+    ptr = zeros(Int, ncells + 1)
+    ptr[1] = 1
+    for (facet_a, facet_b) in interfaces
+        ptr[facet_a[1] + 1] += 1
+        ptr[facet_b[1] + 1] += 1
+    end
+    for i in 2:(ncells + 1)
+        ptr[i] += ptr[i - 1]
+    end
+    adj = Vector{Int}(undef, ptr[end] - 1)
+    cursor = copy(ptr)
+    for (k, (facet_a, facet_b)) in pairs(interfaces)
+        for c in (facet_a[1], facet_b[1])
+            adj[cursor[c]] = k
+            cursor[c] += 1
+        end
+    end
+    return ptr, adj
+end
+
+# Conflict gather for interface items when all dofs written by the interface terms are
+# cell-interior (purely discontinuous fields): an interface writes the dofs of its two
+# cells, so two interfaces conflict iff they share a cell (the "line graph" of the facet
+# adjacency). This needs at most Δ + 1 colors where Δ is the maximum number of facet
+# neighbors of a cell.
+function _gather_interface_cell_chunk!(count, interfaces, chunk, iptr, iadj)
+    buf = Int[]
+    candidates = Int[]
+    for k in chunk
+        facet_a, facet_b = interfaces[k]
+        empty!(candidates)
+        for c in (facet_a[1], facet_b[1])
+            for r in iptr[c]:(iptr[c + 1] - 1)
+                j = iadj[r]
+                j == k || push!(candidates, j)
+            end
+        end
+        _append_candidates_sorted_unique!(buf, count, candidates, k)
+    end
+    return buf
+end
+
+# Conservative conflict gather for interface items: when continuous fields are written
+# by the interface terms the item also writes dofs shared with the node neighbors of its
+# two cells, so two interfaces conflict iff a cell of one is node-adjacent to (or equal
+# to) a cell of the other. This is a superset of the share-a-cell graph above.
+function _gather_interface_node_chunk!(count, grid, interfaces, chunk, nodeptr, nodecells, iptr, iadj)
+    buf = Int[]
+    candidates = Int[]
+    for k in chunk
+        facet_a, facet_b = interfaces[k]
+        empty!(candidates)
+        for c in (facet_a[1], facet_b[1])
+            for v in get_node_ids(getcells(grid, c))
+                for r in nodeptr[v]:(nodeptr[v + 1] - 1)
+                    # Cell node-adjacent to (or equal to) c: all its interfaces conflict
+                    d = nodecells[r]
+                    for r2 in iptr[d]:(iptr[d + 1] - 1)
+                        j = iadj[r2]
+                        j == k || push!(candidates, j)
+                    end
+                end
+            end
+        end
+        _append_candidates_sorted_unique!(buf, count, candidates, k)
+    end
+    return buf
+end
+
+"""
+    create_interface_coloring(
+        grid::AbstractGrid, [topology::ExclusiveTopology], [cellset];
+        alg::ColoringAlgorithm, discontinuous::Bool = false,
+    )
+
+Create a coloring of the *interfaces* of the grid such that no two conflicting
+interfaces -- interfaces whose (concurrent) assembly may write to the same entries of
+the global matrix and vector -- have the same color. This is the interface-loop
+counterpart of [`create_coloring`](@ref), for threading assembly loops over
+[`InterfaceIterator`](@ref) (e.g. interface terms in DG methods).
+
+Returns a vector of vectors of interfaces, where each interface is a tuple of the two
+facets `(facet_here, facet_there)`. Each color can be iterated with
+`InterfaceIterator(grid_or_dh, color)`:
+
+```julia
+colors = create_interface_coloring(grid, topology)
+for color in colors
+    # (interfaces within a color are independent -- loop below can be parallelized)
+    for ic in InterfaceIterator(dh, color)
+        # assemble interface terms
+    end
+end
+```
+
+An interface writes to the dofs of its two cells. With the default
+`discontinuous = false` the coloring is conservative: it is safe also when the interface
+terms write to dofs of continuous fields, which are shared with all node neighbors of
+the two cells. If *all* fields written by the interface assembly are discontinuous (all
+dofs interior to the cells) this can be sharpened by passing `discontinuous = true`, in
+which case two interfaces conflict only if they share a cell, resulting in
+significantly fewer colors.
+
+If `cellset` is given, only interfaces between two cells of the set are colored (cf.
+[`create_coloring`](@ref)).
+
+Note that for a purely discontinuous discretization the accompanying *cell* loop needs
+no coloring at all -- no dofs are shared between cells -- and with continuous fields
+present the standard [`create_coloring`](@ref) covers it. Constraint condensation
+during assembly ([`apply_assemble!`](@ref) with e.g. [`AffineConstraint`](@ref)s) can
+write outside of the interface dofs and is not accounted for here.
+"""
+function create_interface_coloring(
+        grid::AbstractGrid, topology::ExclusiveTopology = ExclusiveTopology(grid),
+        cellset = 1:getncells(grid);
+        alg::ColoringAlgorithm.T = ColoringAlgorithm.WorkStream,
+        discontinuous::Bool = false,
+    )
+    cellvec = _sorted_cellvec(cellset)
+    interfaces = _enumerate_interfaces(grid, topology, cellvec)
+    ninterfaces = length(interfaces)
+    if ninterfaces == 0
+        return Vector{NTuple{2, FacetIndex}}[]
+    end
+    iptr, iadj = _cell_to_interface_map(getncells(grid), interfaces)
+    local colptr, rowval
+    if discontinuous
+        colptr, rowval = _chunked_gather!(ninterfaces, 1:ninterfaces) do counts, chunk
+            _gather_interface_cell_chunk!(counts, interfaces, chunk, iptr, iadj)
+        end
+    else
+        nodeptr, nodecells = _build_node_to_cell_map(grid, cellvec)
+        colptr, rowval = _chunked_gather!(ninterfaces, 1:ninterfaces) do counts, chunk
+            _gather_interface_node_chunk!(counts, grid, interfaces, chunk, nodeptr, nodecells, iptr, iadj)
+        end
+    end
+    incidence_matrix = SparseMatrixCSC(ninterfaces, ninterfaces, colptr, rowval, fill(true, length(rowval)))
+    id_colors = _color_incidence_matrix(incidence_matrix, 1:ninterfaces, alg)
+    return [interfaces[ids] for ids in id_colors]
 end

@@ -119,6 +119,7 @@ export
 
     # Grid coloring
     create_coloring,
+    create_interface_coloring,
     ColoringAlgorithm,
 
     # Dofs

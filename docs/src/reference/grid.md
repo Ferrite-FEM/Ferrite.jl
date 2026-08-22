@@ -64,4 +64,5 @@ addnodeset!
 ### Multithreaded assembly
 ```@docs
 create_coloring
+create_interface_coloring
 ```
