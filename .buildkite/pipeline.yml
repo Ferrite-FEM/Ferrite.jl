@@ -2,20 +2,82 @@ env:
   SECRET_CODECOV_TOKEN: "V1W6eELqofOWx59dQvD1s1Blp64SgjCdW2PtPGrdTjK4iyysFtdmFZGslR004DbgOfqzFHG2yacOtRHt08NiGQy4OqglHPKG2wcPryPE1KbrlWVKbNrrGJDofN8CKwt7a+KWbrxbldKPNMq4kpaaLyDIVxGHyzyPOvIyOWLTsmfZYvfQEY0c0W6rGzox0BR8hI5o6DJXm3GFg2VpCwMJ7YIhbU1uqb0A9zZVC/iRjNVsHgDQuJ2ybtoPsMiZmg3C7DrXAAh1EANsA5nVRHTGVReITtV/plfTwe5fkQ/KpNbhmpj5s0MXS4Z2kLZOHI3OI9NU2swy4sJoXgDGBlAWOA==;U2FsdGVkX19JPGOjpPNnwLMs+yhJ+xvhRahrJ5J+jtdUKwZnt4273Cq0bgjGCkqPuOO9iQlphSvlNK7uip+/+A=="
 
 steps:
-  - label: ":julia: Julia v1"
+  - label: ":julia: CUDA"
     notify:
       - github_commit_status:
           context: "Test GPU / Julia 1"
     plugins:
       - JuliaCI/julia#v1:
           version: "1"
-      # - JuliaCI/julia-test#v1: ~
       - JuliaCI/julia-coverage#v1:
           dirs: ["src", "ext"]
+    env:
+      FERRITE_GPU_BACKEND: "cuda"
     command: |
-      julia --code-coverage=@ --project=test/GPU -e 'using Pkg; Pkg.instantiate()'
-      julia --code-coverage=@ --project=test/GPU test/GPU/runtests.jl
+      julia --code-coverage=@ --project=test/GPU/cuda -e 'using Pkg; Pkg.instantiate()'
+      julia --code-coverage=@ --project=test/GPU/cuda test/GPU/runtests.jl
     agents:
-      queue: "cuda"
+      queue: "juliagpu"
+      cuda: "*"
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 60
+
+  # The vendor steps below only verify that the backend is functional on the agent until
+  # the extensions for these vendors exist; they are allowed to fail meanwhile.
+  - label: ":julia: AMDGPU"
+    notify:
+      - github_commit_status:
+          context: "Test GPU (AMDGPU) / Julia 1"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "1"
+    env:
+      FERRITE_GPU_BACKEND: "amdgpu"
+    command: |
+      julia --project=test/GPU/amdgpu -e 'using Pkg; Pkg.instantiate()'
+      julia --project=test/GPU/amdgpu test/GPU/runtests.jl
+    agents:
+      queue: "juliagpu"
+      rocm: "*"
+    soft_fail: true
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 60
+
+  - label: ":julia: oneAPI"
+    notify:
+      - github_commit_status:
+          context: "Test GPU (oneAPI) / Julia 1"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "1"
+    env:
+      FERRITE_GPU_BACKEND: "oneapi"
+    command: |
+      julia --project=test/GPU/oneapi -e 'using Pkg; Pkg.instantiate()'
+      julia --project=test/GPU/oneapi test/GPU/runtests.jl
+    agents:
+      queue: "juliagpu"
+      intel: "*"
+    soft_fail: true
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 60
+
+  - label: ":julia: Metal"
+    notify:
+      - github_commit_status:
+          context: "Test GPU (Metal) / Julia 1"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "1"
+    env:
+      FERRITE_GPU_BACKEND: "metal"
+    command: |
+      julia --project=test/GPU/metal -e 'using Pkg; Pkg.instantiate()'
+      julia --project=test/GPU/metal test/GPU/runtests.jl
+    agents:
+      queue: "juliaecosystem"
+      os: "macos"
+      arch: "aarch64"
+    soft_fail: true
     if: build.message !~ /\[skip tests\]/
     timeout_in_minutes: 60

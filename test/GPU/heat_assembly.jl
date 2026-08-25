@@ -1,234 +1,111 @@
-include(joinpath(@__DIR__, "..", "..", "docs", "src", "literate-howto", "gpu_assembly.jl"))
+# Backend-parametrized assembly tests. Requires `ka_common.jl` to be included and the
+# globals `backend::KA.Backend` and `sparse_type(Tv, Ti)` to be defined.
 
-using FerriteGmsh
-
-function generate_mixed_grid()
-    gmsh.initialize()
-    gmsh.option.setNumber("General.Terminal", 1)
-    gmsh.model.add("mixed")
-    gmsh.option.setNumber("Mesh.MeshSizeMax", 0.05)
-
-    lc = 0.2
-    gmsh.model.geo.addPoint(-0.5, -1, 0, lc, 1)
-    gmsh.model.geo.addPoint(0.5, -1, 0, lc, 2)
-    gmsh.model.geo.addPoint(-0.5, 0, 0, lc, 3)
-    gmsh.model.geo.addPoint(0.5, 0, 0, lc, 4)
-    gmsh.model.geo.addPoint(-0.5, 1, 0, lc, 5)
-    gmsh.model.geo.addPoint(0.5, 1, 0, lc, 6)
-
-    gmsh.model.geo.addLine(1, 2, 1)
-    gmsh.model.geo.addLine(2, 4, 2)
-    gmsh.model.geo.addLine(4, 3, 3)
-    gmsh.model.geo.addLine(1, 3, 4)
-    gmsh.model.geo.addLine(3, 5, 5)
-    gmsh.model.geo.addLine(5, 6, 6)
-    gmsh.model.geo.addLine(4, 6, 7)
-
-    gmsh.model.geo.addCurveLoop([1, 2, 3, -4], 1)
-    gmsh.model.geo.addCurveLoop([-3, 7, -6, -5], 2)
-    gmsh.model.geo.addPlaneSurface([1], 1)
-    gmsh.model.geo.addPlaneSurface([2], 2)
-    gmsh.model.geo.mesh.setTransfiniteCurve(1, 3)
-    gmsh.model.geo.mesh.setTransfiniteCurve(2, 3)
-    gmsh.model.geo.mesh.setTransfiniteCurve(3, 3)
-    gmsh.model.geo.mesh.setTransfiniteCurve(4, 3)
-    gmsh.model.geo.mesh.setTransfiniteCurve(5, 3)
-    gmsh.model.geo.mesh.setTransfiniteCurve(6, 3)
-    gmsh.model.geo.mesh.setTransfiniteCurve(7, 3)
-    gmsh.model.geo.mesh.setTransfiniteSurface(1)
-    gmsh.model.geo.mesh.setRecombine(2, 1)
-
-    gmsh.model.addPhysicalGroup(2, [1], 1)
-    gmsh.model.setPhysicalName(2, 1, "quad")
-
-    gmsh.model.addPhysicalGroup(2, [2], 2)
-    gmsh.model.setPhysicalName(2, 2, "triangle")
-
-    gmsh.model.addPhysicalGroup(1, [6], 3)
-    gmsh.model.setPhysicalName(1, 3, "top")
-
-    gmsh.model.addPhysicalGroup(1, [1], 4)
-    gmsh.model.setPhysicalName(1, 4, "bottom")
-
-    gmsh.model.geo.synchronize()
-    gmsh.model.mesh.generate(2)
-
-    nodes = tonodes()
-    elements, gmsh_eleidx = toelements(2)
-    boundarydict = toboundary(1)
-    facetsets = tofacetsets(boundarydict, elements)
-    cellsets = tocellsets(2, gmsh_eleidx)
-
-    return Grid(elements, nodes, facetsets = facetsets, cellsets = cellsets)
-end
-
-# Reference for internal testing
-function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::DofHandler)
+@testset "KernelAbstractions heat problem on simple grid ($backend)" begin
+    grid, dh, cv, ch = setup_heat_problem(Float32)
+    colors = create_coloring(grid)
     n_basefuncs = getnbasefunctions(cv)
-    Ke = zeros(Float32, n_basefuncs, n_basefuncs)
-    fe = zeros(Float32, n_basefuncs)
-    assembler = start_assemble(K, f)
-    for cc in CellIterator(dh)
-        fill!(Ke, 0)
-        fill!(fe, 0)
-        reinit!(cv, cc)
-        assemble_element!(Ke, fe, cv)
-        assemble!(assembler, celldofs(cc), Ke, fe)
-    end
-    return nothing
-end
 
-function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh::SubDofHandler)
-    n_basefuncs = getnbasefunctions(cv)
-    Ke = zeros(Float32, n_basefuncs, n_basefuncs)
-    fe = zeros(Float32, n_basefuncs)
-    assembler = start_assemble(K, f; fillzero = false)
-    for cc in CellIterator(dh)
-        fill!(Ke, 0)
-        fill!(fe, 0)
-        reinit!(cv, cc)
-        assemble_element!(Ke, fe, cv)
-        assemble!(assembler, celldofs(cc), Ke, fe)
-    end
-    return nothing
-end
+    # References
+    K_ref = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
+    f_ref = zeros(Float32, ndofs(dh))
+    assemble_global!(cv, K_ref, f_ref, dh)
+    K_unconstrained = copy(K_ref)
+    f_unconstrained = copy(f_ref)
+    Kes_ref = zeros(Float32, getncells(grid), n_basefuncs, n_basefuncs)
+    fes_ref = zeros(Float32, getncells(grid), n_basefuncs)
+    assemble_elements!(cv, Kes_ref, fes_ref, dh)
+    apply!(K_ref, f_ref, ch)
+    u_ref = K_ref \ f_ref
+    K_zero = copy(K_unconstrained)
+    f_zero = copy(f_unconstrained)
+    apply_zero!(K_zero, f_zero, ch)
 
-@kernel function ka_assembly_kernel_mf(@Const(color), ccs, cvs, Kes, fes)
-    ## This is the classical grid-stride-loop
-    worker_index = @index(Global, Linear)
-    stride = prod(KA.@ndrange())
-
-    ## Get the local evaluation buffers for the GPU worker.
-    cv = cvs[worker_index]
-    cc = ccs[worker_index]
-
-    for task_index in worker_index:stride:length(color)
-        ## Work item index
-        cellid = color[task_index]
-
-        Ke = view(Kes, cellid, :, :) # Note row-major indexing, this
-        fe = view(fes, cellid, :)    # is further motivated below.
-
-        ## Query work item cell cache
-        reinit!(cc, cellid)
-
-        ## Actual assembly routine.
-        fill!(Ke, 0)
-        fill!(fe, 0)
-        reinit!(cv, cc)
-        assemble_element!(Ke, fe, cv)
-    end
-end
-function assemble_global_ka!(backend, cellvalues::Ferrite.SoAContainer, ccs, colors::Vector, Kes, fes, n_workers)
-    for color in colors
-        n = length(color)
-        threads, blocks = compute_threads_and_blocks(n)
-        ka_kernel = ka_assembly_kernel_mf(backend, threads)
-        ka_kernel(color, ccs, cellvalues, Kes, fes, ndrange = threads * blocks)
-        KA.synchronize(backend)
-    end
-    return nothing
-end
-
-# ----------------------------- Tests --------------------------
-@testset "How-To correctness" begin
-    @test u_ka ≈ u_cuda
-
-    K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
-    f = zeros(Float32, ndofs(dh))
-    assemble_global!(cv, K, f, dh)
-    apply!(K, f, ch)
-    u_cpu = K \ f
-    # NOTE this might fail because the meandiag differs due to cancellation. However,
-    # the solutions are usually still very close.
-    @test SparseMatrixCSC(K_gpu) ≈ K
-    @test Vector(f_gpu) ≈ f
-    @test u_cpu ≈ u_ka
-end
-
-# Test KA
-@testset "KernelAbstractions paths for heat problem on simple grid using $backend" for backend in [KA.CPU(), CUDABackend()]
+    # Device setup
     colors_device = [adapt(backend, c) for c in colors]
-    max_color_size = maximum(length.(colors))
-    n_workers = prod(compute_threads_and_blocks(max_color_size))
+    n_workers = prod(compute_threads_and_blocks(maximum(length.(colors))))
     dh_device = adapt(backend, dh)
     cv_device = Ferrite.distribute_to_workers(backend, cv, n_workers)
-    cell_cache = Ferrite.distribute_to_workers(backend, CellCache(dh_device), n_workers)
-    Kes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv), getnbasefunctions(cv))
-    fes_device = KA.zeros(backend, Float32, getncells(grid), getnbasefunctions(cv))
-    assemble_global_ka!(backend, cv_device, cell_cache, colors_device, Kes_device, fes_device, n_workers)
-    @test Array(Kes_device) ≈ Array(Kes)
-    @test Array(fes_device) ≈ Array(fes)
+    cc_device = Ferrite.distribute_to_workers(backend, CellCache(dh_device), n_workers)
+    K_device = allocate_matrix(sparse_type(Float32, Int32), dh)
+    f_device = KA.zeros(backend, Float32, ndofs(dh))
+    Kes_device = KA.zeros(backend, Float32, n_workers, n_basefuncs, n_basefuncs)
+    fes_device = KA.zeros(backend, Float32, n_workers, n_basefuncs)
 
-    @test @inferred dof_range(dh_device.subdofhandlers[1], 1) == @inferred dof_range(dh_device.subdofhandlers[1], :u)
+    @test @inferred(dof_range(dh_device.subdofhandlers[1], 1)) == @inferred(dof_range(dh_device.subdofhandlers[1], :u))
+
+    assemble_global_ka!(backend, cv_device, K_device, f_device, cc_device, colors_device, Kes_device, fes_device, n_workers)
+    @test SparseMatrixCSC(K_device) ≈ K_unconstrained
+    @test Vector(f_device) ≈ f_unconstrained
+
+    ch_device = adapt(backend, ch)
+    apply!(K_device, f_device, ch_device)
+    @test SparseMatrixCSC(K_device) ≈ K_ref
+    @test Vector(f_device) ≈ f_ref
+    @test SparseMatrixCSC(K_device) \ Vector(f_device) ≈ u_ref
+
+    assemble_global_ka!(backend, cv_device, K_device, f_device, cc_device, colors_device, Kes_device, fes_device, n_workers)
+    apply!(K_device, f_device, ch_device, true)
+    @test SparseMatrixCSC(K_device) ≈ K_zero
+    @test Vector(f_device) ≈ f_zero
+
+    # Element assembly (one Ke per cell)
+    Kes_cells = KA.zeros(backend, Float32, getncells(grid), n_basefuncs, n_basefuncs)
+    fes_cells = KA.zeros(backend, Float32, getncells(grid), n_basefuncs)
+    assemble_elements_ka!(backend, cv_device, cc_device, colors_device, Kes_cells, fes_cells)
+    @test Array(Kes_cells) ≈ Kes_ref
+    @test Array(fes_cells) ≈ fes_ref
 end
 
-# Test mixed grid
-@testset "KernelAbstractions paths for heat problem on mixed grid using $backend" for backend in [KA.CPU(), CUDABackend()]
+@testset "KernelAbstractions error paths ($backend)" begin
+    grid, dh, cv, ch = setup_heat_problem(Float32, 2)
+    @test_throws ArgumentError Ferrite.distribute_to_workers(backend, cv, 0)
+
+    ch_affine = ConstraintHandler(Float32, Int32, dh)
+    add!(ch_affine, AffineConstraint(1, [2 => 1.0f0], 0.0f0))
+    close!(ch_affine)
+    @test_throws AssertionError adapt(backend, ch_affine)
+end
+
+@testset "KernelAbstractions heat problem on mixed grid ($backend)" begin
     grid = generate_mixed_grid()
 
     dh = DofHandler(grid)
-
     sdh1 = SubDofHandler(dh, getcellset(grid, "triangle"))
     ip1 = Lagrange{RefTriangle, 2}()
-    qr1 = QuadratureRule{RefTriangle}(Float32, 3)
     add!(sdh1, :u, ip1)
-    cv1 = CellValues(Float32, qr1, ip1)
-
+    cv1 = CellValues(Float32, QuadratureRule{RefTriangle}(Float32, 3), ip1)
     sdh2 = SubDofHandler(dh, getcellset(grid, "quad"))
     ip2 = Lagrange{RefQuadrilateral, 2}()
-    qr2 = QuadratureRule{RefQuadrilateral}(Float32, 3)
     add!(sdh2, :u, ip2)
-    cv2 = CellValues(Float32, qr2, ip2)
-
+    cv2 = CellValues(Float32, QuadratureRule{RefQuadrilateral}(Float32, 3), ip2)
     close!(dh)
 
-    colors1 = create_coloring(grid, getcellset(grid, "triangle"))
-    colors2 = create_coloring(grid, getcellset(grid, "quad"))
-
-    colors1_device = [adapt(backend, c) for c in colors1]
-    colors2_device = [adapt(backend, c) for c in colors2]
-
-    dh_device = adapt(backend, dh)
-
-    K_device = if backend isa KA.CPU
-        allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
-    else
-        allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
-    end
-    f_device = KA.zeros(backend, Float32, ndofs(dh))
-
-    n_workers = maximum(length.(colors1_device))
-    cv1_device = Ferrite.distribute_to_workers(backend, cv1, n_workers)
-    cc1 = Ferrite.distribute_to_workers(backend, CellCache(dh_device.subdofhandlers[1]), n_workers)
-    Kes_device = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv1), getnbasefunctions(cv1))
-    fes_device = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv1))
-    assemble_global_ka!(backend, cv1_device, K_device, f_device, cc1, colors1_device, Kes_device, fes_device, n_workers; fillzero = true)
-
-    n_workers = maximum(length.(colors2_device))
-    cv2_device = Ferrite.distribute_to_workers(backend, cv2, n_workers)
-    cc2 = Ferrite.distribute_to_workers(backend, CellCache(dh_device.subdofhandlers[2]), n_workers)
-    Kes_device = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv2), getnbasefunctions(cv2))
-    fes_device = KA.zeros(backend, Float32, n_workers, getnbasefunctions(cv2))
-    assemble_global_ka!(backend, cv2_device, K_device, f_device, cc2, colors2_device, Kes_device, fes_device, n_workers; fillzero = false)
-
     ch = ConstraintHandler(Float32, Int32, dh)
-    ∂Ω = union(
-        getfacetset(grid, "top"), getfacetset(grid, "bottom")
-    )
-    add!(ch, Dirichlet(:u, ∂Ω, (x, t) -> 1.0))
+    add!(ch, Dirichlet(:u, union(getfacetset(grid, "top"), getfacetset(grid, "bottom")), (x, t) -> 1.0f0))
     close!(ch)
 
-    ch_device = backend isa KA.CPU ? ch : adapt(backend, ch)
-    apply!(K_device, f_device, ch_device)
-    u = SparseMatrixCSC(K_device) \ Vector(f_device)
+    K_ref = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
+    f_ref = zeros(Float32, ndofs(dh))
+    assemble_global!(cv1, K_ref, f_ref, sdh1)
+    assemble_global!(cv2, K_ref, f_ref, sdh2; fillzero = false)
+    apply!(K_ref, f_ref, ch)
+    u_ref = K_ref \ f_ref
 
-    K = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
-    f = zeros(Float32, ndofs(dh))
-    assemble_global!(cv1, K, f, dh.subdofhandlers[1])
-    assemble_global!(cv2, K, f, dh.subdofhandlers[2])
-    apply!(K, f, ch)
-    u_cpu = K \ f
-
-    @test u ≈ u_cpu
+    dh_device = adapt(backend, dh)
+    K_device = allocate_matrix(sparse_type(Float32, Int32), dh)
+    f_device = KA.zeros(backend, Float32, ndofs(dh))
+    for (i, (sdh, cv)) in enumerate(((sdh1, cv1), (sdh2, cv2)))
+        colors = create_coloring(grid, sdh.cellset)
+        colors_device = [adapt(backend, c) for c in colors]
+        n_workers = maximum(length.(colors))
+        n_basefuncs = getnbasefunctions(cv)
+        cv_device = Ferrite.distribute_to_workers(backend, cv, n_workers)
+        cc_device = Ferrite.distribute_to_workers(backend, CellCache(dh_device.subdofhandlers[i]), n_workers)
+        Kes_device = KA.zeros(backend, Float32, n_workers, n_basefuncs, n_basefuncs)
+        fes_device = KA.zeros(backend, Float32, n_workers, n_basefuncs)
+        assemble_global_ka!(backend, cv_device, K_device, f_device, cc_device, colors_device, Kes_device, fes_device, n_workers; fillzero = i == 1)
+    end
+    apply!(K_device, f_device, adapt(backend, ch))
+    @test SparseMatrixCSC(K_device) \ Vector(f_device) ≈ u_ref
 end
