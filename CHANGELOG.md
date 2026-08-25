@@ -197,6 +197,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
  - Make default `edgedof_indices` and `facedof_indices` implementation work for externally defined interpolations ([#1365])
+ - Fix export of cell-wise symmetric tensors ([#1375])
 
 ### Added
  - Support generating embedded 2D-grids by passing coordinates `x::Vec{3}` with 2D reference shapes. Note: New calculation of node position leads to slight floating point precision differences in node positions. ([#1367])
