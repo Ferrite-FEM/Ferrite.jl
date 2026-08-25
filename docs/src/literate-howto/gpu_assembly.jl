@@ -213,6 +213,44 @@ apply!(K_gpu, f_gpu, ch_gpu)
 # To not complicate the description further, we simply solve the system on the CPU with a direct solver.
 u_ka = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
 
+#=
+### Assembly without coloring: atomic accumulation
+Just like for the [multithreaded assembly on the CPU](@ref howto-threaded-assembly-atomic),
+passing `atomic = true` to `start_assemble` makes the workers accumulate into `K` and `f`
+with atomic additions. This removes the need for a coloring, so all cells can be assembled
+in a single kernel launch, at the cost of some overhead and a non-deterministic result:
+the order in which the contributions to an entry are summed depends on how the workers are
+scheduled, and floating point addition is not associative.
+=#
+
+# The workers now cover all cells instead of only the largest color, so the per-worker
+# buffers have to be allocated accordingly.
+n_workers_atomic = prod(compute_threads_and_blocks(getncells(grid)))
+cv_gpu_atomic = Ferrite.distribute_to_workers(backend, cv, n_workers_atomic)
+cc_gpu_atomic = Ferrite.distribute_to_workers(backend, CellCache(dh_gpu), n_workers_atomic)
+Kes_atomic = KA.zeros(backend, Float32, n_workers_atomic, getnbasefunctions(cv), getnbasefunctions(cv))
+fes_atomic = KA.zeros(backend, Float32, n_workers_atomic, getnbasefunctions(cv))
+cells_gpu = adapt(backend, collect(1:getncells(grid)))
+
+function assemble_global_ka_atomic!(backend, cellvalues::Ferrite.SoAContainer, K, f, cc, cells, Ke, fe, n_workers)
+    assemblers = Ferrite.distribute_to_workers(backend, start_assemble(K, f; atomic = true), n_workers)
+    threads, blocks = compute_threads_and_blocks(length(cells))
+    ## The kernel from above is reused, with the full cell range in place of a color.
+    ka_kernel = ka_assembly_kernel(backend, threads)
+    ka_kernel(assemblers, cells, cc, cellvalues, Ke, fe, ndrange = threads * blocks)
+    KA.synchronize(backend)
+    return nothing
+end
+
+assemble_global_ka_atomic!(backend, cv_gpu_atomic, K_gpu, f_gpu, cc_gpu_atomic, cells_gpu, Kes_atomic, fes_atomic, n_workers_atomic)
+apply!(K_gpu, f_gpu, ch_gpu)
+u_ka_atomic = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
+
+# !!! note "Package loading"
+#     The device assembler lives in a package extension which is loaded together with
+#     `Adapt.jl`, `GPUArrays.jl`, `GPUArraysCore.jl` and `KernelAbstractions.jl`. All of
+#     these are dependencies of `CUDA.jl`, so `using CUDA` above is enough to activate it.
+
 
 #=
 ## Global matrix assembly with `CUDA.jl`

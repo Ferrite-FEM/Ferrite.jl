@@ -2,12 +2,7 @@ module FerriteCudaExt
 
 using Ferrite, CUDA, SparseArrays
 
-import Base: @propagate_inbounds
-
-import Adapt: Adapt, adapt, adapt_structure
-
 import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype
-import Ferrite: get_substruct
 import Ferrite: meandiag, nnodes_per_cell
 import Ferrite: CellCache
 
@@ -31,79 +26,12 @@ end
     @gputhrow("ErrorException", "You are trying to assemble values in to K, but the entry is missing in the sparsity pattern. Make sure you have called `K = allocate_matrix(dh)` or `K = allocate_matrix(dh, ch)` if you have affine constraints. This error might also happen if you are using the assembler in a threaded assembly loop (you need to create one `assembler` for each task).")
 end
 
-# -------------------- assembler ----------------------
-
-struct DeviceCSCAssembler{Tv, Ti, KType <: AbstractSparseArray{Tv, Ti, 2}, FType <: AbstractVector{Tv}} <: Ferrite.AbstractThreadSafeAssembler{Tv}
-    K::KType
-    f::FType
-end
-Adapt.@adapt_structure DeviceCSCAssembler
-get_substruct(a::DeviceCSCAssembler, i) = a
-
-# FIXME buffer
-function Ferrite.start_assemble(K::CuSparseMatrixCSC, f::CuVector = CUDA.zeros(eltype(K), 0); fillzero::Bool = true)
-    fillzero && fill!(nonzeros(K), zero(eltype(K)))
-    fillzero && fill!(f, zero(eltype(f)))
-    return DeviceCSCAssembler(K, f)
-end
-
-function Ferrite.assemble!(A::DeviceCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::AbstractVector)
-    Ferrite.assemble!(A, dofs, Ke)
-    Ferrite.assemble!(A, dofs, fe)
-    return nothing
-end
-
-function Ferrite.assemble!(A::DeviceCSCAssembler, dofs::AbstractVector{<:Integer}, fe::AbstractVector)
-    for (i, dof) in enumerate(dofs)
-        A.f[dof] += fe[i]
-    end
-    return nothing
-end
-
-function Ferrite.assemble!(A::DeviceCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix)
-    colptr = SparseArrays.getcolptr(A.K)
-    rowval = rowvals(A.K)
-    nzval = nonzeros(A.K)
-
-    ndofs = length(dofs)
-    for j in 1:ndofs
-        col = dofs[j]
-        r1 = colptr[col]
-        r2 = colptr[col + 1] - 1
-        for i in 1:ndofs
-            val = Ke[i, j]
-            iszero(val) && continue
-            inserted_value = false
-            row = dofs[i]
-            # Linear search for the row in this column's nonzeros
-            for idx in r1:r2
-                if rowval[idx] == row
-                    nzval[idx] += val
-                    inserted_value = true
-                    break
-                end
-                if rowval[idx] > row
-                    Ferrite._missing_sparsity_pattern_error(row, col)
-                end
-            end
-            !inserted_value && Ferrite._missing_sparsity_pattern_error(row, col)
-        end
-    end
-    return nothing
-end
-
 function Ferrite.allocate_matrix(::Type{CuSparseMatrixCSC{Tv, Ti}}, dh::DofHandler) where {Tv, Ti}
     return CuSparseMatrixCSC(allocate_matrix(SparseMatrixCSC{Tv, Ti}, dh))
 end
 
 function Ferrite.allocate_matrix(::Type{CuSparseMatrixCSR{Tv, Ti}}, dh::DofHandler) where {Tv, Ti}
     return CuSparseMatrixCSR(allocate_matrix(SparseMatrixCSC{Tv, Ti}, dh))
-end
-
-@propagate_inbounds function Ferrite._atomic_add!(x::CuVector{T}, v::T, i::Int) where {T}
-    @boundscheck checkbounds(x, i)
-    CUDA.@atomic x[i] += v
-    return
 end
 
 end

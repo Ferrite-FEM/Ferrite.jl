@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+ - Assembly into sparse matrices living on a device, via KernelAbstractions.jl:
+   `start_assemble` accepts any `GPUArrays`-based CSC or CSR sparse matrix (e.g.
+   `CUDA.CUSPARSE.CuSparseMatrixCSC` and `CuSparseMatrixCSR`) together with a device
+   vector, and supports `atomic = true`, which lets a kernel assemble all cells in a single
+   launch without a grid coloring.
+   Package extensions for AMDGPU.jl, oneAPI.jl, Metal.jl and GenericSparseArrays.jl make
+   this available on the other vendor backends: `allocate_matrix` also accepts
+   `ROCSparseMatrixCSC`/`ROCSparseMatrixCSR`, `oneSparseMatrixCSC`/`oneSparseMatrixCSR` and
+   the backend agnostic `GenericSparseMatrixCSC`/`GenericSparseMatrixCSR`, the latter being
+   the way to assemble a global matrix on Metal, which has no sparse matrix type of its own.
+   ([#1493])
  - `write_solution`, `write_cellset`, `write_facetset`, and `write_nodeset` now support
    `prefix` and `suffix` keyword arguments to customize exported data names. ([#1308])
  - New cell type `QuadraticWedge` (18 nodes) with geometric interpolation
@@ -1653,6 +1664,7 @@ poking into Ferrite internals:
 [#1541]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1541
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
+[#1493]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1493
 [#1556]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1556
 [#1469]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1469
 [#1472]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1472
