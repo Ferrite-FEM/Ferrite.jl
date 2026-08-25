@@ -49,12 +49,52 @@
     @test SparseMatrixCSC(K_device) ≈ K_zero
     @test Vector(f_device) ≈ f_zero
 
+    # Atomic assembly without coloring: one launch over all cells
+    cells_device = adapt(backend, collect(1:getncells(grid)))
+    n_workers_all = prod(compute_threads_and_blocks(getncells(grid)))
+    cv_all = Ferrite.distribute_to_workers(backend, cv, n_workers_all)
+    cc_all = Ferrite.distribute_to_workers(backend, CellCache(dh_device), n_workers_all)
+    Kes_all = KA.zeros(backend, Float32, n_workers_all, n_basefuncs, n_basefuncs)
+    fes_all = KA.zeros(backend, Float32, n_workers_all, n_basefuncs)
+    K_atomic = allocate_matrix(sparse_type(Float32, Int32), dh)
+    f_atomic = KA.zeros(backend, Float32, ndofs(dh))
+    assemble_global_ka_atomic!(backend, cv_all, K_atomic, f_atomic, cc_all, cells_device, Kes_all, fes_all, n_workers_all)
+    @test SparseMatrixCSC(K_atomic) ≈ K_unconstrained
+    @test Vector(f_atomic) ≈ f_unconstrained
+
     # Element assembly (one Ke per cell)
     Kes_cells = KA.zeros(backend, Float32, getncells(grid), n_basefuncs, n_basefuncs)
     fes_cells = KA.zeros(backend, Float32, getncells(grid), n_basefuncs)
     assemble_elements_ka!(backend, cv_device, cc_device, colors_device, Kes_cells, fes_cells)
     @test Array(Kes_cells) ≈ Kes_ref
     @test Array(fes_cells) ≈ fes_ref
+end
+
+@testset "KernelAbstractions CSR assembly on simple grid ($backend)" begin
+    grid, dh, cv, ch = setup_heat_problem(Float32)
+    colors = create_coloring(grid)
+    n_basefuncs = getnbasefunctions(cv)
+
+    K_ref = allocate_matrix(SparseMatrixCSC{Float32, Int32}, dh)
+    f_ref = zeros(Float32, ndofs(dh))
+    assemble_global!(cv, K_ref, f_ref, dh)
+
+    colors_device = [adapt(backend, c) for c in colors]
+    n_workers = prod(compute_threads_and_blocks(maximum(length.(colors))))
+    dh_device = adapt(backend, dh)
+    cv_device = Ferrite.distribute_to_workers(backend, cv, n_workers)
+    cc_device = Ferrite.distribute_to_workers(backend, CellCache(dh_device), n_workers)
+    K_device = allocate_matrix(sparse_type_csr(Float32, Int32), dh)
+    f_device = KA.zeros(backend, Float32, ndofs(dh))
+    Kes_device = KA.zeros(backend, Float32, n_workers, n_basefuncs, n_basefuncs)
+    fes_device = KA.zeros(backend, Float32, n_workers, n_basefuncs)
+
+    # `apply!` is not implemented for CSR device matrices yet, so only the assembled system
+    # is compared against the CSC reference. Both are densified for the comparison, since
+    # `SparseMatricesCSR.SparseMatrixCSR` has no conversion to `SparseMatrixCSC`.
+    assemble_global_ka!(backend, cv_device, K_device, f_device, cc_device, colors_device, Kes_device, fes_device, n_workers)
+    @test Array(K_device) ≈ Array(K_ref)
+    @test Vector(f_device) ≈ f_ref
 end
 
 @testset "KernelAbstractions error paths ($backend)" begin

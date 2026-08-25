@@ -67,6 +67,16 @@ function assemble_global_ka!(backend, cvs::Ferrite.SoAContainer, K, f, ccs, colo
     return nothing
 end
 
+# Atomic assembly: no coloring, a single launch over all cells. The kernel above is reused
+# with the full cell range in place of a color.
+function assemble_global_ka_atomic!(backend, cvs::Ferrite.SoAContainer, K, f, ccs, cells, Kes, fes, n_workers; fillzero = true)
+    assemblers = Ferrite.distribute_to_workers(backend, start_assemble(K, f; fillzero, atomic = true), n_workers)
+    threads, blocks = compute_threads_and_blocks(length(cells))
+    ka_assembly_kernel(backend, threads)(assemblers, cells, ccs, cvs, Kes, fes; ndrange = threads * blocks)
+    KA.synchronize(backend)
+    return nothing
+end
+
 # Element-assembly variant: one element matrix and vector per cell, no global matrix.
 @kernel function ka_element_assembly_kernel(@Const(color), ccs, cvs, Kes, fes)
     worker_index = @index(Global, Linear)

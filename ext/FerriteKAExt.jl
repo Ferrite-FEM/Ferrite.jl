@@ -2,6 +2,8 @@ module FerriteKAExt
 
 using Ferrite, SparseArrays
 
+import Base: @propagate_inbounds
+
 import Adapt: Adapt, adapt, adapt_structure
 
 import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype, get_coordinate_type
@@ -13,7 +15,8 @@ import KernelAbstractions: get_backend, @kernel, @index
 
 import SparseArrays: AbstractSparseMatrixCSC
 import GPUArraysCore: @allowscalar
-import GPUArrays: AbstractGPUSparseMatrixCSC, AbstractGPUVector
+import GPUArrays
+import GPUArrays: AbstractGPUSparseMatrixCSC, AbstractGPUSparseMatrixCSR, AbstractGPUVector
 
 include("FerriteKAExt/adapt_core.jl")
 include("FerriteKAExt/soa_core.jl")
@@ -21,6 +24,8 @@ include("FerriteKAExt/soa_core.jl")
 include("FerriteKAExt/device_grid.jl")
 
 include("FerriteKAExt/dof_handler.jl")
+
+include("FerriteKAExt/assembler.jl")
 
 include("FerriteKAExt/iterator.jl")
 

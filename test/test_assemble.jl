@@ -389,3 +389,46 @@ end
     Ferrite.addindex!(A, 0.0, 2, 2, Val(true)) # zero values short-circuit before the error
     @test A == [0.0 1.0; 0.0 0.0]
 end
+
+@testset "assemble! without sorting scratch" begin
+    # The scratch-free assembler (`ST === Nothing`, used by GPU assembly kernels) takes the
+    # dofs in cell order and looks each entry up with a binary search, which must give
+    # bitwise the same result as sorting the dofs first.
+    grid = generate_grid(Quadrilateral, (5, 5))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 2}())
+    close!(dh)
+    element_matrix(dofs) = [sin(i * j / 100) for i in dofs, j in dofs]
+    element_vector(dofs) = [cos(i) for i in dofs]
+
+    for atomic in (false, true)
+        K = allocate_matrix(dh)
+        f = zeros(ndofs(dh))
+        Ku = allocate_matrix(dh)
+        fu = zeros(ndofs(dh))
+        a = start_assemble(K, f; atomic)
+        au = Ferrite.CSCAssembler{Float64, Int, typeof(Ku), atomic, Vector{Float64}, Nothing}(Ku, fu, nothing, nothing, nothing, nothing)
+        for cell in CellIterator(dh)
+            dofs = celldofs(cell)
+            assemble!(a, dofs, element_matrix(dofs), element_vector(dofs))
+            assemble!(au, dofs, element_matrix(dofs), element_vector(dofs))
+        end
+        @test K == Ku
+        @test f == fu
+    end
+
+    # Rectangular assembly and the missing sparsity pattern error
+    I = [1, 1, 4, 4, 6, 6]
+    J = [1, 3, 1, 3, 1, 3]
+    K = sparse(I, J, zeros(length(I)), 6, 6)
+    Ku = sparse(I, J, zeros(length(I)), 6, 6)
+    rdofs = [6, 1, 4] # intentionally unsorted
+    cdofs = [3, 1]
+    Ke = rand(length(rdofs), length(cdofs))
+    a = start_assemble(K)
+    au = Ferrite.CSCAssembler{Float64, Int, typeof(Ku), false, Vector{Float64}, Nothing}(Ku, Float64[], nothing, nothing, nothing, nothing)
+    assemble!(a, rdofs, cdofs, Ke)
+    assemble!(au, rdofs, cdofs, Ke)
+    @test K == Ku
+    @test_throws ErrorException assemble!(au, rdofs, [3, 2], Ke)
+end

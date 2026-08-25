@@ -1,7 +1,6 @@
 abstract type AbstractAssembler{Tv} end
 abstract type AbstractCSCAssembler{Tv} <: AbstractAssembler{Tv} end
 abstract type AbstractCSRAssembler{Tv} <: AbstractAssembler{Tv} end
-abstract type AbstractThreadSafeAssembler{Tv} <: AbstractAssembler{Tv} end
 
 """
     struct COOAssembler{Tv, Ti}
@@ -179,28 +178,33 @@ matrix_handle, vector_handle
 # (LLVM neither unswitches a branch at the accumulation site out of the assembly loops,
 # nor generates as good code when both paths are inlined next to each other).
 
+# The scratch buffers used to sort the local dofs are typed by `ST`, which is `Vector{Int}`
+# for the regular assemblers and `Nothing` for assemblers that cannot allocate per-instance
+# buffers (GPU kernels). In the latter case `assemble!` looks up the local dofs with a
+# binary search instead of sorting them first, see `_assemble_compressed_unsorted!`.
+
 """
 Assembler for sparse matrix with CSC storage type.
 """
-struct CSCAssembler{Tv, Ti, MT <: AbstractSparseMatrixCSC{Tv, Ti}, atomic} <: AbstractCSCAssembler{Tv}
+struct CSCAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}, atomic, FT <: AbstractVector{Tv}, ST <: Union{Nothing, Vector{Int}}} <: AbstractCSCAssembler{Tv}
     K::MT
-    f::Vector{Tv}
-    rowpermutation::Vector{Int}
-    colpermutation::Vector{Int}
-    sortedrowdofs::Vector{Int}
-    sortedcoldofs::Vector{Int}
+    f::FT
+    rowpermutation::ST
+    colpermutation::ST
+    sortedrowdofs::ST
+    sortedcoldofs::ST
 end
 
 """
 Assembler for sparse matrix with CSR storage type.
 """
-struct CSRAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}, atomic} <: AbstractCSRAssembler{Tv} #AbstractSparseMatrixCSR does not exist
+struct CSRAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}, atomic, FT <: AbstractVector{Tv}, ST <: Union{Nothing, Vector{Int}}} <: AbstractCSRAssembler{Tv} #AbstractSparseMatrixCSR does not exist
     K::MT
-    f::Vector{Tv}
-    rowpermutation::Vector{Int}
-    colpermutation::Vector{Int}
-    sortedrowdofs::Vector{Int}
-    sortedcoldofs::Vector{Int}
+    f::FT
+    rowpermutation::ST
+    colpermutation::ST
+    sortedrowdofs::ST
+    sortedcoldofs::ST
 end
 
 """
@@ -287,7 +291,7 @@ start_assemble(K::Union{AbstractSparseMatrixCSC, Symmetric{<:Any, <:AbstractSpar
 Base.@constprop :aggressive function start_assemble(K::AbstractSparseMatrixCSC{T, Ti}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T, Ti}
     _check_atomic_eltype(atomic, T)
     fillzero && (fillzero!(K); fillzero!(f))
-    return CSCAssembler{T, Ti, typeof(K), atomic}(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
+    return CSCAssembler{T, Ti, typeof(K), atomic, typeof(f), Vector{Int}}(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 Base.@constprop :aggressive function start_assemble(K::Symmetric{T, <:SparseMatrixCSC{T, Ti}}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T, Ti}
     _check_atomic_eltype(atomic, T)
@@ -356,6 +360,11 @@ end
     K = matrix_handle(A)
     @boundscheck checkbounds(K, rowdofs, coldofs)
 
+    # Assemblers without sorting scratch (`ST === Nothing`) look up the dofs one by one
+    if A.sortedcoldofs === nothing
+        return _assemble_inner_unsorted!(K, Ke, rowdofs, coldofs, sym, atomic)
+    end
+
     # We assume that the input dofs are not sorted, because the cells need the dofs in
     # a specific order, which might not be the sorted order. Hence we sort them.
     # Note that we are not allowed to mutate `dofs` in the process.
@@ -369,9 +378,149 @@ end
     return _assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym, atomic)
 end
 
-# Number of stored entries per local row above which a column is searched with binary
-# search instead of the linear merge walk in `_assemble_inner!`.
+# Number of stored entries per local minor dof above which a major slice is searched with
+# binary search instead of the linear merge walk in `_assemble_compressed!`.
 const SPARSE_COLUMN_SEARCH_RATIO = 8
+
+# The assembly kernels below operate on the raw arrays of a compressed sparse matrix and are
+# phrased in terms of the *major* index -- the one whose entries are stored contiguously,
+# i.e. the column for CSC and the row for CSR -- and the *minor* index -- the one stored in
+# the index array, i.e. the row for CSC and the column for CSR. These singletons name that
+# orientation; they are shared with the constraint application kernels.
+struct MajorIsColumn end
+struct MajorIsRow end
+
+_missing_sparsity_pattern_error(::MajorIsColumn, major::Integer, minor::Integer) = _missing_sparsity_pattern_error(minor, major)
+_missing_sparsity_pattern_error(::MajorIsRow, major::Integer, minor::Integer) = _missing_sparsity_pattern_error(major, minor)
+
+"""
+    _assemble_compressed!(orient, majorptr, minoridx, nzval, nminor, Ke, sortedmajordofs, majorperm, sortedminordofs, minorperm, sym, atomic)
+
+Assemble the local matrix `Ke` into the compressed sparse matrix given by the pointer array
+`majorptr` (`colptr` for CSC, `rowptr` for CSR), the index array `minoridx` (`rowvals` for
+CSC, `colvals` for CSR) and the stored values `nzval`. `nminor` is the number of possible
+minor indices, i.e. the number of rows for CSC and the number of columns for CSR, and
+`Ke[i, j]` is the local value for the `i`th minor and the `j`th major dof.
+
+The local dofs are expected to be sorted (`sortedmajordofs`/`sortedminordofs`) together with
+the permutations mapping them back to the local indices of `Ke`. If `sym` is `true` only the
+`minor <= major` triangle is assembled (the upper triangle for CSC storage).
+"""
+@propagate_inbounds function _assemble_compressed!(
+        orient, majorptr::AbstractVector, minoridx::AbstractVector, nzval::AbstractVector, nminor::Int,
+        Ke::AbstractMatrix,
+        sortedmajordofs::AbstractVector, majorperm::AbstractVector,
+        sortedminordofs::AbstractVector, minorperm::AbstractVector,
+        sym::Bool, atomic::Val = Val(false)
+    )
+    current_major = 1
+    ld = length(sortedminordofs)
+    @inbounds for Kmajor in sortedmajordofs
+        maxlookups = sym ? current_major : ld
+        Kemajor = majorperm[current_major]
+        nzr = majorptr[Kmajor]:(majorptr[Kmajor + 1] - 1)
+        # Fast path for a fully dense major slice
+        if length(nzr) == nminor
+            offset = first(nzr) - 1
+            for mi in 1:maxlookups
+                val = Ke[minorperm[mi], Kemajor]
+                iszero(val) || addindex!(nzval, val, offset + sortedminordofs[mi], atomic)
+            end
+            current_major += 1
+            continue
+        end
+        # Fast path for a major slice with many entries per local minor dof, but not dense
+        # enough for the branch above
+        if length(nzr) > SPARSE_COLUMN_SEARCH_RATIO * maxlookups
+            lo = first(nzr)
+            hi = last(nzr)
+            for mi in 1:maxlookups
+                Keminor_dof = sortedminordofs[mi]
+                R = searchsortedfirst(minoridx, Keminor_dof, lo, hi, Base.Order.Forward)
+                if R <= hi && minoridx[R] == Keminor_dof
+                    val = Ke[minorperm[mi], Kemajor]
+                    iszero(val) || addindex!(nzval, val, R, atomic)
+                    lo = R + 1
+                else
+                    # No entry exists in the global matrix for this minor index, which is
+                    # allowed as long as the value which would have been inserted is zero.
+                    iszero(Ke[minorperm[mi], Kemajor]) || _missing_sparsity_pattern_error(orient, Kmajor, Keminor_dof)
+                    lo = R
+                end
+            end
+            current_major += 1
+            continue
+        end
+        mi = 1 # minor index pointer for the local matrix
+        Mi = 1 # minor index pointer for the global matrix
+        while Mi <= length(nzr) && mi <= maxlookups
+            R = nzr[Mi]
+            Kminor = minoridx[R]
+            Keminor_dof = sortedminordofs[mi]
+            if Kminor == Keminor_dof
+                # Match: add the value (if non-zero) and advance the pointers
+                val = Ke[minorperm[mi], Kemajor]
+                if !iszero(val)
+                    addindex!(nzval, val, R, atomic)
+                end
+                mi += 1
+                Mi += 1
+            elseif Kminor < Keminor_dof
+                # No match yet: advance the global matrix pointer
+                Mi += 1
+            else # Kminor > Keminor_dof
+                # No match: no entry exist in the global matrix for this minor index. This
+                # is allowed as long as the value which would have been inserted is zero.
+                iszero(Ke[minorperm[mi], Kemajor]) || _missing_sparsity_pattern_error(orient, Kmajor, Keminor_dof)
+                # Advance the local matrix pointer
+                mi += 1
+            end
+        end
+        # Make sure that remaining entries in this slice of the local matrix are all zero
+        for i in mi:maxlookups
+            if !iszero(Ke[minorperm[i], Kemajor])
+                _missing_sparsity_pattern_error(orient, Kmajor, sortedminordofs[i])
+            end
+        end
+        current_major += 1
+    end
+    return
+end
+
+"""
+    _assemble_compressed_unsorted!(orient, majorptr, minoridx, nzval, Ke, majordofs, minordofs, sym, atomic)
+
+Scratch-free variant of [`_assemble_compressed!`](@ref) taking the local dofs in the order
+given by the cell: every stored local value is looked up with a binary search in the minor
+index array. Allocation- and recursion-free so that it can be called from a GPU kernel.
+"""
+@propagate_inbounds function _assemble_compressed_unsorted!(
+        orient, majorptr::AbstractVector, minoridx::AbstractVector, nzval::AbstractVector,
+        Ke::AbstractMatrix, majordofs::AbstractVector, minordofs::AbstractVector,
+        sym::Bool, atomic::Val = Val(false)
+    )
+    @inbounds for j in eachindex(majordofs)
+        majordof = majordofs[j]
+        # `Int` conversion so that the two bounds have the same type also for matrices with
+        # a narrow index type (`searchsortedfirst` requires that).
+        lo = Int(majorptr[majordof])
+        hi = Int(majorptr[majordof + 1]) - 1
+        for i in eachindex(minordofs)
+            minordof = minordofs[i]
+            # Symmetric assembly only stores the `minor <= major` triangle
+            sym && minordof > majordof && continue
+            val = Ke[i, j]
+            iszero(val) && continue
+            k = searchsortedfirst(minoridx, minordof, lo, hi, Base.Order.Forward)
+            if k <= hi && minoridx[k] == minordof
+                addindex!(nzval, val, k, atomic)
+            else
+                _missing_sparsity_pattern_error(orient, majordof, minordof)
+            end
+        end
+    end
+    return
+end
 
 @propagate_inbounds function _assemble_inner!(
         K::SparseMatrixCSC, Ke::AbstractMatrix,
@@ -379,81 +528,21 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
         sym::Bool, atomic::Val = Val(false)
     )
-    current_col = 1
-    Krows = rowvals(K)
-    Kvals = nonzeros(K)
-    ld = length(rowdofs)
-    nrows = size(K, 1)
-    @inbounds for Kcol in sortedcoldofs
-        maxlookups = sym ? current_col : ld
-        Kecol = colpermutation[current_col]
-        nzr = nzrange(K, Kcol)
-        # Fast path for a fully dense column
-        if length(nzr) == nrows
-            offset = first(nzr) - 1
-            for ri in 1:maxlookups
-                val = Ke[rowpermutation[ri], Kecol]
-                iszero(val) || addindex!(Kvals, val, offset + sortedrowdofs[ri], atomic)
-            end
-            current_col += 1
-            continue
-        end
-        # Fast path for a column with many entries per local row, but not dense enough for
-        # the branch above
-        if length(nzr) > SPARSE_COLUMN_SEARCH_RATIO * maxlookups
-            lo = first(nzr)
-            hi = last(nzr)
-            for ri in 1:maxlookups
-                Kerow_dof = sortedrowdofs[ri]
-                R = searchsortedfirst(Krows, Kerow_dof, lo, hi, Base.Order.Forward)
-                if R <= hi && Krows[R] == Kerow_dof
-                    val = Ke[rowpermutation[ri], Kecol]
-                    iszero(val) || addindex!(Kvals, val, R, atomic)
-                    lo = R + 1
-                else
-                    # No entry exists in the global matrix for this row, which is allowed
-                    # as long as the value which would have been inserted is zero.
-                    iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol)
-                    lo = R
-                end
-            end
-            current_col += 1
-            continue
-        end
-        ri = 1 # row index pointer for the local matrix
-        Ri = 1 # row index pointer for the global matrix
-        while Ri <= length(nzr) && ri <= maxlookups
-            R = nzr[Ri]
-            Krow = Krows[R]
-            Kerow_dof = sortedrowdofs[ri]
-            if Krow == Kerow_dof
-                # Match: add the value (if non-zero) and advance the pointers
-                val = Ke[rowpermutation[ri], Kecol]
-                if !iszero(val)
-                    addindex!(Kvals, val, R, atomic)
-                end
-                ri += 1
-                Ri += 1
-            elseif Krow < Kerow_dof
-                # No match yet: advance the global matrix row pointer
-                Ri += 1
-            else # Krow > Kerow_dof
-                # No match: no entry exist in the global matrix for this row. This is
-                # allowed as long as the value which would have been inserted is zero.
-                iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol)
-                # Advance the local matrix row pointer
-                ri += 1
-            end
-        end
-        # Make sure that remaining entries in this column of the local matrix are all zero
-        for i in ri:maxlookups
-            if !iszero(Ke[rowpermutation[i], Kecol])
-                _missing_sparsity_pattern_error(sortedrowdofs[i], Kcol)
-            end
-        end
-        current_col += 1
-    end
-    return
+    return _assemble_compressed!(
+        MajorIsColumn(), SparseArrays.getcolptr(K), rowvals(K), nonzeros(K), size(K, 1), Ke,
+        sortedcoldofs, colpermutation, sortedrowdofs, rowpermutation, sym, atomic
+    )
+end
+
+@propagate_inbounds function _assemble_inner_unsorted!(
+        K::SparseMatrixCSC, Ke::AbstractMatrix,
+        rowdofs::AbstractVector, coldofs::AbstractVector,
+        sym::Bool, atomic::Val = Val(false)
+    )
+    return _assemble_compressed_unsorted!(
+        MajorIsColumn(), SparseArrays.getcolptr(K), rowvals(K), nonzeros(K), Ke,
+        coldofs, rowdofs, sym, atomic
+    )
 end
 
 function _missing_sparsity_pattern_error(Krow::Integer, Kcol::Integer)

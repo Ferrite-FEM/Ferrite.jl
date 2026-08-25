@@ -37,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Atomic assembly (`start_assemble(K, f; atomic = true)`) now supports `Float16` and
    `Complex` of `Float16`/`Float32`/`Float64` as value types, in addition to `Float32`
    and `Float64`. ([#1474])
+ - Assembly into sparse matrices living on a device, via KernelAbstractions.jl:
+   `start_assemble` now accepts any `GPUArrays`-based CSC or CSR sparse matrix (e.g.
+   `CUDA.CUSPARSE.CuSparseMatrixCSC` and `CuSparseMatrixCSR`) together with a device
+   vector, and supports `atomic = true`, which lets a kernel assemble all cells in a single
+   launch without a grid coloring. The internal, CUDA-only `DeviceCSCAssembler` and the
+   internal abstract type `Ferrite.AbstractThreadSafeAssembler` have been removed.
+   ([#1493])
 
 ### Performance
  - `create_coloring` is significantly faster: the incidence matrix construction and the
@@ -1435,3 +1442,4 @@ poking into Ferrite internals:
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
+[#1493]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1493

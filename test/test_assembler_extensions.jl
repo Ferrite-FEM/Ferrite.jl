@@ -180,6 +180,36 @@ using SparseArrays, LinearAlgebra
         Ke2[2, 3] = 3.0 # entry (19, 32) is not in the sparsity pattern
         @test_throws ErrorException assemble!(a, dofs2, Ke2)
 
+        # Scratch-free assembler (`ST === Nothing`, used by GPU assembly kernels): takes
+        # the dofs in cell order and looks each entry up with a binary search, which must
+        # give bitwise the same result as sorting the dofs first.
+        grid = generate_grid(Quadrilateral, (5, 5))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefQuadrilateral, 2}())
+        close!(dh)
+        element_matrix(dofs) = [sin(i * j / 100) for i in dofs, j in dofs]
+        element_vector(dofs) = [cos(i) for i in dofs]
+        for atomic in (false, true)
+            K = allocate_matrix(SparseMatrixCSR, dh)
+            f = zeros(ndofs(dh))
+            Ku = allocate_matrix(SparseMatrixCSR, dh)
+            fu = zeros(ndofs(dh))
+            a = start_assemble(K, f; atomic)
+            au = Ferrite.CSRAssembler{Float64, Int, typeof(Ku), atomic, Vector{Float64}, Nothing}(Ku, fu, nothing, nothing, nothing, nothing)
+            for cell in CellIterator(dh)
+                dofs = celldofs(cell)
+                assemble!(a, dofs, element_matrix(dofs), element_vector(dofs))
+                assemble!(au, dofs, element_matrix(dofs), element_vector(dofs))
+            end
+            @test K == Ku
+            @test K.nzval == Ku.nzval
+            @test f == fu
+        end
+        ## Missing entries in the sparsity pattern are still an error
+        Kdofs = celldofs(dh, 1)
+        au = Ferrite.CSRAssembler{Float64, Int, typeof(K), false, Vector{Float64}, Nothing}(K, Float64[], nothing, nothing, nothing, nothing)
+        @test_throws ErrorException assemble!(au, Kdofs, celldofs(dh, getncells(grid)), element_matrix(Kdofs))
+
         # Check if coupling works
         grid = generate_grid(Quadrilateral, (2, 2))
         ip = Lagrange{RefQuadrilateral, 1}()
