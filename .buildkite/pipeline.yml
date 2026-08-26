@@ -17,8 +17,7 @@ steps:
       julia --code-coverage=@ --project=test/GPU/cuda -e 'using Pkg; Pkg.instantiate()'
       julia --code-coverage=@ --project=test/GPU/cuda test/GPU/runtests.jl
     agents:
-      queue: "juliagpu"
-      cuda: "*"
+      queue: "cuda"
     if: build.message !~ /\[skip tests\]/
     timeout_in_minutes: 60
 
@@ -37,8 +36,8 @@ steps:
       julia --project=test/GPU/amdgpu -e 'using Pkg; Pkg.instantiate()'
       julia --project=test/GPU/amdgpu test/GPU/runtests.jl
     agents:
-      queue: "juliagpu"
-      rocm: "*"
+      queue: "rocm"
+      rocmgpu: "*"
     soft_fail: true
     if: build.message !~ /\[skip tests\]/
     timeout_in_minutes: 60
@@ -56,8 +55,7 @@ steps:
       julia --project=test/GPU/oneapi -e 'using Pkg; Pkg.instantiate()'
       julia --project=test/GPU/oneapi test/GPU/runtests.jl
     agents:
-      queue: "juliagpu"
-      intel: "*"
+      queue: "oneapi"
     soft_fail: true
     if: build.message !~ /\[skip tests\]/
     timeout_in_minutes: 60
