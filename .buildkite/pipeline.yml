@@ -21,8 +21,8 @@ steps:
     if: build.message !~ /\[skip tests\]/
     timeout_in_minutes: 60
 
-  # The vendor steps below run the same test suite as the CUDA step above. They are allowed
-  # to fail until they have been seen green on the corresponding agents.
+  # The vendor steps run the same test suite as the CUDA step; their failures do not fail
+  # the build.
   - label: ":julia: AMDGPU"
     notify:
       - github_commit_status:

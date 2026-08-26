@@ -31,8 +31,8 @@ end
 
 # Row and column roles are swapped compared to CSC, so the local matrix is handed to the
 # shared kernel transposed (a lazy view), mirroring the host method in
-# ext/FerriteSparseMatrixCSR.jl. That one uses `PermutedDimsArray`, which does not compile
-# for CUDA, so `transpose` is used here (equivalent for the scalar `Ke` of an assembler).
+# ext/FerriteSparseMatrixCSR.jl. `transpose` is used instead of `PermutedDimsArray`, which
+# does not compile for CUDA; both are equivalent for the scalar `Ke` of an assembler.
 @propagate_inbounds function Ferrite._assemble_inner_unsorted!(
         K::GPUArrays.GPUSparseDeviceMatrixCSR, Ke::AbstractMatrix,
         rowdofs::AbstractVector, coldofs::AbstractVector,
