@@ -2,7 +2,10 @@ module FerriteAMDGPUExt
 
 using Ferrite, AMDGPU, SparseArrays
 
-import AMDGPU: ROCVector
+import Base: @propagate_inbounds
+import KernelAbstractions as KA
+
+import AMDGPU: ROCVector, ROCDeviceVector
 import AMDGPU.Device: @device_override
 import AMDGPU.rocSPARSE: ROCSparseMatrixCSC, ROCSparseMatrixCSR
 
@@ -36,6 +39,15 @@ function Ferrite.allocate_matrix(::Type{ROCSparseMatrixCSR{Tv, Ti}}, dh::DofHand
     # the host, since the conversion routines in AMDGPU.jl force `Ti = Cint`.
     Kt = SparseMatrixCSC(transpose(allocate_matrix(SparseMatrixCSC{Tv, Ti}, dh)))
     return ROCSparseMatrixCSR{Tv, Ti}(ROCVector{Ti}(Kt.colptr), ROCVector{Ti}(Kt.rowval), ROCVector{Tv}(Kt.nzval), reverse(size(Kt)))
+end
+
+# ---------------- atomic assembly --------------------------------------
+
+# See `Ferrite._atomic_add!` in ext/FerriteKAExt/assembler.jl.
+@propagate_inbounds function Ferrite._atomic_add!(x::ROCDeviceVector{T}, v::T, i::Int) where {T <: Union{Float16, Float32, Float64}}
+    @boundscheck checkbounds(x, i)
+    KA.@atomic x[i] += v
+    return
 end
 
 end

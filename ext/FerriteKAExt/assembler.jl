@@ -44,9 +44,12 @@ end
     )
 end
 
-# Atomic accumulation for device vectors, and for `Array` under the `KA.CPU` backend. Plain
-# `Vector`s keep the more specific `llvmcall` based method from src/arrayutils.jl.
-@propagate_inbounds function Ferrite._atomic_add!(x::AbstractVector{T}, v::T, i::Int) where {T <: Union{Float16, Float32, Float64}}
+# Atomic accumulation for device vectors. The vendor packages define their device array
+# types without the GPUArrays abstraction, so each vendor extension has a method for its own
+# type; this one covers device arrays that are anchored in GPUArrays. `KA.@atomic` is
+# Atomix, which the vendor packages implement for their device arrays. Under the `KA.CPU`
+# backend the vectors are plain `Vector`s, handled in src/arrayutils.jl.
+@propagate_inbounds function Ferrite._atomic_add!(x::GPUArrays.AbstractDeviceArray{T, 1}, v::T, i::Int) where {T <: Union{Float16, Float32, Float64}}
     @boundscheck checkbounds(x, i)
     KA.@atomic x[i] += v
     return

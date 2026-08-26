@@ -7,7 +7,10 @@ module FerriteMetalExt
 
 using Ferrite, Metal
 
-import Metal: @device_override
+import Base: @propagate_inbounds
+import KernelAbstractions as KA
+
+import Metal: MtlDeviceVector, @device_override
 
 # ---------------- custom dispatches for error paths --------------------
 
@@ -22,6 +25,15 @@ end
 
 @device_override @noinline function Ferrite._missing_sparsity_pattern_error(Krow::Integer, Kcol::Integer)
     throw(ErrorException("You are trying to assemble values in to K, but the entry is missing in the sparsity pattern. Make sure you have called `K = allocate_matrix(dh)` or `K = allocate_matrix(dh, ch)` if you have affine constraints. This error might also happen if you are using the assembler in a threaded assembly loop (you need to create one `assembler` for each task)."))
+end
+
+# ---------------- atomic assembly --------------------------------------
+
+# See `Ferrite._atomic_add!` in ext/FerriteKAExt/assembler.jl.
+@propagate_inbounds function Ferrite._atomic_add!(x::MtlDeviceVector{T}, v::T, i::Int) where {T <: Union{Float16, Float32, Float64}}
+    @boundscheck checkbounds(x, i)
+    KA.@atomic x[i] += v
+    return
 end
 
 end

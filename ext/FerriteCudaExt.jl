@@ -2,6 +2,8 @@ module FerriteCudaExt
 
 using Ferrite, CUDA, SparseArrays
 
+import Base: @propagate_inbounds
+
 import Ferrite: get_grid, AbstractGrid, AbstractDofHandler, get_coordinate_eltype
 import Ferrite: meandiag, nnodes_per_cell
 import Ferrite: CellCache
@@ -32,6 +34,15 @@ end
 
 function Ferrite.allocate_matrix(::Type{CuSparseMatrixCSR{Tv, Ti}}, dh::DofHandler) where {Tv, Ti}
     return CuSparseMatrixCSR(allocate_matrix(SparseMatrixCSC{Tv, Ti}, dh))
+end
+
+# ---------------- atomic assembly --------------------------------------
+
+# See `Ferrite._atomic_add!` in ext/FerriteKAExt/assembler.jl.
+@propagate_inbounds function Ferrite._atomic_add!(x::CuDeviceVector{T}, v::T, i::Int) where {T <: Union{Float16, Float32, Float64}}
+    @boundscheck checkbounds(x, i)
+    KA.@atomic x[i] += v
+    return
 end
 
 end
