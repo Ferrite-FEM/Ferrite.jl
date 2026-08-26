@@ -234,7 +234,7 @@ the order in which the contributions to an entry are summed depends on how the w
 scheduled, and floating point addition is not associative.
 =#
 
-# The workers now cover all cells instead of only the largest color, so the per-worker
+# The workers cover all cells instead of only the largest color, so the per-worker
 # buffers have to be allocated accordingly.
 n_workers_atomic = prod(compute_threads_and_blocks(getncells(grid)))
 cv_gpu_atomic = Ferrite.distribute_to_workers(backend, cv, n_workers_atomic)
