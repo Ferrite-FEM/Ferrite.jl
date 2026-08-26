@@ -202,7 +202,8 @@ function generate_mixed_grid()
     gmsh.model.geo.synchronize()
     gmsh.model.mesh.generate(2)
 
-    nodes = tonodes()
+    # gmsh produces Float64 coordinates; Metal has no Float64 support.
+    nodes = [Node(Vec{2, Float32}(n.x)) for n in tonodes()]
     elements, gmsh_eleidx = toelements(2)
     boundarydict = toboundary(1)
     facetsets = tofacetsets(boundarydict, elements)
