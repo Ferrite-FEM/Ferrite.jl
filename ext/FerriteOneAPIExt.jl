@@ -16,7 +16,7 @@ import oneAPI.oneMKL: oneSparseMatrixCSC, oneSparseMatrixCSR
 
 # ---------------- custom dispatches for error paths --------------------
 
-# GPUs cannot interpolate strings out of the box, so we use a reduced error message for now.
+# GPUs cannot interpolate strings, so the device error messages are constant.
 @device_override @noinline Ferrite.throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive. Please check the value on CPU."))
 @device_override @noinline function Ferrite.throw_incompatible_dof_length(length_ue, n_base_funcs)
     throw(ArgumentError("the number of base functions does not match the length of the vector. Perhaps you passed the global vector, or forgot to pass a dof_range? Please check the values on CPU."))
@@ -39,8 +39,8 @@ function Ferrite.allocate_matrix(::Type{oneSparseMatrixCSR{Tv, Ti}}, dh::DofHand
     return oneSparseMatrixCSR(allocate_matrix(SparseMatrixCSC{Tv, Ti}, dh))
 end
 
-# oneMKL only implements `nonzeros` for its sparse matrices, but `Ferrite.apply!` also needs
-# the structure of the CSC storage. This belongs upstream in oneAPI.jl.
+# oneMKL only implements `nonzeros` for its sparse matrices; `Ferrite.apply!` also needs
+# the structure of the CSC storage.
 SparseArrays.getcolptr(K::oneSparseMatrixCSC) = K.colPtr
 SparseArrays.rowvals(K::oneSparseMatrixCSC) = K.rowVal
 
@@ -49,7 +49,7 @@ SparseArrays.rowvals(K::oneSparseMatrixCSC) = K.rowVal
 # The last type parameter of the GPUArrays device views is the address space of the storage.
 _addrspace(::Type{<:oneAPI.oneDeviceArray{T, N, A}}) where {T, N, A} = A
 
-# Type piracy: this belongs upstream in oneAPI.jl, next to the matrices it converts.
+# Type piracy on oneAPI.jl's matrix types.
 function Adapt.adapt_structure(to::oneAPI.KernelAdaptor, K::oneSparseMatrixCSC{Tv, Ti}) where {Tv, Ti}
     colPtr, rowVal, nzVal = adapt(to, K.colPtr), adapt(to, K.rowVal), adapt(to, K.nzVal)
     return GPUArrays.GPUSparseDeviceMatrixCSC{Tv, Ti, typeof(colPtr), typeof(nzVal), _addrspace(typeof(nzVal))}(colPtr, rowVal, nzVal, size(K), K.nnz)

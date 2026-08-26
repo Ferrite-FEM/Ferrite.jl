@@ -80,6 +80,11 @@ end
     @test SparseMatrixCSC(K_device) ≈ K_zero
     @test Vector(f_device) ≈ f_zero
 
+    # Matrix only: no vector passed to `start_assemble` and none to `assemble!`
+    K_only = allocate_device_matrix(backend, sparse_type(Float32, Int32), dh)
+    assemble_matrix_ka!(backend, cv_device, K_only, cc_device, colors_device, Kes_device, fes_device, n_workers)
+    @test SparseMatrixCSC(K_only) ≈ K_unconstrained
+
     # Atomic assembly without coloring: one launch over all cells
     cells_device = adapt(backend, collect(1:getncells(grid)))
     n_workers_all = prod(compute_threads_and_blocks(getncells(grid)))
@@ -113,7 +118,7 @@ end
     Kes_device = KA.zeros(backend, Float32, n_workers, n_basefuncs, n_basefuncs)
     fes_device = KA.zeros(backend, Float32, n_workers, n_basefuncs)
 
-    # `apply!` is not implemented for CSR device matrices yet, so only the assembled system
+    # `apply!` requires CSC storage, so only the assembled system
     # is compared against the CSC reference.
     assemble_global_ka!(backend, cv_device, K_device, f_device, cc_device, colors_device, Kes_device, fes_device, n_workers)
     @test SparseMatrixCSC(K_device) ≈ K_ref

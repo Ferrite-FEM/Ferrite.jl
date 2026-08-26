@@ -11,7 +11,7 @@ import AMDGPU.rocSPARSE: ROCSparseMatrixCSC, ROCSparseMatrixCSR
 
 # ---------------- custom dispatches for error paths --------------------
 
-# GPUs cannot interpolate strings out of the box, so we use a reduced error message for now.
+# GPUs cannot interpolate strings, so the device error messages are constant.
 @device_override @noinline Ferrite.throw_detJ_not_pos(detJ) = throw(ArgumentError("det(J) is not positive. Please check the value on CPU."))
 @device_override @noinline function Ferrite.throw_incompatible_dof_length(length_ue, n_base_funcs)
     throw(ArgumentError("the number of base functions does not match the length of the vector. Perhaps you passed the global vector, or forgot to pass a dof_range? Please check the values on CPU."))

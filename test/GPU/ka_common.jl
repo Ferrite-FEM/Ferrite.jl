@@ -9,7 +9,7 @@ import Adapt: adapt
 import KernelAbstractions as KA
 import KernelAbstractions: @kernel, @index
 
-# Deliberately small so that a color with few cells still exercises several blocks.
+# Small so that a color with few cells still spans several blocks.
 function compute_threads_and_blocks(n)
     MAX_NUM_THREADS = 8
     NUM_TASKS_PER_THREAD = 2
@@ -63,6 +63,35 @@ function assemble_global_ka!(backend, cvs::Ferrite.SoAContainer, K, f, ccs, colo
     for color in colors
         threads, blocks = compute_threads_and_blocks(length(color))
         ka_assembly_kernel(backend, threads)(assemblers, color, ccs, cvs, Kes, fes; ndrange = threads * blocks)
+        KA.synchronize(backend)
+    end
+    return nothing
+end
+
+# Matrix only: `start_assemble(K)` without a vector and `assemble!` without `fe`.
+@kernel function ka_matrix_assembly_kernel(assemblers, @Const(color), ccs, cvs, Kes, fes)
+    worker_index = @index(Global, Linear)
+    stride = prod(KA.@ndrange())
+    assembler = assemblers[worker_index]
+    cv = cvs[worker_index]
+    cc = ccs[worker_index]
+    Ke = view(Kes, worker_index, :, :)
+    fe = view(fes, worker_index, :)
+    for task_index in worker_index:stride:length(color)
+        reinit!(cc, color[task_index])
+        fill!(Ke, 0)
+        fill!(fe, 0)
+        reinit!(cv, cc)
+        assemble_element!(Ke, fe, cv)
+        assemble!(assembler, celldofs(cc), Ke)
+    end
+end
+
+function assemble_matrix_ka!(backend, cvs::Ferrite.SoAContainer, K, ccs, colors::Vector, Kes, fes, n_workers)
+    assemblers = Ferrite.distribute_to_workers(backend, start_assemble(K), n_workers)
+    for color in colors
+        threads, blocks = compute_threads_and_blocks(length(color))
+        ka_matrix_assembly_kernel(backend, threads)(assemblers, color, ccs, cvs, Kes, fes; ndrange = threads * blocks)
         KA.synchronize(backend)
     end
     return nothing

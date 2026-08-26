@@ -28,9 +28,8 @@ end
 
 # ---------------- assembly ---------------------------------------------
 
-# These always create a scratch free assembler (see `Ferrite._device_assembler`), also when
-# the storage vectors are plain `Vector`s: these matrices exist to be assembled from many
-# concurrent workers, and serial host assembly is better served by `SparseMatrixCSC`.
+# Always a scratch free assembler (see `Ferrite._device_assembler`), also for plain `Vector`
+# storage: these matrices are meant to be assembled from many concurrent workers.
 # The `@constprop :aggressive` propagates a literal `atomic` keyword argument into the
 # `atomic` type parameter, see the corresponding host methods in src/assembler.jl.
 Base.@constprop :aggressive function Ferrite.start_assemble(
