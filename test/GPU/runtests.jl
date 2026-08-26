@@ -2,7 +2,6 @@
 # `--project=test/GPU/<backend>` and `FERRITE_GPU_BACKEND=<backend>`.
 using Test
 using SparseArrays
-using SparseMatricesCSR
 import KernelAbstractions as KA
 
 const gpu_backend = get(ENV, "FERRITE_GPU_BACKEND", "cuda")
@@ -16,31 +15,33 @@ if gpu_backend == "cuda"
     sparse_type_csr(Tv, Ti) = CuSparseMatrixCSR{Tv, Ti}
 elseif gpu_backend == "amdgpu"
     using AMDGPU
+    import AMDGPU.rocSPARSE: ROCSparseMatrixCSC, ROCSparseMatrixCSR
     @test AMDGPU.functional()
     backend = ROCBackend()
+    sparse_type(Tv, Ti) = ROCSparseMatrixCSC{Tv, Ti}
+    sparse_type_csr(Tv, Ti) = ROCSparseMatrixCSR{Tv, Ti}
 elseif gpu_backend == "oneapi"
     using oneAPI
+    import oneAPI.oneMKL: oneSparseMatrixCSC, oneSparseMatrixCSR
     @test oneAPI.functional()
     backend = oneAPIBackend()
+    sparse_type(Tv, Ti) = oneSparseMatrixCSC{Tv, Ti}
+    sparse_type_csr(Tv, Ti) = oneSparseMatrixCSR{Tv, Ti}
 elseif gpu_backend == "metal"
+    # Metal has no sparse matrix type of its own, the backend agnostic matrices from
+    # GenericSparseArrays.jl are used instead.
     using Metal
+    using GenericSparseArrays
     @test Metal.functional()
     backend = MetalBackend()
+    sparse_type(Tv, Ti) = GenericSparseMatrixCSC{Tv, Ti}
+    sparse_type_csr(Tv, Ti) = GenericSparseMatrixCSR{Tv, Ti}
 else
     error("unknown FERRITE_GPU_BACKEND=$gpu_backend")
 end
 
 include("ka_common.jl")
 
-if gpu_backend == "cuda"
-    include("howto.jl")
-    include("heat_assembly.jl")
-else
-    # Sparse matrix allocation and the KernelAbstractions assembler for the other vendors
-    # are not implemented yet. Until then this only verifies that the backend loads and is
-    # functional on the CI agent, and runs the KA test suite on the CPU backend there.
-    backend = KA.CPU()
-    sparse_type(Tv, Ti) = SparseMatrixCSC{Tv, Ti}
-    sparse_type_csr(Tv, Ti) = SparseMatrixCSR{1, Tv, Ti}
-    include("heat_assembly.jl")
-end
+gpu_backend == "cuda" && include("howto.jl")
+
+include("heat_assembly.jl")

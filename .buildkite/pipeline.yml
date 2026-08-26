@@ -22,8 +22,8 @@ steps:
     if: build.message !~ /\[skip tests\]/
     timeout_in_minutes: 60
 
-  # The vendor steps below only verify that the backend is functional on the agent until
-  # the extensions for these vendors exist; they are allowed to fail meanwhile.
+  # The vendor steps below run the same test suite as the CUDA step above. They are allowed
+  # to fail until they have been seen green on the corresponding agents.
   - label: ":julia: AMDGPU"
     notify:
       - github_commit_status:

@@ -301,6 +301,31 @@ Base.@constprop :aggressive function start_assemble(K::Symmetric{T, <:SparseMatr
     return SymmetricCSCAssembler{T, Ti, typeof(K), atomic}(K, f, permutation, permutation, sorteddofs, sorteddofs)
 end
 
+# Atomic accumulation on a device uses `KernelAbstractions.@atomic`, which updates a single
+# array element, so there is no way to update the real and the imaginary part of a complex
+# number in one atomic operation.
+function _check_device_atomic_eltype(atomic::Bool, ::Type{Tv}) where {Tv}
+    _check_atomic_eltype(atomic, Tv)
+    if atomic && Tv <: Complex
+        throw(ArgumentError("atomic assembly on device is not supported for complex value types, got $Tv"))
+    end
+    return
+end
+
+# Assemblers for sparse matrices living on a device, shared by the `start_assemble` methods
+# of the GPU extensions. The assemblers carry no sorting scratch (`ST === Nothing`), so a
+# single instance can be shared by all workers and the kernels look up every entry with a
+# binary search, see `_assemble_compressed_unsorted!`. The `atomic` flag is passed as a
+# `Val` so that the returned type does not depend on constant propagation into this
+# function.
+for AT in (:CSCAssembler, :CSRAssembler)
+    @eval function _device_assembler(::Type{$AT}, K::AbstractSparseMatrix{Tv, Ti}, f::AbstractVector{Tv}, fillzero::Bool, ::Val{atomic}) where {Tv, Ti, atomic}
+        _check_device_atomic_eltype(atomic, Tv)
+        fillzero && (fillzero!(K); fillzero!(f))
+        return $AT{Tv, Ti, typeof(K), atomic, typeof(f), Nothing}(K, f, nothing, nothing, nothing, nothing)
+    end
+end
+
 function finish_assemble(a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssembler})
     return a.K, a.f
 end

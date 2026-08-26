@@ -1,17 +1,4 @@
-# Assembly into sparse matrices living on a device. The assemblers created here carry no
-# sorting scratch (`ST === Nothing`), so a single instance can be shared by all workers and
-# the kernels look up every entry with a binary search, see
-# `Ferrite._assemble_compressed_unsorted!`.
-
-# `KA.@atomic` accumulates into a single element, so there is no way to update the real and
-# the imaginary part of a complex number in one atomic operation.
-function _check_device_atomic_eltype(atomic::Bool, ::Type{Tv}) where {Tv}
-    Ferrite._check_atomic_eltype(atomic, Tv)
-    if atomic && Tv <: Complex
-        throw(ArgumentError("atomic assembly on device is not supported for complex value types, got $Tv"))
-    end
-    return
-end
+# Assembly into sparse matrices living on a device, see `Ferrite._device_assembler`.
 
 # The `@constprop :aggressive` propagates a literal `atomic` keyword argument into the
 # `atomic` type parameter, see the corresponding host methods in src/assembler.jl.
@@ -20,9 +7,7 @@ Base.@constprop :aggressive function Ferrite.start_assemble(
         f::AbstractGPUVector{Tv} = KA.zeros(get_backend(nonzeros(K)), Tv, 0);
         fillzero::Bool = true, atomic::Bool = false
     ) where {Tv, Ti}
-    _check_device_atomic_eltype(atomic, Tv)
-    fillzero && (Ferrite.fillzero!(K); Ferrite.fillzero!(f))
-    return Ferrite.CSCAssembler{Tv, Ti, typeof(K), atomic, typeof(f), Nothing}(K, f, nothing, nothing, nothing, nothing)
+    return Ferrite._device_assembler(Ferrite.CSCAssembler, K, f, fillzero, Val(atomic))
 end
 
 Base.@constprop :aggressive function Ferrite.start_assemble(
@@ -30,9 +15,7 @@ Base.@constprop :aggressive function Ferrite.start_assemble(
         f::AbstractGPUVector{Tv} = KA.zeros(get_backend(nonzeros(K)), Tv, 0);
         fillzero::Bool = true, atomic::Bool = false
     ) where {Tv, Ti}
-    _check_device_atomic_eltype(atomic, Tv)
-    fillzero && (Ferrite.fillzero!(K); Ferrite.fillzero!(f))
-    return Ferrite.CSRAssembler{Tv, Ti, typeof(K), atomic, typeof(f), Nothing}(K, f, nothing, nothing, nothing, nothing)
+    return Ferrite._device_assembler(Ferrite.CSRAssembler, K, f, fillzero, Val(atomic))
 end
 
 @propagate_inbounds function Ferrite._assemble_inner_unsorted!(

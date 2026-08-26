@@ -43,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    vector, and supports `atomic = true`, which lets a kernel assemble all cells in a single
    launch without a grid coloring. The internal, CUDA-only `DeviceCSCAssembler` and the
    internal abstract type `Ferrite.AbstractThreadSafeAssembler` have been removed.
+   Package extensions for AMDGPU.jl, oneAPI.jl, Metal.jl and GenericSparseArrays.jl make
+   this available on the other vendor backends: `allocate_matrix` now also accepts
+   `ROCSparseMatrixCSC`/`ROCSparseMatrixCSR`, `oneSparseMatrixCSC`/`oneSparseMatrixCSR` and
+   the backend agnostic `GenericSparseMatrixCSC`/`GenericSparseMatrixCSR`, the latter being
+   the way to assemble a global matrix on Metal, which has no sparse matrix type of its own.
    ([#1493])
 
 ### Performance
