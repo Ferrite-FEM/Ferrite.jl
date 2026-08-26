@@ -73,7 +73,7 @@ steps:
       julia --project=test/GPU/metal -e 'using Pkg; Pkg.instantiate()'
       julia --project=test/GPU/metal test/GPU/runtests.jl
     agents:
-      queue: "juliaecosystem"
+      queue: "metal"
       os: "macos"
       arch: "aarch64"
     soft_fail: true
