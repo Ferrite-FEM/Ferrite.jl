@@ -178,6 +178,17 @@ dh_gpu = adapt(backend, dh)
 K_gpu = allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
 f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 
+# !!! note "Other backends"
+#     The `KernelAbstractions.jl` part of this how-to is backend agnostic, only the setup
+#     above is vendor specific. `AMDGPU.jl` works the same way with `ROCBackend()` and
+#     `ROCSparseMatrixCSC`/`ROCSparseMatrixCSR`,
+#     `oneAPI.jl` with `oneAPIBackend()` and `oneSparseMatrixCSC`/`oneSparseMatrixCSR`.
+#     `Metal.jl` has no sparse matrix type; there (and on any other backend) the backend
+#     agnostic `GenericSparseMatrixCSC`/`GenericSparseMatrixCSR` from
+#     [GenericSparseArrays.jl](https://github.com/albertomercurio/GenericSparseArrays.jl) can be
+#     used instead. Those are allocated on the host and moved to the device explicitly:
+#     `K_gpu = adapt(backend, allocate_matrix(GenericSparseMatrixCSC{Float32, Int32}, dh))`.
+
 # Furthermore, the individual GPU workers need local buffers.
 # Ferrite comes with a helper, `Ferrite.distribute_to_workers`, which transforms common buffers
 # into a suitable GPU format. Since we parallelize over the colors, we need to allocate
