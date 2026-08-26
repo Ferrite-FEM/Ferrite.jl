@@ -136,6 +136,13 @@ function assemble_elements!(cv::CellValues, Kes::AbstractArray{T, 3}, fes::Abstr
     return nothing
 end
 
+# The sparse direct solver only factorizes `Float64` matrices on Julia 1.10, so the solves
+# are done in `Float64` and cast back, keeping the comparison tolerance of the assembly type.
+function solve_cpu(K, f)
+    u = SparseMatrixCSC{Float64, Int}(SparseMatrixCSC(K)) \ Vector{Float64}(Vector(f))
+    return Vector{eltype(f)}(u)
+end
+
 function setup_heat_problem(T = Float32, num_elements = 5)
     grid = generate_grid(Hexahedron, (num_elements, num_elements, num_elements), Vec{3}(T.((-1, -1, -1))), Vec{3}(T.((1, 1, 1))))
     ip = Lagrange{RefHexahedron, 1}()

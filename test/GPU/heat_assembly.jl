@@ -49,7 +49,7 @@ end
     K_unconstrained = copy(K_ref)
     f_unconstrained = copy(f_ref)
     apply!(K_ref, f_ref, ch)
-    u_ref = K_ref \ f_ref
+    u_ref = solve_cpu(K_ref, f_ref)
     K_zero = copy(K_unconstrained)
     f_zero = copy(f_unconstrained)
     apply_zero!(K_zero, f_zero, ch)
@@ -73,7 +73,7 @@ end
     apply!(K_device, f_device, ch_device)
     @test SparseMatrixCSC(K_device) ≈ K_ref
     @test Vector(f_device) ≈ f_ref
-    @test SparseMatrixCSC(K_device) \ Vector(f_device) ≈ u_ref
+    @test solve_cpu(K_device, f_device) ≈ u_ref
 
     assemble_global_ka!(backend, cv_device, K_device, f_device, cc_device, colors_device, Kes_device, fes_device, n_workers)
     apply!(K_device, f_device, ch_device, true)
@@ -143,7 +143,7 @@ end
     assemble_global!(cv1, K_ref, f_ref, sdh1)
     assemble_global!(cv2, K_ref, f_ref, sdh2; fillzero = false)
     apply!(K_ref, f_ref, ch)
-    u_ref = K_ref \ f_ref
+    u_ref = solve_cpu(K_ref, f_ref)
 
     dh_device = adapt(backend, dh)
     K_device = allocate_device_matrix(backend, sparse_type(Float32, Int32), dh)
@@ -160,5 +160,5 @@ end
         assemble_global_ka!(backend, cv_device, K_device, f_device, cc_device, colors_device, Kes_device, fes_device, n_workers; fillzero = i == 1)
     end
     apply!(K_device, f_device, adapt(backend, ch))
-    @test SparseMatrixCSC(K_device) \ Vector(f_device) ≈ u_ref
+    @test solve_cpu(K_device, f_device) ≈ u_ref
 end

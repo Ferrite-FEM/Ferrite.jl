@@ -10,7 +10,7 @@ include(joinpath(@__DIR__, "..", "..", "docs", "src", "literate-howto", "gpu_ass
     f = zeros(Float32, ndofs(dh))
     assemble_global!(cv, K, f, dh)
     apply!(K, f, ch)
-    u_cpu = K \ f
+    u_cpu = solve_cpu(K, f)
     # NOTE this might fail because the meandiag differs due to cancellation. However,
     # the solutions are usually still very close.
     @test SparseMatrixCSC(K_gpu) ≈ K
