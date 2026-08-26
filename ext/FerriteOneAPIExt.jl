@@ -2,11 +2,14 @@ module FerriteOneAPIExt
 
 using Ferrite, oneAPI, SparseArrays
 
+import Base: @propagate_inbounds
+
 import Adapt: Adapt, adapt
 import GPUArrays
+import KernelAbstractions as KA
 # `@device_override` comes from SPIRVIntrinsics (imported into oneAPI) and overlays the
 # `method_table` that is visible in the module it is used from, hence the import below.
-import oneAPI: oneVector, @device_override, method_table
+import oneAPI: oneVector, oneDeviceVector, @device_override, method_table
 import oneAPI.oneMKL: oneSparseMatrixCSC, oneSparseMatrixCSR
 
 # The oneMKL sparse matrices do not subtype the GPUArrays sparse types, so the methods that
@@ -76,6 +79,15 @@ Base.@constprop :aggressive function Ferrite.start_assemble(
         fillzero::Bool = true, atomic::Bool = false
     ) where {Tv, Ti}
     return Ferrite._device_assembler(Ferrite.CSRAssembler, K, f, fillzero, Val(atomic))
+end
+
+# ---------------- atomic assembly --------------------------------------
+
+# See `Ferrite._atomic_add!` in ext/FerriteKAExt/assembler.jl.
+@propagate_inbounds function Ferrite._atomic_add!(x::oneDeviceVector{T}, v::T, i::Int) where {T <: Union{Float16, Float32, Float64}}
+    @boundscheck checkbounds(x, i)
+    KA.@atomic x[i] += v
+    return
 end
 
 end
