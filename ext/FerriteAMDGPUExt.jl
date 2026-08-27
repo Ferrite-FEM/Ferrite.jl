@@ -5,7 +5,8 @@ using Ferrite, AMDGPU, SparseArrays
 import Base: @propagate_inbounds
 import KernelAbstractions as KA
 
-import AMDGPU: ROCVector, ROCDeviceVector
+import AMDGPU: ROCVector
+import AMDGPU.Device: ROCDeviceVector
 import AMDGPU.Device: @device_override
 import AMDGPU.rocSPARSE: ROCSparseMatrixCSC, ROCSparseMatrixCSR
 

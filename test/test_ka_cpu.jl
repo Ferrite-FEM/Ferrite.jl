@@ -19,5 +19,6 @@ include(joinpath(@__DIR__, "GPU", "heat_assembly.jl"))
 # how backends without a sparse matrix library of their own (e.g. Metal) assemble.
 sparse_type(Tv, Ti) = GenericSparseMatrixCSC{Tv, Ti}
 sparse_type_csr(Tv, Ti) = GenericSparseMatrixCSR{Tv, Ti}
+allocate_device_matrix(backend, MT::Type{<:GenericSparseArrays.AbstractGenericSparseMatrix}, dh) = adapt(backend, allocate_matrix(MT, dh))
 
 include(joinpath(@__DIR__, "GPU", "heat_assembly.jl"))
