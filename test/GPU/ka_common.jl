@@ -134,10 +134,10 @@ function assemble_elements_ka!(backend, cvs::Ferrite.SoAContainer, ccs, colors::
     return nothing
 end
 
-# `allocate_matrix` returns a device matrix for the vendor sparse types, but a host matrix
-# for the backend agnostic ones from GenericSparseArrays.jl. `adapt` moves the latter to the
-# device and is a no-op for the former.
-allocate_device_matrix(backend, MT, dh) = adapt(backend, allocate_matrix(MT, dh))
+# The vendor sparse matrix types are allocated on the device. The backend agnostic ones
+# from GenericSparseArrays.jl are allocated on the host and moved with `adapt`; that method
+# is defined where GenericSparseArrays is loaded.
+allocate_device_matrix(backend, MT, dh) = allocate_matrix(MT, dh)
 
 # Serial CPU references. `dh` may be a `DofHandler` or a `SubDofHandler`.
 function assemble_global!(cv::CellValues, K::SparseMatrixCSC, f, dh; fillzero = true)

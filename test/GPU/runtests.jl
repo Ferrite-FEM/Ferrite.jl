@@ -42,6 +42,10 @@ end
 
 include("ka_common.jl")
 
+if gpu_backend == "metal"
+    allocate_device_matrix(backend, MT::Type{<:GenericSparseArrays.AbstractGenericSparseMatrix}, dh) = adapt(backend, allocate_matrix(MT, dh))
+end
+
 gpu_backend == "cuda" && include("howto.jl")
 
 include("heat_assembly.jl")
