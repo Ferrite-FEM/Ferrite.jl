@@ -329,3 +329,40 @@ end
     atomic_assembler = start_assemble(KB, fB; atomic = true)
     @test_throws ErrorException assemble!(atomic_assembler, dofs, ke, fe)
 end
+
+@testset "BlockAssembler scatter ($blockname blocks)" for (blockname, BT) in BLOCK_TYPES
+    grid = generate_grid(Triangle, (10, 10))
+    dh = DofHandler(grid)
+    ip = Lagrange{RefTriangle, 1}()
+    add!(dh, :u, ip^2)
+    add!(dh, :p, ip)
+    close!(dh)
+    renumber!(dh, DofOrder.FieldWise())
+    nd = ndofs(dh) ÷ 3
+
+    bsp = BlockSparsityPattern([2nd, 1nd])
+    add_sparsity_entries!(bsp, dh)
+    KB = allocate_matrix(BlockMatrix{Float64, Matrix{BT}}, bsp)
+    fB = similar(KB, axes(KB, 1))
+
+    npc = ndofs_per_cell(dh)
+    ke = rand(npc, npc)
+    fe = rand(npc)
+    dofs = celldofs(dh, 1)
+
+    # The scatter reuses the buffers in the assembler, so after the first cell an assembly
+    # loop must not allocate at all.
+    assembler = start_assemble(KB, fB)
+    assemble!(assembler, dofs, ke, fe)
+    @test (@allocated assemble!(assembler, dofs, ke, fe)) == 0
+    @test (@allocated assemble!(assembler, dofs, ke)) == 0
+
+    # Writing outside the sparsity pattern is reported with the global dof numbers, even
+    # though each block is assembled through block local indices. The :p dofs live in the
+    # second block, so the reported index is only correct if the block offset is applied.
+    pdofs = filter(>(2nd), dofs)
+    KB = allocate_matrix(BlockMatrix{Float64, Matrix{BT}}, BlockSparsityPattern([2nd, 1nd]))
+    assembler = start_assemble(KB)
+    m = minimum(pdofs)
+    @test_throws "K[$m, $m]" assemble!(assembler, pdofs, ones(length(pdofs), length(pdofs)))
+end

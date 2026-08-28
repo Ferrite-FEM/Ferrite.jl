@@ -16,7 +16,7 @@ end
         K::SparseMatrixCSR, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-        sym::Bool, atomic::Val = Val(false)
+        sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
     )
     current_row = 1
     ld = length(coldofs)
@@ -53,7 +53,7 @@ end
                 else
                     # No entry exists in the global matrix for this column, which is
                     # allowed as long as the value which would have been inserted is zero.
-                    iszero(Ke[Kerow, colpermutation[ci]]) || Ferrite._missing_sparsity_pattern_error(Krow, Kecol_dof)
+                    iszero(Ke[Kerow, colpermutation[ci]]) || Ferrite._missing_sparsity_pattern_error(Krow + rowoffset, Kecol_dof + coloffset)
                     lo = C
                 end
             end
@@ -78,7 +78,7 @@ end
             else # Kcol > Kecol_dof
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
-                iszero(Ke[Kerow, colpermutation[ci]]) || Ferrite._missing_sparsity_pattern_error(Krow, Kecol_dof)
+                iszero(Ke[Kerow, colpermutation[ci]]) || Ferrite._missing_sparsity_pattern_error(Krow + rowoffset, Kecol_dof + coloffset)
                 # Advance the local matrix row pointer
                 ci += 1
             end
@@ -86,7 +86,7 @@ end
         # Make sure that remaining entries in this column of the local matrix are all zero
         for i in ci:maxlookups
             if !iszero(Ke[Kerow, colpermutation[i]])
-                Ferrite._missing_sparsity_pattern_error(Krow, sortedcoldofs[i])
+                Ferrite._missing_sparsity_pattern_error(Krow + rowoffset, sortedcoldofs[i] + coloffset)
             end
         end
         current_row += 1

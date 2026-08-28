@@ -29,21 +29,29 @@ Ferrite.zero_out_columns!
 Ferrite.add_inhomogeneities!
 Ferrite.condense_into!
 Ferrite.addindex!
+Ferrite._assemble_inner!
 ```
 
 and the `AbstractMatrix` interface for their custom matrix type. [`apply!`](@ref) itself is
 generic and dispatches on `AbstractMatrix`, so a custom format is supported as soon as the
 functions above are dispatched -- there is no need to add an `apply!` method.
 
-Each of these takes the constraint data explicitly and, where relevant, index offsets, rather
-than a [`ConstraintHandler`](@ref). That is deliberate: the very same methods are then used
-both for a matrix on its own and for a matrix used as a *block* of a blocked matrix, where the
-indices are block local and the offsets place the block in the global system. A format that
-implements them therefore works with the BlockArrays extension without any further work, and
-without that extension having to know anything about it.
+Each of these takes its data -- an element matrix or the constraint data -- explicitly, plus
+index offsets where relevant, rather than an assembler or a [`ConstraintHandler`](@ref). That
+is deliberate: the very same methods are then used both for a matrix on its own and for a
+matrix used as a *block* of a blocked matrix, where the indices are block local and the
+offsets place the block in the global system. A format that implements them therefore works
+with the BlockArrays extension without any further work, and without that extension having to
+know anything about it.
 
-Two conventions are worth calling out:
+Three conventions are worth calling out:
 
+- `_assemble_inner!` is the only one of these with a working default implementation: it
+  writes the element matrix entry by entry with `addindex!`, so a format is assembled into as
+  soon as it implements that. Specializing it pays off for a format that stores its entries
+  sorted, since the element matrix and the stored entries can then be walked in a single pass
+  instead of searching for each entry -- which is what makes it worth roughly a factor of
+  three for CSC and CSR.
 - `zero_out_rows!` and `zero_out_columns!` receive the set of indices to zero **twice**, once
   as a sorted list and once as a boolean mask. Which one can be used efficiently depends on the
   storage: a column-compressed format walks the listed columns directly, while a row-compressed

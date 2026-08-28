@@ -1,7 +1,7 @@
 module FerriteBlockArrays
 
 using BlockArrays: Block, BlockArray, BlockIndex, BlockMatrix, BlockVector, block,
-    blockaxes, blockindex, blocks, findblockindex, undef_blocks
+    blockaxes, blockindex, blocks, blocksize, findblockindex, undef_blocks
 using Ferrite:
     Ferrite, BlockSparsityPattern, ConstraintHandler, addindex!, allocate_matrix, assemble!,
     fillzero!, DofCoefficients, _is_atomic
@@ -62,7 +62,9 @@ end
 struct BlockAssembler{Tv, BM <: BlockMatrix{Tv}, Bv <: AbstractVector{Tv}, atomic} <: Ferrite.AbstractAssembler{Tv}
     K::BM
     f::Bv
-    blockindices::Vector{BlockIndex{1}}
+    sorteddofs::Vector{Int}  # cell dofs, sorted and made local to their block
+    permutation::Vector{Int} # sorted position -> index into the element matrix
+    blockstops::Vector{Int}  # block -> last position in `sorteddofs` belonging to it
 end
 
 Ferrite.matrix_handle(ba::BlockAssembler) = ba.K
@@ -73,18 +75,42 @@ Ferrite.vector_handle(ba::BlockAssembler) = ba.f
 Base.@constprop :aggressive function Ferrite.start_assemble(K::BlockMatrix{Tv}, f::AbstractVector = Tv[]; fillzero::Bool = true, atomic::Bool = false) where {Tv}
     Ferrite._check_atomic_eltype(atomic, eltype(K))
     fillzero && (fillzero!(K); fillzero!(f))
-    return BlockAssembler{eltype(K), typeof(K), typeof(f), atomic}(K, f, BlockIndex{1}[])
+    return BlockAssembler{eltype(K), typeof(K), typeof(f), atomic}(K, f, Int[], Int[], Int[])
 end
 
-# Split into the block and the local index
-splindex(idx::BlockIndex{1}) = (block(idx), blockindex(idx))
+# The global index range of block `B` along axis `d`.
+blockrange(K::BlockMatrix, d::Int, B::Block{1}) = axes(K, d)[B]
+
+# Split the (sorted) cell dofs into the per-block, block local dof lists that each block's
+# scatter needs. Since the blocks partition the axis into consecutive index ranges, dofs
+# sorted ascending are also grouped by block, so each block's dofs are a consecutive slice
+# `blockstops[b - 1] + 1 : blockstops[b]` of `sorteddofs`. Returns the number of blocks.
+function split_into_blocks!(sorteddofs::Vector{Int}, blockstops::Vector{Int}, K::BlockMatrix)
+    nblocks = blocksize(K, 1)
+    resize!(blockstops, nblocks)
+    stop = 0
+    @inbounds for b in 1:nblocks
+        rng = blockrange(K, 1, Block(b))
+        start = stop + 1
+        stop = searchsortedlast(sorteddofs, last(rng))
+        offset = first(rng) - 1
+        for k in start:stop
+            sorteddofs[k] -= offset
+        end
+        blockstops[b] = stop
+    end
+    return nblocks
+end
+
+# The slice of `sorteddofs` belonging to block `b`.
+blockslice(blockstops::Vector{Int}, b::Int) = @inbounds (b == 1 ? 1 : blockstops[b - 1] + 1):blockstops[b]
 
 function Ferrite.assemble!(assembler::BlockAssembler, dofs::AbstractVector{<:Integer}, ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
     atomic = Val(_is_atomic(assembler))
 
     K = assembler.K
     f = assembler.f
-    blockindices = assembler.blockindices
+    blockstops = assembler.blockstops
 
     @assert blockaxes(K, 1) == blockaxes(K, 2)
     @assert axes(K, 1) == axes(K, 2)
@@ -92,30 +118,43 @@ function Ferrite.assemble!(assembler::BlockAssembler, dofs::AbstractVector{<:Int
     @boundscheck checkbounds(K, dofs, dofs)
     @boundscheck fe === nothing || checkbounds(f, dofs)
 
-    # Update the cached the block indices
-    resize!(blockindices, length(dofs))
-    @inbounds for (i, I) in pairs(dofs)
-        blockindices[i] = findblockindex(axes(K, 1), I)
-    end
+    sorteddofs, permutation = Ferrite._sortdofs_for_assembly!(assembler.permutation, assembler.sorteddofs, dofs)
+    nblocks = split_into_blocks!(sorteddofs, blockstops, K)
 
-    # Assemble matrix entries
-    @inbounds for (j, blockindex_j) in pairs(blockindices)
-        Bj, lj = splindex(blockindex_j)
-        for (i, blockindex_i) in pairs(blockindices)
-            Bi, li = splindex(blockindex_i)
-            KB = @view K[Bi, Bj]
-            addindex!(KB, ke[i, j], li, lj, atomic)
+    # Assemble matrix entries. Each block scatters the part of `ke` that belongs to it
+    # through the same `_assemble_inner!` the unblocked assemblers use, so a block format
+    # needs nothing beyond what it already implements to be assembled into as a block.
+    Kblocks = blocks(K)
+    @inbounds for bj in 1:nblocks
+        cols = blockslice(blockstops, bj)
+        isempty(cols) && continue
+        coloffset = first(blockrange(K, 2, Block(bj))) - 1
+        sortedcoldofs = view(sorteddofs, cols)
+        colpermutation = view(permutation, cols)
+        for bi in 1:nblocks
+            rows = blockslice(blockstops, bi)
+            isempty(rows) && continue
+            rowoffset = first(blockrange(K, 1, Block(bi))) - 1
+            sortedrowdofs = view(sorteddofs, rows)
+            rowpermutation = view(permutation, rows)
+            Ferrite._assemble_inner!(
+                Kblocks[bi, bj], ke,
+                sortedrowdofs, sortedrowdofs, rowpermutation,
+                sortedcoldofs, sortedcoldofs, colpermutation,
+                false, atomic, rowoffset, coloffset,
+            )
         end
     end
 
     # Assemble vector entries
     if fe !== nothing
         if blockaxes(f, 1) == blockaxes(K, 1)
-            # If f::BlockVector with the same axes the same blockindex cache can be used...
-            @inbounds for (i, blockindex_i) in pairs(blockindices)
-                Bi, li = splindex(blockindex_i)
-                fB = @view f[Bi]
-                addindex!(fB, fe[i], li, atomic)
+            # If f::BlockVector with the same axes the block splitting above can be reused...
+            @inbounds for bi in 1:nblocks
+                fb = view(f, Block(bi))
+                for k in blockslice(blockstops, bi)
+                    addindex!(fb, fe[permutation[k]], sorteddofs[k], atomic)
+                end
             end
         else
             # ... otherwise, use regular indexing in fallback assemble!
@@ -137,9 +176,6 @@ Ferrite._is_atomic(::BlockAssembler{<:Any, <:Any, <:Any, atomic}) where {atomic}
 # and forwards to the *same* interface function on the block, so this file knows nothing about
 # how a block stores its entries -- supporting a new format is a matter of implementing that
 # interface for it, with no change here. See the devdocs on assembly for the interface.
-
-# The global index range of block `B` along axis `d`.
-blockrange(K::BlockMatrix, d::Int, B::Block{1}) = axes(K, d)[B]
 
 # `prescribed_dofs` is sorted, so the dofs inside the (contiguous) index range `rng` form a
 # contiguous slice of it. Returns the indices into `prescribed_dofs`, i.e. also the indices
@@ -227,12 +263,14 @@ end
 ## Overloaded assembly pieces from src/arrayutils.jl ##
 #######################################################
 
+# Split a global index into the number of the block holding it and its index within that block
+splindex(idx::BlockIndex{1}) = (Int(block(idx).n[1]), Int(blockindex(idx)))
+
 function Ferrite.addindex!(B::BlockMatrix{Tv}, v::Tv, i::Int, j::Int, ::Val{atomic} = Val(false)) where {Tv, atomic}
     @boundscheck checkbounds(B, i, j)
-    Bi, li = splindex(findblockindex(axes(B, 1), i))
-    Bj, lj = splindex(findblockindex(axes(B, 2), j))
-    BB = @view B[Bi, Bj]
-    @inbounds addindex!(BB, v, li, lj, Val{atomic}())
+    bi, li = splindex(findblockindex(axes(B, 1), i))
+    bj, lj = splindex(findblockindex(axes(B, 2), j))
+    @inbounds addindex!(blocks(B)[bi, bj], v, li, lj, Val{atomic}())
     return B
 end
 
@@ -240,9 +278,8 @@ end
 # `Ferrite._condense_local!` reach the atomic accumulation in the underlying block.
 function Ferrite.addindex!(B::BlockVector{Tv}, v::Tv, i::Int, ::Val{atomic} = Val(false)) where {Tv, atomic}
     @boundscheck checkbounds(B, i)
-    Bi, li = splindex(findblockindex(axes(B, 1), i))
-    BB = @view B[Bi]
-    @inbounds addindex!(BB, v, li, Val{atomic}())
+    bi, li = splindex(findblockindex(axes(B, 1), i))
+    @inbounds addindex!(blocks(B)[bi], v, li, Val{atomic}())
     return B
 end
 
