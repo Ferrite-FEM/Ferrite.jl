@@ -76,6 +76,7 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
             # Point-value dofs must satisfy the Kronecker delta property at their
             # reference coordinates
             coords = Ferrite.reference_coordinates(ip)
+            @test map(f -> f.x, fs) == Tuple(coords)
             for j in 1:getnbasefunctions(ip), i in 1:getnbasefunctions(ip)
                 Nij = Ferrite.reference_shape_value(ip, coords[j], i)
                 @test isapprox(Nij, i == j ? one(Nij) : zero(Nij); atol = 200 * eps(Float64))
@@ -83,7 +84,7 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
         else
             # Moment-type layouts must have uniform per-entity signatures so that dof
             # distribution can compare them entity-wise
-            for entity_functionals in (Ferrite.vertexdof_functionals, Ferrite.edgedof_functionals, Ferrite.facedof_functionals)
+            for entity_functionals in (Ferrite.vertexdof_functionals, Ferrite.edgedof_functionals, Ferrite.facedof_functionals, Ferrite.facetdof_functionals)
                 sigs = unique(filter(!isempty, collect(entity_functionals(ip))))
                 @test length(sigs) <= 1
             end

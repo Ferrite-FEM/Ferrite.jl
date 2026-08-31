@@ -26,8 +26,8 @@ RannacherTurek
 
 ## [Dof functionals](@id dof-functionals)
 
-Each local dof of an interpolation has a *dof functional* describing its physical
-meaning. Most interpolations have only [`PointValue`](@ref) dofs, but e.g. H(div)/H(curl)
+Each local dof of an interpolation has a *dof functional* describing how it evaluates a
+function. Most interpolations have only [`PointValue`](@ref) dofs, but e.g. H(div)/H(curl)
 interpolations have integral moment dofs, and Hermite-type interpolations have derivative
 dofs. The functional can be used to select which dofs a [`Dirichlet`](@ref) condition
 constrains.

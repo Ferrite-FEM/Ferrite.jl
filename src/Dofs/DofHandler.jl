@@ -389,7 +389,7 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
             if n_components(ip) != n_components(_ip)
                 error("Field :$name has a different number of components in another SubDofHandler. Use a different field name.")
             end
-            _check_shared_dof_functionals(name, ip, _ip)
+            _check_shared_dof_definitions(name, ip, _ip, sdh, _sdh)
             if getorder(ip) != getorder(_ip)
                 @warn "Field :$name uses a different interpolation order in another SubDofHandler."
             end
@@ -408,45 +408,158 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
     return sdh
 end
 
-# Check that a field with the same name in two SubDofHandlers uses compatible dof
-# functionals on entity classes that can be shared between cells, i.e. classes with
-# dimension below the reference dimension of at least one of the cell types (this
-# includes the cell-interior "face" dofs of a 2D cell embedded in 3D, which share
-# facedict entries with a neighboring volume cell's face dofs). Dof distribution reuses
-# entity dofs positionally with the reusing cell's own layout, so mismatching functionals
-# or counts would silently alias unrelated dofs.
-function _check_shared_dof_functionals(name::Symbol, ip::Interpolation, _ip::Interpolation)
-    base, _base = get_base_interpolation(ip), get_base_interpolation(_ip)
-    n_copies = ip isa VectorizedInterpolation ? get_n_copies(ip) : 1
-    _n_copies = _ip isa VectorizedInterpolation ? get_n_copies(_ip) : 1
-    max_rdim = max(getrefdim(base), getrefdim(_base))
+# Dof distribution reuses entity dofs positionally. Check every entity class that may be
+# shared, including a 2D cell's interior face when coupled to a 3D cell.
+function _check_shared_dof_definitions(name::Symbol, ip::Interpolation, _ip::Interpolation, sdh::SubDofHandler, _sdh::SubDofHandler)
+    max_rdim = max(getrefdim(ip), getrefdim(_ip))
     for (class, entity_dim, entity_functionals) in (
             ("vertices", 0, vertexdof_functionals),
             ("edges", 1, edgedof_functionals),
             ("faces", 2, facedof_functionals),
         )
         entity_dim < max_rdim || continue
-        sigs = unique(filter(!isempty, collect(entity_functionals(base))))
-        _sigs = unique(filter(!isempty, collect(entity_functionals(_base))))
+        functional_layouts = map(fs -> map(_functional_signature, fs), entity_functionals(ip))
+        _functional_layouts = map(fs -> map(_functional_signature, fs), entity_functionals(_ip))
+        sigs = unique(filter(!isempty, collect(functional_layouts)))
+        _sigs = unique(filter(!isempty, collect(_functional_layouts)))
         # An entity carrying dofs from only one of the interpolations is never shared
         (isempty(sigs) || isempty(_sigs)) && continue
+        _subdomains_share_entity(get_grid(sdh.dh), sdh.cellset, _sdh.cellset, entity_dim) || continue
         compatible = if length(sigs) == 1 && length(_sigs) == 1
-            n_copies == _n_copies && sigs[1] == _sigs[1]
+            sigs[1] == _sigs[1]
         else
             # Entity-heterogeneous layouts can only be compared positionally
-            getrefshape(base) === getrefshape(_base) && n_copies == _n_copies &&
-                collect(entity_functionals(base)) == collect(entity_functionals(_base))
+            getrefshape(ip) === getrefshape(_ip) &&
+                collect(functional_layouts) == collect(_functional_layouts)
+        end
+        if compatible
+            positional = !(length(sigs) == 1 && length(_sigs) == 1)
+            compatible = _point_locations_compatible(ip, _ip, entity_dim, positional)
         end
         if !compatible
             error(
-                "Field :$name is shared between SubDofHandlers with incompatible dof functionals " *
-                    "on $class: $(Tuple(sigs)) × $n_copies copies vs $(Tuple(_sigs)) × $_n_copies copies. " *
-                    "Shared entities would receive dofs with conflicting physical meaning. Use a different field name."
+                "Field :$name has incompatible dof definitions on shared $class: " *
+                    "$(Tuple(sigs)) vs $(Tuple(_sigs)). Point dofs must have matching " *
+                    "entity-local coordinates; use a different field name."
             )
         end
     end
     return
 end
+
+_functional_signature(f::DofFunctional) = f
+_functional_signature(f::PointValue) = f.direction === nothing ? PointValue() : PointValue(f.direction)
+function _functional_signature(f::PointDerivative)
+    f.α === nothing && return PointDerivative()
+    return f.direction === nothing ? PointDerivative(f.α) : PointDerivative(f.α, f.direction)
+end
+
+function _point_locations_compatible(ip::Interpolation, _ip::Interpolation, entity_dim::Int, positional::Bool)
+    locations = filter(!isempty, collect(_entity_point_locations(ip, entity_dim)))
+    _locations = filter(!isempty, collect(_entity_point_locations(_ip, entity_dim)))
+    # Moment weights and normalization are not modeled.
+    (
+        all(all(isnothing, location) for location in locations) &&
+            all(all(isnothing, location) for location in _locations)
+    ) && return true
+    if positional
+        length(locations) == length(_locations) || return false
+        return all(_same_point_locations(a, b) for (a, b) in zip(locations, _locations))
+    end
+    # Uniform layouts can be compared across different reference shapes.
+    all(_same_point_locations(first(locations), location) for location in locations) || return false
+    all(_same_point_locations(first(_locations), location) for location in _locations) || return false
+    return _same_point_locations(first(locations), first(_locations))
+end
+
+function _entity_point_locations(ip::Interpolation, entity_dim::Int)
+    functionals = entity_dim == 0 ? vertexdof_functionals(ip) :
+        entity_dim == 1 ? edgedof_functionals(ip) : facedof_functionals(ip)
+    all(all(f -> !(f isa Union{PointValue, PointDerivative}), fs) for fs in functionals) &&
+        return map(fs -> ntuple(_ -> nothing, length(fs)), functionals)
+
+    dof_indices = _entity_dof_indices(ip, entity_dim)
+    vertex_coordinates = reference_coordinates(Lagrange{getrefshape(ip), 1}())
+    reference_entities = entity_dim == 0 ? map(i -> (i,), reference_vertices(getrefshape(ip))) :
+        entity_dim == 1 ? reference_edges(getrefshape(ip)) : reference_faces(getrefshape(ip))
+    return map(functionals, dof_indices, reference_entities) do fs, dofs, entity_vertices
+        entity_coordinates = vertex_coordinates[[entity_vertices...]]
+        return map(fs, dofs) do f, dof
+            f isa Union{PointValue, PointDerivative} || return nothing
+            x = f.x
+            x === nothing && error("dof_functionals must include the point of every point-supported dof (local dof $dof of $ip)")
+            return _entity_local_coordinate(x, entity_coordinates, entity_dim)
+        end
+    end
+end
+
+function _entity_dof_indices(ip::Interpolation, entity_dim::Int)
+    return entity_dim == 0 ? vertexdof_indices(ip) :
+        entity_dim == 1 ? edgedof_interior_indices(ip) : facedof_interior_indices(ip)
+end
+function _entity_dof_indices(ip::VectorizedInterpolation{vdim}, entity_dim::Int) where {vdim}
+    return map(_entity_dof_indices(ip.ip, entity_dim)) do dofs
+        Tuple((dof - 1) * vdim + direction for dof in dofs for direction in 1:vdim)
+    end
+end
+
+function _entity_local_coordinate(x, vertices, entity_dim::Int)
+    if entity_dim == 0
+        isapprox(x, only(vertices)) || error("point-supported vertex dof is not located on its owning vertex")
+        return ()
+    elseif entity_dim == 1
+        a = vertices[2] - vertices[1]
+        t = ((x - vertices[1]) ⋅ a) / (a ⋅ a)
+        isapprox(x, vertices[1] + t * a) || error("point-supported edge dof is not located on its owning edge")
+        return (t,)
+    end
+    # Triangles and quadrilaterals use vertices (1, 2, 3) and (1, 2, 4) as affine axes.
+    a = vertices[2] - vertices[1]
+    b = vertices[length(vertices) == 3 ? 3 : 4] - vertices[1]
+    r = x - vertices[1]
+    aa, ab, bb = a ⋅ a, a ⋅ b, b ⋅ b
+    ar, br = a ⋅ r, b ⋅ r
+    denominator = aa * bb - ab * ab
+    u = (ar * bb - br * ab) / denominator
+    v = (br * aa - ar * ab) / denominator
+    isapprox(x, vertices[1] + u * a + v * b) || error("point-supported face dof is not located on its owning face")
+    return (u, v)
+end
+
+function _same_point_locations(a::Tuple, b::Tuple)
+    length(a) == length(b) || return false
+    return all(_same_point_coordinate(x, y) for (x, y) in zip(a, b))
+end
+_same_point_coordinate(x, y) = x === nothing || y === nothing ? x === y : isapprox(x, y)
+function _same_point_coordinate(x::Tuple, y::Tuple)
+    length(x) == length(y) || return false
+    return all(isapprox(a, b) for (a, b) in zip(x, y))
+end
+
+# Only an actual shared entity can alias global dofs between two cellsets.
+function _subdomains_share_entity(grid::AbstractGrid, cellset, _cellset, entity_dim::Int)
+    entities = Set{Any}()
+    for cellid in cellset
+        for entity in _cell_entities(getcells(grid, cellid), entity_dim)
+            push!(entities, _canonical_entity(entity, entity_dim))
+        end
+    end
+    for cellid in _cellset
+        for entity in _cell_entities(getcells(grid, cellid), entity_dim)
+            _canonical_entity(entity, entity_dim) in entities && return true
+        end
+    end
+    return false
+end
+
+_cell_entities(cell, ::Val{0}) = vertices(cell)
+_cell_entities(cell, ::Val{1}) = edges(cell)
+_cell_entities(cell, ::Val{2}) = faces(cell)
+_cell_entities(cell, entity_dim::Int) = _cell_entities(cell, Val(entity_dim))
+_canonical_entity(entity, ::Val{0}) = entity
+_canonical_entity(entity, ::Val{1}) = first(sortedge(entity))
+_canonical_entity(entity, ::Val{2}) = first(sortface(entity))
+_canonical_entity(entity, entity_dim::Int) = _canonical_entity(entity, Val(entity_dim))
 
 """
     add!(dh::DofHandler, name::Symbol, ip::Interpolation)

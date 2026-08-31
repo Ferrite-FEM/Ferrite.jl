@@ -87,25 +87,40 @@ end
     dh = DofHandler(grid)
     add!(dh, :s, Lagrange{RefTriangle, 1}())
     close!(dh)
-    # default functional (PointValue) gives unchanged behavior
+    # The default preserves the existing behavior.
     ch = ConstraintHandler(dh)
     add!(ch, Dirichlet(:s, Γ, x -> 1.0))
     close!(ch)
     update!(ch, 0.0)
     @test length(ch.prescribed_dofs) == 3
     @test all(ch.inhomogeneities .== 1.0)
-    # selecting a functional the boundary dofs do not have
+    # The selector must match a boundary dof.
     ch = ConstraintHandler(dh)
-    @test_throws ErrorException add!(ch, Dirichlet(:s, Γ, x -> 0.0; functional = PointDerivative))
-    # moment dofs cannot be prescribed with Dirichlet
+    @test_throws ErrorException add!(ch, Dirichlet(:s, Γ, x -> 0.0; functional = PointDerivative()))
+    # Moment dofs require projection.
     dhq = DofHandler(grid)
     add!(dhq, :q, RaviartThomas{RefTriangle, 1}())
     close!(dhq)
     ch = ConstraintHandler(dhq)
-    @test_throws ErrorException add!(ch, Dirichlet(:q, Γ, x -> 0.0; functional = NormalMoment))
-    # nodesets require purely nodal interpolations
+    @test_throws ErrorException add!(ch, Dirichlet(:q, Γ, x -> 0.0; functional = NormalMoment()))
+    # Nodesets require purely nodal interpolations.
     ch = ConstraintHandler(dhq)
     @test_throws ArgumentError add!(ch, Dirichlet(:q, Set(1:3), x -> 0.0))
+
+    # Functional directions intersect with `components`.
+    dhv = DofHandler(grid)
+    add!(dhv, :u, Lagrange{RefTriangle, 1}()^2)
+    close!(dhv)
+    ch = ConstraintHandler(dhv)
+    add!(ch, Dirichlet(:u, Γ, x -> 2.0; functional = PointValue(2)))
+    close!(ch)
+    @test length(ch.prescribed_dofs) == 3
+    @test all(ch.inhomogeneities .== 2.0)
+    @test ch.dbcs[1].components == [2]
+    ch = ConstraintHandler(dhv)
+    @test_throws ErrorException add!(ch, Dirichlet(:u, Γ, x -> 0.0, [1]; functional = PointValue(2)))
+    ch = ConstraintHandler(dhv)
+    @test_throws ArgumentError add!(ch, Dirichlet(:u, Set(1:3), x -> 0.0; functional = PointValue(Vec{2}((1.0, 0.0)))))
 end
 
 @testset "node bc" begin

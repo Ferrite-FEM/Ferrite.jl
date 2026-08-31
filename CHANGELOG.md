@@ -23,13 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
  - Each local dof of an interpolation now has a queryable *dof functional* describing
-   its physical meaning (`PointValue`, `PointDerivative`, `NormalMoment`, ...), see
+   how it evaluates a function (`PointValue`, `PointDerivative`, `NormalMoment`, ...), see
    `Ferrite.dof_functionals`. `Dirichlet` accepts a new `functional` keyword to select
-   which dofs to constrain (default `PointValue`, i.e. unchanged behavior). ([#1493])
+   which dofs to constrain (default `PointValue()`, i.e. unchanged behavior). ([#1493])
  - Sharing a field name between `SubDofHandler`s whose interpolations put incompatible
-   dof functionals on shared entities (e.g. `Lagrange^2` vs `RaviartThomas`, or
-   `Lagrange` of order 2 vs 3) is now an error instead of silently assigning the same
-   dof numbers to unrelated dofs. ([#1493])
+   dof definitions on shared entities (different functionals, counts, or point locations;
+   e.g. `Lagrange^2` vs `RaviartThomas`, or `Lagrange` of order 2 vs 3) is now an error
+   instead of silently assigning the same dof numbers to unrelated dofs. ([#1493])
  - Added mesh-free [`AlgebraicVariable`s](https://ferrite-fem.github.io/Ferrite.jl/dev/topics/algebraic_variables/)
    and coupling descriptors for small global unknowns such as Lagrange multipliers and
    homogenized quantities. See the documentation for details. ([#1422])

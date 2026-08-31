@@ -3,6 +3,17 @@ using LinearAlgebra
 using SparseArrays
 import Metis
 
+# Quadratic layout with off-center edge points.
+struct OffCenterQuadraticTriangle <: ScalarInterpolation{RefTriangle, 2} end
+Ferrite.getnbasefunctions(::OffCenterQuadraticTriangle) = 6
+Ferrite.vertexdof_indices(::OffCenterQuadraticTriangle) = ((1,), (2,), (3,))
+Ferrite.edgedof_interior_indices(::OffCenterQuadraticTriangle) = ((4,), (5,), (6,))
+Ferrite.facedof_interior_indices(::OffCenterQuadraticTriangle) = ((),)
+function Ferrite.reference_coordinates(::OffCenterQuadraticTriangle)
+    vertices = Ferrite.reference_coordinates(Lagrange{RefTriangle, 1}())
+    return [vertices; [vertices[a] + (vertices[b] - vertices[a]) / 3 for (a, b) in Ferrite.reference_edges(RefTriangle)]]
+end
+
 @testset "DofHandler construction" begin
     grid = generate_grid(Quadrilateral, (2, 1))
     dh = DofHandler(grid)
@@ -31,21 +42,30 @@ import Metis
     # different interpolation order in different sdh
     @test_logs (:warn,) add!(sdh2, :u, Lagrange{RefQuadrilateral, 2}())
 
-    # incompatible dof functionals on shared entities across SubDofHandlers
     tgrid = generate_grid(Triangle, (2, 2))
     dh = DofHandler(tgrid)
     sdh1 = Ferrite.SubDofHandler(dh, Set(1:4))
     sdh2 = Ferrite.SubDofHandler(dh, Set(5:8))
-    # point-value edge dofs vs normal-moment edge dofs (same n_components, same order)
     add!(sdh1, :u, Lagrange{RefTriangle, 2}()^2)
     @test_throws ErrorException add!(sdh2, :u, RaviartThomas{RefTriangle, 2}())
-    # different edge dof counts (previously only a warning, but aliases dofs)
     dh = DofHandler(tgrid)
     sdh1 = Ferrite.SubDofHandler(dh, Set(1:4))
     sdh2 = Ferrite.SubDofHandler(dh, Set(5:8))
     add!(sdh1, :u, Lagrange{RefTriangle, 2}())
     @test_throws ErrorException add!(sdh2, :u, Lagrange{RefTriangle, 3}())
-    # incompatible face dofs in 3D (point values vs normal moments)
+    dh = DofHandler(tgrid)
+    sdh1 = Ferrite.SubDofHandler(dh, Set(1:4))
+    sdh2 = Ferrite.SubDofHandler(dh, Set(5:8))
+    add!(sdh1, :u, Lagrange{RefTriangle, 2}())
+    @test_throws ErrorException add!(sdh2, :u, OffCenterQuadraticTriangle())
+    dcells = [Triangle((1, 2, 3)), Triangle((4, 5, 6))]
+    dnodes = [Node(Vec{2}((x, y))) for (x, y) in ((0, 0), (1, 0), (0, 1), (2, 0), (3, 0), (2, 1))]
+    dh = DofHandler(Grid(dcells, dnodes))
+    sdh1 = Ferrite.SubDofHandler(dh, Set(1))
+    sdh2 = Ferrite.SubDofHandler(dh, Set(2))
+    add!(sdh1, :u, Lagrange{RefTriangle, 2}())
+    @test_logs (:warn,) add!(sdh2, :u, Lagrange{RefTriangle, 3}())
+    close!(dh)
     hgrid = generate_grid(Hexahedron, (2, 1, 1))
     dh = DofHandler(hgrid)
     sdh1 = Ferrite.SubDofHandler(dh, Set(1))
