@@ -78,4 +78,23 @@ let g = SUITE["mesh"]["coloring"]
     tetgrid = generate_grid(Tetrahedron, (8, 8, 8))
     g["workstream (Tetrahedron 8×8×8)"] = @benchmarkable create_coloring($tetgrid; alg = ColoringAlgorithm.WorkStream) evals = 1
     g["greedy (Tetrahedron 8×8×8)"] = @benchmarkable create_coloring($tetgrid; alg = ColoringAlgorithm.Greedy) evals = 1
+    # Interface (DG) conflicts: purely discontinuous discretization (facet mode) via the
+    # DofHandler, and the conservative graph via the grid-only method
+    hexdh = DofHandler(hexgrid)
+    add!(hexdh, :u, DiscontinuousLagrange{RefHexahedron, 1}())
+    close!(hexdh)
+    g["workstream DG (Hexahedron 15×15×15)"] = @benchmarkable create_coloring($hexdh; interface_coupling = true, alg = ColoringAlgorithm.WorkStream) evals = 1
+    g["workstream DG conservative (Hexahedron 15×15×15)"] = @benchmarkable create_coloring($hexgrid; interface_coupling = true, alg = ColoringAlgorithm.WorkStream) evals = 1
+    tetdh = DofHandler(tetgrid)
+    add!(tetdh, :u, DiscontinuousLagrange{RefTetrahedron, 1}())
+    close!(tetdh)
+    g["greedy DG (Tetrahedron 8×8×8)"] = @benchmarkable create_coloring($tetdh; interface_coupling = true, alg = ColoringAlgorithm.Greedy) evals = 1
+    # Constraint (periodic) conflicts
+    quaddh = DofHandler(quadgrid)
+    add!(quaddh, :u, Lagrange{RefQuadrilateral, 1}())
+    close!(quaddh)
+    quadch = ConstraintHandler(quaddh)
+    add!(quadch, PeriodicDirichlet(:u, collect_periodic_facets(quadgrid, "left", "right")))
+    close!(quadch)
+    g["workstream periodic (Quadrilateral 50×50)"] = @benchmarkable create_coloring($quaddh, $quadch; alg = ColoringAlgorithm.WorkStream) evals = 1
 end

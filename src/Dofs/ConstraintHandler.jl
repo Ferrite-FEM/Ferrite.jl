@@ -2096,3 +2096,188 @@ function integrate_projected_dbc!(::Union{H1Conformity, L2Conformity}, _, _, _, 
     ip_str = sprint(show, function_interpolation(fv))
     throw(ArgumentError("ProjectedDirichlet is not implemented for H¹ and L2 conformities ($ip_str)"))
 end
+
+###########################################
+# Constraint aware grid coloring support  #
+###########################################
+
+# All basis functions of the interpolation are interior to the cell, i.e. no dofs are
+# shared with neighboring cells. Note that this is what matters for assembly conflicts,
+# not the conformity: e.g. `CrouzeixRaviart` is L2-conforming but places (shared) dofs
+# on the facets.
+_all_dofs_volume_interior(ip::VectorizedInterpolation) = _all_dofs_volume_interior(ip.ip)
+function _all_dofs_volume_interior(ip::Interpolation)
+    return length(volumedof_interior_indices(ip)) == getnbasefunctions(ip)
+end
+
+# Determine the interface conflict mode for `create_incidence_matrix` from the
+# discretization (see the gather functions in src/Grid/coloring.jl):
+#  - a continuous field couples across interfaces: interface terms write to shared dofs
+#    of the facet neighbors, requiring the conservative product graph (:product);
+#  - only discontinuous fields cross, but continuous fields exist: their cell assembly
+#    still conflicts all node neighbors (:sharp = node graph ∪ A_f²);
+#  - purely discontinuous discretization: no dofs are shared between cells at all and
+#    only the interface writes conflict (:facet = A_f ∪ A_f², fewest colors).
+function _interface_conflict_mode(dh::DofHandler, interface_coupling::Union{Nothing, Bool, AbstractMatrix{Bool}})
+    if interface_coupling === nothing || interface_coupling === false
+        return :none
+    elseif interface_coupling isa AbstractMatrix{Bool} && !any(interface_coupling)
+        return :none
+    end
+    fieldnames = getfieldnames(dh)
+    nfields = length(fieldnames)
+    # Which fields couple across interfaces? For a Bool (or a coupling matrix that
+    # cannot be interpreted per-field) all fields are assumed to cross.
+    crossing = if interface_coupling isa AbstractMatrix{Bool} && size(interface_coupling) == (nfields, nfields)
+        Bool[any(view(interface_coupling, i, :)) || any(view(interface_coupling, :, i)) for i in 1:nfields]
+    else
+        fill(true, nfields)
+    end
+    all_discontinuous = true
+    for sdh in dh.subdofhandlers
+        for (name, ip) in zip(sdh.field_names, sdh.field_interpolations)
+            if !_all_dofs_volume_interior(ip)
+                all_discontinuous = false
+                fi = findfirst(==(name), fieldnames)
+                @assert fi !== nothing
+                if crossing[fi]
+                    return :product
+                end
+            end
+        end
+    end
+    return all_discontinuous ? :facet : :sharp
+end
+
+# Conflict edges from constraint condensation during assembly (`apply_assemble!` /
+# `apply_local!`): condensing the local matrix of an assembly item with (global) dofs S
+# writes global entries only within S ∪ M(S), where M(S) are the master dofs of the
+# affinely constrained dofs in S (see `_condense_local!`; plain Dirichlet constraints
+# cause no global writes). The node based conflict graph already covers S_A ∩ S_B, so
+# the new conflicts are exactly the cell pairs whose writes meet in a master dof: for
+# each master m, all pairs among the cells containing m or a dof constrained to m --
+# expanded with facet neighbors when interface (DG) assembly is active, since interface
+# items also condense the dofs of the facet neighbor.
+function _incidence_constraint_extras(ch::ConstraintHandler, grid::AbstractGrid, cellvec, facetptr, facetadj)
+    isclosed(ch) || error("the ConstraintHandler must be closed")
+    dh = ch.dh
+    if get_grid(dh) !== grid
+        error("the ConstraintHandler belongs to a DofHandler on a different grid")
+    end
+    # Index the master dofs and map affinely constrained dofs to their masters. Note
+    # that `close!(ch)` has already resolved recursive constraints, so the coefficient
+    # lists are final.
+    n = ndofs(dh)
+    master_of = zeros(Int, n) # dof -> master index, or 0
+    affine_of = zeros(Int, n) # dof -> index into affine_masters, or 0
+    nmasters = 0
+    affine_masters = Vector{Int}[]
+    for (i, d) in pairs(ch.prescribed_dofs)
+        coefficients = ch.dofcoefficients[i]
+        (coefficients === nothing || isempty(coefficients)) && continue
+        master_ids = Int[]
+        for (m, _) in coefficients
+            if master_of[m] == 0
+                nmasters += 1
+                master_of[m] = nmasters
+            end
+            push!(master_ids, master_of[m])
+        end
+        push!(affine_masters, master_ids)
+        affine_of[d] = length(affine_masters)
+    end
+    nmasters == 0 && return nothing
+    # For each master, collect the cells (in the cellset) whose condensation writes to
+    # it: cells containing the master dof itself, and cells containing a dof constrained
+    # to it.
+    master_cells = [Int[] for _ in 1:nmasters]
+    dofbuf = Int[]
+    for sdh in dh.subdofhandlers
+        resize!(dofbuf, ndofs_per_cell(sdh))
+        for cellid in sdh.cellset
+            insorted(cellid, cellvec) || continue
+            celldofs!(dofbuf, dh, cellid)
+            for dof in dofbuf
+                mi = master_of[dof]
+                if mi != 0
+                    push!(master_cells[mi], cellid)
+                end
+                ai = affine_of[dof]
+                if ai != 0
+                    for m in affine_masters[ai]
+                        push!(master_cells[m], cellid)
+                    end
+                end
+            end
+        end
+    end
+    # With interface (DG) conflicts active the write set of an item is the facet closure
+    # of the cell (the item also condenses the facet neighbors' constrained dofs), so
+    # expand the lists with the facet neighbors of their members.
+    if facetptr !== nothing
+        for cells in master_cells
+            norig = length(cells)
+            for k in 1:norig
+                c = cells[k]
+                for r in facetptr[c]:(facetptr[c + 1] - 1)
+                    push!(cells, facetadj[r])
+                end
+            end
+        end
+    end
+    # All pairs within each list conflict. Duplicate edges (e.g. from multiple masters)
+    # are deduplicated in the incidence matrix gather.
+    extras = Dict{Int, Vector{Int}}()
+    for cells in master_cells
+        sort!(cells)
+        unique!(cells)
+        length(cells) < 2 && continue
+        for a in cells, b in cells
+            a == b && continue
+            push!(get!(() -> Int[], extras, a), b)
+        end
+    end
+    return isempty(extras) ? nothing : extras
+end
+
+# DofHandler/ConstraintHandler based method of `create_coloring`, mirroring the
+# signature of `add_sparsity_entries!` so that the same arguments used for matrix
+# allocation can be forwarded as-is. See the docstring in src/Grid/coloring.jl.
+function create_coloring(
+        dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
+        cellset = 1:getncells(get_grid(dh)),
+        alg::ColoringAlgorithm.T = ColoringAlgorithm.WorkStream,
+        keep_constrained::Bool = true, # accepted for symmetry; no effect on conflicts
+        coupling = nothing,            # accepted for symmetry; no effect on conflicts
+        interface_coupling::Union{Nothing, Bool, AbstractMatrix{Bool}} = nothing,
+        topology = nothing,
+        algebraic_couplings = (),
+        extra_conflicts = nothing,
+    )
+    isclosed(dh) || error("the DofHandler must be closed")
+    if ch !== nothing
+        isclosed(ch) || error("the ConstraintHandler must be closed")
+        ch.dh === dh || error("the ConstraintHandler belongs to a different DofHandler")
+    end
+    # `coupling` cannot reduce the conflict graph (two cells sharing any dof conflict
+    # regardless of which field blocks are written) so it is validated but otherwise
+    # ignored, like `keep_constrained` (which only changes which entries exist in the
+    # sparsity pattern, not which entries assembly writes to).
+    _check_coupling_kwarg(coupling)
+    if !isempty(algebraic_couplings)
+        throw(
+            ArgumentError(
+                "conflict analysis for `algebraic_couplings` is not implemented: a coupling " *
+                    "to e.g. a global variable makes all coupled cells conflict with each other. " *
+                    "Assemble these entries outside of the colored loop (or use atomic assembly), " *
+                    "or provide the conflicts explicitly with the `extra_conflicts` keyword argument."
+            )
+        )
+    end
+    incidence_matrix = create_incidence_matrix(
+        get_grid(dh), cellset;
+        interface_mode = _interface_conflict_mode(dh, interface_coupling),
+        topology, ch, extra_conflicts,
+    )
+    return _color_incidence_matrix(incidence_matrix, cellset, alg)
+end
