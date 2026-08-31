@@ -48,21 +48,21 @@ Ferrite.get_direction
 ```
 
 #### Implementing dof functionals
-Every local dof carries a [`Ferrite.DofFunctional`](@ref) describing its physical meaning,
-queryable with [`Ferrite.dof_functionals`](@ref). Scalar interpolations default to
+Every local dof carries a [`Ferrite.DofFunctional`](@ref) describing how it evaluates a
+function, queryable with [`Ferrite.dof_functionals`](@ref). Scalar interpolations default to
 all-[`PointValue`](@ref) (correct for nodal bases) and MUST override the method if some
 dofs are not plain point evaluations; interpolations subtyping `VectorInterpolation`
 directly (e.g. `RaviartThomas`) have no fallback and must always define it.
 
-The functional identifies *what* a dof is, never *where* it is located -- geometry stays
-in `reference_coordinates` and the entity dof-index functions -- so that functionals can
-be compared between cells sharing an entity. This comparison is used when a field is
-shared between `SubDofHandler`s: entities that can be shared between cells (vertices,
-edges, and faces in 3D grids) must carry the same dof functional signature in all
-subdomains, otherwise `add!` errors instead of silently aliasing unrelated dofs. Note
-that the moment functionals do not encode the weight function or normalization
-convention, so equal signatures from different interpolation families do not guarantee
-identical functionals.
+Point-supported functionals include their reference coordinate and, for vectorized
+interpolations, direction. Their owning entity is described by the entity dof-index
+functions. When a field is shared between `SubDofHandler`s, shared entities must carry
+compatible functional signatures and point-supported dofs must have the same entity-local
+coordinates. Otherwise, `add!` errors instead of silently aliasing unrelated dofs.
+Moment functionals do not encode their weight or normalization, so equal signatures from
+different interpolation families do not guarantee identical functionals. A
+`VectorizedInterpolation` repeats each scalar-base functional with its vector direction
+in scalar-dof-major, direction-minor order.
 
 ```@docs; canonical=false
 Ferrite.DofFunctional

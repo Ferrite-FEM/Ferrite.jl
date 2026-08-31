@@ -244,6 +244,37 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         end
     end
 
+    @testset "Dof functionals of vectorized interpolations" begin
+        ip = Lagrange{RefTriangle, 1}()^2
+        fs = Ferrite.dof_functionals(ip)
+        base_coords = Ferrite.reference_coordinates(ip.ip)
+        @test length(fs) == getnbasefunctions(ip)
+        @test fs == (
+            PointValue(base_coords[1], 1), PointValue(base_coords[1], 2),
+            PointValue(base_coords[2], 1), PointValue(base_coords[2], 2),
+            PointValue(base_coords[3], 1), PointValue(base_coords[3], 2),
+        )
+        coords = Ferrite.reference_coordinates(ip)
+        @test coords == base_coords
+        for j in eachindex(fs), i in eachindex(fs)
+            Nij = Ferrite.reference_shape_value(ip, fs[j].x, i)
+            @test Nij[fs[j].direction] == (i == j)
+        end
+        @test Ferrite.vertexdof_functionals(ip) == ntuple(i -> (PointValue(base_coords[i], 1), PointValue(base_coords[i], 2)), 3)
+        @test Ferrite.facetdof_functionals(ip) == ((), (), ())
+        @test Ferrite.matches_functional(PointValue(), PointValue(2))
+        @test !Ferrite.matches_functional(PointValue(1), PointValue(2))
+        @test Ferrite.matches_functional(PointDerivative(), PointDerivative((1, 0), 2))
+        @test Ferrite.matches_functional(PointDerivative((1, 0)), PointDerivative((1, 0), 2))
+        @test !Ferrite.matches_functional(PointDerivative((0, 1)), PointDerivative((1, 0), 2))
+        @test Ferrite._base_functional(PointDerivative()) == PointDerivative()
+        @test repr(PointValue()) == "PointValue()"
+        @test repr(PointValue(2)) == "PointValue(2)"
+        @test repr(PointValue(base_coords[1], 2)) == "PointValue([1.0, 0.0], 2)"
+        @test repr(PointDerivative((1, 0), 2)) == "PointDerivative((1, 0), 2)"
+        @test repr(NormalMoment()) == "NormalMoment()"
+    end
+
     @testset "Errors for entitydof_indices on VectorizedInterpolations" begin
         ip = Lagrange{RefQuadrilateral, 2}()^2
         @test_throws ArgumentError Ferrite.vertexdof_indices(ip)

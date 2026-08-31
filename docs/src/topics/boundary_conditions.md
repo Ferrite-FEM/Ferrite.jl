@@ -102,7 +102,7 @@ other kinds. For example, for a Hermite-type interpolation with both value and d
 dofs, the derivative can be prescribed with
 
 ```julia
-dbc = Dirichlet(:w, getfacetset(grid, "left"), Returns(0.0); functional = PointDerivative)
+dbc = Dirichlet(:w, getfacetset(grid, "left"), Returns(0.0); functional = PointDerivative())
 ```
 
 ## ProjectedDirichlet
