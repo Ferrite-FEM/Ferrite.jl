@@ -13,8 +13,8 @@ Base.@constprop :aggressive function Ferrite.start_assemble(K::SparseMatrixCSR{<
 end
 
 # The row/column roles are swapped compared to CSC: the row is the major index and the
-# column the minor one, so the local matrix is handed to the shared kernel transposed (a
-# lazy view). `sym` is always `false` since there is no symmetric CSR assembler; note that
+# column the minor one, so the local matrix is handed to the shared kernel transposed
+# (lazily; `PermutedDimsArray` would allocate on Julia 1.10). `sym` is always `false` since there is no symmetric CSR assembler; note that
 # the shared kernel stores the `minor <= major` triangle, which is the *lower* triangle for
 # CSR storage. Only `SparseMatrixCSR{1}` is supported, since the kernel indexes `rowptr`
 # and `colval` directly (`colval` holds 1-based column indices only for `Bi == 1`).
@@ -25,7 +25,7 @@ end
         sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
     )
     return Ferrite._assemble_compressed!(
-        Ferrite.MajorIsRow(), K.rowptr, K.colval, K.nzval, size(K, 2), PermutedDimsArray(Ke, (2, 1)),
+        Ferrite.MajorIsRow(), K.rowptr, K.colval, K.nzval, size(K, 2), transpose(Ke),
         sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, false, atomic, rowoffset, coloffset
     )
 end
@@ -36,7 +36,7 @@ end
         sym::Bool, atomic::Val = Val(false)
     )
     return Ferrite._assemble_compressed_unsorted!(
-        Ferrite.MajorIsRow(), K.rowptr, K.colval, K.nzval, PermutedDimsArray(Ke, (2, 1)),
+        Ferrite.MajorIsRow(), K.rowptr, K.colval, K.nzval, transpose(Ke),
         rowdofs, coldofs, false, atomic
     )
 end
