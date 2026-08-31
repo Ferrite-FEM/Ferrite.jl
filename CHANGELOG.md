@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Atomic assembly (`start_assemble(K, f; atomic = true)`) now supports `Float16` and
    `Complex` of `Float16`/`Float32`/`Float64` as value types, in addition to `Float32`
    and `Float64`. ([#1474])
+ - New function `global_dof_range(dh, field_name)` for computing the global dof range for
+   dofs pertaining to a specific field. This requires dofs to be enumerated field wise,
+   see `renumber!` and `DofOrder.FieldWise`. ([#457])
 
 ### Performance
  - `create_coloring` is significantly faster: the incidence matrix construction and the
@@ -1183,6 +1186,7 @@ poking into Ferrite internals:
 [#453]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/453
 [#455]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/455
 [#456]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/456
+[#457]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/457
 [#458]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/458
 [#459]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/459
 [#460]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/460

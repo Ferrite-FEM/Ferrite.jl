@@ -44,6 +44,7 @@ DofOrder.ComponentWise
 ndofs
 ndofs_per_cell
 dof_range
+global_dof_range
 celldofs
 celldofs!
 ```
