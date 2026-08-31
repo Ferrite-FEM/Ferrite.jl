@@ -226,4 +226,83 @@ end
 
 main()
 
+function setup_multiplier_dofs(grid, ipu, ipp)
+    dh = DofHandler(grid)
+    add!(dh, :u, ipu)
+    add!(dh, :p, ipp)
+    add!(dh, :λ, AlgebraicVariable())
+    close!(dh)
+    # All external boundaries
+    Γ = union(
+        getfacetset(grid, "Γ1"), getfacetset(grid, "Γ2"),
+        getfacetset(grid, "Γ3"), getfacetset(grid, "Γ4"),
+    )
+    coupling = FacetCoupling(Γ; algebraic_coupling = (:p, :λ))
+    return dh, Γ, coupling
+end
+
+function setup_multiplier_constraints(dh)
+    ch = ConstraintHandler(dh)
+    R = rotation_tensor(π / 2)
+    periodic_faces = collect_periodic_facets(dh.grid, "Γ3", "Γ1", x -> R ⋅ x)
+    add!(ch, PeriodicDirichlet(:u, periodic_faces, R, [1, 2]))
+    Γ24 = union(getfacetset(dh.grid, "Γ2"), getfacetset(dh.grid, "Γ4"))
+    add!(ch, Dirichlet(:u, Γ24, (x, t) -> [0, 0], [1, 2]))
+    close!(ch)
+    update!(ch, 0)
+    return ch
+end
+
+function assemble_multiplier_terms!(assembler, dh, fvp, Γ)
+    n = ndofs_per_cell(dh)
+    dofs = Vector{Int}(undef, n + 1)
+    dofs[n + 1] = only(algebraic_dofs(dh, :λ))
+    range_p = dof_range(dh, :p)
+    λdof = n + 1 # local index of the multiplier
+    Ke = zeros(n + 1, n + 1)
+    fe = zeros(n + 1)
+    for facet in FacetIterator(dh, Γ)
+        reinit!(fvp, facet)
+        copyto!(dofs, celldofs(facet)) # refresh the first n entries
+        fill!(Ke, 0)
+        for qp in 1:getnquadpoints(fvp)
+            dΓ = getdetJdV(fvp, qp)
+            for (i, I) in pairs(range_p)
+                Cip = shape_value(fvp, qp, i) * dΓ
+                Ke[I, λdof] += Cip
+                Ke[λdof, I] += Cip
+            end
+        end
+        assemble!(assembler, dofs, Ke, fe)
+    end
+    return
+end
+
+function main_multiplier(h = 0.05)
+    grid = setup_grid(h)
+    ipu = Lagrange{RefTriangle, 2}()^2
+    ipp = Lagrange{RefTriangle, 1}()
+    dh, Γ, coupling = setup_multiplier_dofs(grid, ipu, ipp)
+    ipg = Lagrange{RefTriangle, 1}()
+    cvu, cvp, fvp = setup_fevalues(ipu, ipp, ipg)
+    ch = setup_multiplier_constraints(dh)
+    coupling_matrix = [true true; true false] # no coupling between pressure test/trial functions
+    K = allocate_matrix(dh, ch; coupling = coupling_matrix, algebraic_couplings = coupling)
+    f = zeros(ndofs(dh))
+    # Assemble the cell contributions (unchanged) and the multiplier terms
+    assemble_system!(K, f, dh, cvu, cvp)
+    assembler = start_assemble(K, f; fillzero = false)
+    assemble_multiplier_terms!(assembler, dh, fvp, Γ)
+    # Apply boundary conditions and solve
+    apply!(K, f, ch)
+    a = K \ f
+    apply!(a, ch)
+
+
+    # Return the multiplier value
+    return algebraic_value(dh, a, :λ)
+end
+
+λ = main_multiplier()
+
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
