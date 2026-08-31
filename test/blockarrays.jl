@@ -325,6 +325,11 @@ end
     g[dofs] = fe
     @test KB == D
     @test fB == g
+
+    # Element arrays are bounds checked before entering the inbounds scatter loops
+    @test_throws BoundsError assemble!(assembler, dofs, ones(1, 1), fe)
+    @test_throws BoundsError assemble!(assembler, dofs, ke, ones(1))
+
     # Atomic assembly is not supported for dense blocks
     atomic_assembler = start_assemble(KB, fB; atomic = true)
     @test_throws ErrorException assemble!(atomic_assembler, dofs, ke, fe)

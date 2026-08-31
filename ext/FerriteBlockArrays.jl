@@ -115,6 +115,8 @@ function Ferrite.assemble!(assembler::BlockAssembler, dofs::AbstractVector{<:Int
     @assert blockaxes(K, 1) == blockaxes(K, 2)
     @assert axes(K, 1) == axes(K, 2)
     @assert fe === nothing || axes(f, 1) == axes(K, 1)
+    @boundscheck checkbounds(ke, keys(dofs), keys(dofs))
+    @boundscheck fe === nothing || checkbounds(fe, keys(dofs))
     @boundscheck checkbounds(K, dofs, dofs)
     @boundscheck fe === nothing || checkbounds(f, dofs)
 
