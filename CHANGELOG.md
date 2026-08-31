@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Next] - xxxx-xx-xx
+## [v1.7.0] - 2026-08-31
 
 ### Fixes
  - Atomic assembly support for BlockAssembler. ([#1452])
@@ -73,6 +73,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    matrices are unchanged. ([#1397], [#1490])
  - Building a `SparsityPattern` and instantiating a `SparseMatrixCSC` or `SparseMatrixCSR`
    from it is now multithreaded. ([#1481])
+ - Faster `ExclusiveTopology` construction (about 1.5x for hexahedral and 1.7x for
+   tetrahedral grids), `vertex_star_stencils` (roughly 30x), and `getneighborhood` with an
+   `EdgeIndex` (roughly 4x). ([#1466])
 
 ### Internal changes
  - `SparsityPattern` has been rewritten: all rows are now stored in a single contiguous
@@ -82,11 +85,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    been removed. ([#1397])
  - The documented contract of `Ferrite.eachrow(sp[, row])` for `AbstractSparsityPattern` now
    states that column indices are iterated in sorted order. ([#1397])
-
-### Performance
- - Faster `ExclusiveTopology` construction (about 1.5x for hexahedral and 1.7x for
-   tetrahedral grids), `vertex_star_stencils` (roughly 30x), and `getneighborhood` with an
-   `EdgeIndex` (roughly 4x). ([#1466])
 
 ### Documentation
  - New tutorial: Stress-driven computational homogenization, where the macroscopic
@@ -1176,6 +1174,7 @@ poking into Ferrite internals:
 [v1.4.1]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.4.1
 [v1.5.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.5.0
 [v1.6.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.6.0
+[v1.7.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.7.0
 [#352]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/352
 [#363]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/363
 [#378]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/378
@@ -1448,10 +1447,11 @@ poking into Ferrite internals:
 [#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
 [#1438]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1438
 [#1452]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1452
+[#1465]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1465
 [#1466]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1466
 [#1468]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1468
 [#1474]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1474
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
-[#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
+[#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
