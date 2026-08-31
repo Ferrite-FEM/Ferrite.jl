@@ -31,11 +31,69 @@ using SparseArrays, LinearAlgebra
         @test K1 == K2
         @test f0 ≈ f1
         @test f1 ≈ f2
-        # Error for affine constraints
+        # Affine constraints are condensed just like for the CSC matrix. The sparsity pattern
+        # has to hold the fill-in, so allocate it through the constraint handler.
         ch = ConstraintHandler(dh)
         add!(ch, AffineConstraint(1, [3 => 1.0], 1.0))
         close!(ch)
-        @test_throws ErrorException("condensation of ::SparseMatrixCSR{1, Float64, Int64} matrix not supported") apply!(K2, f2, ch)
+        Kc = allocate_matrix(dh, ch)
+        Kr = allocate_matrix(SparseMatrixCSR, dh, ch)
+        ac = start_assemble(Kc)
+        ar = start_assemble(Kr)
+        ke = [1.0 2.0; 3.0 4.0]
+        for dofs in ([1, 2], [3, 2])
+            assemble!(ac, dofs, ke)
+            assemble!(ar, dofs, ke)
+        end
+        @test Kc ≈ Kr
+        fc = collect(1.0:3.0)
+        fr = collect(1.0:3.0)
+        apply!(Kc, fc, ch)
+        apply!(Kr, fr, ch)
+        @test Kc ≈ Kr
+        @test fc ≈ fr
+        # ... but the symmetric case still is not supported
+        @test_throws ErrorException("condensation of ::Symmetric matrix not supported") apply!(Symmetric(Kr), fr, ch)
+    end
+
+    @testset "add_inhomogeneities!(::SparseMatrixCSR,...)" begin
+        # `apply!` has to reach the format specific kernel, not the generic SpMSpV fallback,
+        # which for a CSR matrix indexes the sparse vector once per stored entry.
+        csr_ext = Base.get_extension(Ferrite, :FerriteSparseMatrixCSR)
+        m = which(Ferrite.add_inhomogeneities!, Tuple{Vector{Float64}, SparseMatrixCSR{1, Float64, Int}, Vector{Int}, Vector{Float64}})
+        @test m.module === csr_ext
+
+        # The inhomogeneities keep their own precision. CSC multiplies each of them by the
+        # stored matrix value, so a Float32 matrix with Float64 constraints does the product in
+        # Float64; CSR gathers them into a dense vector first and must not round them to
+        # Float32 on the way. `1 + 2^-30` is exactly the difference.
+        A = sparse(Float32[1 0; 0 1])
+        v = 1.0 + 2.0^-30
+        for K in (A, sparsecsr(findnz(A)..., size(A)...))
+            f = zeros(Float64, 2)
+            Ferrite.add_inhomogeneities!(f, K, [1], [v])
+            @test f[1] == -v
+        end
+    end
+
+    @testset "addindex!(::SparseMatrixCSR,...)" begin
+        I = [1, 1, 2, 3]
+        J = [1, 3, 2, 3]
+        K = sparsecsr(I, J, zeros(4))
+        Ferrite.addindex!(K, 1.0, 1, 3)
+        Ferrite.addindex!(K, 2.0, 1, 3)
+        @test K[1, 3] == 3.0
+        # Zeros short-circuit before the pattern lookup, also outside the pattern
+        Ferrite.addindex!(K, 0.0, 2, 3)
+        @test K[2, 3] == 0.0
+        # Writing outside the pattern is an error, and the same one as for CSC
+        @test_throws Ferrite.SparsityError Ferrite.addindex!(K, 1.0, 2, 3)
+        @test_throws BoundsError Ferrite.addindex!(K, 1.0, 4, 1)
+        # Atomic accumulation gives identical results sequentially
+        Ka = sparsecsr(I, J, zeros(4))
+        Ferrite.addindex!(Ka, 1.0, 1, 3, Val(true))
+        Ferrite.addindex!(Ka, 2.0, 1, 3, Val(true))
+        @test Ka[1, 3] == K[1, 3]
     end
 
     @testset "assembly integration" begin
@@ -220,6 +278,52 @@ using SparseArrays, LinearAlgebra
                 @test_throws ErrorException assemble!(a, dofs, Ke_rand)
             end
         end
+    end
+
+    @testset "concurrent apply_assemble! ($name)" for (name, allocate) in (
+            "CSC" => (dh, ch) -> allocate_matrix(dh, ch),
+            "CSR" => (dh, ch) -> allocate_matrix(SparseMatrixCSR, dh, ch),
+        )
+        # Condensing a constraint that reaches outside the element (here periodic) makes
+        # `apply_assemble!` write into the global matrix and vector, so those writes have to be
+        # atomic too when the assembler is. See test/blockarrays.jl for the BlockAssembler.
+        grid = generate_grid(Triangle, (10, 10))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefTriangle, 1}())
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid, "top", "bottom")))
+        close!(ch)
+        update!(ch, 0)
+
+        element_matrix(dofs) = [sin(i * j / 100) for i in dofs, j in dofs]
+        element_vector(dofs) = [cos(i) for i in dofs]
+
+        Ks = allocate(dh, ch)
+        fs = zeros(ndofs(dh))
+        let assembler = start_assemble(Ks, fs; atomic = true)
+            for cc in CellIterator(dh)
+                dofs = celldofs(cc)
+                apply_assemble!(assembler, ch, dofs, element_matrix(dofs), element_vector(dofs))
+            end
+        end
+
+        # Shared K and f, but one assembler per task and no coloring
+        Kc = allocate(dh, ch)
+        fc = zeros(ndofs(dh))
+        _ = start_assemble(Kc, fc) # zero out
+        @sync for chunk in Iterators.partition(1:getncells(grid), cld(getncells(grid), 4))
+            Threads.@spawn begin
+                assembler = start_assemble(Kc, fc; fillzero = false, atomic = true)
+                for cellidx in chunk
+                    dofs = celldofs(dh, cellidx)
+                    apply_assemble!(assembler, ch, dofs, element_matrix(dofs), element_vector(dofs))
+                end
+            end
+        end
+        # Equal up to the (task dependent) summation order
+        @test Kc ≈ Ks rtol = 1.0e-14
+        @test fc ≈ fs rtol = 1.0e-14
     end
 
 end

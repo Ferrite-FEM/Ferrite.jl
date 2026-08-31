@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Atomic assembly support for BlockAssembler. ([#1452])
  - `apply_assemble!` now respects the assembler's atomic mode when non-local affine
    constraints write directly to the global matrix and vector. ([#1465])
+ - Assembling into a `BlockMatrix` is no longer orders of magnitude slower than assembling
+   into an unblocked matrix. The `BlockAssembler` cached the cell dofs as `BlockIndex{1}`,
+   which is not a concrete type, so the scatter loop was type unstable and allocated ~8
+   times per matrix entry. It now splits the cell dofs into their blocks and scatters each
+   block through `Ferrite._assemble_inner!`, i.e. the same routine the CSC and CSR
+   assemblers use, and assembles without allocating. ([#1489])
  - `add_interface_entries!` (and thereby `interface_coupling` builds) no longer errors for
    grids where some cells are not covered by any `SubDofHandler`: an uncovered cell has no
    dofs and contributes no interface entries, but the covered side of such an interface
@@ -39,6 +45,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Atomic assembly (`start_assemble(K, f; atomic = true)`) now supports `Float16` and
    `Complex` of `Float16`/`Float32`/`Float64` as value types, in addition to `Float32`
    and `Float64`. ([#1474])
+ - `apply!` and `apply_zero!` now work for a `BlockMatrix`, including condensation of affine
+   constraints. Previously constraints could only be applied to a blocked system with
+   `apply_assemble!`. Blocks in either of the sparse formats Ferrite supports (`SparseMatrixCSC`
+   and `SparseMatrixCSR`) work, and so does any custom format implementing the internal
+   interface documented in the devdocs on assembly -- that interface is now phrased in terms of
+   explicit constraint data and index offsets, so the same methods serve a matrix on its own and
+   as a block of a blocked matrix, and the BlockArrays extension contains no format specific
+   code. As part of this, `apply!` and `apply_zero!` dispatch on `AbstractMatrix` rather than
+   `AbstractSparseMatrix`. ([#1489])
+ - `apply!` on a `SparseMatrixCSR` now supports affine constraints, which previously threw
+   `"condensation of ::SparseMatrixCSR{...} matrix not supported"`. ([#1489])
 
 ### Performance
  - `create_coloring` is significantly faster: the incidence matrix construction and the
@@ -1437,3 +1454,4 @@ poking into Ferrite internals:
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
+[#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
