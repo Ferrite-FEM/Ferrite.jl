@@ -37,4 +37,5 @@ VTKHDF = "45d8cf6f-ab5f-45bc-ab92-77e36ab192e6"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [compat]
+Documenter = "1.18"
 OrdinaryDiffEqRosenbrock = "2"

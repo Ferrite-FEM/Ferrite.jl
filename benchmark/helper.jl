@@ -261,6 +261,30 @@ function elasticity_kernel!(Ke, cv, C)
     return Ke
 end
 
+# The (u, p) Stokes saddle point system. Unlike the single field kernels above this fills all
+# the coupling blocks of the element matrix, which is the shape of problem that a blocked
+# global matrix exists for. `range_u` and `range_p` are the `dof_range`s of the two fields.
+function stokes_kernel!(Ke, cmv, range_u, range_p)
+    fill!(Ke, 0)
+    cvu, cvp = cmv.u, cmv.p
+    for q_point in 1:getnquadpoints(cmv)
+        dΩ = getdetJdV(cmv, q_point)
+        for (i, I) in pairs(range_u)
+            ∇φi = shape_gradient(cvu, q_point, i)
+            divφi = shape_divergence(cvu, q_point, i)
+            for (j, J) in pairs(range_u)
+                Ke[I, J] += (∇φi ⊡ shape_gradient(cvu, q_point, j)) * dΩ
+            end
+            for (j, J) in pairs(range_p)
+                v = -divφi * shape_value(cvp, q_point, j) * dΩ
+                Ke[I, J] += v
+                Ke[J, I] += v
+            end
+        end
+    end
+    return Ke
+end
+
 # The divergence coupling block of a mixed u-p (Stokes-like) formulation, exercising
 # shape_divergence and per-field access into a MultiFieldCellValues.
 function mixed_divergence_kernel!(Ke, cmv)

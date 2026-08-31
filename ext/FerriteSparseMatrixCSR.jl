@@ -1,7 +1,7 @@
 module FerriteSparseMatrixCSR
 
 using Ferrite, SparseArrays, SparseMatricesCSR
-import Ferrite: AbstractSparsityPattern, CSRAssembler, getnrows, getncols
+import Ferrite: AbstractSparsityPattern, CSRAssembler, DofCoefficients, getnrows, getncols
 import Base: @propagate_inbounds
 
 # Could be generalized if https://github.com/JuliaSparse/SparseArrays.jl/pull/546 is merged
@@ -22,11 +22,11 @@ end
         K::SparseMatrixCSR{1}, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-        sym::Bool, atomic::Val = Val(false)
+        sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
     )
     return Ferrite._assemble_compressed!(
         Ferrite.MajorIsRow(), K.rowptr, K.colval, K.nzval, size(K, 2), PermutedDimsArray(Ke, (2, 1)),
-        sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, false, atomic
+        sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, false, atomic, rowoffset, coloffset
     )
 end
 
@@ -41,23 +41,62 @@ end
     )
 end
 
-function Ferrite.zero_out_rows!(K::SparseMatrixCSR, ch::ConstraintHandler)
-    @debug @assert issorted(ch.prescribed_dofs)
-    for row in ch.prescribed_dofs
-        r = nzrange(K, row)
-        K.nzval[r] .= 0.0
-    end
-    return
+###########################################################
+## Constraint application (see the devdocs on assembly)  ##
+###########################################################
+
+# CSR is the mirror image of CSC: the rows are stored contiguously ("the majors") and the
+# stored column indices are the minors. That is all the shared kernels in Ferrite need to know,
+# so every method below is a one-liner picking the major or the minor variant.
+#
+# Restricted to `SparseMatrixCSR{1}` throughout: `colvals` returns the raw index array, which
+# for `Bi = 0` holds 0-based column indices, and the kernels index it as a 1-based dof number.
+Ferrite.minor_indices(K::SparseMatrixCSR{1}) = colvals(K)
+
+function Ferrite.zero_out_rows!(K::SparseMatrixCSR{1}, rows::AbstractVector{<:Integer}, ::AbstractVector{Bool})
+    return Ferrite._zero_out_majors!(K, rows)
 end
 
-function Ferrite.zero_out_columns!(K::SparseMatrixCSR, ch::ConstraintHandler)
-    @boundscheck checkbounds(ch.isconstrained, axes(K, 2))
-    colval = K.colval
-    nzval = K.nzval
-    return @inbounds for (i, col) in pairs(colval)
-        if ch.isconstrained[col]
-            nzval[i] = 0
-        end
+function Ferrite.zero_out_columns!(K::SparseMatrixCSR{1}, ::AbstractVector{<:Integer}, mask::AbstractVector{Bool})
+    @boundscheck checkbounds(mask, axes(K, 2))
+    return Ferrite._zero_out_minors!(K, mask)
+end
+
+# The prescribed columns are minors here, so they are spread over all rows and every stored
+# entry has to be visited.
+function Ferrite.add_inhomogeneities!(f::AbstractVector, K::SparseMatrixCSR{1}, columns::AbstractVector{<:Integer}, inhomogeneities::AbstractVector)
+    return Ferrite._add_inhomogeneities_minors!(f, K, columns, inhomogeneities)
+end
+
+function Ferrite.condense_into!(
+        Kdst::AbstractMatrix, K::SparseMatrixCSR{1}, rowoffset::Int, coloffset::Int,
+        dofcoefficients::Vector, dofmapping::Dict{<:Integer, <:Integer},
+    )
+    return Ferrite._condense_majors!(Kdst, K, Ferrite.MajorIsRow(), rowoffset, coloffset, dofcoefficients, dofmapping)
+end
+
+function Ferrite._condense!(K::SparseMatrixCSR{1}, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false) where {T, Ti}
+    return Ferrite._condense_sparse!(K, f, dofcoefficients, dofmapping, sym)
+end
+
+# Mirror of `Ferrite.addindex!(::SparseMatrixCSC, ...)` in src/arrayutils.jl. Needed to write
+# the affine contributions of `condense_into!`/`_condense_local!` into a CSR matrix, and to
+# assemble into CSR blocks of a blocked matrix.
+function Ferrite.addindex!(A::SparseMatrixCSR{Bi, Tv}, v::Tv, i::Int, j::Int, ::Val{atomic} = Val(false)) where {Bi, Tv, atomic}
+    @boundscheck checkbounds(A, i, j)
+    # Return early if v is 0
+    iszero(v) && return A
+    # Search row i for column j
+    nzr = nzrange(A, i)
+    stored_j = j - (1 - Bi)
+    searchk = searchsortedfirst(A.colval, stored_j, first(nzr), last(nzr), Base.Order.Forward)
+    if searchk <= last(nzr) && A.colval[searchk] == stored_j
+        # Row i contains entry A[i,j]. Update and return.
+        Ferrite.addindex!(A.nzval, v, searchk, Val{atomic}())
+        return A
+    else
+        # (i, j) not stored. Throw.
+        throw(Ferrite.SparsityError())
     end
 end
 

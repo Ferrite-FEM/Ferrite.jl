@@ -3,7 +3,8 @@
 # ![](darcy_flow-light.png)
 # ![](darcy_flow-dark.png)
 #
-# *Figure 1*: Pressure (left) and flux magnitude (right) for Darcy flow through a domain
+# [[*Figure 1*](@ref tutorial-darcy-flow-figure-1)](@id tutorial-darcy-flow-figure-1):
+# Pressure (left) and flux magnitude (right) for Darcy flow through a domain
 # with an almost impermeable barrier: the flow is forced through the gap in the middle.
 #
 #-
@@ -63,7 +64,8 @@
 # ![](darcy_flow-geometry-light.png)
 # ![](darcy_flow-geometry-dark.png)
 #
-# *Figure 2*: Geometry and boundary conditions: the pressure is prescribed on the left
+# [[*Figure 2*](@ref tutorial-darcy-flow-figure-2)](@id tutorial-darcy-flow-figure-2):
+# Geometry and boundary conditions: the pressure is prescribed on the left
 # and right edges (``\Gamma_\mathrm{p}``), the top and bottom edges are impermeable
 # (``\Gamma_\mathrm{q}``), and the flow must pass through the gap in the almost
 # impermeable barrier.
@@ -317,7 +319,8 @@ VTKGridFile("darcy_flow", dh) do vtk
     Ferrite.write_cellset(vtk, grid, "barrier")
 end;
 
-# Visualizing the flux magnitude (Figure 1) shows the flow channeling through the gap in
+# Visualizing the flux magnitude ([Figure 1](@ref tutorial-darcy-flow-figure-1)) shows the
+# flow channeling through the gap in
 # the barrier, with the flux vanishing inside the barrier itself.
 #
 # ### Local and global conservation

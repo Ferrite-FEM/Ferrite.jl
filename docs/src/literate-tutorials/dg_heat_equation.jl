@@ -3,7 +3,8 @@
 # ![](dg_heat_equation-light.png)
 # ![](dg_heat_equation-dark.png)
 #
-# *Figure 1*: Temperature field on the unit square with an internal uniform heat source
+# [[*Figure 1*](@ref tutorial-dg-heat-equation-figure-1)](@id tutorial-dg-heat-equation-figure-1):
+# Temperature field on the unit square with an internal uniform heat source
 # solved with inhomogeneous Dirichlet boundary conditions on the left and right boundaries
 # and flux on the top and bottom boundaries.
 #

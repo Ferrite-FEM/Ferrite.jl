@@ -407,19 +407,52 @@ end
 # binary search instead of the linear merge walk in `_assemble_compressed!`.
 const SPARSE_COLUMN_SEARCH_RATIO = 8
 
+"""
+    Ferrite._assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
+
+Scatter the element matrix `Ke` into the (already allocated) entries of `K`, i.e.
+`K[rowdofs, coldofs] += Ke`. The dofs are passed both in element order (`rowdofs`, `coldofs`)
+and sorted ascending (`sortedrowdofs`, `sortedcoldofs`), the latter together with the
+permutations mapping a sorted position back to its index in `Ke`, so that a format storing
+its entries in sorted order can walk them and the element matrix in a single pass. If `sym`
+is `true` only the upper triangle of `Ke` is read. `atomic` is a `Val{Bool}` selecting
+whether the accumulation is concurrency safe.
+
+`rowoffset` and `coloffset` place the matrix within a larger system; they are only used to
+report global indices when an entry is missing from the sparsity pattern, and are nonzero
+when `K` is used as a *block* of a blocked matrix.
+
+The default implementation writes the entries one by one with [`Ferrite.addindex!`](@ref),
+which is all a custom format has to provide. A format that stores its entries sorted should
+specialize this and walk them together with the element matrix, as CSC and CSR do.
+"""
+@propagate_inbounds function _assemble_inner!(
+        K::AbstractMatrix, Ke::AbstractMatrix,
+        rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
+        coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
+        sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
+    )
+    ld = length(rowdofs)
+    @inbounds for (current_col, Kcol) in pairs(sortedcoldofs)
+        Kecol = colpermutation[current_col]
+        maxlookups = sym ? current_col : ld
+        for ri in 1:maxlookups
+            addindex!(K, Ke[rowpermutation[ri], Kecol], sortedrowdofs[ri], Kcol, atomic)
+        end
+    end
+    return
+end
+
 # The assembly kernels below operate on the raw arrays of a compressed sparse matrix and are
 # phrased in terms of the *major* index -- the one whose entries are stored contiguously,
 # i.e. the column for CSC and the row for CSR -- and the *minor* index -- the one stored in
-# the index array, i.e. the row for CSC and the column for CSR. These singletons name that
-# orientation; they are shared with the constraint application kernels.
-struct MajorIsColumn end
-struct MajorIsRow end
-
+# the index array, i.e. the row for CSC and the column for CSR. The orientation is named by
+# `MajorIsColumn`/`MajorIsRow`, shared with the constraint application kernels.
 _missing_sparsity_pattern_error(::MajorIsColumn, major::Integer, minor::Integer) = _missing_sparsity_pattern_error(minor, major)
 _missing_sparsity_pattern_error(::MajorIsRow, major::Integer, minor::Integer) = _missing_sparsity_pattern_error(major, minor)
 
 """
-    _assemble_compressed!(orient, majorptr, minoridx, nzval, nminor, Ke, sortedmajordofs, majorperm, sortedminordofs, minorperm, sym, atomic)
+    _assemble_compressed!(orient, majorptr, minoridx, nzval, nminor, Ke, sortedmajordofs, majorperm, sortedminordofs, minorperm, sym, atomic, majoroffset, minoroffset)
 
 Assemble the local matrix `Ke` into the compressed sparse matrix given by the pointer array
 `majorptr` (`colptr` for CSC, `rowptr` for CSR), the index array `minoridx` (`rowvals` for
@@ -429,14 +462,16 @@ minor indices, i.e. the number of rows for CSC and the number of columns for CSR
 
 The local dofs are expected to be sorted (`sortedmajordofs`/`sortedminordofs`) together with
 the permutations mapping them back to the local indices of `Ke`. If `sym` is `true` only the
-`minor <= major` triangle is assembled (the upper triangle for CSC storage).
+`minor <= major` triangle is assembled (the upper triangle for CSC storage). `majoroffset`
+and `minoroffset` are added to the indices reported for an entry missing from the sparsity
+pattern, see [`_assemble_inner!`](@ref).
 """
 @propagate_inbounds function _assemble_compressed!(
         orient, majorptr::AbstractVector, minoridx::AbstractVector, nzval::AbstractVector, nminor::Int,
         Ke::AbstractMatrix,
         sortedmajordofs::AbstractVector, majorperm::AbstractVector,
         sortedminordofs::AbstractVector, minorperm::AbstractVector,
-        sym::Bool, atomic::Val = Val(false)
+        sym::Bool, atomic::Val = Val(false), majoroffset::Int = 0, minoroffset::Int = 0
     )
     current_major = 1
     ld = length(sortedminordofs)
@@ -469,7 +504,7 @@ the permutations mapping them back to the local indices of `Ke`. If `sym` is `tr
                 else
                     # No entry exists in the global matrix for this minor index, which is
                     # allowed as long as the value which would have been inserted is zero.
-                    iszero(Ke[minorperm[mi], Kemajor]) || _missing_sparsity_pattern_error(orient, Kmajor, Keminor_dof)
+                    iszero(Ke[minorperm[mi], Kemajor]) || _missing_sparsity_pattern_error(orient, Kmajor + majoroffset, Keminor_dof + minoroffset)
                     lo = R
                 end
             end
@@ -496,7 +531,7 @@ the permutations mapping them back to the local indices of `Ke`. If `sym` is `tr
             else # Kminor > Keminor_dof
                 # No match: no entry exist in the global matrix for this minor index. This
                 # is allowed as long as the value which would have been inserted is zero.
-                iszero(Ke[minorperm[mi], Kemajor]) || _missing_sparsity_pattern_error(orient, Kmajor, Keminor_dof)
+                iszero(Ke[minorperm[mi], Kemajor]) || _missing_sparsity_pattern_error(orient, Kmajor + majoroffset, Keminor_dof + minoroffset)
                 # Advance the local matrix pointer
                 mi += 1
             end
@@ -504,7 +539,7 @@ the permutations mapping them back to the local indices of `Ke`. If `sym` is `tr
         # Make sure that remaining entries in this slice of the local matrix are all zero
         for i in mi:maxlookups
             if !iszero(Ke[minorperm[i], Kemajor])
-                _missing_sparsity_pattern_error(orient, Kmajor, sortedminordofs[i])
+                _missing_sparsity_pattern_error(orient, Kmajor + majoroffset, sortedminordofs[i] + minoroffset)
             end
         end
         current_major += 1
@@ -551,11 +586,11 @@ end
         K::SparseMatrixCSC, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-        sym::Bool, atomic::Val = Val(false)
+        sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
     )
     return _assemble_compressed!(
         MajorIsColumn(), SparseArrays.getcolptr(K), rowvals(K), nonzeros(K), size(K, 1), Ke,
-        sortedcoldofs, colpermutation, sortedrowdofs, rowpermutation, sym, atomic
+        sortedcoldofs, colpermutation, sortedrowdofs, rowpermutation, sym, atomic, coloffset, rowoffset
     )
 end
 
@@ -608,9 +643,10 @@ function apply_assemble!(
         local_matrix::AbstractMatrix, local_vector::AbstractVector;
         apply_zero::Bool = false
     )
+    atomic = Val(_is_atomic(assembler))
     _apply_local!(
         local_matrix, local_vector, global_dofs, ch, apply_zero,
-        matrix_handle(assembler), vector_handle(assembler),
+        matrix_handle(assembler), vector_handle(assembler), atomic,
     )
     assemble!(assembler, global_dofs, local_matrix, local_vector)
     return
