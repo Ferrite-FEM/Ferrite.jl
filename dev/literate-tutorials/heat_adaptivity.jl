@@ -3,7 +3,8 @@
 # ![](heat_adaptivity-light.webp)
 # ![](heat_adaptivity-dark.webp)
 #
-# *Figure 1*: The adaptive refinement loop, shown on a cross section of the cube.
+# [[*Figure 1*](@ref tutorial-heat-adaptivity-figure-1)](@id tutorial-heat-adaptivity-figure-1):
+# The adaptive refinement loop, shown on a cross section of the cube.
 # On the coarse initial meshes the solution is badly polluted; as the mesh refines
 # around the sharp spherical feature the solution converges.
 #
