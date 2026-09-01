@@ -2,6 +2,12 @@
 #
 # ![](quasi_incompressible_hyperelasticity-light.webp)
 # ![](quasi_incompressible_hyperelasticity-dark.webp)
+#
+# [[*Figure 1*](@ref tutorial-nearly-incompressible-hyperelasticity-figure-1)](@id tutorial-nearly-incompressible-hyperelasticity-figure-1):
+# Deformation of the
+# unit cube, colored by the displacement magnitude ``|\mathbf{u}|``, as the right face is
+# displaced in the ``x``-direction while the left, bottom and back faces are supported by
+# rollers.
 #-
 #md # !!! tip
 #md #     This example is also available as a Jupyter notebook:
