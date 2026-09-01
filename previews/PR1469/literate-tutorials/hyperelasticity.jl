@@ -6,7 +6,8 @@
 # ![](hyperelasticity-light.png)
 # ![](hyperelasticity-dark.png)
 #
-# *Figure 1*: Cube loaded in torsion modeled with a hyperelastic material model and
+# [[*Figure 1*](@ref tutorial-hyperelasticity-figure-1)](@id tutorial-hyperelasticity-figure-1):
+# Cube loaded in torsion modeled with a hyperelastic material model and
 # finite strain.
 #
 #-
@@ -41,7 +42,8 @@
 # are defined on the deformed (sometimes also called *current* or *spatial*) domain, depending
 # on the specific formulation.
 #
-# The specific problem we will solve in this example is the cube from Figure 1: On one side
+# The specific problem we will solve in this example is the cube from
+# [Figure 1](@ref tutorial-hyperelasticity-figure-1): On one side
 # we apply a rotation using Dirichlet boundary conditions, on the opposite side we fix the
 # displacement with a homogeneous Dirichlet boundary condition, and on the remaining four
 # sides we apply a traction in the normal direction of the surface. In addition, a body
