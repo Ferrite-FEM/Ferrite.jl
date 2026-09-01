@@ -1,6 +1,6 @@
 module ConvergenceTestHelper
 
-using Ferrite, SparseArrays, ForwardDiff, Test
+using Ferrite, Test
 import LinearAlgebra: diag
 import Ferrite: getrefdim, geometric_interpolation
 
@@ -69,7 +69,7 @@ function assemble_element!(Ke::Matrix, fe::Vector, cellvalues::CellValues, coord
 end
 
 # Standard assembly copy pasta for Poisson problem
-function assemble_global(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler)
+function assemble_global(cellvalues::CellValues, K, dh::DofHandler)
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
