@@ -129,53 +129,37 @@ end
     IntegralMoment
 
 Supertype for dof functionals defined as integral moments over the entity owning the dof:
-[`NormalMoment`](@ref), [`TangentialMoment`](@ref), and [`InteriorMoment`](@ref). `nr`
-enumerates the moments on one entity in local entity-dof order. The identity does not
-encode the weight function or normalization, so equal moment signatures from different
-interpolation families do not guarantee identical functionals.
+[`NormalMoment`](@ref), [`TangentialMoment`](@ref), and [`InteriorMoment`](@ref). The
+identity does not encode the weight function or normalization, so equal moment signatures
+from different interpolation families do not guarantee identical functionals.
 """
 abstract type IntegralMoment <: DofFunctional end
 
 """
-    NormalMoment([nr::Int])
+    NormalMoment()
 
-Moment nr `nr` of the normal trace, ℓ(v) = ∫ (v ⋅ n) q dS, over the entity owning the dof
+Moment of the normal trace, ℓ(v) = ∫ (v ⋅ n) q dS, over the entity owning the dof
 (H(div) interpolations).
-`NormalMoment()` is a selector matching every normal moment.
 """
-struct NormalMoment{N} <: IntegralMoment
-    nr::N
-end
-NormalMoment() = NormalMoment(nothing)
-NormalMoment(nr::Integer) = NormalMoment{Int}(Int(nr))
-Base.show(io::IO, f::NormalMoment) = print(io, "NormalMoment(", f.nr === nothing ? "" : f.nr, ")")
+struct NormalMoment <: IntegralMoment end
+Base.show(io::IO, ::NormalMoment) = print(io, "NormalMoment()")
 
 """
-    TangentialMoment([nr::Int])
+    TangentialMoment()
 
-Moment nr `nr` of the tangential trace, ℓ(v) = ∫ (v ⋅ t) q dS, over the entity owning the
-dof (H(curl) interpolations).
-`TangentialMoment()` is a selector matching every tangential moment.
+Moment of the tangential trace, ℓ(v) = ∫ (v ⋅ t) q dS, over the entity owning the dof
+(H(curl) interpolations).
 """
-struct TangentialMoment{N} <: IntegralMoment
-    nr::N
-end
-TangentialMoment() = TangentialMoment(nothing)
-TangentialMoment(nr::Integer) = TangentialMoment{Int}(Int(nr))
-Base.show(io::IO, f::TangentialMoment) = print(io, "TangentialMoment(", f.nr === nothing ? "" : f.nr, ")")
+struct TangentialMoment <: IntegralMoment end
+Base.show(io::IO, ::TangentialMoment) = print(io, "TangentialMoment()")
 
 """
-    InteriorMoment([nr::Int])
+    InteriorMoment()
 
-Cell-interior moment nr `nr`, ℓ(v) = ∫ v ⋅ q dV, for dofs interior to the cell.
-`InteriorMoment()` is a selector matching every interior moment.
+Cell-interior moment, ℓ(v) = ∫ v ⋅ q dV, for dofs interior to the cell.
 """
-struct InteriorMoment{N} <: IntegralMoment
-    nr::N
-end
-InteriorMoment() = InteriorMoment(nothing)
-InteriorMoment(nr::Integer) = InteriorMoment{Int}(Int(nr))
-Base.show(io::IO, f::InteriorMoment) = print(io, "InteriorMoment(", f.nr === nothing ? "" : f.nr, ")")
+struct InteriorMoment <: IntegralMoment end
+Base.show(io::IO, ::InteriorMoment) = print(io, "InteriorMoment()")
 
 """
     VectorizedFunctional(functional::DofFunctional, direction::Int)
@@ -218,9 +202,6 @@ while `PointDerivative((1,))` matches only that derivative. A scalar selector ma
 matches_functional(selector::DofFunctional, f::DofFunctional) = f == selector
 _matches_property(selector, value) = selector === nothing || selector == value
 matches_functional(selector::PointDerivative, f::PointDerivative) = _matches_property(selector.α, f.α)
-matches_functional(selector::NormalMoment, f::NormalMoment) = _matches_property(selector.nr, f.nr)
-matches_functional(selector::TangentialMoment, f::TangentialMoment) = _matches_property(selector.nr, f.nr)
-matches_functional(selector::InteriorMoment, f::InteriorMoment) = _matches_property(selector.nr, f.nr)
 matches_functional(selector::DofFunctional, f::VectorizedFunctional) = matches_functional(selector, f.functional)
 matches_functional(selector::VectorizedFunctional, f::VectorizedFunctional) =
     selector.direction == f.direction && matches_functional(selector.functional, f.functional)
@@ -2056,7 +2037,7 @@ end
 
 getnbasefunctions(::RaviartThomas{RefTriangle, 1}) = 3
 edgedof_interior_indices(::RaviartThomas{RefTriangle, 1}) = ((1,), (2,), (3,))
-dof_functionals(::RaviartThomas{RefTriangle, 1}) = ntuple(_ -> NormalMoment(1), 3)
+dof_functionals(::RaviartThomas{RefTriangle, 1}) = ntuple(_ -> NormalMoment(), 3)
 facedof_interior_indices(::RaviartThomas{RefTriangle, 1}) = ((),)
 adjust_dofs_during_distribution(::RaviartThomas) = false
 
@@ -2087,7 +2068,7 @@ getnbasefunctions(::RaviartThomas{RefTriangle, 2}) = 8
 edgedof_interior_indices(::RaviartThomas{RefTriangle, 2}) = ((1, 2), (3, 4), (5, 6))
 facedof_interior_indices(::RaviartThomas{RefTriangle, 2}) = ((7, 8),)
 function dof_functionals(::RaviartThomas{RefTriangle, 2})
-    return (ntuple(i -> NormalMoment(mod1(i, 2)), 6)..., InteriorMoment(1), InteriorMoment(2))
+    return (ntuple(_ -> NormalMoment(), 6)..., InteriorMoment(), InteriorMoment())
 end
 adjust_dofs_during_distribution(::RaviartThomas{RefTriangle, 2}) = true
 
@@ -2113,7 +2094,7 @@ end
 getnbasefunctions(::RaviartThomas{RefQuadrilateral, 1}) = 4
 edgedof_interior_indices(::RaviartThomas{RefQuadrilateral, 1}) = ((1,), (2,), (3,), (4,))
 facedof_interior_indices(::RaviartThomas{RefQuadrilateral, 1}) = ((),)
-dof_functionals(::RaviartThomas{RefQuadrilateral, 1}) = ntuple(_ -> NormalMoment(1), 4)
+dof_functionals(::RaviartThomas{RefQuadrilateral, 1}) = ntuple(_ -> NormalMoment(), 4)
 adjust_dofs_during_distribution(::RaviartThomas{RefQuadrilateral, 1}) = false
 
 function get_direction(::RaviartThomas{RefQuadrilateral, 1}, shape_nr, cell)
@@ -2134,7 +2115,7 @@ end
 getnbasefunctions(::RaviartThomas{RefTetrahedron, 1}) = 4
 edgedof_interior_indices(::RaviartThomas{RefTetrahedron, 1}) = ntuple(_ -> (), 6)
 facedof_interior_indices(::RaviartThomas{RefTetrahedron, 1}) = ((1,), (2,), (3,), (4,))
-dof_functionals(::RaviartThomas{RefTetrahedron, 1}) = ntuple(_ -> NormalMoment(1), 4)
+dof_functionals(::RaviartThomas{RefTetrahedron, 1}) = ntuple(_ -> NormalMoment(), 4)
 adjust_dofs_during_distribution(::RaviartThomas{RefTetrahedron, 1}) = false
 
 function get_direction(::RaviartThomas{RefTetrahedron, 1}, shape_nr, cell)
@@ -2160,7 +2141,7 @@ end
 getnbasefunctions(::RaviartThomas{RefHexahedron, 1}) = 6
 edgedof_interior_indices(::RaviartThomas{RefHexahedron, 1}) = ntuple(_ -> (), 12)
 facedof_interior_indices(::RaviartThomas{RefHexahedron, 1}) = ((1,), (2,), (3,), (4,), (5,), (6,))
-dof_functionals(::RaviartThomas{RefHexahedron, 1}) = ntuple(_ -> NormalMoment(1), 6)
+dof_functionals(::RaviartThomas{RefHexahedron, 1}) = ntuple(_ -> NormalMoment(), 6)
 adjust_dofs_during_distribution(::RaviartThomas{RefHexahedron, 1}) = false
 
 function get_direction(::RaviartThomas{RefHexahedron, 1}, shape_nr, cell)
@@ -2199,7 +2180,7 @@ end
 
 getnbasefunctions(::BrezziDouglasMarini{RefTriangle, 1}) = 6
 edgedof_interior_indices(::BrezziDouglasMarini{RefTriangle, 1}) = ((1, 2), (3, 4), (5, 6))
-dof_functionals(::BrezziDouglasMarini{RefTriangle, 1}) = ntuple(i -> NormalMoment(mod1(i, 2)), 6)
+dof_functionals(::BrezziDouglasMarini{RefTriangle, 1}) = ntuple(_ -> NormalMoment(), 6)
 adjust_dofs_during_distribution(::BrezziDouglasMarini{RefTriangle, 1}) = true
 
 function get_direction(::BrezziDouglasMarini{RefTriangle, 1}, shape_nr, cell)
@@ -2233,7 +2214,7 @@ end
 
 getnbasefunctions(::Nedelec{RefTriangle, 1}) = 3
 edgedof_interior_indices(::Nedelec{RefTriangle, 1}) = ((1,), (2,), (3,))
-dof_functionals(::Nedelec{RefTriangle, 1}) = ntuple(_ -> TangentialMoment(1), 3)
+dof_functionals(::Nedelec{RefTriangle, 1}) = ntuple(_ -> TangentialMoment(), 3)
 adjust_dofs_during_distribution(::Nedelec{RefTriangle, 1}) = false
 
 function get_direction(::Nedelec{RefTriangle, 1}, shape_nr, cell)
@@ -2265,7 +2246,7 @@ getnbasefunctions(::Nedelec{RefTriangle, 2}) = 8
 edgedof_interior_indices(::Nedelec{RefTriangle, 2}) = ((1, 2), (3, 4), (5, 6))
 facedof_interior_indices(::Nedelec{RefTriangle, 2}) = ((7, 8),)
 function dof_functionals(::Nedelec{RefTriangle, 2})
-    return (ntuple(i -> TangentialMoment(mod1(i, 2)), 6)..., InteriorMoment(1), InteriorMoment(2))
+    return (ntuple(_ -> TangentialMoment(), 6)..., InteriorMoment(), InteriorMoment())
 end
 adjust_dofs_during_distribution(::Nedelec{RefTriangle, 2}) = true
 
@@ -2291,7 +2272,7 @@ end
 
 getnbasefunctions(::Nedelec{RefQuadrilateral, 1}) = 4
 edgedof_interior_indices(::Nedelec{RefQuadrilateral, 1}) = ((1,), (2,), (3,), (4,))
-dof_functionals(::Nedelec{RefQuadrilateral, 1}) = ntuple(_ -> TangentialMoment(1), 4)
+dof_functionals(::Nedelec{RefQuadrilateral, 1}) = ntuple(_ -> TangentialMoment(), 4)
 adjust_dofs_during_distribution(::Nedelec{RefQuadrilateral, 1}) = false
 
 function get_direction(::Nedelec{RefQuadrilateral, 1}, shape_nr, cell)
@@ -2315,7 +2296,7 @@ end
 
 getnbasefunctions(::Nedelec{RefTetrahedron, 1}) = 6
 edgedof_interior_indices(::Nedelec{RefTetrahedron, 1}) = ((1,), (2,), (3,), (4,), (5,), (6,))
-dof_functionals(::Nedelec{RefTetrahedron, 1}) = ntuple(_ -> TangentialMoment(1), 6)
+dof_functionals(::Nedelec{RefTetrahedron, 1}) = ntuple(_ -> TangentialMoment(), 6)
 adjust_dofs_during_distribution(::Nedelec{RefTetrahedron, 1}) = false
 
 function get_direction(::Nedelec{RefTetrahedron, 1}, shape_nr, cell)
@@ -2345,7 +2326,7 @@ end
 
 getnbasefunctions(::Nedelec{RefHexahedron, 1}) = 12
 edgedof_interior_indices(::Nedelec{RefHexahedron, 1}) = ((1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,), (9,), (10,), (11,), (12,))
-dof_functionals(::Nedelec{RefHexahedron, 1}) = ntuple(_ -> TangentialMoment(1), 12)
+dof_functionals(::Nedelec{RefHexahedron, 1}) = ntuple(_ -> TangentialMoment(), 12)
 adjust_dofs_during_distribution(::Nedelec{RefHexahedron, 1}) = false
 
 function get_direction(::Nedelec{RefHexahedron, 1}, shape_nr, cell)
