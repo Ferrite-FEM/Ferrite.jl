@@ -107,30 +107,20 @@ Base.show(io::IO, ::PointValue) = print(io, "PointValue()")
 
 """
     PointDerivative(α)
-    PointDerivative(; order)
 
 Dof functional for a point evaluation of a derivative: ℓ(f) = ∂^|α|f/∂x^α at xᵢ, with
 multi-index `α`, e.g. `PointDerivative((1,))` for du/dx in 1D or `PointDerivative((1, 1))`
 for ∂²u/∂x∂y. The point xᵢ is given by `reference_coordinates`, but the derivative is with
 respect to physical coordinates so that the dof is cell-invariant on shared entities.
-`PointDerivative()` is a selector matching every point-derivative functional and
-`PointDerivative(order = 1)` one matching every derivative of order |α| = 1.
+The first type parameter is the derivative order |α|, so the types `PointDerivative` and
+`PointDerivative{1}` can be used as selectors for every derivative and every first
+derivative, respectively (cf. [`Ferrite.matches_functional`](@ref)).
 """
-struct PointDerivative{A} <: DofFunctional
-    α::A
-    order::Union{Nothing, Int}
+struct PointDerivative{order, N} <: DofFunctional
+    α::NTuple{N, Int}
+    PointDerivative(α::NTuple{N, Int}) where {N} = new{sum(α), N}(α)
 end
-PointDerivative(α::NTuple{N, Int}) where {N} = PointDerivative(α, sum(α))
-PointDerivative(; order::Union{Nothing, Integer} = nothing) = PointDerivative(nothing, order === nothing ? nothing : Int(order))
-function Base.show(io::IO, f::PointDerivative)
-    print(io, "PointDerivative(")
-    if f.α !== nothing
-        show(io, f.α)
-    elseif f.order !== nothing
-        print(io, "order = ", f.order)
-    end
-    return print(io, ")")
-end
+Base.show(io::IO, f::PointDerivative) = print(io, "PointDerivative(", f.α, ")")
 
 """
     IntegralMoment
@@ -198,20 +188,30 @@ point-supported dof `i` must be given by `reference_coordinates(ip)[i]`.
 """
 dof_functionals(ip::ScalarInterpolation) = ntuple(_ -> PointValue(), getnbasefunctions(ip))
 
-"""
-    matches_functional(selector::DofFunctional, f::DofFunctional)
+# Selectors accepted by e.g. the `functional` keyword of `Dirichlet`: a functional
+# instance, a functional type acting as a wildcard, or a tuple of either. Tuple elements
+# must be checked with `_is_selector` at runtime, since e.g. `typeof((PointValue,))` is
+# `Tuple{DataType}` which no `Tuple{Vararg{Type{<:DofFunctional}}}` constraint covers.
+const DofFunctionalSelector = Union{DofFunctional, Type{<:DofFunctional}, Tuple}
+_is_selector(s) = s isa DofFunctional || (s isa Type && s <: DofFunctional)
+_selector_tuple(selector::Union{DofFunctional, Type{<:DofFunctional}}) = (selector,)
+_selector_tuple(selectors::Tuple) = selectors
 
-Return `true` if the dof functional `f` matches `selector`. Omitted properties in selector
-instances act as wildcards; for example, `PointDerivative()` matches every derivative,
-`PointDerivative(order = 1)` every first derivative, and `PointDerivative((1,))` only that
-derivative. A scalar selector matches a
+"""
+    matches_functional(selector, f::DofFunctional)
+
+Return `true` if the dof functional `f` matches `selector`. A `DofFunctional` instance
+matches by equality and a `DofFunctional` type by `isa`, so types act as wildcards, e.g.
+`PointDerivative` matches every derivative and `PointDerivative{1}` every first
+derivative. A tuple of selectors matches if any element does. A scalar selector matches a
 [`VectorizedFunctional`](@ref) if it matches the wrapped functional, in every direction.
 """
 matches_functional(selector::DofFunctional, f::DofFunctional) = f == selector
-_matches_property(selector, value) = selector === nothing || selector == value
-matches_functional(selector::PointDerivative, f::PointDerivative) =
-    _matches_property(selector.α, f.α) && _matches_property(selector.order, f.order)
+matches_functional(selector::Type{<:DofFunctional}, f::DofFunctional) = f isa selector
+matches_functional(selectors::Tuple, f::DofFunctional) = any(s -> matches_functional(s, f), selectors)
 matches_functional(selector::DofFunctional, f::VectorizedFunctional) = matches_functional(selector, f.functional)
+matches_functional(selector::Type{<:DofFunctional}, f::VectorizedFunctional) =
+    f isa selector || matches_functional(selector, f.functional)
 matches_functional(selector::VectorizedFunctional, f::VectorizedFunctional) =
     selector.direction == f.direction && matches_functional(selector.functional, f.functional)
 

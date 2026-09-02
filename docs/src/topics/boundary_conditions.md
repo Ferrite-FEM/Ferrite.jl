@@ -102,11 +102,13 @@ other kinds. For example, for a Hermite-type interpolation with both value and d
 dofs, the derivatives can be prescribed with
 
 ```julia
-dbc = Dirichlet(:w, getfacetset(grid, "left"), Returns(0.0); functional = PointDerivative())
+dbc = Dirichlet(:w, getfacetset(grid, "left"), Returns(0.0); functional = PointDerivative)
 ```
 
-and `PointDerivative(order = 1)` or `PointDerivative((1, 0))` narrow the selection to the
-first derivatives or to a single derivative.
+where the type `PointDerivative` selects every derivative dof. `PointDerivative{1}` or
+`PointDerivative((1, 0))` narrow the selection to the first derivatives or to a single
+derivative, and a tuple of selectors, e.g.
+`functional = (PointDerivative((2, 0)), PointDerivative((0, 2)))`, constrains the union.
 
 ## ProjectedDirichlet
 Some interpolations don't have nodal support points:
