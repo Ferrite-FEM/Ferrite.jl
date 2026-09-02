@@ -14,8 +14,9 @@ represent more than one kind of [`Ferrite.DofFunctional`](@ref) (cf.
 [`Ferrite.dof_functionals`](@ref)). The default, `PointValue()`, constrains the
 dofs whose value is the function value at the dof location. Omitted properties act as
 wildcards, e.g. `functional = PointDerivative()` selects all derivative dofs of a
-Hermite-type interpolation while `functional = PointDerivative((1, 0))` selects one
-derivative. For vectorized interpolations `functional` selects the kind of dof (the
+Hermite-type interpolation, `functional = PointDerivative(order = 1)` its first
+derivatives, and `functional = PointDerivative((1, 0))` one derivative. For vectorized
+interpolations `functional` selects the kind of dof (the
 scalar functional) and `components` selects the direction.
 
 The set, `∂Ω`, can be an `AbstractSet` or `AbstractVector` with elements of
