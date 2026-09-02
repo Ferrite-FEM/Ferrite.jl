@@ -85,71 +85,43 @@ function conformity end
     DofFunctional
 
 Supertype for the dof functional ℓᵢ of local shape function `i` of an interpolation,
-queryable with [`Ferrite.dof_functionals`](@ref). Point-supported functionals include
-their reference point and vector direction; the owning topological entity is given by the
-entity dof-index functions. Point coordinates are also available collectively through
-[`Ferrite.reference_coordinates`](@ref).
+queryable with [`Ferrite.dof_functionals`](@ref). The functional describes only the kind
+of dof; the owning topological entity is given by the entity dof-index functions and the
+point of a point-supported dof `i` by `reference_coordinates(ip)[i]`.
 
-Subtypes: [`PointValue`](@ref), [`PointDerivative`](@ref), and the
-[`IntegralMoment`](@ref) family ([`NormalMoment`](@ref), [`TangentialMoment`](@ref),
-[`InteriorMoment`](@ref)). Not to be confused with [`PointValues`](@ref) (plural).
+Subtypes: [`PointValue`](@ref), [`PointDerivative`](@ref), the [`IntegralMoment`](@ref)
+family ([`NormalMoment`](@ref), [`TangentialMoment`](@ref), [`InteriorMoment`](@ref)),
+and [`VectorizedFunctional`](@ref) wrapping a scalar functional for the dofs of a
+`VectorizedInterpolation`. Not to be confused with [`PointValues`](@ref) (plural).
 """
 abstract type DofFunctional end
 
 """
     PointValue()
-    PointValue(direction)
-    PointValue(x [, direction])
 
 Dof functional for a point evaluation: ℓ(f) = f(xᵢ), where xᵢ is given by
-`reference_coordinates`. `direction` is the component selected from a vector-valued
-function and is omitted for scalar-valued interpolations. `PointValue()` and
-`PointValue(direction)` omit the point and can be used as selectors matching every point
-with the requested direction.
+`reference_coordinates`.
 """
-struct PointValue{X, D} <: DofFunctional
-    x::X
-    direction::D
-end
-PointValue() = PointValue(nothing, nothing)
-PointValue(x::Vec) = PointValue(x, nothing)
-PointValue(direction::Integer) = PointValue{Nothing, Int}(nothing, Int(direction))
-PointValue(x::Vec, direction::Integer) = PointValue{typeof(x), Int}(x, Int(direction))
-function Base.show(io::IO, f::PointValue)
-    print(io, "PointValue(")
-    f.x === nothing || show(io, f.x)
-    f.direction === nothing || print(io, f.x === nothing ? "" : ", ", f.direction)
-    return print(io, ")")
-end
+struct PointValue <: DofFunctional end
+Base.show(io::IO, ::PointValue) = print(io, "PointValue()")
 
 """
     PointDerivative()
-    PointDerivative(α [, direction])
-    PointDerivative(x, α [, direction])
+    PointDerivative(α)
 
 Dof functional for a point evaluation of a derivative: ℓ(f) = ∂^|α|f/∂x^α at xᵢ, with
 multi-index `α`, e.g. `PointDerivative((1,))` for du/dx in 1D or `PointDerivative((1, 1))`
-for ∂²u/∂x∂y. The point `x` is a reference coordinate, but the derivative is with respect
-to physical coordinates so that the dof is cell-invariant on shared entities. `direction`
-has the same meaning as for [`PointValue`](@ref).
-`PointDerivative()` is a selector matching every point-derivative functional, while
-`PointDerivative(α)` matches the derivative `α` at every point and in every direction.
+for ∂²u/∂x∂y. The point xᵢ is given by `reference_coordinates`, but the derivative is with
+respect to physical coordinates so that the dof is cell-invariant on shared entities.
+`PointDerivative()` is a selector matching every point-derivative functional.
 """
-struct PointDerivative{X, A, D} <: DofFunctional
-    x::X
+struct PointDerivative{A} <: DofFunctional
     α::A
-    direction::D
 end
-PointDerivative() = PointDerivative(nothing, nothing, nothing)
-PointDerivative(α::NTuple{N, Int}) where {N} = PointDerivative(nothing, α, nothing)
-PointDerivative(α::NTuple{N, Int}, direction::Integer) where {N} = PointDerivative{Nothing, typeof(α), Int}(nothing, α, Int(direction))
-PointDerivative(x::Vec, α::NTuple{N, Int}) where {N} = PointDerivative(x, α, nothing)
-PointDerivative(x::Vec, α::NTuple{N, Int}, direction::Integer) where {N} = PointDerivative{typeof(x), typeof(α), Int}(x, α, Int(direction))
+PointDerivative() = PointDerivative(nothing)
 function Base.show(io::IO, f::PointDerivative)
     print(io, "PointDerivative(")
-    f.x === nothing || (show(io, f.x); print(io, ", "))
     f.α === nothing || show(io, f.α)
-    f.direction === nothing || print(io, f.α === nothing ? "nothing, " : ", ", f.direction)
     return print(io, ")")
 end
 
@@ -206,44 +178,56 @@ InteriorMoment(nr::Integer) = InteriorMoment{Int}(Int(nr))
 Base.show(io::IO, f::InteriorMoment) = print(io, "InteriorMoment(", f.nr === nothing ? "" : f.nr, ")")
 
 """
+    VectorizedFunctional(functional::DofFunctional, direction::Int)
+
+Dof functional of a `VectorizedInterpolation` dof: the scalar `functional` applied to
+component `direction` of a vector-valued function, ℓ(v) = ℓₛ(v ⋅ e_direction). Scalar
+selectors such as `PointValue()` match through the wrapper, so a [`Dirichlet`](@ref)
+condition selects the kind of dof with `functional` and the direction with `components`.
+"""
+struct VectorizedFunctional{F <: DofFunctional} <: DofFunctional
+    functional::F
+    direction::Int
+end
+Base.show(io::IO, f::VectorizedFunctional) = print(io, "VectorizedFunctional(", f.functional, ", ", f.direction, ")")
+
+"""
     dof_functionals(ip::Interpolation)
 
 Return a tuple of length `getnbasefunctions(ip)` with the [`DofFunctional`](@ref) of each
-local dof. Functionals for a `VectorizedInterpolation` include their vector direction and
-follow the same scalar-dof-major, direction-minor ordering as its shape functions.
+local dof. Functionals for a `VectorizedInterpolation` are the scalar functionals wrapped
+in [`VectorizedFunctional`](@ref), in the same scalar-dof-major, direction-minor ordering
+as its shape functions.
 
 The `ScalarInterpolation` fallback returns all-[`PointValue`](@ref), correct for nodal
 interpolations; scalar interpolations with other kinds of dofs (e.g. derivative dofs)
 must override this method. Interpolations subtyping `VectorInterpolation` directly (e.g.
-`RaviartThomas`) have no fallback and must always define it.
+`RaviartThomas`) have no fallback and must always define it. The point of every
+point-supported dof `i` must be given by `reference_coordinates(ip)[i]`.
 """
-dof_functionals(ip::ScalarInterpolation) = Tuple(PointValue(x) for x in reference_coordinates(ip))
+dof_functionals(ip::ScalarInterpolation) = ntuple(_ -> PointValue(), getnbasefunctions(ip))
 
 """
     matches_functional(selector::DofFunctional, f::DofFunctional)
 
 Return `true` if the dof functional `f` matches `selector`. Omitted properties in selector
-instances act as wildcards; for example, `PointValue()` matches every point and direction,
-`PointValue(2)` matches every point in direction 2, and `PointDerivative((1,))` matches
-that derivative at every point and in every direction.
+instances act as wildcards; for example, `PointDerivative()` matches every derivative
+while `PointDerivative((1,))` matches only that derivative. A scalar selector matches a
+[`VectorizedFunctional`](@ref) if it matches the wrapped functional, in every direction.
 """
 matches_functional(selector::DofFunctional, f::DofFunctional) = f == selector
 _matches_property(selector, value) = selector === nothing || selector == value
-matches_functional(selector::PointValue, f::PointValue) =
-    _matches_property(selector.x, f.x) && _matches_property(selector.direction, f.direction)
-matches_functional(selector::PointDerivative, f::PointDerivative) =
-    _matches_property(selector.x, f.x) && _matches_property(selector.α, f.α) &&
-    _matches_property(selector.direction, f.direction)
+matches_functional(selector::PointDerivative, f::PointDerivative) = _matches_property(selector.α, f.α)
 matches_functional(selector::NormalMoment, f::NormalMoment) = _matches_property(selector.nr, f.nr)
 matches_functional(selector::TangentialMoment, f::TangentialMoment) = _matches_property(selector.nr, f.nr)
 matches_functional(selector::InteriorMoment, f::InteriorMoment) = _matches_property(selector.nr, f.nr)
+matches_functional(selector::DofFunctional, f::VectorizedFunctional) = matches_functional(selector, f.functional)
+matches_functional(selector::VectorizedFunctional, f::VectorizedFunctional) =
+    selector.direction == f.direction && matches_functional(selector.functional, f.functional)
 
+# The scalar functional underlying a `VectorizedFunctional` (cf. `get_base_interpolation`).
 _base_functional(f::DofFunctional) = f
-_base_functional(f::PointValue) = f.x === nothing ? PointValue() : PointValue(f.x)
-function _base_functional(f::PointDerivative)
-    f.α === nothing && return PointDerivative()
-    return f.x === nothing ? PointDerivative(f.α) : PointDerivative(f.x, f.α)
-end
+_base_functional(f::VectorizedFunctional) = f.functional
 
 # Per-entity functionals in local entity-dof order.
 function _entity_functionals(ip::Interpolation, entity_indices::Tuple)
@@ -1948,10 +1932,8 @@ struct VectorizedInterpolation{vdim, refshape, order, SI <: ScalarInterpolation{
 end
 conformity(ip::VectorizedInterpolation) = conformity(ip.ip)
 function dof_functionals(ip::VectorizedInterpolation{vdim}) where {vdim}
-    return Tuple(_with_direction(f, d) for f in dof_functionals(ip.ip) for d in 1:vdim)
+    return Tuple(VectorizedFunctional(f, d) for f in dof_functionals(ip.ip) for d in 1:vdim)
 end
-_with_direction(f::PointValue, direction::Int) = PointValue(f.x, direction)
-_with_direction(f::PointDerivative, direction::Int) = PointDerivative(f.x, f.α, direction)
 
 function _vectorized_entity_functionals(ip::VectorizedInterpolation{vdim}, entity_indices) where {vdim}
     fs = dof_functionals(ip)

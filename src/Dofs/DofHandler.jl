@@ -418,8 +418,8 @@ function _check_shared_dof_definitions(name::Symbol, ip::Interpolation, _ip::Int
             ("faces", 2, facedof_functionals),
         )
         entity_dim < max_rdim || continue
-        functional_layouts = map(fs -> map(_functional_signature, fs), entity_functionals(ip))
-        _functional_layouts = map(fs -> map(_functional_signature, fs), entity_functionals(_ip))
+        functional_layouts = entity_functionals(ip)
+        _functional_layouts = entity_functionals(_ip)
         sigs = unique(filter(!isempty, collect(functional_layouts)))
         _sigs = unique(filter(!isempty, collect(_functional_layouts)))
         # An entity carrying dofs from only one of the interpolations is never shared
@@ -434,7 +434,7 @@ function _check_shared_dof_definitions(name::Symbol, ip::Interpolation, _ip::Int
         end
         if compatible
             positional = !(length(sigs) == 1 && length(_sigs) == 1)
-            compatible = _point_locations_compatible(ip, _ip, entity_dim, positional)
+            compatible = _point_locations_compatible(get_base_interpolation(ip), get_base_interpolation(_ip), entity_dim, positional)
         end
         if !compatible
             error(
@@ -445,13 +445,6 @@ function _check_shared_dof_definitions(name::Symbol, ip::Interpolation, _ip::Int
         end
     end
     return
-end
-
-_functional_signature(f::DofFunctional) = f
-_functional_signature(f::PointValue) = f.direction === nothing ? PointValue() : PointValue(f.direction)
-function _functional_signature(f::PointDerivative)
-    f.α === nothing && return PointDerivative()
-    return f.direction === nothing ? PointDerivative(f.α) : PointDerivative(f.α, f.direction)
 end
 
 function _point_locations_compatible(ip::Interpolation, _ip::Interpolation, entity_dim::Int, positional::Bool)
@@ -472,13 +465,17 @@ function _point_locations_compatible(ip::Interpolation, _ip::Interpolation, enti
     return _same_point_locations(first(locations), first(_locations))
 end
 
+# Entity-local coordinates of the point-supported dofs (`nothing` for other dofs) of a
+# non-vectorized interpolation.
 function _entity_point_locations(ip::Interpolation, entity_dim::Int)
     functionals = entity_dim == 0 ? vertexdof_functionals(ip) :
         entity_dim == 1 ? edgedof_functionals(ip) : facedof_functionals(ip)
     all(all(f -> !(f isa Union{PointValue, PointDerivative}), fs) for fs in functionals) &&
         return map(fs -> ntuple(_ -> nothing, length(fs)), functionals)
 
-    dof_indices = _entity_dof_indices(ip, entity_dim)
+    dof_indices = entity_dim == 0 ? vertexdof_indices(ip) :
+        entity_dim == 1 ? edgedof_interior_indices(ip) : facedof_interior_indices(ip)
+    dof_coordinates = reference_coordinates(ip)
     vertex_coordinates = reference_coordinates(Lagrange{getrefshape(ip), 1}())
     reference_entities = entity_dim == 0 ? map(i -> (i,), reference_vertices(getrefshape(ip))) :
         entity_dim == 1 ? reference_edges(getrefshape(ip)) : reference_faces(getrefshape(ip))
@@ -486,20 +483,8 @@ function _entity_point_locations(ip::Interpolation, entity_dim::Int)
         entity_coordinates = vertex_coordinates[[entity_vertices...]]
         return map(fs, dofs) do f, dof
             f isa Union{PointValue, PointDerivative} || return nothing
-            x = f.x
-            x === nothing && error("dof_functionals must include the point of every point-supported dof (local dof $dof of $ip)")
-            return _entity_local_coordinate(x, entity_coordinates, entity_dim)
+            return _entity_local_coordinate(dof_coordinates[dof], entity_coordinates, entity_dim)
         end
-    end
-end
-
-function _entity_dof_indices(ip::Interpolation, entity_dim::Int)
-    return entity_dim == 0 ? vertexdof_indices(ip) :
-        entity_dim == 1 ? edgedof_interior_indices(ip) : facedof_interior_indices(ip)
-end
-function _entity_dof_indices(ip::VectorizedInterpolation{vdim}, entity_dim::Int) where {vdim}
-    return map(_entity_dof_indices(ip.ip, entity_dim)) do dofs
-        Tuple((dof - 1) * vdim + direction for dof in dofs for direction in 1:vdim)
     end
 end
 

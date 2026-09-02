@@ -31,6 +31,7 @@ export
     NormalMoment,
     TangentialMoment,
     InteriorMoment,
+    VectorizedFunctional,
 
     # Quadrature
     QuadratureRule,

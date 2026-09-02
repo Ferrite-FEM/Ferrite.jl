@@ -40,5 +40,6 @@ IntegralMoment
 NormalMoment
 TangentialMoment
 InteriorMoment
+VectorizedFunctional
 Ferrite.dof_functionals
 ```

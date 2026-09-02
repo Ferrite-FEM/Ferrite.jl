@@ -24,8 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
  - Each local dof of an interpolation now has a queryable *dof functional* describing
    how it evaluates a function (`PointValue`, `PointDerivative`, `NormalMoment`, ...), see
-   `Ferrite.dof_functionals`. `Dirichlet` accepts a new `functional` keyword to select
-   which dofs to constrain (default `PointValue()`, i.e. unchanged behavior). ([#1493])
+   `Ferrite.dof_functionals`. Dofs of vectorized interpolations wrap the scalar functional
+   in `VectorizedFunctional` together with the direction. `Dirichlet` accepts a new
+   `functional` keyword to select which dofs to constrain (default `PointValue()`, i.e.
+   unchanged behavior); for vectorized interpolations `components` selects the direction
+   as before. ([#1493])
  - Sharing a field name between `SubDofHandler`s whose interpolations put incompatible
    dof definitions on shared entities (different functionals, counts, or point locations;
    e.g. `Lagrange^2` vs `RaviartThomas`, or `Lagrange` of order 2 vs 3) is now an error

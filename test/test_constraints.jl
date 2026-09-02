@@ -107,20 +107,23 @@ end
     ch = ConstraintHandler(dhq)
     @test_throws ArgumentError add!(ch, Dirichlet(:q, Set(1:3), x -> 0.0))
 
-    # Functional directions intersect with `components`.
+    # For vectorized interpolations the selector picks the scalar functional and
+    # `components` picks the direction.
     dhv = DofHandler(grid)
     add!(dhv, :u, Lagrange{RefTriangle, 1}()^2)
     close!(dhv)
     ch = ConstraintHandler(dhv)
-    add!(ch, Dirichlet(:u, Γ, x -> 2.0; functional = PointValue(2)))
+    add!(ch, Dirichlet(:u, Γ, x -> 2.0, [2]; functional = PointValue()))
     close!(ch)
     @test length(ch.prescribed_dofs) == 3
     @test all(ch.inhomogeneities .== 2.0)
     @test ch.dbcs[1].components == [2]
     ch = ConstraintHandler(dhv)
-    @test_throws ErrorException add!(ch, Dirichlet(:u, Γ, x -> 0.0, [1]; functional = PointValue(2)))
+    @test_throws ErrorException add!(ch, Dirichlet(:u, Γ, x -> 0.0; functional = PointDerivative()))
     ch = ConstraintHandler(dhv)
-    @test_throws ArgumentError add!(ch, Dirichlet(:u, Set(1:3), x -> 0.0; functional = PointValue(Vec{2}((1.0, 0.0)))))
+    @test_throws ArgumentError add!(ch, Dirichlet(:u, Γ, x -> 0.0; functional = VectorizedFunctional(PointValue(), 2)))
+    ch = ConstraintHandler(dhv)
+    @test_throws ErrorException add!(ch, Dirichlet(:u, Set(1:3), x -> 0.0; functional = PointDerivative()))
 end
 
 @testset "node bc" begin

@@ -15,8 +15,8 @@ represent more than one kind of [`Ferrite.DofFunctional`](@ref) (cf.
 dofs whose value is the function value at the dof location. Omitted properties act as
 wildcards, e.g. `functional = PointDerivative()` selects all derivative dofs of a
 Hermite-type interpolation while `functional = PointDerivative((1, 0))` selects one
-derivative. For vectorized interpolations a direction can also be selected, e.g.
-`PointValue(2)`; this is equivalent to intersecting the selection with `components = [2]`.
+derivative. For vectorized interpolations `functional` selects the kind of dof (the
+scalar functional) and `components` selects the direction.
 
 The set, `∂Ω`, can be an `AbstractSet` or `AbstractVector` with elements of
 type [`FacetIndex`](@ref), [`FaceIndex`](@ref), [`EdgeIndex`](@ref), [`VertexIndex`](@ref),
@@ -446,7 +446,6 @@ function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, 
     # `functional === nothing` means no filtering (the PeriodicDirichlet and
     # ProjectedDirichlet callers); the filter must mirror the one in `BCValues` to keep
     # the dof list and the pseudo quadrature points index-aligned
-    functional = functional === nothing ? nothing : _base_functional(functional)
     functionals = functional === nothing ? nothing : dof_functionals(interpolation)
     local_facet_dofs = Int[]
     local_facet_dofs_offset = Int[1]
@@ -1009,43 +1008,32 @@ function add!(ch::ConstraintHandler{<:Any, Tv, Ti}, dbc::Dirichlet) where {Tv, T
         end
         # Create BCValues for coordinate evaluation at dof-locations
         EntityType = eltype(dbc.facets) # (Facet|Face|Edge|Vertex)Index
-        fs = dof_functionals(field_interpolation)
+        # The selector is matched against the scalar functionals of the base interpolation;
+        # `components` selects the direction of a vectorized interpolation
+        if dbc.functional isa VectorizedFunctional
+            throw(ArgumentError("`functional` selects the scalar functional of a vectorized interpolation (got $(dbc.functional)); select the direction with `components` instead"))
+        end
+        fs = dof_functionals(interpolation)
         if EntityType <: Integer
             # The node idx -> local dof idx assumption in the nodeset _add! below only
             # holds for purely nodal interpolations
             all(f -> f isa PointValue, fs) ||
                 throw(ArgumentError("Dirichlet conditions on a nodeset are only supported for interpolations whose dofs are all point values (got $(field_interpolation)); use a facetset or vertexset instead."))
-            if dbc.functional isa PointValue && dbc.functional.x !== nothing
-                throw(ArgumentError("a point-specific functional selector is not supported for nodeset Dirichlet conditions; select nodes through the nodeset itself"))
+            if !any(f -> matches_functional(dbc.functional, f), fs)
+                error("interpolation $(field_interpolation) for field :$(dbc.field_name) has no dofs matching functional $(dbc.functional)")
             end
-            matched_components = if field_interpolation isa VectorizedInterpolation
-                [c for c in components if any(i -> matches_functional(dbc.functional, fs[i]), c:n_comp:length(fs))]
-            else
-                any(f -> matches_functional(dbc.functional, f), fs) ? components : Int[]
-            end
-            if isempty(matched_components)
-                error("interpolation $(field_interpolation) for field :$(dbc.field_name) has no dofs matching functional $(dbc.functional) in components $(components)")
-            end
-            components = matched_components
             # BCValues are just dummy for nodesets so set to FacetIndex
             EntityType = FacetIndex
         else
             boundarydofs = dirichlet_boundarydof_indices(EntityType)(interpolation)
             used_entities = unique(entityidx for (_, entityidx) in filtered_set)
-            available = if field_interpolation isa VectorizedInterpolation
-                unique(fs[(i - 1) * n_comp + c] for e in used_entities for i in boundarydofs[e] for c in components)
-            else
-                unique(fs[i] for e in used_entities for i in boundarydofs[e])
-            end
+            available = unique(fs[i] for e in used_entities for i in boundarydofs[e])
             matched = filter(f -> matches_functional(dbc.functional, f), available)
             if isempty(matched)
                 error("interpolation $(field_interpolation) for field :$(dbc.field_name) has no dofs matching functional $(dbc.functional) on the constrained boundary entities (available functionals: $(join(available, ", ")))")
             end
             if any(f -> f isa IntegralMoment, matched)
                 error("dofs with integral moment functionals cannot be prescribed with `Dirichlet`; use `ProjectedDirichlet` instead")
-            end
-            if field_interpolation isa VectorizedInterpolation
-                components = [c for c in components if any(f -> matches_functional(dbc.functional, f), fs[c:n_comp:length(fs)])]
             end
         end
         CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
