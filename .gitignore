@@ -21,7 +21,7 @@ docs/src/assets/ref-*.svg
 *.DS_Store
 /Manifest.toml
 /test/coverage/Manifest.toml
-/test/GPU/Manifest.toml
+/test/GPU/*/Manifest.toml
 /benchmark/Manifest.toml
 
 LocalPreferences.toml

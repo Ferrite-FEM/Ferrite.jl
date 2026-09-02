@@ -9,88 +9,36 @@ import Base: @propagate_inbounds
 Base.@constprop :aggressive function Ferrite.start_assemble(K::SparseMatrixCSR{<:Any, T, Ti}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T, Ti}
     Ferrite._check_atomic_eltype(atomic, T)
     fillzero && (Ferrite.fillzero!(K); Ferrite.fillzero!(f))
-    return CSRAssembler{T, Ti, typeof(K), atomic}(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
+    return CSRAssembler{T, Ti, typeof(K), atomic, typeof(f), Vector{Int}}(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 
+# The row/column roles are swapped compared to CSC: the row is the major index and the
+# column the minor one, so the local matrix is handed to the shared kernel transposed
+# (lazily; `PermutedDimsArray` would allocate on Julia 1.10). `sym` is always `false` since there is no symmetric CSR assembler; note that
+# the shared kernel stores the `minor <= major` triangle, which is the *lower* triangle for
+# CSR storage. Only `SparseMatrixCSR{1}` is supported, since the kernel indexes `rowptr`
+# and `colval` directly (`colval` holds 1-based column indices only for `Bi == 1`).
 @propagate_inbounds function Ferrite._assemble_inner!(
-        K::SparseMatrixCSR, Ke::AbstractMatrix,
+        K::SparseMatrixCSR{1}, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
         sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
     )
-    current_row = 1
-    ld = length(coldofs)
-    ncols = size(K, 2)
-    threshold = Ferrite.SPARSE_COLUMN_SEARCH_RATIO * ld
-    return @inbounds for Krow in sortedrowdofs
-        maxlookups = sym ? current_row : ld
-        Kerow = rowpermutation[current_row]
-        ci = 1 # col index pointer for the local matrix
-        Ci = 1 # col index pointer for the global matrix
-        nzr = nzrange(K, Krow)
-        # Fast paths for rows holding many entries per local column, mirroring the
-        # corresponding column fast paths in `Ferrite._assemble_inner!` for
-        # `SparseMatrixCSC` in src/assembler.jl
-        if length(nzr) == ncols
-            offset = first(nzr) - 1
-            for ci in 1:maxlookups
-                val = Ke[Kerow, colpermutation[ci]]
-                iszero(val) || Ferrite.addindex!(K.nzval, val, offset + sortedcoldofs[ci], atomic)
-            end
-            current_row += 1
-            continue
-        end
-        if length(nzr) > (sym ? Ferrite.SPARSE_COLUMN_SEARCH_RATIO * maxlookups : threshold)
-            lo = first(nzr)
-            hi = last(nzr)
-            for ci in 1:maxlookups
-                Kecol_dof = sortedcoldofs[ci]
-                C = searchsortedfirst(K.colval, Kecol_dof, lo, hi, Base.Order.Forward)
-                if C <= hi && K.colval[C] == Kecol_dof
-                    val = Ke[Kerow, colpermutation[ci]]
-                    iszero(val) || Ferrite.addindex!(K.nzval, val, C, atomic)
-                    lo = C + 1
-                else
-                    # No entry exists in the global matrix for this column, which is
-                    # allowed as long as the value which would have been inserted is zero.
-                    iszero(Ke[Kerow, colpermutation[ci]]) || Ferrite._missing_sparsity_pattern_error(Krow + rowoffset, Kecol_dof + coloffset)
-                    lo = C
-                end
-            end
-            current_row += 1
-            continue
-        end
-        while Ci <= length(nzr) && ci <= maxlookups
-            C = nzr[Ci]
-            Kcol = K.colval[C]
-            Kecol_dof = sortedcoldofs[ci]
-            if Kcol == Kecol_dof
-                # Match: add the value (if non-zero) and advance the pointers
-                val = Ke[Kerow, colpermutation[ci]]
-                if !iszero(val)
-                    Ferrite.addindex!(K.nzval, val, C, atomic)
-                end
-                ci += 1
-                Ci += 1
-            elseif Kcol < Kecol_dof
-                # No match yet: advance the global matrix row pointer
-                Ci += 1
-            else # Kcol > Kecol_dof
-                # No match: no entry exist in the global matrix for this row. This is
-                # allowed as long as the value which would have been inserted is zero.
-                iszero(Ke[Kerow, colpermutation[ci]]) || Ferrite._missing_sparsity_pattern_error(Krow + rowoffset, Kecol_dof + coloffset)
-                # Advance the local matrix row pointer
-                ci += 1
-            end
-        end
-        # Make sure that remaining entries in this column of the local matrix are all zero
-        for i in ci:maxlookups
-            if !iszero(Ke[Kerow, colpermutation[i]])
-                Ferrite._missing_sparsity_pattern_error(Krow + rowoffset, sortedcoldofs[i] + coloffset)
-            end
-        end
-        current_row += 1
-    end
+    return Ferrite._assemble_compressed!(
+        Ferrite.MajorIsRow(), K.rowptr, K.colval, K.nzval, size(K, 2), transpose(Ke),
+        sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, false, atomic, rowoffset, coloffset
+    )
+end
+
+@propagate_inbounds function Ferrite._assemble_inner_unsorted!(
+        K::SparseMatrixCSR{1}, Ke::AbstractMatrix,
+        rowdofs::AbstractVector, coldofs::AbstractVector,
+        sym::Bool, atomic::Val = Val(false)
+    )
+    return Ferrite._assemble_compressed_unsorted!(
+        Ferrite.MajorIsRow(), K.rowptr, K.colval, K.nzval, transpose(Ke),
+        rowdofs, coldofs, false, atomic
+    )
 end
 
 ###########################################################

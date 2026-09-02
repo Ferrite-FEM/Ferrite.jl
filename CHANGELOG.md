@@ -45,6 +45,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Atomic assembly (`start_assemble(K, f; atomic = true)`) now supports `Float16` and
    `Complex` of `Float16`/`Float32`/`Float64` as value types, in addition to `Float32`
    and `Float64`. ([#1474])
+ - Assembly into sparse matrices living on a device, via KernelAbstractions.jl:
+   `start_assemble` accepts any `GPUArrays`-based CSC or CSR sparse matrix (e.g.
+   `CUDA.CUSPARSE.CuSparseMatrixCSC` and `CuSparseMatrixCSR`) together with a device
+   vector, and supports `atomic = true`, which lets a kernel assemble all cells in a single
+   launch without a grid coloring.
+   Package extensions for AMDGPU.jl, oneAPI.jl, Metal.jl and GenericSparseArrays.jl make
+   this available on the other vendor backends: `allocate_matrix` also accepts
+   `ROCSparseMatrixCSC`/`ROCSparseMatrixCSR`, `oneSparseMatrixCSC`/`oneSparseMatrixCSR` and
+   the backend agnostic `GenericSparseMatrixCSC`/`GenericSparseMatrixCSR`, the latter being
+   the way to assemble a global matrix on Metal, which has no sparse matrix type of its own.
+   ([#1493])
  - `apply!` and `apply_zero!` now work for a `BlockMatrix`, including condensation of affine
    constraints. Previously constraints could only be applied to a blocked system with
    `apply_assemble!`. Blocks in either of the sparse formats Ferrite supports (`SparseMatrixCSC`
@@ -1454,4 +1465,5 @@ poking into Ferrite internals:
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
+[#1493]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1493
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489

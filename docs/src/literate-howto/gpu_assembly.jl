@@ -178,6 +178,17 @@ dh_gpu = adapt(backend, dh)
 K_gpu = allocate_matrix(CuSparseMatrixCSC{Float32, Int32}, dh)
 f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 
+# !!! note "Other backends"
+#     The `KernelAbstractions.jl` part of this how-to is backend agnostic, only the setup
+#     above is vendor specific. `AMDGPU.jl` works the same way with `ROCBackend()` and
+#     `ROCSparseMatrixCSC`/`ROCSparseMatrixCSR`,
+#     `oneAPI.jl` with `oneAPIBackend()` and `oneSparseMatrixCSC`/`oneSparseMatrixCSR`.
+#     `Metal.jl` has no sparse matrix type; there (and on any other backend) the backend
+#     agnostic `GenericSparseMatrixCSC`/`GenericSparseMatrixCSR` from
+#     [GenericSparseArrays.jl](https://github.com/albertomercurio/GenericSparseArrays.jl) can be
+#     used instead. Those are allocated on the host and moved to the device explicitly:
+#     `K_gpu = adapt(backend, allocate_matrix(GenericSparseMatrixCSC{Float32, Int32}, dh))`.
+
 # Furthermore, the individual GPU workers need local buffers.
 # Ferrite comes with a helper, `Ferrite.distribute_to_workers`, which transforms common buffers
 # into a suitable GPU format. Since we parallelize over the colors, we need to allocate
@@ -212,6 +223,44 @@ ch_gpu = adapt(backend, ch)
 apply!(K_gpu, f_gpu, ch_gpu)
 # To not complicate the description further, we simply solve the system on the CPU with a direct solver.
 u_ka = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
+
+#=
+### Assembly without coloring: atomic accumulation
+Just like for the [multithreaded assembly on the CPU](@ref howto-threaded-assembly-atomic),
+passing `atomic = true` to `start_assemble` makes the workers accumulate into `K` and `f`
+with atomic additions. This removes the need for a coloring, so all cells can be assembled
+in a single kernel launch, at the cost of some overhead and a non-deterministic result:
+the order in which the contributions to an entry are summed depends on how the workers are
+scheduled, and floating point addition is not associative.
+=#
+
+# The workers cover all cells instead of only the largest color, so the per-worker
+# buffers have to be allocated accordingly.
+n_workers_atomic = prod(compute_threads_and_blocks(getncells(grid)))
+cv_gpu_atomic = Ferrite.distribute_to_workers(backend, cv, n_workers_atomic)
+cc_gpu_atomic = Ferrite.distribute_to_workers(backend, CellCache(dh_gpu), n_workers_atomic)
+Kes_atomic = KA.zeros(backend, Float32, n_workers_atomic, getnbasefunctions(cv), getnbasefunctions(cv))
+fes_atomic = KA.zeros(backend, Float32, n_workers_atomic, getnbasefunctions(cv))
+cells_gpu = adapt(backend, collect(1:getncells(grid)))
+
+function assemble_global_ka_atomic!(backend, cellvalues::Ferrite.SoAContainer, K, f, cc, cells, Ke, fe, n_workers)
+    assemblers = Ferrite.distribute_to_workers(backend, start_assemble(K, f; atomic = true), n_workers)
+    threads, blocks = compute_threads_and_blocks(length(cells))
+    ## The kernel from above is reused, with the full cell range in place of a color.
+    ka_kernel = ka_assembly_kernel(backend, threads)
+    ka_kernel(assemblers, cells, cc, cellvalues, Ke, fe, ndrange = threads * blocks)
+    KA.synchronize(backend)
+    return nothing
+end
+
+assemble_global_ka_atomic!(backend, cv_gpu_atomic, K_gpu, f_gpu, cc_gpu_atomic, cells_gpu, Kes_atomic, fes_atomic, n_workers_atomic)
+apply!(K_gpu, f_gpu, ch_gpu)
+u_ka_atomic = SparseMatrixCSC(K_gpu) \ Vector(f_gpu)
+
+# !!! note "Package loading"
+#     The device assembler lives in a package extension which is loaded together with
+#     `Adapt.jl`, `GPUArrays.jl`, `GPUArraysCore.jl` and `KernelAbstractions.jl`. All of
+#     these are dependencies of `CUDA.jl`, so `using CUDA` above is enough to activate it.
 
 
 #=

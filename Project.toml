@@ -15,26 +15,35 @@ Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
 [weakdeps]
+AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CUDACore =  "bd0ed864-bdfe-4181-a5ed-ce625a5fdea2"
+GenericSparseArrays = "da3fe0eb-88a8-4d14-ae1a-857c283e9c70"
 GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
 GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
+Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 Metis = "2679e427-3c69-5b7f-982b-ece356f1e94b"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
 VTKHDF = "45d8cf6f-ab5f-45bc-ab92-77e36ab192e6"
+oneAPI = "8f75cd03-7ff8-4ecb-9b8f-daf728133b1b"
 
 [extensions]
+FerriteAMDGPUExt = ["AMDGPU", "Adapt", "GPUArrays", "GPUArraysCore", "KernelAbstractions"]
 FerriteBlockArrays = "BlockArrays"
 FerriteCudaExt = ["Adapt", "CUDA", "CUDACore", "GPUArrays", "GPUArraysCore", "KernelAbstractions"]
+FerriteGenericSparseArraysExt = ["Adapt", "GenericSparseArrays", "GPUArrays", "GPUArraysCore", "KernelAbstractions"]
 FerriteKAExt = ["Adapt", "GPUArrays", "GPUArraysCore", "KernelAbstractions"]
+FerriteMetalExt = ["Adapt", "GPUArrays", "GPUArraysCore", "KernelAbstractions", "Metal"]
 FerriteMetis = "Metis"
+FerriteOneAPIExt = ["Adapt", "GPUArrays", "GPUArraysCore", "KernelAbstractions", "oneAPI"]
 FerriteSparseMatrixCSR = "SparseMatricesCSR"
 FerriteVTKHDF = "VTKHDF"
 
 [compat]
+AMDGPU = "2"
 Adapt = "4"
 BlockArrays = "0.16, 1"
 CUDA = "6"
@@ -42,9 +51,11 @@ CUDACore = "6"
 EnumX = "1"
 HCubature = "1.7.0"
 ForwardDiff = "0.10, 1"
+GenericSparseArrays = "0.1"
 GPUArraysCore = "0.2"
 GPUArrays = "11"
 KernelAbstractions = "0.9"
+Metal = "1"
 Metis = "1.3"
 SparseMatricesCSR = "0.6"
 NearestNeighbors = "0.4"
@@ -56,12 +67,14 @@ Tensors = "1.17"
 VTKHDF = "1"
 WriteVTK = "1.13"
 julia = "1.10"
+oneAPI = "2"
 
 [extras]
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 FerriteGmsh = "4f95f4f8-b27c-4ae5-9a39-ea55e634e36b"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+GenericSparseArrays = "da3fe0eb-88a8-4d14-ae1a-857c283e9c70"
 Gmsh = "705231aa-382f-11e9-3f0c-b7cb4346fdeb"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
@@ -81,4 +94,4 @@ TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 VTKHDF = "45d8cf6f-ab5f-45bc-ab92-77e36ab192e6"
 
 [targets]
-test = ["Adapt", "BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "GPUArrays", "Gmsh", "IterativeSolvers", "KernelAbstractions", "Metis", "NBInclude", "OhMyThreads", "ParallelTestRunner", "ProgressMeter", "Random", "SHA", "SparseMatricesCSR", "StaticArrays", "TaskLocalValues", "Test", "TimerOutputs", "Logging", "HCubature", "VTKHDF"]
+test = ["Adapt", "BlockArrays", "Downloads", "FerriteGmsh", "ForwardDiff", "GenericSparseArrays", "GPUArrays", "Gmsh", "IterativeSolvers", "KernelAbstractions", "Metis", "NBInclude", "OhMyThreads", "ParallelTestRunner", "ProgressMeter", "Random", "SHA", "SparseMatricesCSR", "StaticArrays", "TaskLocalValues", "Test", "TimerOutputs", "Logging", "HCubature", "VTKHDF"]
