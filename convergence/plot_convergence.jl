@@ -4,7 +4,7 @@ Pkg.activate(@__DIR__) # Ensure correct environment
 include(joinpath(@__DIR__, "..", "test", "integration", "convergence_test_utils.jl"))
 
 using Ferrite, Tensors
-using Test
+using Test, LaTeXStrings
 using .ConvergenceTestHelper:
     get_geometry, get_num_elements, get_quadrature_order,
     setup_poisson_problem, solve, check_and_compute_convergence_norms
@@ -12,9 +12,11 @@ using .ConvergenceTestHelper:
 using Ferrite: getrefdim, getorder
 import CairoMakie as Plt
 
+Plt.set_theme!(; fontsize = 20)
+
 function get_convergence_rate(ip::Interpolation)
     @show ip
-    nel_base = ceil(Int, 11 / getorder(ip))
+    nel_base = ceil(Int, 10 / getorder(ip))
     nels = nel_base * (2 .^ (1:4))
     CT = get_geometry(ip) # Cell type
     ip_geo = geometric_interpolation(CT)
@@ -36,19 +38,20 @@ end
 
 function plot_convergence_rates(data::Vector{<:Pair})
     fig = Plt.Figure(; size = (1000, 400))
-    Plt.Label(fig[0, :], "Convergence for Lagrange{RefTriangle, p}")
-    ax_L2 = Plt.Axis(fig[1, 1]; yscale = log2, xscale = log2, ylabel = L"$L_2$ norm", xlabel = L"$N$ (number of elements)")
-    ax_H1 = Plt.Axis(fig[1, 2]; yscale = log2, xscale = log2, ylabel = L"$H^1$ seminorm", xlabel = L"$N$ (number of elements)")
+    Plt.Label(fig[0, 1:3], L"\textbf{Convergence with element size for different interpolation orders,} $p$"; halign = :center)
+    ax_L2 = Plt.Axis(fig[1, 1]; yscale = log2, xscale = log2, ylabel = L"$\vert\vert u - u_h\vert\vert_{L_2(\Omega)}$", xlabel = L"$h$ (element size)")
+    ax_H1 = Plt.Axis(fig[1, 2]; yscale = log2, xscale = log2, ylabel = L"$\vert u - u_h \vert_{H^1(\Omega)}$", xlabel = L"$h$ (element size)")
     for (ip, ip_results) in data
         (; nels, L2_norms, H1_norms) = ip_results
+        h = 2 ./ nels
         h_rel = nels[1] ./ collect(nels)
         label = string(typeof(ip))
-        label = "p = $(getorder(ip))"
+        label = L"p = %$(getorder(ip))"
         order = getorder(ip)
-        Plt.scatter!(ax_L2, nels, L2_norms; label)
-        Plt.lines!(ax_L2, nels, L2_norms[1] * h_rel .^ (order + 1); color = :black, linestyle = :dash)
-        Plt.scatter!(ax_H1, nels, H1_norms; label)
-        Plt.lines!(ax_H1, nels, H1_norms[1] * h_rel .^ order; color = :black, linestyle = :dash)
+        Plt.scatter!(ax_L2, h, L2_norms; label)
+        Plt.lines!(ax_L2, h, L2_norms[1] * h_rel .^ (order + 1); color = :black, linestyle = :dash)
+        Plt.scatter!(ax_H1, h, H1_norms; label)
+        Plt.lines!(ax_H1, h, H1_norms[1] * h_rel .^ order; color = :black, linestyle = :dash)
     end
     Plt.Legend(fig[1, 3], ax_L2)
     return fig
