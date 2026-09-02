@@ -373,11 +373,47 @@ end
 # search instead of the linear merge walk in `_assemble_inner!`.
 const SPARSE_COLUMN_SEARCH_RATIO = 8
 
+"""
+    Ferrite._assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
+
+Scatter the element matrix `Ke` into the (already allocated) entries of `K`, i.e.
+`K[rowdofs, coldofs] += Ke`. The dofs are passed both in element order (`rowdofs`, `coldofs`)
+and sorted ascending (`sortedrowdofs`, `sortedcoldofs`), the latter together with the
+permutations mapping a sorted position back to its index in `Ke`, so that a format storing
+its entries in sorted order can walk them and the element matrix in a single pass. If `sym`
+is `true` only the upper triangle of `Ke` is read. `atomic` is a `Val{Bool}` selecting
+whether the accumulation is concurrency safe.
+
+`rowoffset` and `coloffset` place the matrix within a larger system; they are only used to
+report global indices when an entry is missing from the sparsity pattern, and are nonzero
+when `K` is used as a *block* of a blocked matrix.
+
+The default implementation writes the entries one by one with [`Ferrite.addindex!`](@ref),
+which is all a custom format has to provide. A format that stores its entries sorted should
+specialize this and walk them together with the element matrix, as CSC and CSR do.
+"""
+@propagate_inbounds function _assemble_inner!(
+        K::AbstractMatrix, Ke::AbstractMatrix,
+        rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
+        coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
+        sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
+    )
+    ld = length(rowdofs)
+    @inbounds for (current_col, Kcol) in pairs(sortedcoldofs)
+        Kecol = colpermutation[current_col]
+        maxlookups = sym ? current_col : ld
+        for ri in 1:maxlookups
+            addindex!(K, Ke[rowpermutation[ri], Kecol], sortedrowdofs[ri], Kcol, atomic)
+        end
+    end
+    return
+end
+
 @propagate_inbounds function _assemble_inner!(
         K::SparseMatrixCSC, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-        sym::Bool, atomic::Val = Val(false)
+        sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
     )
     current_col = 1
     Krows = rowvals(K)
@@ -413,7 +449,7 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
                 else
                     # No entry exists in the global matrix for this row, which is allowed
                     # as long as the value which would have been inserted is zero.
-                    iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol)
+                    iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof + rowoffset, Kcol + coloffset)
                     lo = R
                 end
             end
@@ -440,7 +476,7 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
             else # Krow > Kerow_dof
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
-                iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol)
+                iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof + rowoffset, Kcol + coloffset)
                 # Advance the local matrix row pointer
                 ri += 1
             end
@@ -448,7 +484,7 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
         # Make sure that remaining entries in this column of the local matrix are all zero
         for i in ri:maxlookups
             if !iszero(Ke[rowpermutation[i], Kecol])
-                _missing_sparsity_pattern_error(sortedrowdofs[i], Kcol)
+                _missing_sparsity_pattern_error(sortedrowdofs[i] + rowoffset, Kcol + coloffset)
             end
         end
         current_col += 1
@@ -494,9 +530,10 @@ function apply_assemble!(
         local_matrix::AbstractMatrix, local_vector::AbstractVector;
         apply_zero::Bool = false
     )
+    atomic = Val(_is_atomic(assembler))
     _apply_local!(
         local_matrix, local_vector, global_dofs, ch, apply_zero,
-        matrix_handle(assembler), vector_handle(assembler),
+        matrix_handle(assembler), vector_handle(assembler), atomic,
     )
     assemble!(assembler, global_dofs, local_matrix, local_vector)
     return

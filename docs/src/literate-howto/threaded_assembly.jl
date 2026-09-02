@@ -55,7 +55,8 @@
 #
 # Ferrite include functionality to color the grid with the [`create_coloring`](@ref)
 # function. Here we create a simple 2D grid, color it, and export the colors to a VTK file
-# to visualize the result (see *Figure 1*.). Note that no cells with the same color has any
+# to visualize the result (see [*Figure 1*](@ref howto-threaded-assembly-figure-1)). Note that
+# no cells with the same color has any
 # shared nodes (dofs). This means that it is safe to assemble in parallel as long as we only
 # assemble one color at a time.
 #
@@ -84,7 +85,8 @@ create_example_2d_grid()
 # ![](coloring-light.png)
 # ![](coloring-dark.png)
 #
-# *Figure 1*: Element coloring using the "workstream"-algorithm (left) and the "greedy"-
+# [[*Figure 1*](@ref howto-threaded-assembly-figure-1)](@id howto-threaded-assembly-figure-1):
+# Element coloring using the "workstream"-algorithm (left) and the "greedy"-
 # algorithm (right). The swatches below each grid are the colors the algorithm used.
 
 # ## Multithreaded assembly of a cantilever beam in 3D

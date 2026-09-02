@@ -2,7 +2,7 @@
 
 julia_version = "1.12.7"
 manifest_format = "2.0"
-project_hash = "8bc9f5c0108d82776caf192618c5ffa1b7222253"
+project_hash = "3b50a0c0c38617d51d70cb7b4bec554c05b22c41"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "ec6be48a85c93d995563b84bff8a86bc98df45ce"
@@ -516,9 +516,9 @@ version = "0.9.5"
 
 [[deps.Documenter]]
 deps = ["ANSIColoredPrinters", "AbstractTrees", "Base64", "CodecZlib", "Dates", "DocStringExtensions", "Downloads", "Git", "IOCapture", "InteractiveUtils", "JSON", "Logging", "Markdown", "MarkdownAST", "Pkg", "PrecompileTools", "REPL", "RegistryInstances", "SHA", "TOML", "Test", "Unicode"]
-git-tree-sha1 = "56e9c37b5e7c3b4f080ab1da18d72d5c290e184a"
+git-tree-sha1 = "17d7a103a75db0d3f8c5764d51e478341a905c36"
 uuid = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-version = "1.17.0"
+version = "1.18.0"
 
 [[deps.DocumenterCitations]]
 deps = ["AbstractTrees", "Bibliography", "Bijections", "Dates", "Documenter", "Logging", "Markdown", "MarkdownAST", "OrderedCollections", "SHA", "Unicode"]
@@ -528,9 +528,9 @@ version = "1.5.0"
 
 [[deps.DocumenterCodeBlocks]]
 deps = ["CRC32c", "Documenter", "JuliaSyntax"]
-git-tree-sha1 = "f22e6b591995ee0b354280169dc47c9660611867"
+git-tree-sha1 = "326d0dc2dc9e08fb4076372aa49f86056a0d7dd2"
 uuid = "b6400b83-267f-4b55-9fd8-bffc853bdfd8"
-version = "1.4.0"
+version = "1.5.0"
 
 [[deps.Downloads]]
 deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]

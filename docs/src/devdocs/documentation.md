@@ -59,7 +59,12 @@ The pipeline consists of the following pieces:
    machines) fetch them when building the docs.
 6. Show the figure at the top of the example by adding an `# ![](<name>-light.png)` /
    `# ![](<name>-dark.png)` pair after the title in the literate source file (see e.g.
-   `docs/src/literate-tutorials/heat_equation.jl`).
+   `docs/src/literate-tutorials/heat_equation.jl`). Give the caption a named anchor,
+   `# [[*Figure 1*](@ref <page-id>-figure-1)](@id <page-id>-figure-1):` on its own line
+   followed by the caption text, where `<page-id>` is the `@id` of the page title. The
+   inner `@ref` makes the label a link to itself (so its URL can be copied), and the
+   figure can be referenced from the text (on any page) with
+   `[Figure 1](@ref <page-id>-figure-1)`.
 7. For a tutorial or gallery example, add it to the overview page: an entry in the
    corresponding `cards` list in `docs/generate.jl` *and* a `---`-separated description
    section in

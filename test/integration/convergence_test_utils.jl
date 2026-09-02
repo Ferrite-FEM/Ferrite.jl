@@ -108,12 +108,12 @@ function check_and_compute_convergence_norms(dh, u, cellvalues, testatol)
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
             x = spatial_coordinate(cellvalues, q_point, coords)
-            uₐₙₐ = prod(cos, x * π / 2)
+            uₐₙₐ = analytical_solution(x)
             uₐₚₚᵣₒₓ = function_value(cellvalues, q_point, uₑ)
             L∞norm = max(L∞norm, norm(uₐₙₐ - uₐₚₚᵣₒₓ))
             L2norm += norm(uₐₙₐ - uₐₚₚᵣₒₓ)^2 * dΩ
 
-            ∇uₐₙₐ = gradient(x -> prod(cos, x * π / 2), x)
+            ∇uₐₙₐ = gradient(analytical_solution, x)
             ∇uₐₚₚᵣₒₓ = function_gradient(cellvalues, q_point, uₑ)
             ∇L2norm += norm(∇uₐₙₐ - ∇uₐₚₚᵣₒₓ)^2 * dΩ
 
