@@ -260,23 +260,26 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         @test Ferrite.facetdof_functionals(ip) == ((), (), ())
         # Scalar selectors match through the wrapper, in every direction
         @test Ferrite.matches_functional(PointValue(), fs[2])
-        @test !Ferrite.matches_functional(PointDerivative(), fs[2])
-        @test Ferrite.matches_functional(PointDerivative(), VectorizedFunctional(PointDerivative((1, 0)), 2))
+        @test !Ferrite.matches_functional(PointDerivative, fs[2])
+        @test Ferrite.matches_functional(PointDerivative, VectorizedFunctional(PointDerivative((1, 0)), 2))
         @test Ferrite.matches_functional(PointDerivative((1, 0)), VectorizedFunctional(PointDerivative((1, 0)), 2))
         @test !Ferrite.matches_functional(PointDerivative((0, 1)), VectorizedFunctional(PointDerivative((1, 0)), 2))
-        @test Ferrite.matches_functional(PointDerivative(order = 1), PointDerivative((0, 1)))
-        @test Ferrite.matches_functional(PointDerivative(order = 2), PointDerivative((1, 1)))
-        @test !Ferrite.matches_functional(PointDerivative(order = 1), PointDerivative((1, 1)))
-        @test !Ferrite.matches_functional(PointDerivative(order = 1), PointValue())
+        # Types select by order, tuples by union
+        @test Ferrite.matches_functional(PointDerivative{1}, PointDerivative((0, 1)))
+        @test Ferrite.matches_functional(PointDerivative{2}, PointDerivative((1, 1)))
+        @test !Ferrite.matches_functional(PointDerivative{1}, PointDerivative((1, 1)))
+        @test !Ferrite.matches_functional(PointDerivative{1}, PointValue())
+        @test Ferrite.matches_functional(PointDerivative{1}, VectorizedFunctional(PointDerivative((1, 0)), 2))
+        @test Ferrite.matches_functional((PointValue(), PointDerivative{1}), PointDerivative((0, 1)))
+        @test Ferrite.matches_functional((PointValue(), PointDerivative{1}), fs[2])
+        @test !Ferrite.matches_functional((PointDerivative((1, 0)), PointDerivative((0, 1))), PointDerivative((1, 1)))
         @test Ferrite.matches_functional(VectorizedFunctional(PointValue(), 2), fs[2])
         @test !Ferrite.matches_functional(VectorizedFunctional(PointValue(), 1), fs[2])
         @test !Ferrite.matches_functional(VectorizedFunctional(PointValue(), 2), PointValue())
         @test Ferrite._base_functional(fs[2]) == PointValue()
-        @test Ferrite._base_functional(PointDerivative()) == PointDerivative()
+        @test Ferrite._base_functional(PointDerivative((1, 0))) == PointDerivative((1, 0))
         @test repr(PointValue()) == "PointValue()"
-        @test repr(PointDerivative()) == "PointDerivative()"
         @test repr(PointDerivative((1, 0))) == "PointDerivative((1, 0))"
-        @test repr(PointDerivative(order = 2)) == "PointDerivative(order = 2)"
         @test repr(fs[2]) == "VectorizedFunctional(PointValue(), 2)"
         @test repr(NormalMoment()) == "NormalMoment()"
     end

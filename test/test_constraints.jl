@@ -131,7 +131,7 @@ end
     @test all(ch.inhomogeneities .== 1.0)
     # The selector must match a boundary dof.
     ch = ConstraintHandler(dh)
-    @test_throws ErrorException add!(ch, Dirichlet(:s, Γ, x -> 0.0; functional = PointDerivative()))
+    @test_throws ErrorException add!(ch, Dirichlet(:s, Γ, x -> 0.0; functional = PointDerivative))
     # Moment dofs require projection.
     dhq = DofHandler(grid)
     add!(dhq, :q, RaviartThomas{RefTriangle, 1}())
@@ -154,11 +154,13 @@ end
     @test all(ch.inhomogeneities .== 2.0)
     @test ch.dbcs[1].components == [2]
     ch = ConstraintHandler(dhv)
-    @test_throws ErrorException add!(ch, Dirichlet(:u, Γ, x -> 0.0; functional = PointDerivative()))
+    @test_throws ErrorException add!(ch, Dirichlet(:u, Γ, x -> 0.0; functional = PointDerivative))
     ch = ConstraintHandler(dhv)
     @test_throws ArgumentError add!(ch, Dirichlet(:u, Γ, x -> 0.0; functional = VectorizedFunctional(PointValue(), 2)))
     ch = ConstraintHandler(dhv)
-    @test_throws ErrorException add!(ch, Dirichlet(:u, Set(1:3), x -> 0.0; functional = PointDerivative()))
+    @test_throws ArgumentError add!(ch, Dirichlet(:u, Γ, x -> 0.0; functional = (PointValue(), VectorizedFunctional)))
+    ch = ConstraintHandler(dhv)
+    @test_throws ErrorException add!(ch, Dirichlet(:u, Set(1:3), x -> 0.0; functional = PointDerivative))
 end
 
 @testset "node bc" begin

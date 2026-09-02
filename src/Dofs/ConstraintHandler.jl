@@ -12,12 +12,12 @@ of `u` are prescribed.
 `functional` selects which dofs the condition constrains, for interpolations whose dofs
 represent more than one kind of [`Ferrite.DofFunctional`](@ref) (cf.
 [`Ferrite.dof_functionals`](@ref)). The default, `PointValue()`, constrains the
-dofs whose value is the function value at the dof location. Omitted properties act as
-wildcards, e.g. `functional = PointDerivative()` selects all derivative dofs of a
-Hermite-type interpolation, `functional = PointDerivative(order = 1)` its first
-derivatives, and `functional = PointDerivative((1, 0))` one derivative. For vectorized
-interpolations `functional` selects the kind of dof (the
-scalar functional) and `components` selects the direction.
+dofs whose value is the function value at the dof location. A functional type acts as a
+wildcard, e.g. `functional = PointDerivative` selects all derivative dofs of a
+Hermite-type interpolation and `functional = PointDerivative{1}` its first derivatives,
+while `functional = PointDerivative((1, 0))` selects a single derivative and a tuple of
+selectors the union of its elements. For vectorized interpolations `functional` selects
+the kind of dof (the scalar functional) and `components` selects the direction.
 
 The set, `∂Ω`, can be an `AbstractSet` or `AbstractVector` with elements of
 type [`FacetIndex`](@ref), [`FaceIndex`](@ref), [`EdgeIndex`](@ref), [`VertexIndex`](@ref),
@@ -53,11 +53,13 @@ struct Dirichlet # <: Constraint
     facets::OrderedSet{T} where {T <: Union{Int, FacetIndex, FaceIndex, EdgeIndex, VertexIndex}}
     field_name::Symbol
     components::Vector{Int} # components of the field
-    functional::DofFunctional # which dofs to constrain (cf. dof_functionals)
+    functional::DofFunctionalSelector # which dofs to constrain (cf. dof_functionals)
     local_facet_dofs::Vector{Int}
     local_facet_dofs_offset::Vector{Int}
 end
-function Dirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function, components = nothing; functional::DofFunctional = PointValue())
+function Dirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function, components = nothing; functional::DofFunctionalSelector = PointValue())
+    all(_is_selector, _selector_tuple(functional)) ||
+        throw(ArgumentError("`functional` must be a `DofFunctional` instance, type, or tuple of those (got $functional)"))
     return Dirichlet(f, convert_to_orderedset(facets), field_name, __to_components(components), functional, Int[], Int[])
 end
 
@@ -1232,7 +1234,7 @@ function add!(ch::ConstraintHandler{<:Any, Tv, Ti}, dbc::Dirichlet) where {Tv, T
         EntityType = eltype(dbc.facets) # (Facet|Face|Edge|Vertex)Index
         # The selector is matched against the scalar functionals of the base interpolation;
         # `components` selects the direction of a vectorized interpolation
-        if dbc.functional isa VectorizedFunctional
+        if any(s -> s isa VectorizedFunctional || (s isa Type && s <: VectorizedFunctional), _selector_tuple(dbc.functional))
             throw(ArgumentError("`functional` selects the scalar functional of a vectorized interpolation (got $(dbc.functional)); select the direction with `components` instead"))
         end
         fs = dof_functionals(interpolation)

@@ -54,9 +54,9 @@ all-[`PointValue`](@ref) (correct for nodal bases) and MUST override the method 
 dofs are not plain point evaluations; interpolations subtyping `VectorInterpolation`
 directly (e.g. `RaviartThomas`) have no fallback and must always define it.
 
-Point-supported functionals include their reference coordinate and, for vectorized
-interpolations, direction. Their owning entity is described by the entity dof-index
-functions. When a field is shared between `SubDofHandler`s, shared entities must carry
+Functionals describe only the kind of dof: the owning entity is described by the entity
+dof-index functions and the point of a point-supported dof `i` by
+`reference_coordinates(ip)[i]`. When a field is shared between `SubDofHandler`s, shared entities must carry
 compatible functional signatures and point-supported dofs must have the same entity-local
 coordinates. Otherwise, `add!` errors instead of silently aliasing unrelated dofs.
 Moment functionals do not encode their weight or normalization, so equal signatures from
