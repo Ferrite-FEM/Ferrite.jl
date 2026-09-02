@@ -47,7 +47,7 @@ function apply_analytical!(
             intersect(BitSet(sdh.cellset), BitSet(cellset))
         end
         isempty(set_intersection) && continue
-        if !all(fl -> fl isa PointValue, dof_functionals(ip_fun))
+        if !all(fl -> Ferrite._base_functional(fl) isa PointValue, dof_functionals(ip_fun))
             error("apply_analytical! is only supported for interpolations whose dofs are all point values (writing f at the dof location), got $(ip_fun).")
         end
         _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, set_intersection)
