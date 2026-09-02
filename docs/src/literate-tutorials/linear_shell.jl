@@ -252,7 +252,7 @@ end;
 # ##### Main element routine
 # Below is the main routine that calculates the stiffness matrix of the shell element.
 # Since it is a so-called degenerate shell element, the code is similar to that for a standard continuum element.
-shape_reference_gradient(cv::CellValues, q_point, i) = cv.fun_values.dNdξ[i, q_point]
+shape_reference_gradient(cv::CellValues, q_point, i) = cv.fun_values[1].dNdξ[i, q_point]
 
 function integrate_shell!(ke, cv, qr_ooplane, X, data)
     nnodes = getnbasefunctions(cv)
