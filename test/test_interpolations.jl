@@ -244,6 +244,46 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         end
     end
 
+    @testset "Dof functionals of vectorized interpolations" begin
+        ip = Lagrange{RefTriangle, 1}()^2
+        fs = Ferrite.dof_functionals(ip)
+        base_coords = Ferrite.reference_coordinates(ip.ip)
+        @test length(fs) == getnbasefunctions(ip)
+        @test fs == Tuple(VectorizedFunctional(PointValue(), d) for i in 1:3 for d in 1:2)
+        coords = Ferrite.reference_coordinates(ip)
+        @test coords == base_coords
+        for j in eachindex(fs), i in eachindex(fs)
+            Nij = Ferrite.reference_shape_value(ip, coords[fld1(j, 2)], i)
+            @test Nij[fs[j].direction] == (i == j)
+        end
+        @test Ferrite.vertexdof_functionals(ip) == ntuple(i -> (VectorizedFunctional(PointValue(), 1), VectorizedFunctional(PointValue(), 2)), 3)
+        @test Ferrite.facetdof_functionals(ip) == ((), (), ())
+        # Scalar selectors match through the wrapper, in every direction
+        @test Ferrite.matches_functional(PointValue(), fs[2])
+        @test !Ferrite.matches_functional(PointDerivative, fs[2])
+        @test Ferrite.matches_functional(PointDerivative, VectorizedFunctional(PointDerivative((1, 0)), 2))
+        @test Ferrite.matches_functional(PointDerivative((1, 0)), VectorizedFunctional(PointDerivative((1, 0)), 2))
+        @test !Ferrite.matches_functional(PointDerivative((0, 1)), VectorizedFunctional(PointDerivative((1, 0)), 2))
+        # Types select by order, tuples by union
+        @test Ferrite.matches_functional(PointDerivative{1}, PointDerivative((0, 1)))
+        @test Ferrite.matches_functional(PointDerivative{2}, PointDerivative((1, 1)))
+        @test !Ferrite.matches_functional(PointDerivative{1}, PointDerivative((1, 1)))
+        @test !Ferrite.matches_functional(PointDerivative{1}, PointValue())
+        @test Ferrite.matches_functional(PointDerivative{1}, VectorizedFunctional(PointDerivative((1, 0)), 2))
+        @test Ferrite.matches_functional((PointValue(), PointDerivative{1}), PointDerivative((0, 1)))
+        @test Ferrite.matches_functional((PointValue(), PointDerivative{1}), fs[2])
+        @test !Ferrite.matches_functional((PointDerivative((1, 0)), PointDerivative((0, 1))), PointDerivative((1, 1)))
+        @test Ferrite.matches_functional(VectorizedFunctional(PointValue(), 2), fs[2])
+        @test !Ferrite.matches_functional(VectorizedFunctional(PointValue(), 1), fs[2])
+        @test !Ferrite.matches_functional(VectorizedFunctional(PointValue(), 2), PointValue())
+        @test Ferrite._base_functional(fs[2]) == PointValue()
+        @test Ferrite._base_functional(PointDerivative((1, 0))) == PointDerivative((1, 0))
+        @test repr(PointValue()) == "PointValue()"
+        @test repr(PointDerivative((1, 0))) == "PointDerivative((1, 0))"
+        @test repr(fs[2]) == "VectorizedFunctional(PointValue(), 2)"
+        @test repr(NormalMoment()) == "NormalMoment()"
+    end
+
     @testset "Errors for entitydof_indices on VectorizedInterpolations" begin
         ip = Lagrange{RefQuadrilateral, 2}()^2
         @test_throws ArgumentError Ferrite.vertexdof_indices(ip)

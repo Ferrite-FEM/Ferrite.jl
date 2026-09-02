@@ -3,6 +3,17 @@ using LinearAlgebra
 using SparseArrays
 import Metis
 
+# Quadratic layout with off-center edge points.
+struct OffCenterQuadraticTriangle <: ScalarInterpolation{RefTriangle, 2} end
+Ferrite.getnbasefunctions(::OffCenterQuadraticTriangle) = 6
+Ferrite.vertexdof_indices(::OffCenterQuadraticTriangle) = ((1,), (2,), (3,))
+Ferrite.edgedof_interior_indices(::OffCenterQuadraticTriangle) = ((4,), (5,), (6,))
+Ferrite.facedof_interior_indices(::OffCenterQuadraticTriangle) = ((),)
+function Ferrite.reference_coordinates(::OffCenterQuadraticTriangle)
+    vertices = Ferrite.reference_coordinates(Lagrange{RefTriangle, 1}())
+    return [vertices; [vertices[a] + (vertices[b] - vertices[a]) / 3 for (a, b) in Ferrite.reference_edges(RefTriangle)]]
+end
+
 @testset "DofHandler construction" begin
     grid = generate_grid(Quadrilateral, (2, 1))
     dh = DofHandler(grid)
@@ -30,6 +41,60 @@ import Metis
     @test_throws ErrorException add!(sdh2, :u, Lagrange{RefQuadrilateral, 1}()^2)
     # different interpolation order in different sdh
     @test_logs (:warn,) add!(sdh2, :u, Lagrange{RefQuadrilateral, 2}())
+
+    tgrid = generate_grid(Triangle, (2, 2))
+    dh = DofHandler(tgrid)
+    sdh1 = Ferrite.SubDofHandler(dh, Set(1:4))
+    sdh2 = Ferrite.SubDofHandler(dh, Set(5:8))
+    add!(sdh1, :u, Lagrange{RefTriangle, 2}()^2)
+    @test_throws ErrorException add!(sdh2, :u, RaviartThomas{RefTriangle, 2}())
+    dh = DofHandler(tgrid)
+    sdh1 = Ferrite.SubDofHandler(dh, Set(1:4))
+    sdh2 = Ferrite.SubDofHandler(dh, Set(5:8))
+    add!(sdh1, :u, Lagrange{RefTriangle, 2}())
+    @test_throws ErrorException add!(sdh2, :u, Lagrange{RefTriangle, 3}())
+    dh = DofHandler(tgrid)
+    sdh1 = Ferrite.SubDofHandler(dh, Set(1:4))
+    sdh2 = Ferrite.SubDofHandler(dh, Set(5:8))
+    add!(sdh1, :u, Lagrange{RefTriangle, 2}())
+    @test_throws ErrorException add!(sdh2, :u, OffCenterQuadraticTriangle())
+    dcells = [Triangle((1, 2, 3)), Triangle((4, 5, 6))]
+    dnodes = [Node(Vec{2}((x, y))) for (x, y) in ((0, 0), (1, 0), (0, 1), (2, 0), (3, 0), (2, 1))]
+    dh = DofHandler(Grid(dcells, dnodes))
+    sdh1 = Ferrite.SubDofHandler(dh, Set(1))
+    sdh2 = Ferrite.SubDofHandler(dh, Set(2))
+    add!(sdh1, :u, Lagrange{RefTriangle, 2}())
+    @test_logs (:warn,) add!(sdh2, :u, Lagrange{RefTriangle, 3}())
+    close!(dh)
+    hgrid = generate_grid(Hexahedron, (2, 1, 1))
+    dh = DofHandler(hgrid)
+    sdh1 = Ferrite.SubDofHandler(dh, Set(1))
+    sdh2 = Ferrite.SubDofHandler(dh, Set(2))
+    add!(sdh1, :q, Lagrange{RefHexahedron, 2}()^3)
+    @test_throws ErrorException add!(sdh2, :q, RaviartThomas{RefHexahedron, 1}())
+    # mixed refshapes with matching functionals close cleanly (2D cell-interior dofs
+    # are never shared, so the quad face bubble is not compared)
+    cells = [Quadrilateral((1, 2, 5, 4)), Triangle((2, 3, 5)), Triangle((3, 6, 5))]
+    nodes = [Node(Vec{2}((x, y))) for (x, y) in ((0.0, 0.0), (1.0, 0.0), (2.0, 0.0), (0.0, 1.0), (1.0, 1.0), (2.0, 1.0))]
+    mgrid = Grid(cells, nodes)
+    dh = DofHandler(mgrid)
+    sdh1 = Ferrite.SubDofHandler(dh, Set(1))
+    sdh2 = Ferrite.SubDofHandler(dh, Set(2:3))
+    add!(sdh1, :u, Lagrange{RefQuadrilateral, 2}())
+    @test_logs add!(sdh2, :u, Lagrange{RefTriangle, 2}())
+    close!(dh)
+    @test ndofs(dh) == 6 + 8 + 1 # 6 vertices, 8 edges, 1 quad interior
+    # same mixed surface mesh embedded in 3D: 2D cell interiors are still never shared,
+    # so the differing interior signatures must not be flagged
+    snodes = [Node(Vec{3}((x, y, 0.0))) for (x, y) in ((0.0, 0.0), (1.0, 0.0), (2.0, 0.0), (0.0, 1.0), (1.0, 1.0), (2.0, 1.0))]
+    sgrid = Grid(copy(cells), snodes)
+    dh = DofHandler(sgrid)
+    sdh1 = Ferrite.SubDofHandler(dh, Set(1))
+    sdh2 = Ferrite.SubDofHandler(dh, Set(2:3))
+    add!(sdh1, :u, Lagrange{RefQuadrilateral, 2}())
+    @test_logs add!(sdh2, :u, Lagrange{RefTriangle, 2}())
+    close!(dh)
+    @test ndofs(dh) == 6 + 8 + 1
 end
 
 
