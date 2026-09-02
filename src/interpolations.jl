@@ -106,22 +106,29 @@ struct PointValue <: DofFunctional end
 Base.show(io::IO, ::PointValue) = print(io, "PointValue()")
 
 """
-    PointDerivative()
     PointDerivative(α)
+    PointDerivative(; order)
 
 Dof functional for a point evaluation of a derivative: ℓ(f) = ∂^|α|f/∂x^α at xᵢ, with
 multi-index `α`, e.g. `PointDerivative((1,))` for du/dx in 1D or `PointDerivative((1, 1))`
 for ∂²u/∂x∂y. The point xᵢ is given by `reference_coordinates`, but the derivative is with
 respect to physical coordinates so that the dof is cell-invariant on shared entities.
-`PointDerivative()` is a selector matching every point-derivative functional.
+`PointDerivative()` is a selector matching every point-derivative functional and
+`PointDerivative(order = 1)` one matching every derivative of order |α| = 1.
 """
 struct PointDerivative{A} <: DofFunctional
     α::A
+    order::Union{Nothing, Int}
 end
-PointDerivative() = PointDerivative(nothing)
+PointDerivative(α::NTuple{N, Int}) where {N} = PointDerivative(α, sum(α))
+PointDerivative(; order::Union{Nothing, Integer} = nothing) = PointDerivative(nothing, order === nothing ? nothing : Int(order))
 function Base.show(io::IO, f::PointDerivative)
     print(io, "PointDerivative(")
-    f.α === nothing || show(io, f.α)
+    if f.α !== nothing
+        show(io, f.α)
+    elseif f.order !== nothing
+        print(io, "order = ", f.order)
+    end
     return print(io, ")")
 end
 
@@ -195,13 +202,15 @@ dof_functionals(ip::ScalarInterpolation) = ntuple(_ -> PointValue(), getnbasefun
     matches_functional(selector::DofFunctional, f::DofFunctional)
 
 Return `true` if the dof functional `f` matches `selector`. Omitted properties in selector
-instances act as wildcards; for example, `PointDerivative()` matches every derivative
-while `PointDerivative((1,))` matches only that derivative. A scalar selector matches a
+instances act as wildcards; for example, `PointDerivative()` matches every derivative,
+`PointDerivative(order = 1)` every first derivative, and `PointDerivative((1,))` only that
+derivative. A scalar selector matches a
 [`VectorizedFunctional`](@ref) if it matches the wrapped functional, in every direction.
 """
 matches_functional(selector::DofFunctional, f::DofFunctional) = f == selector
 _matches_property(selector, value) = selector === nothing || selector == value
-matches_functional(selector::PointDerivative, f::PointDerivative) = _matches_property(selector.α, f.α)
+matches_functional(selector::PointDerivative, f::PointDerivative) =
+    _matches_property(selector.α, f.α) && _matches_property(selector.order, f.order)
 matches_functional(selector::DofFunctional, f::VectorizedFunctional) = matches_functional(selector, f.functional)
 matches_functional(selector::VectorizedFunctional, f::VectorizedFunctional) =
     selector.direction == f.direction && matches_functional(selector.functional, f.functional)

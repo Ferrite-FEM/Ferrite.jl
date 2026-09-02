@@ -99,11 +99,14 @@ Some interpolations have dofs representing more than one kind of quantity (see
 [Dof functionals](@ref dof-functionals)). By default a `Dirichlet` condition constrains the dofs
 representing function values ([`PointValue`](@ref)); the `functional` keyword selects
 other kinds. For example, for a Hermite-type interpolation with both value and derivative
-dofs, the derivative can be prescribed with
+dofs, the derivatives can be prescribed with
 
 ```julia
 dbc = Dirichlet(:w, getfacetset(grid, "left"), Returns(0.0); functional = PointDerivative())
 ```
+
+and `PointDerivative(order = 1)` or `PointDerivative((1, 0))` narrow the selection to the
+first derivatives or to a single derivative.
 
 ## ProjectedDirichlet
 Some interpolations don't have nodal support points:
