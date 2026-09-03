@@ -28,7 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    lower-triangle storage before modifying the system. Constraint application also
    rejects unsupported lower-triangle CSC storage.
  - Constraint matrices correctly account for affine constraints with prescribed masters.
- - CSC and CSR assembly correctly accumulate repeated interface dofs.
+ - CSC and CSR assembly detect repeated dofs in the index vector and reject them with an
+   informative error, independent of the storage pattern (previously the behavior was
+   traversal-dependent: sometimes silently correct, sometimes a misleading missing-entry
+   error). For interface assembly with shared dofs, condense onto the unique dofs first,
+   see `condense_interface!`.
  - Fixed the single-argument `InterfaceValues(facetvalues)` constructor.
  - L2 projection supports complex scalar and tensor data.
  - `ArrayOfVectorViews` validates offsets before constructing unchecked views.
@@ -60,11 +64,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `unique_interfacedofs(ic)`, `nstacked_interface_dofs(ic)`, `nunique_interface_dofs(ic)`,
    `max_nstacked_interface_dofs(dh)` (allocation bound for local interface
    matrices/vectors), and `is_shared(ic, i)`. Assembling raw stacked matrices with
-   duplicated dof entries is supported through a slower fallback in the assemblers;
-   condensing first is the recommended (and faster) path, and when a genuinely missing
-   sparsity pattern entry is hit with duplicated dofs the error message now explains the
-   interface context and points to `interface_coupling` and `condense_interface!`.
-   ([#1433])
+   repeated dof entries is rejected with an error pointing at `condense_interface!`
+   (previously the behavior was storage-pattern-dependent: sometimes silently correct
+   through a fast path, sometimes a misleading "missing sparsity pattern entry" error).
+   The detection runs before all storage traversals, so the outcome no longer depends on
+   mesh size or the coupling mask. ([#1433])
  - `ExclusiveTopology` now supports grids with mixed reference dimensions (e.g. a 3D grid
    containing both `Hexahedron` and `Quadrilateral` cells). Mixed-dimensional connections
    are stored in `vertex_vertex_neighbor`, `edge_edge_neighbor`, and `face_face_neighbor`

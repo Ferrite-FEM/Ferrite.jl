@@ -335,13 +335,19 @@ draft's cancellation-based "lean mask" recommendation is withdrawn.
 
 ## Diagnostics
 
-On the missing-entry error path in `_assemble_inner!` (error path only, zero happy-path cost):
-report **both** facts when both hold — the requested global entry is missing from the pattern,
-*and* the index vector contains duplicated dofs (pointing at `condense_interface!`). Never
-replace the missing-entry report unconditionally: duplicates do not prove the missing entry is
-a false positive; a kernel may have duplicates *and* attempt a genuinely absent coupling
-(review §3.6). Documented limitation: this is a crash diagnostic, not a semantic guard — on
-the dense CSC path a raw duplicated scatter silently computes `Tᵀ Ke T` and no message fires.
+Repeated dofs in the index vector are **detected and rejected deterministically**: a cheap
+SIMD scan of the (already computed) sorted dofs runs at the top of the sparse traversal —
+before the dense-column, binary-search, and merge paths — and throws an `ArgumentError`
+pointing at `condense_interface!` (CSC checks rows, CSR checks columns: the direction whose
+single-pass traversal cannot accumulate repeats; the respectively harmless direction
+accumulates natively and is not restricted). This replaces the historical
+storage-pattern-dependent behavior (silently correct on the dense fast path, a misleading
+missing-entry error on the merge walk) with one outcome independent of mesh size and
+coupling mask, and it keeps a single documented interface-assembly path. Note the strictness
+is deliberate and value-blind: a stacked matrix whose duplicated rows/columns are all
+exactly zero (e.g. interface terms only for a cell-local field next to a continuous field)
+is also rejected — condense, or assemble that field's block with its duplicate-free dof
+subset. The missing-entry error itself now additionally hints at `interface_coupling`.
 
 ## User surface
 

@@ -391,23 +391,19 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
     return repeated
 end
 
-# Repeated interface dofs need multiple additions into the same stored entry.
-# Use independent lookups for this uncommon case, leaving the merge walk for
-# ordinary elements unchanged. Test the global triangle, including every local
-# contribution to a repeated global diagonal dof.
-@noinline function _assemble_repeated!(K, Ke, sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
-    for (j, col) in pairs(sortedcoldofs), (i, row) in pairs(sortedrowdofs)
-        sym && row > col && continue
-        val = Ke[rowpermutation[i], colpermutation[j]]
-        iszero(val) && continue
-        try
-            addindex!(K, convert(eltype(K), val), row, col, atomic)
-        catch err
-            err isa SparsityError || rethrow()
-            _missing_sparsity_pattern_error(row + rowoffset, col + coloffset, true)
-        end
-    end
-    return
+# Repeated dofs would need multiple additions into the same stored entry, which the
+# single-pass traversals below do not support (and which typically indicates that an
+# interface system with shared dofs should have been condensed first). Detect and reject
+# them deterministically, independent of which traversal the storage pattern selects.
+@noinline function _repeated_dofs_error()
+    msg = "the dof index vector passed to `assemble!` contains repeated entries. This " *
+        "happens in interface assembly when a field has dofs that are shared between the " *
+        "two cells of the interface (e.g. a continuous interpolation): condense the " *
+        "local matrix/vector onto the unique dofs before assembly, see " *
+        "`condense_interface!`. For interface terms involving only cell-local (e.g. " *
+        "discontinuous) fields, the local matrix can instead be assembled directly with " *
+        "the corresponding duplicate-free subset of the interface dofs."
+    throw(ArgumentError(msg))
 end
 
 """
@@ -452,9 +448,7 @@ end
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
         sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
     )
-    if _has_repeated_dofs(sortedrowdofs)
-        return _assemble_repeated!(K, Ke, sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
-    end
+    _has_repeated_dofs(sortedrowdofs) && _repeated_dofs_error()
 
     current_col = 1
     Krows = rowvals(K)
@@ -533,23 +527,14 @@ end
     return
 end
 
-function _missing_sparsity_pattern_error(Krow::Integer, Kcol::Integer, repeated_dofs::Bool = false)
+function _missing_sparsity_pattern_error(Krow::Integer, Kcol::Integer)
     msg = "You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), " *
         "$(Kcol)] is missing in the sparsity pattern. Make sure you have called `K = " *
         "allocate_matrix(dh)` or `K = allocate_matrix(dh, ch)` if you " *
-        "have affine constraints. This error might also happen if you are using " *
-        "the assembler in a threaded assembly loop (you need to create one " *
-        "`assembler` for each task)."
-    if repeated_dofs
-        msg *= " Note: the dof index vector passed to `assemble!` contains duplicated " *
-            "entries, as happens in interface assembly when a field has dofs that are " *
-            "shared between the two cells (e.g. a continuous interpolation). For " *
-            "interface assembly make sure `interface_coupling` was passed to " *
-            "`allocate_matrix` and covers the coupled field blocks. Alternatively, " *
-            "condensing the local matrix onto the unique dofs before assembly (see " *
-            "`condense_interface!`) is faster and does not require pattern entries for " *
-            "contributions that cancel exactly in the condensation."
-    end
+        "have affine constraints (for interface contributions, also make sure " *
+        "`interface_coupling` was passed and covers the coupled field blocks). This " *
+        "error might also happen if you are using the assembler in a threaded assembly " *
+        "loop (you need to create one `assembler` for each task)."
     throw(ErrorException(msg))
 end
 

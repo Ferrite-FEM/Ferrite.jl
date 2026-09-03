@@ -206,10 +206,9 @@ end
 end
 
 @testset "#1433 regression: assembly with a continuous field across interfaces" begin
-    # NOTE: with only two cells (three dofs) every column of K is fully dense and the
-    # dense-column fast path in the assembler accumulates duplicated dofs without ever
-    # reaching the repeated-dof detection. Four cells make the interface columns sparse
-    # enough to exercise the detection and the repeated-dof fallback.
+    # NOTE: four cells (instead of two, where every column of K is fully dense) make the
+    # interface columns sparse enough that the assembly of the condensed system exercises
+    # the ordinary merge walk rather than only the dense-column fast path.
     grid = generate_grid(Line, (4,))
     dh = DofHandler(grid)
     add!(dh, :u, Lagrange{RefLine, 1}())
@@ -244,29 +243,17 @@ end
     @test interfacedofs(ic)[2] == interfacedofs(ic)[3] # P1 on Line: dofs [d0, D, D, d2]
     _, Kc1 = condense_interface!(buf, ic, ones(4, 4))
     @test Matrix(Kc1) == [1.0 2.0 1.0; 2.0 4.0 2.0; 1.0 2.0 1.0]
-    # The raw duplicated scatter is supported through the repeated-dof fallback and must
-    # compute the same congruence transform as the condensed path
-    K2 = allocate_matrix(dh; topology = topology, interface_coupling = trues(1, 1))
-    f2 = zeros(ndofs(dh))
-    assembler2 = start_assemble(K2, f2)
-    for ic2 in InterfaceIterator(dh, topology)
-        assemble!(assembler2, interfacedofs(ic2), ones(4, 4), ones(4))
-    end
-    @test Matrix(K2) ≈ Kref
-    @test f2 ≈ fref
-    # When a genuinely missing pattern entry is hit with duplicated dofs, the error notes
-    # the duplicates and points at interface_coupling/condense_interface!
-    Ksmall = allocate_matrix(dh) # no interface entries in the pattern
-    assembler3 = start_assemble(Ksmall)
+    # The raw duplicated scatter is rejected deterministically (independent of the
+    # storage pattern) with an error pointing at condense_interface!
+    assembler2 = start_assemble(K, f)
     err = try
-        assemble!(assembler3, interfacedofs(ic), ones(4, 4))
+        assemble!(assembler2, interfacedofs(ic), ones(4, 4))
         nothing
     catch e
         e
     end
-    @test err isa ErrorException
-    @test occursin("missing in the sparsity pattern", err.msg)
-    @test occursin("duplicated", err.msg)
+    @test err isa ArgumentError
+    @test occursin("repeated entries", err.msg)
     @test occursin("condense_interface!", err.msg)
     # COOAssembler sums duplicates natively: raw stacked assembly must equal the
     # explicit congruence transform
