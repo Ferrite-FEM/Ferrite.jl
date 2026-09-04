@@ -7,28 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v1.7.0] - 2026-08-31
 
-### Fixes
- - Atomic assembly support for BlockAssembler. ([#1452])
- - `apply_assemble!` now respects the assembler's atomic mode when non-local affine
-   constraints write directly to the global matrix and vector. ([#1465])
- - Assembling into a `BlockMatrix` is no longer orders of magnitude slower than assembling
-   into an unblocked matrix. The `BlockAssembler` cached the cell dofs as `BlockIndex{1}`,
-   which is not a concrete type, so the scatter loop was type unstable and allocated ~8
-   times per matrix entry. It now splits the cell dofs into their blocks and scatters each
-   block through `Ferrite._assemble_inner!`, i.e. the same routine the CSC and CSR
-   assemblers use, and assembles without allocating. ([#1489])
- - `add_interface_entries!` (and thereby `interface_coupling` builds) no longer errors for
-   grids where some cells are not covered by any `SubDofHandler`: an uncovered cell has no
-   dofs and contributes no interface entries, but the covered side of such an interface
-   still gets its same-side entries. ([#1490])
- - `add_sparsity_entries!` (and thereby `allocate_matrix`) now guarantees that passing
-   `interface_coupling` adds the requested interface entries: the `topology` keyword
-   argument is now optional and, when not passed, constructed from the grid (previously
-   `interface_coupling` without `topology` was silently ignored). Passing an existing
-   topology is still recommended for performance reasons, in particular since one is
-   typically needed for `InterfaceIterator` in the assembly loop anyway. Calls that pass
-   both keyword arguments behave exactly as before. ([#1468])
-
 ### Added
  - Added mesh-free [`AlgebraicVariable`s](https://ferrite-fem.github.io/Ferrite.jl/dev/topics/algebraic_variables/)
    and coupling descriptors for small global unknowns such as Lagrange multipliers and
@@ -56,6 +34,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `AbstractSparseMatrix`. ([#1489])
  - `apply!` on a `SparseMatrixCSR` now supports affine constraints, which previously threw
    `"condensation of ::SparseMatrixCSR{...} matrix not supported"`. ([#1489])
+
+### Fixes
+ - Atomic assembly support for BlockAssembler. ([#1452])
+ - `apply_assemble!` now respects the assembler's atomic mode when non-local affine
+   constraints write directly to the global matrix and vector. ([#1465])
+ - Assembling into a `BlockMatrix` is no longer orders of magnitude slower than assembling
+   into an unblocked matrix. The `BlockAssembler` cached the cell dofs as `BlockIndex{1}`,
+   which is not a concrete type, so the scatter loop was type unstable and allocated ~8
+   times per matrix entry. It now splits the cell dofs into their blocks and scatters each
+   block through `Ferrite._assemble_inner!`, i.e. the same routine the CSC and CSR
+   assemblers use, and assembles without allocating. ([#1489])
+ - `add_interface_entries!` (and thereby `interface_coupling` builds) no longer errors for
+   grids where some cells are not covered by any `SubDofHandler`: an uncovered cell has no
+   dofs and contributes no interface entries, but the covered side of such an interface
+   still gets its same-side entries. ([#1490])
+ - `add_sparsity_entries!` (and thereby `allocate_matrix`) now guarantees that passing
+   `interface_coupling` adds the requested interface entries: the `topology` keyword
+   argument is now optional and, when not passed, constructed from the grid (previously
+   `interface_coupling` without `topology` was silently ignored). Passing an existing
+   topology is still recommended for performance reasons, in particular since one is
+   typically needed for `InterfaceIterator` in the assembly loop anyway. Calls that pass
+   both keyword arguments behave exactly as before. ([#1468])
 
 ### Performance
  - `create_coloring` is significantly faster: the incidence matrix construction and the
