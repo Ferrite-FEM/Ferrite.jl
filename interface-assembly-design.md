@@ -556,6 +556,18 @@ arrays, `Adapt.@adapt_structure` then just works):
 3. `condense_interface!` grows the buffer on demand — for non-resizable storage this must
    become an `ArgumentError` naming the required capacity (grow when resizable, require
    capacity otherwise).
+4. The validation error paths interpolate into strings (`"size(Ke) = $(size(Ke))..."`) —
+   dynamic string construction does not compile in device kernels; device paths need
+   interpolation-free errors. In practice validation moves host-side anyway (see above).
+5. `InterfaceAssemblyBuffer` needs a `distribute_to_workers` story (worker-major storage,
+   the `Kes`/`fes` pattern from the GPU how-to).
+
+Note also a device/host asymmetry to resolve in a future port: the device assembler
+(`DeviceCSCAssembler`) looks up every entry independently (no merge walk), so raw duplicated
+scatter accumulates *correctly* on device today, and the CPU-side strict rejection of
+repeated dofs is not mirrored there. A port should either mirror the rejection for
+consistency or deliberately allow it — the economics differ from CPU, since per-entry
+lookups are already paid and fold-on-scatter is nearly free.
 
 **Orthogonal prerequisites, outside this proposal:** a host-precomputed device work list of
 facet pairs per color (the interface analogue of the cell-id color vectors — static and
