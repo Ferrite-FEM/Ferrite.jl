@@ -140,7 +140,11 @@ end
     end
     # A field present on only one side is rejected
     @test_throws ErrorException dof_range(ic2, :q)
-    err = try dof_range(ic2, :q); nothing; catch e; e; end
+    err = try
+        dof_range(ic2, :q); nothing
+    catch e
+        e
+    end
     @test occursin("only one side", err.msg)
     # Unknown fields are rejected too
     @test_throws ErrorException dof_range(ic2, :nonexistent)
@@ -594,7 +598,11 @@ end
     ic3 = InterfaceCache(dh3)
     reinit!(ic3, FacetIndex(1, 2), FacetIndex(2, 4))
     @test ic3.sdh_index_b == 0
-    err = try dof_range(ic3, :u); nothing; catch e; e; end
+    err = try
+        dof_range(ic3, :u); nothing
+    catch e
+        e
+    end
     @test err isa ErrorException
     @test occursin("not defined on both cells", err.msg)
 
@@ -688,15 +696,15 @@ end
     # derivative with respect to a unique dof is the *sum* of the two copies' partials
     # (chain rule through the gather u_s = T u_u), which is what the TᵀJsT fold computes —
     # a double count would show up as a factor 2 in the shared-dof rows/columns.
-    let h = 1e-6, Jfd = zeros(nu, nu)
+    let h = 1.0e-6, Jfd = zeros(nu, nu)
         for j in 1:nu
             up = copy(uu); up[j] += h
             um = copy(uu); um[j] -= h
             Jfd[:, j] = (unique_residual(up) - unique_residual(um)) / (2h)
         end
-        @test isapprox(Matrix(Jc), Jfd; rtol = 1e-5)
+        @test isapprox(Matrix(Jc), Jfd; rtol = 1.0e-5)
         for j in unique(ic.stacked_to_unique[i] for i in 1:ns if is_shared(ic, i))
-            @test norm(Matrix(Jc)[:, j]) ≈ norm(Jfd[:, j]) rtol = 1e-5 # ratio 1, not 2
+            @test norm(Matrix(Jc)[:, j]) ≈ norm(Jfd[:, j]) rtol = 1.0e-5 # ratio 1, not 2
         end
     end
     # A Dual-typed buffer works too (the buffer eltype is the user's choice, matching the
