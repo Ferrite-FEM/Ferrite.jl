@@ -575,10 +575,15 @@ Condense a local interface matrix `Ke` (and optionally vector `fe`), computed in
 result can be assembled with the ordinary `assemble!(assembler, udofs, Kc, fc)` (or
 `apply_assemble!(assembler, ch, udofs, Kc, fc)` for constrained problems).
 
-The vector-only method condenses a local residual without requiring a matrix. This is the
-method to use inside a residual evaluation that is differentiated with e.g. ForwardDiff:
-construct the buffer with the dual number type as its element type and condense the
-(dual-valued) stacked residual before returning it from the differentiated function.
+The vector-only method condenses a local residual without requiring a matrix, e.g. for
+residual-only evaluations in a nonlinear solve (residual norms, line search). For computing
+an interface Jacobian with automatic differentiation, the recommended pattern is to
+differentiate the *stacked* residual and condense the resulting stacked Jacobian (and
+residual) afterwards with the matrix methods — this uses the ordinary buffer and allocates
+nothing extra. (Differentiating the condensed residual instead also works, since the
+buffer's element type is the user's choice and can be a dual number type, but the
+dual-typed buffer must then be constructed inside the differentiated function or hoisted
+with an explicitly spelled-out dual type.)
 
 With `T` the map from unique to stacked dofs, this computes `Kc = Tᵀ Ke T` and
 `fc = Tᵀ fe`: the two stacked copies of a dof shared between the cells are summed onto its

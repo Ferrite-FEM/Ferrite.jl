@@ -700,10 +700,11 @@ end
     @test_throws DimensionMismatch condense_interface!(buf, ic, rand(ns + 1))
     @test_throws ArgumentError condense_interface!(buf, ic, view(buf.fc, 1:ns))
 
-    # The actual ForwardDiff workflow: the residual function itself condenses through the
-    # vector-only method with a dual-typed buffer, and is differentiated with respect to
-    # the *unique* coefficients (gathering the stacked coefficients through the map).
-    # The result must equal the condensed stacked Jacobian, Ju = Tᵀ Js T.
+    # Alternative AD route (the recommended one is to condense the stacked Jacobian, as
+    # above): the residual function itself condenses through the vector-only method with a
+    # dual-typed buffer and is differentiated with respect to the *unique* coefficients
+    # (gathering the stacked coefficients through the map). This exercises dual numbers
+    # through the vector condensation path; the result must equal Ju = Tᵀ Js T.
     function condensed_residual(uu)
         ue2 = uu[ic.stacked_to_unique]                            # gather: u_s = T * u_u
         re = stacked_residual(ue2)                                # dual-valued stacked residual

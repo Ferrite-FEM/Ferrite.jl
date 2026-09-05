@@ -444,30 +444,25 @@ ue = a[interfacedofs(ic)]                                       # stacked gather
 jump_P = function_value_jump(iv_P, qp, ue, dof_range(ic, :P))
 ```
 
-AD sketches (stacked all the way to the boundary). Route 1 — differentiate the stacked
-residual, condense the resulting stacked Jacobian afterwards:
+AD sketch (stacked all the way to the boundary): **differentiate the stacked residual,
+condense the resulting stacked Jacobian (and residual) afterwards** — one Float64 buffer, no
+extra allocation, one index space, and with `DiffResults` a single AD sweep yields both:
 
 ```julia
 ue = a[interfacedofs(ic)]
-Ke = ForwardDiff.jacobian(u -> stacked_residual(u, ic, iv_u, iv_P), ue)
-udofs, Kc = condense_interface!(buf, ic, Ke)
+result = DiffResults.JacobianResult(ue)
+ForwardDiff.jacobian!(result, u -> stacked_residual(u, ic, iv_u, iv_P), ue)
+udofs, Kc, fc = condense_interface!(buf, ic, DiffResults.jacobian(result), DiffResults.value(result))
 ```
 
-Route 2 — the residual function itself condenses through the **vector-only method** with a
-dual-typed buffer and is differentiated with respect to the *unique* coefficients (gather
-`u_s = T u_u` through `stacked_to_unique`); by the chain rule the Jacobian is `Tᵀ Js T`
-directly:
-
-```julia
-function condensed_residual(uu)
-    ue = uu[ic.stacked_to_unique]                        # gather to the stacked layout
-    re = stacked_residual(ue, ic, iv_u, iv_P)            # dual-valued under ForwardDiff
-    _, fc = condense_interface!(buf_dual, ic, re)        # buf_dual: dual element type
-    return copy(fc)
-end
-uu = a[unique_interfacedofs(ic)]
-Ju = ForwardDiff.jacobian(condensed_residual, uu)        # nu × nu, assembles with udofs
-```
+The vector-only method serves residual-only evaluations (Newton residual norms, line
+search), which have no matrix to pass. Differentiating the *condensed* residual with
+respect to the unique coefficients (gather `u_s = T u_u`, condense the dual-valued stacked
+residual with a dual-typed buffer) is also supported and equal by the chain rule
+(`Ju = Tᵀ Js T`, tested) — but it is not the recommended route: the dual-typed buffer must
+be allocated inside the differentiated closure (once per chunk pass) or hoisted with an
+explicitly spelled-out `Dual{Tag, T, N}` type, and the chunk-count savings from `nu < ns`
+inputs are marginal.
 
 ### (c) Sparsity pattern for the mixed case
 
