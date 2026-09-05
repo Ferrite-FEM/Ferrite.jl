@@ -210,18 +210,21 @@ condense_interface!(buf, ic, Ke, fe) -> (udofs, Kc, fc)
 
 - Computes `Kc = Tᵀ Ke T` and `fc = Tᵀ fe` as `Kc[m[i], m[j]] += Ke[i, j]`,
   `fc[m[i]] += fe[i]` with `m = ic.stacked_to_unique` — `T` is never materialized.
-- **Identity rule** (both paths): `udofs === unique_interfacedofs(ic)`, and
-  `unique_interfacedofs(ic)` itself returns `interfacedofs(ic)` (the identical vector) when
-  no dof is shared.
-- **Pass-through path**: when `!ic.any_shared`, `Kc === Ke` / `fc === fe` are returned
-  without copying. Precise performance claims (updated review §4.4): *no copy* on this
-  path, *no changes to the generic assembler hot loop*, and — with the lazy map — *raw DG
-  loops never build the map*; not "zero overhead" (the call itself branches and returns a
-  tuple).
-- **Per-path lifetime**: condensed `Kc`/`fc` alias buffer storage and are overwritten by
-  the next `condense_interface!` with the same buffer; pass-through outputs alias the
-  caller's own arrays and follow *their* lifetime (buffer reuse does not invalidate them);
-  dof vectors alias cache storage and are invalidated by the next `reinit!`.
+- **Identity rule**: `udofs === unique_interfacedofs(ic)`, and `unique_interfacedofs(ic)`
+  itself returns `interfacedofs(ic)` (the identical vector) when no dof is shared.
+- **Type-stable outputs**: `Kc`/`fc` are *always* views into the buffer — for an interface
+  without shared dofs the map is the identity and the fold degenerates to a `copyto!`.
+  Returning the caller's `Ke`/`fe` unchanged in that case would make the return type depend
+  on the *values* of the input (buffer view vs. whatever type the caller's local matrix
+  has, e.g. a `SubArray` of a presized buffer), i.e. a value-dependent `Union` at every
+  call site. Users who want to skip the copy for pure DG call the plain
+  `assemble!(assembler, interfacedofs(ic), Ke, fe)` directly (valid whenever the dof
+  vector has no repeats). Precise performance claims (updated review §4.4): *no changes to
+  the generic assembler hot loop*, *raw DG loops never build the map* (lazy), and the
+  no-sharing condensation costs one dense `ns²` copy.
+- **Lifetime** (uniform, both cases): `Kc`/`fc` alias buffer storage and are overwritten by
+  the next `condense_interface!` with the same buffer; dof vectors alias cache storage and
+  are invalidated by the next `reinit!`.
 - **Buffer contract** (updated review §3.5): `Ke`/`fe` must match the stacked size
   (`DimensionMismatch` otherwise) and use one-based indexing; they must not alias the
   buffer's storage (`ArgumentError`, e.g. a previous call's output passed back in); the
@@ -368,14 +371,14 @@ for ic in InterfaceIterator(dh, topology)
     Kie = @view Ki[1:n, 1:n]
     fill!(Kie, 0)
     assemble_interface!(Kie, interfacevalues, μ)     # unchanged kernel
-    udofs, Kc = condense_interface!(buf, ic, Kie)    # pass-through (no copy) for pure DG
+    udofs, Kc = condense_interface!(buf, ic, Kie)    # a plain copy for pure DG
     assemble!(assembler, udofs, Kc)
 end
 ```
 
-For pure DG the condense call is a no-op pass-through, and the raw
-`assemble!(assembler, interfacedofs(ic), Kie)` also remains valid — the uniform pattern above
-is what tutorials show so that adding a conforming field later changes nothing.
+For pure DG the condensation degenerates to a copy into the buffer, and the raw
+`assemble!(assembler, interfacedofs(ic), Kie)` remains valid (and copy-free) — the uniform
+pattern above is what tutorials show so that adding a conforming field later changes nothing.
 
 ### (b) Mixed continuous `u` / discontinuous `P` — the issue #1433 case
 
@@ -467,8 +470,8 @@ way and defaults to the full mask.
 - `interfacedofs(ic)`, `InterfaceIterator`, `reinit!(iv, ic)` — same names, same behavior
   (only the `interfacedofs` docstring is corrected).
 - Every existing DG kernel and assembly loop works verbatim; adopting the condense boundary
-  is optional for pure DG (no-copy pass-through; the lazy map means raw loops also keep
-  their current `reinit!` cost).
+  is optional for pure DG (raw `assemble!` stays valid without repeats; the lazy map means
+  raw loops also keep their current `reinit!` cost).
 - Sparsity-pattern machinery — unchanged.
 - Assembler structs, `start_assemble`, the generic `assemble!` hot loop, both extensions —
   unchanged except the error-path diagnostic.
@@ -647,7 +650,9 @@ v1's boundary and already tested by it.
 1. Stacked-residual Jacobian condensed vs differentiation w.r.t. unique coefficients through
    the gather `u_s = T u_u` — equal up to roundoff.
 2. Benchmark: unchanged cell assembly (generic hot path untouched), pure DG interface
-   assembly (pass-through overhead == 0), mixed H1/L2 assembly, and (v2) the merged wrapper.
+   assembly (raw path unchanged; condensed path = one `ns²` copy), mixed H1/L2 assembly,
+   and (v2) the merged wrapper. Type stability of `condense_interface!` asserted with
+   `@inferred` for both the shared and the no-sharing case.
 3. Allocations per interface reported for each supported path.
 
 ---

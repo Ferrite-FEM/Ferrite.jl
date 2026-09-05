@@ -57,10 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    explicit boundary before assembly with the new
    `condense_interface!(buf::InterfaceAssemblyBuffer, ic, Ke, fe)`, after which the
    ordinary `assemble!` (and `apply_assemble!` for constrained problems) applies. For
-   interfaces without shared dofs (e.g. pure discontinuous Galerkin) `condense_interface!`
-   is a no-copy pass-through; the stacked-to-unique dof map is built lazily on first use
-   after `reinit!`, so existing loops that never use it (raw DG assembly, sparsity
-   construction) keep their current `reinit!` cost. New supporting API:
+   interfaces without shared dofs (e.g. pure discontinuous Galerkin) the condensation
+   degenerates to a copy into the buffer (the outputs are always buffer views, keeping the
+   return types independent of the input data; raw `assemble!` with `interfacedofs(ic)`
+   remains the copy-free option when no dof is repeated). The stacked-to-unique dof map is
+   built lazily on first use after `reinit!`, so existing loops that never use it (raw DG
+   assembly, sparsity construction) keep their current `reinit!` cost. New supporting API:
    `unique_interfacedofs(ic)`, `nstacked_interface_dofs(ic)`, `nunique_interface_dofs(ic)`,
    `max_nstacked_interface_dofs(dh)` (allocation bound for local interface
    matrices/vectors), and `is_shared(ic, i)`. Assembling raw stacked matrices with

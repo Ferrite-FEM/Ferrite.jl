@@ -581,17 +581,17 @@ supplied by the kernel — a kernel that weights the two copies of a shared dof 
 (e.g. summing raw side values of a continuous field) is not repaired by it. See the
 documentation on interface assembly for the weighting rules.
 
-When the interface has no shared dofs (e.g. pure discontinuous interpolations) the inputs
-`Ke`/`fe` are returned unchanged, without copying.
+The outputs are always written into the buffer, so the return types do not depend on the
+values of the input data (type stability at the call site): `Kc`/`fc` are views into `buf`,
+and the dof vector is `unique_interfacedofs(ic)` (the identical object). When the interface
+has no shared dofs (e.g. pure discontinuous interpolations) the map is the identity and
+the condensation degenerates to a copy into the buffer; the copy can be avoided entirely
+by assembling with the plain `assemble!(assembler, interfacedofs(ic), Ke, fe)`, which is
+valid whenever the dof vector has no repeated entries.
 
-On both paths the returned dof vector is `unique_interfacedofs(ic)` (the identical object).
-The lifetime of the outputs depends on the path:
-- the dof vector is borrowed cache storage, valid until the next `reinit!` of the cache;
-- a condensed `Kc`/`fc` is borrowed buffer storage, overwritten by the next
-  `condense_interface!` call with the same buffer;
-- on the no-sharing pass-through, `Kc === Ke` and `fc === fe` follow the lifetime of the
-  caller's own arrays (reuse of the buffer does not invalidate them).
-Borrowed outputs must not be mutated and must be copied before storing.
+All outputs are *borrowed* storage: the dof vector from the cache (valid until the next
+`reinit!`), `Kc`/`fc` from the buffer (overwritten by the next `condense_interface!` call
+with the same buffer). They must not be mutated and must be copied before storing.
 
 `Ke` and `fe` must use one-based indexing and must not alias the buffer's storage (e.g. a
 `Kc` returned from a previous call must not be passed back in).
@@ -615,27 +615,34 @@ function condense_interface!(
     end
     _ensure_unique_interface_map!(ic)
     udofs = unique_interfacedofs(ic)
-    if !ic.any_shared
-        # No shared dofs: stacked == unique, pass the inputs through without copying
-        return fe === nothing ? (udofs, Ke) : (udofs, Ke, fe)
-    end
     m = ic.stacked_to_unique
-    nu = length(ic.unique_dofs)
+    nu = length(udofs)
     length(buf.Kc) < nu * nu && resize!(buf.Kc, nu * nu)
     Kc = reshape(view(buf.Kc, 1:(nu * nu)), nu, nu)
-    fill!(Kc, zero(eltype(Kc)))
-    @inbounds for j in 1:ns
-        mj = m[j]
-        for i in 1:ns
-            Kc[m[i], mj] += Ke[i, j]
+    if ic.any_shared
+        fill!(Kc, zero(eltype(Kc)))
+        @inbounds for j in 1:ns
+            mj = m[j]
+            for i in 1:ns
+                Kc[m[i], mj] += Ke[i, j]
+            end
         end
+    else
+        # No shared dofs: the map is the identity and the fold is a plain copy. (The copy,
+        # rather than returning Ke itself, keeps the return type independent of the input
+        # values; use the plain `assemble!(assembler, interfacedofs(ic), Ke)` to avoid it.)
+        copyto!(Kc, Ke)
     end
     fe === nothing && return udofs, Kc
     length(buf.fc) < nu && resize!(buf.fc, nu)
     fc = view(buf.fc, 1:nu)
-    fill!(fc, zero(eltype(fc)))
-    @inbounds for i in 1:ns
-        fc[m[i]] += fe[i]
+    if ic.any_shared
+        fill!(fc, zero(eltype(fc)))
+        @inbounds for i in 1:ns
+            fc[m[i]] += fe[i]
+        end
+    else
+        copyto!(fc, fe)
     end
     return udofs, Kc, fc
 end

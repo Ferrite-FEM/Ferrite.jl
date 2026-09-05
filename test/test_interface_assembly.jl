@@ -182,7 +182,9 @@ end
         @test_throws DimensionMismatch condense_interface!(buf, ic, rand(ns + 1, ns + 1))
         @test_throws DimensionMismatch condense_interface!(buf, ic, Ke, rand(ns + 1))
     end
-    # Pass-through (no copy) when nothing is shared
+    # No shared dofs: the map is the identity and the condensation is a copy into the
+    # buffer (not a pass-through of the inputs, so that the return types do not depend on
+    # the values of the input data)
     dhdg = DofHandler(grid)
     add!(dhdg, :u, DiscontinuousLagrange{RefQuadrilateral, 1}())
     close!(dhdg)
@@ -190,9 +192,21 @@ end
     Ke = rand(8, 8)
     fe = rand(8)
     udofs, Kc, fc = condense_interface!(buf, icdg, Ke, fe)
-    @test Kc === Ke
-    @test fc === fe
+    @test Kc == Ke && Kc !== Ke
+    @test fc == fe && fc !== fe
     @test udofs === interfacedofs(icdg)
+    # Type stability: the same return types for the shared and the no-sharing case, also
+    # when the input is a view (whose type would leak into the return under pass-through)
+    ic1 = first(InterfaceIterator(dh, topology))
+    n1 = nstacked_interface_dofs(ic1)
+    Kview = view(zeros(n1 + 5, n1 + 5), 1:n1, 1:n1)
+    fview = view(zeros(n1 + 5), 1:n1)
+    T_shared = typeof(@inferred condense_interface!(buf, ic1, Kview, fview))
+    Kviewdg = view(zeros(20, 20), 1:8, 1:8)
+    fviewdg = view(zeros(20), 1:8)
+    T_dg = typeof(@inferred condense_interface!(buf, icdg, Kviewdg, fviewdg))
+    @test T_shared === T_dg
+    @test isconcretetype(T_shared)
     # An undersized buffer grows as needed
     smallbuf = InterfaceAssemblyBuffer{Float64}()
     dhh1 = DofHandler(grid)
@@ -523,8 +537,8 @@ end
     @test !ic.unique_map_valid
     udofs = unique_interfacedofs(ic) # first accessor builds it
     @test ic.unique_map_valid
-    # Identity rule: condense returns unique_interfacedofs(ic) (the same object), on both
-    # the condensing and the pass-through path
+    # Identity rule: condense returns unique_interfacedofs(ic) (the same object), with and
+    # without shared dofs
     buf = InterfaceAssemblyBuffer{Float64}(max_nstacked_interface_dofs(dh))
     n = nstacked_interface_dofs(ic)
     ud2, Kc = condense_interface!(buf, ic, rand(n, n))
@@ -536,7 +550,7 @@ end
     Ke = rand(8, 8)
     uddg, Kdg = condense_interface!(buf, icdg, Ke)
     @test uddg === unique_interfacedofs(icdg) === interfacedofs(icdg)
-    @test Kdg === Ke
+    @test Kdg == Ke && Kdg !== Ke # copied into the buffer (type-stable return)
     # Aliasing: views into the buffer's storage (e.g. outputs of a previous call) must not
     # be passed back as input, even when the sizes happen to match
     bad_K = reshape(view(buf.Kc, 1:(n * n)), n, n)
