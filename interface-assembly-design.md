@@ -537,10 +537,21 @@ friendly views), matching the documented one-buffer-per-task rule. `InterfaceDof
 isbits (two `UnitRange`s) and kernel-passable as a value.
 
 **Two v1 design points dissolve rather than port:**
-- The *lazy* unique map is a CPU-loop optimization; on GPU the maps are static data
-  (topology + dof layout) and would be precomputed on the host once for all interfaces and
-  uploaded SoA (flat arrays + offsets). The accessor-behind-cache design permits that
-  without API change.
+- The *lazy* unique map is a CPU-loop optimization and does not port as such — but note
+  that **naive host precomputation of all maps is memory-expensive**: `ns` integers per
+  interface at ~3 interfaces/cell means e.g. ~650 MB for 1M P2 hexes. Per-interface storage
+  is also unnecessary; two cheaper translations:
+  1. *Per-worker recompute* (the direct analog of the CPU design, which also stores only
+     one map, rebuilt per interface): `n_workers × ns` scratch, each worker rebuilding the
+     map with the O(n_a·n_b) equality scan in registers. Likely *faster* than loading a
+     precomputed map — the worker reads the two `celldofs` lists for the scatter anyway,
+     so the scan adds register arithmetic but no global-memory traffic.
+  2. *Canonical map table*: for conforming matching interfaces the map pattern depends only
+     on `(sdh_a, sdh_b, facet_a, facet_b, relative orientation)` — a small finite set (288
+     combinations per sdh pair for hexes) computable once, keyed by the same orientation
+     info `InterfaceValues.reinit!` already consumes per interface. Needs verification for
+     higher-order entity-interior dofs (`adjust_dofs_during_distribution` ordering) before
+     relying on it.
 - `dof_range(ic, field)` is host code (`Symbol` lookup, throwing errors): hoisted outside
   the kernel for a single `SubDofHandler` (loop-invariant, the cell-assembly idiom) or
   precomputed per sdh pair otherwise.
