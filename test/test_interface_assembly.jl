@@ -681,6 +681,24 @@ end
     Ju = ForwardDiff.jacobian(unique_residual, uu)
     @test Matrix(Jc) ≈ Ju
     @test collect(fc) ≈ unique_residual(uu)
+    # Independent arbiter (both routes above go through ForwardDiff, so a shared
+    # systematic error would cancel): central finite differences of the condensed residual
+    # with respect to the unique coefficients. In particular this rules out double
+    # counting of the shared dofs, which appear twice in the stacked input: the total
+    # derivative with respect to a unique dof is the *sum* of the two copies' partials
+    # (chain rule through the gather u_s = T u_u), which is what the TᵀJsT fold computes —
+    # a double count would show up as a factor 2 in the shared-dof rows/columns.
+    let h = 1e-6, Jfd = zeros(nu, nu)
+        for j in 1:nu
+            up = copy(uu); up[j] += h
+            um = copy(uu); um[j] -= h
+            Jfd[:, j] = (unique_residual(up) - unique_residual(um)) / (2h)
+        end
+        @test isapprox(Matrix(Jc), Jfd; rtol = 1e-5)
+        for j in unique(ic.stacked_to_unique[i] for i in 1:ns if is_shared(ic, i))
+            @test norm(Matrix(Jc)[:, j]) ≈ norm(Jfd[:, j]) rtol = 1e-5 # ratio 1, not 2
+        end
+    end
     # A Dual-typed buffer works too (the buffer eltype is the user's choice, matching the
     # local matrix eltype). Condensation is linear, so it acts on values and partials alike.
     DualT = ForwardDiff.Dual{Nothing, Float64, 1}
