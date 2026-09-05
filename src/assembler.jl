@@ -568,11 +568,17 @@ end
 """
     condense_interface!(buf::InterfaceAssemblyBuffer, ic::InterfaceCache, Ke::AbstractMatrix) -> (udofs, Kc)
     condense_interface!(buf::InterfaceAssemblyBuffer, ic::InterfaceCache, Ke::AbstractMatrix, fe::AbstractVector) -> (udofs, Kc, fc)
+    condense_interface!(buf::InterfaceAssemblyBuffer, ic::InterfaceCache, fe::AbstractVector) -> (udofs, fc)
 
 Condense a local interface matrix `Ke` (and optionally vector `fe`), computed in the
 *stacked* layout of [`interfacedofs`](@ref), onto the unique interface dofs, such that the
 result can be assembled with the ordinary `assemble!(assembler, udofs, Kc, fc)` (or
 `apply_assemble!(assembler, ch, udofs, Kc, fc)` for constrained problems).
+
+The vector-only method condenses a local residual without requiring a matrix. This is the
+method to use inside a residual evaluation that is differentiated with e.g. ForwardDiff:
+construct the buffer with the dual number type as its element type and condense the
+(dual-valued) stacked residual before returning it from the differentiated function.
 
 With `T` the map from unique to stacked dofs, this computes `Kc = Tᵀ Ke T` and
 `fc = Tᵀ fe`: the two stacked copies of a dof shared between the cells are summed onto its
@@ -645,6 +651,34 @@ function condense_interface!(
         copyto!(fc, fe)
     end
     return udofs, Kc, fc
+end
+
+# Vector-only method: condense a local residual (no matrix), e.g. inside a dual-valued
+# residual evaluation under automatic differentiation.
+function condense_interface!(buf::InterfaceAssemblyBuffer, ic::InterfaceCache, fe::AbstractVector)
+    Base.require_one_based_indexing(fe)
+    ns = nstacked_interface_dofs(ic)
+    if length(fe) != ns
+        throw(DimensionMismatch("length(fe) = $(length(fe)) does not match the stacked interface size $ns"))
+    end
+    if _array_root(fe) === buf.Kc || _array_root(fe) === buf.fc
+        throw(ArgumentError("the input vector aliases the buffer's storage (e.g. the output of a previous condense_interface! call): pass the original stacked local vector instead"))
+    end
+    _ensure_unique_interface_map!(ic)
+    udofs = unique_interfacedofs(ic)
+    nu = length(udofs)
+    length(buf.fc) < nu && resize!(buf.fc, nu)
+    fc = view(buf.fc, 1:nu)
+    if ic.any_shared
+        m = ic.stacked_to_unique
+        fill!(fc, zero(eltype(fc)))
+        @inbounds for i in 1:ns
+            fc[m[i]] += fe[i]
+        end
+    else
+        copyto!(fc, fe)
+    end
+    return udofs, fc
 end
 
 # Root array behind (nested) views/reshapes, for the aliasing check above

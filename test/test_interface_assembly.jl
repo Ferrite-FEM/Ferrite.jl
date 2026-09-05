@@ -689,4 +689,28 @@ end
     _, JcD = condense_interface!(bufdual, ic, Jdual)
     @test ForwardDiff.value.(Matrix(JcD)) ≈ Ju
     @test map(d -> ForwardDiff.partials(d)[1], Matrix(JcD)) ≈ 2 .* Ju
+
+    # The vector-only method condenses a residual without a matrix: fc == Tᵀ fs, with the
+    # same borrowed-buffer, identity, and type-stability rules as the matrix methods
+    udofs_v, fc_v = condense_interface!(buf, ic, fs)
+    @test udofs_v === unique_interfacedofs(ic)
+    @test collect(fc_v) ≈ T' * fs
+    Tv = typeof(@inferred condense_interface!(buf, ic, fs))
+    @test isconcretetype(Tv)
+    @test_throws DimensionMismatch condense_interface!(buf, ic, rand(ns + 1))
+    @test_throws ArgumentError condense_interface!(buf, ic, view(buf.fc, 1:ns))
+
+    # The actual ForwardDiff workflow: the residual function itself condenses through the
+    # vector-only method with a dual-typed buffer, and is differentiated with respect to
+    # the *unique* coefficients (gathering the stacked coefficients through the map).
+    # The result must equal the condensed stacked Jacobian, Ju = Tᵀ Js T.
+    function condensed_residual(uu)
+        ue2 = uu[ic.stacked_to_unique]                            # gather: u_s = T * u_u
+        re = stacked_residual(ue2)                                # dual-valued stacked residual
+        bufD = InterfaceAssemblyBuffer{eltype(re)}(length(re))    # dual-typed buffer
+        _, fcD = condense_interface!(bufD, ic, re)                # fc = Tᵀ re
+        return copy(fcD)                                          # copy out of the buffer
+    end
+    @test condensed_residual(uu) ≈ T' * fs
+    @test ForwardDiff.jacobian(condensed_residual, uu) ≈ Ju
 end

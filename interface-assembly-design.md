@@ -206,6 +206,7 @@ InterfaceAssemblyBuffer{T}(max_n::Int) where {T}
 
 condense_interface!(buf, ic, Ke)     -> (udofs, Kc)
 condense_interface!(buf, ic, Ke, fe) -> (udofs, Kc, fc)
+condense_interface!(buf, ic, fe)     -> (udofs, fc)       # vector-only: residual evaluation
 ```
 
 - Computes `Kc = Tᵀ Ke T` and `fc = Tᵀ fe` as `Kc[m[i], m[j]] += Ke[i, j]`,
@@ -443,13 +444,29 @@ ue = a[interfacedofs(ic)]                                       # stacked gather
 jump_P = function_value_jump(iv_P, qp, ue, dof_range(ic, :P))
 ```
 
-AD sketch (stacked all the way to the boundary):
+AD sketches (stacked all the way to the boundary). Route 1 — differentiate the stacked
+residual, condense the resulting stacked Jacobian afterwards:
 
 ```julia
 ue = a[interfacedofs(ic)]
 Ke = ForwardDiff.jacobian(u -> stacked_residual(u, ic, iv_u, iv_P), ue)
-buf_dual = InterfaceAssemblyBuffer{eltype(Ke)}(max_nstacked_interface_dofs(dh))
-udofs, Kc = condense_interface!(buf_dual, ic, Ke)
+udofs, Kc = condense_interface!(buf, ic, Ke)
+```
+
+Route 2 — the residual function itself condenses through the **vector-only method** with a
+dual-typed buffer and is differentiated with respect to the *unique* coefficients (gather
+`u_s = T u_u` through `stacked_to_unique`); by the chain rule the Jacobian is `Tᵀ Js T`
+directly:
+
+```julia
+function condensed_residual(uu)
+    ue = uu[ic.stacked_to_unique]                        # gather to the stacked layout
+    re = stacked_residual(ue, ic, iv_u, iv_P)            # dual-valued under ForwardDiff
+    _, fc = condense_interface!(buf_dual, ic, re)        # buf_dual: dual element type
+    return copy(fc)
+end
+uu = a[unique_interfacedofs(ic)]
+Ju = ForwardDiff.jacobian(condensed_residual, uu)        # nu × nu, assembles with udofs
 ```
 
 ### (c) Sparsity pattern for the mixed case
@@ -648,7 +665,9 @@ v1's boundary and already tested by it.
 ## AD and performance
 
 1. Stacked-residual Jacobian condensed vs differentiation w.r.t. unique coefficients through
-   the gather `u_s = T u_u` — equal up to roundoff.
+   the gather `u_s = T u_u` — equal up to roundoff. Both AD routes: condense-the-Jacobian
+   (matrix method, Float64 buffer) and differentiate-the-condensed-residual (vector-only
+   method executed inside the dual-valued closure with a dual-typed buffer).
 2. Benchmark: unchanged cell assembly (generic hot path untouched), pure DG interface
    assembly (raw path unchanged; condensed path = one `ns²` copy), mixed H1/L2 assembly,
    and (v2) the merged wrapper. Type stability of `condense_interface!` asserted with
@@ -667,6 +686,34 @@ standalone fix: it repairs storage traversal only — not sizing, not constraint
 flux kernel above still assembles silently wrong. It also costs a comparison per matched entry
 in the hottest loop and needs delicate `SymmetricCSCAssembler` diagonal handling. Its
 diagnostics idea survives in v1 (both-facts error message).
+
+## Rejected after benchmarking: fold-on-write mapped accumulator
+
+A fourth point in the design space, prototyped and benchmarked (2026-09-05, script
+`bench_interface_wrapper.jl`, not committed): a `MappedInterfaceMatrix`/`-Vector` —
+deliberately *not* `<: AbstractArray` — holding the buffer's `nu²` storage plus a borrowed
+`stacked_to_unique`, mapping stacked indices to unique slots in `getindex`/`setindex!`.
+Kernels are character-identical (stacked indices from `dof_range` as in v1), `Ke[I, J] += v`
+folds on write (read-add-write of the aliased slot is exactly slot accumulation), and the
+separate `Tᵀ Ke T` pass disappears. Unlike B′ there is only one index space in the kernel,
+so the first review's main objection does not apply.
+
+Benchmark (mixed continuous-`u`/DG-`P` kernel, full mask, min over 20 reps):
+
+| Case                     | ns→nu | end-to-end vs condense-after | kernel-only vs dense |
+|--------------------------|-------|------------------------------|----------------------|
+| 100×100 quads, u=P1      | 16→14 | +4.9%                        | +19.6%               |
+| 100×100 quads, u=P2      | 26→23 | +2.7%                        | +18.8%               |
+| 60×60 quads, u=P3        | 40→36 | −0.2%                        | +19.9%               |
+
+Rejected: the two extra `Int` loads per kernel write cost a steady ~19–20% in the hot
+quadrature loop (`O(nqp · ns²)` writes) and defeat inner-loop vectorization, while the
+`O(ns²)` condense pass they replace is contiguous, SIMD-friendly, and amortized over `nqp`
+sweeps — the trade never wins and only breaks even at high order. Additional strikes:
+aliased reads make it a write-accumulator rather than a faithful matrix (plain `=`
+assignment silently clobbers across the aliased copies), and AD residual closures need real
+arrays. The idea survives where it is inherent: the GPU matrix-free path (gather/scatter
+with duplicated indices) computes the same fold implicitly.
 
 ## Rejected: Option B′ — unique-mapped writes inside the kernel
 
