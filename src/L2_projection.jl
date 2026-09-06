@@ -357,7 +357,9 @@ function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandle
 
         # Assemble cell contribution
         for (num, dof) in enumerate(celldofs(cell))
-            f[dof, :] += fe[num, :]
+            for j in axes(f, 2)
+                f[dof, j] += fe[num, j]
+            end
         end
     end
     return
