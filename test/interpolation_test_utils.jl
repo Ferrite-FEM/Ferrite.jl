@@ -69,7 +69,7 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
         Ferrite.mapping_type(ip) # Dry-run just to catch if it isn't defined
         @test Ferrite.conformity(ip) isa Union{Ferrite.L2Conformity, Ferrite.HdivConformity, Ferrite.HcurlConformity, Ferrite.H1Conformity}
 
-        # Test F: dof functionals
+        # Dof functionals and point-value duality
         fs = Ferrite.dof_functionals(ip)
         @test fs isa NTuple{getnbasefunctions(ip), DofFunctional}
         if all(f -> f isa PointValue, fs)
@@ -80,13 +80,6 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
             for j in 1:getnbasefunctions(ip), i in 1:getnbasefunctions(ip)
                 Nij = Ferrite.reference_shape_value(ip, coords[j], i)
                 @test isapprox(Nij, i == j ? one(Nij) : zero(Nij); atol = 200 * eps(Float64))
-            end
-        else
-            # Moment-type layouts must have uniform per-entity signatures so that dof
-            # distribution can compare them entity-wise
-            for entity_functionals in (Ferrite.vertexdof_functionals, Ferrite.edgedof_functionals, Ferrite.facedof_functionals, Ferrite.facetdof_functionals)
-                sigs = unique(filter(!isempty, collect(entity_functionals(ip))))
-                @test length(sigs) <= 1
             end
         end
     end

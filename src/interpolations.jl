@@ -87,7 +87,7 @@ function conformity end
 Supertype for the dof functional ℓᵢ of local shape function `i` of an interpolation,
 queryable with [`Ferrite.dof_functionals`](@ref). The functional describes only the kind
 of dof; the owning topological entity is given by the entity dof-index functions and the
-point of a point-supported dof `i` by `reference_coordinates(ip)[i]`.
+point of a point-supported scalar dof `i` by `reference_coordinates(ip)[i]`.
 
 Subtypes: [`PointValue`](@ref), [`PointDerivative`](@ref), the [`IntegralMoment`](@ref)
 family ([`NormalMoment`](@ref), [`TangentialMoment`](@ref), [`InteriorMoment`](@ref)),
@@ -109,16 +109,21 @@ Base.show(io::IO, ::PointValue) = print(io, "PointValue()")
     PointDerivative(α)
 
 Dof functional for a point evaluation of a derivative: ℓ(f) = ∂^|α|f/∂x^α at xᵢ, with
-multi-index `α`, e.g. `PointDerivative((1,))` for du/dx in 1D or `PointDerivative((1, 1))`
-for ∂²u/∂x∂y. The point xᵢ is given by `reference_coordinates`, but the derivative is with
-respect to physical coordinates so that the dof is cell-invariant on shared entities.
+nonnegative multi-index `α` of positive total order, e.g. `PointDerivative((1,))` for
+du/dx in 1D or `PointDerivative((1, 1))` for ∂²u/∂x∂y. The point xᵢ is given by
+`reference_coordinates`, but the derivative is with respect to physical coordinates so
+that the dof is cell-invariant on shared entities.
 The first type parameter is the derivative order |α|, so the types `PointDerivative` and
 `PointDerivative{1}` can be used as selectors for every derivative and every first
 derivative, respectively (cf. [`Ferrite.matches_functional`](@ref)).
 """
-struct PointDerivative{order, N} <: DofFunctional
-    α::NTuple{N, Int}
-    PointDerivative(α::NTuple{N, Int}) where {N} = new{sum(α), N}(α)
+struct PointDerivative{order, dim} <: DofFunctional
+    α::NTuple{dim, Int}
+    function PointDerivative(α::NTuple{dim, Int}) where {dim}
+        all(>=(0), α) && any(>(0), α) ||
+            throw(ArgumentError("a derivative multi-index must be nonnegative with positive total order"))
+        return new{sum(α), dim}(α)
+    end
 end
 Base.show(io::IO, f::PointDerivative) = print(io, "PointDerivative(", f.α, ")")
 
@@ -184,14 +189,13 @@ The `ScalarInterpolation` fallback returns all-[`PointValue`](@ref), correct for
 interpolations; scalar interpolations with other kinds of dofs (e.g. derivative dofs)
 must override this method. Interpolations subtyping `VectorInterpolation` directly (e.g.
 `RaviartThomas`) have no fallback and must always define it. The point of every
-point-supported dof `i` must be given by `reference_coordinates(ip)[i]`.
+point-supported dof `i` must be given by `reference_coordinates(ip)[i]`. For a
+`VectorizedInterpolation`, reference coordinates are stored once per scalar dof, so dof
+`i` uses `reference_coordinates(ip)[fld1(i, n_components(ip))]`.
 """
 dof_functionals(ip::ScalarInterpolation) = ntuple(_ -> PointValue(), getnbasefunctions(ip))
 
-# Selectors accepted by e.g. the `functional` keyword of `Dirichlet`: a functional
-# instance, a functional type acting as a wildcard, or a tuple of either. Tuple elements
-# must be checked with `_is_selector` at runtime, since e.g. `typeof((PointValue,))` is
-# `Tuple{DataType}` which no `Tuple{Vararg{Type{<:DofFunctional}}}` constraint covers.
+# Tuple elements need runtime validation: tuples of types have element type `DataType`.
 const DofFunctionalSelector = Union{DofFunctional, Type{<:DofFunctional}, Tuple}
 _is_selector(s) = s isa DofFunctional || (s isa Type && s <: DofFunctional)
 _selector_tuple(selector::Union{DofFunctional, Type{<:DofFunctional}}) = (selector,)

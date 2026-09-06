@@ -105,7 +105,8 @@ dofs, the derivatives can be prescribed with
 dbc = Dirichlet(:w, getfacetset(grid, "left"), Returns(0.0); functional = PointDerivative)
 ```
 
-where the type `PointDerivative` selects every derivative dof. `PointDerivative{1}` or
+Here `f` supplies the derivative value directly; Ferrite does not differentiate it.
+The type `PointDerivative` selects every derivative dof. `PointDerivative{1}` or
 `PointDerivative((1, 0))` narrow the selection to the first derivatives or to a single
 derivative, and a tuple of selectors, e.g.
 `functional = (PointDerivative((2, 0)), PointDerivative((0, 2)))`, constrains the union.

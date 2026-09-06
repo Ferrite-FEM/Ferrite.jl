@@ -17,7 +17,8 @@ wildcard, e.g. `functional = PointDerivative` selects all derivative dofs of a
 Hermite-type interpolation and `functional = PointDerivative{1}` its first derivatives,
 while `functional = PointDerivative((1, 0))` selects a single derivative and a tuple of
 selectors the union of its elements. For vectorized interpolations `functional` selects
-the kind of dof (the scalar functional) and `components` selects the direction.
+the kind of dof (the scalar functional) and `components` selects the direction. For a
+derivative dof, `f` returns the prescribed derivative value; it is not differentiated.
 
 The set, `∂Ω`, can be an `AbstractSet` or `AbstractVector` with elements of
 type [`FacetIndex`](@ref), [`FaceIndex`](@ref), [`EdgeIndex`](@ref), [`VertexIndex`](@ref),
@@ -446,13 +447,11 @@ end
 # facet `i` have dofs `local_facet_dofs[local_facet_dofs_offset[i]:local_facet_dofs_offset[i+1]-1]
 function _local_facet_dofs_for_bc(interpolation, field_dim, components, offset, boundaryfunc::F = dirichlet_facetdof_indices, functional = nothing) where {F}
     @assert issorted(components)
-    # `functional === nothing` means no filtering (the PeriodicDirichlet and
-    # ProjectedDirichlet callers); the filter must mirror the one in `BCValues` to keep
-    # the dof list and the pseudo quadrature points index-aligned
+    # Keep filtering aligned with BCValues; `nothing` leaves dofs unfiltered.
     functionals = functional === nothing ? nothing : dof_functionals(interpolation)
     local_facet_dofs = Int[]
     local_facet_dofs_offset = Int[1]
-    for (_, facet) in enumerate(boundaryfunc(interpolation))
+    for facet in boundaryfunc(interpolation)
         for fdof in facet
             if functionals !== nothing
                 matches_functional(functional, functionals[fdof]) || continue
@@ -1232,15 +1231,12 @@ function add!(ch::ConstraintHandler{<:Any, Tv, Ti}, dbc::Dirichlet) where {Tv, T
         end
         # Create BCValues for coordinate evaluation at dof-locations
         EntityType = eltype(dbc.facets) # (Facet|Face|Edge|Vertex)Index
-        # The selector is matched against the scalar functionals of the base interpolation;
-        # `components` selects the direction of a vectorized interpolation
         if any(s -> s isa VectorizedFunctional || (s isa Type && s <: VectorizedFunctional), _selector_tuple(dbc.functional))
             throw(ArgumentError("`functional` selects the scalar functional of a vectorized interpolation (got $(dbc.functional)); select the direction with `components` instead"))
         end
         fs = dof_functionals(interpolation)
         if EntityType <: Integer
-            # The node idx -> local dof idx assumption in the nodeset _add! below only
-            # holds for purely nodal interpolations
+            # The nodeset path assumes node indices correspond to local dof indices.
             all(f -> f isa PointValue, fs) ||
                 throw(ArgumentError("Dirichlet conditions on a nodeset are only supported for interpolations whose dofs are all point values (got $(field_interpolation)); use a facetset or vertexset instead."))
             if !any(f -> matches_functional(dbc.functional, f), fs)

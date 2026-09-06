@@ -244,6 +244,14 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         end
     end
 
+    @testset "Derivative multi-indices" begin
+        @test PointDerivative((1, 0)) isa PointDerivative{1, 2}
+        @test PointDerivative((1, 1)) isa PointDerivative{2, 2}
+        @test_throws ArgumentError PointDerivative((-1, 2))
+        @test_throws ArgumentError PointDerivative((0, 0))
+        @test_throws ArgumentError PointDerivative(())
+    end
+
     @testset "Dof functionals of vectorized interpolations" begin
         ip = Lagrange{RefTriangle, 1}()^2
         fs = Ferrite.dof_functionals(ip)

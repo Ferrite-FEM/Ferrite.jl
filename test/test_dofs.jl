@@ -14,6 +14,40 @@ function Ferrite.reference_coordinates(::OffCenterQuadraticTriangle)
     return [vertices; [vertices[a] + (vertices[b] - vertices[a]) / 3 for (a, b) in Ferrite.reference_edges(RefTriangle)]]
 end
 
+# A nodal layout with a different functional at each vertex.
+struct VertexFunctionalTriangle{F} <: ScalarInterpolation{RefTriangle, 1}
+    functionals::F
+end
+Ferrite.getnbasefunctions(::VertexFunctionalTriangle) = 3
+Ferrite.vertexdof_indices(::VertexFunctionalTriangle) = ((1,), (2,), (3,))
+Ferrite.edgedof_interior_indices(::VertexFunctionalTriangle) = ((), (), ())
+Ferrite.facedof_interior_indices(::VertexFunctionalTriangle) = ((),)
+Ferrite.reference_coordinates(::VertexFunctionalTriangle) = Ferrite.reference_coordinates(Lagrange{RefTriangle, 1}())
+Ferrite.dof_functionals(ip::VertexFunctionalTriangle) = ip.functionals
+Ferrite.adjust_dofs_during_distribution(::VertexFunctionalTriangle) = false
+
+@testset "Functionals on actual shared vertices" begin
+    nodes = [Node(Vec(x)) for x in ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0))]
+    grid = Grid([Triangle((1, 2, 3)), Triangle((2, 4, 3))], nodes)
+    value, derivative = PointValue(), PointDerivative((1, 0))
+
+    # Identical local layouts can disagree at a shared vertex with different local indices.
+    ip = VertexFunctionalTriangle((value, derivative, value))
+    dh = DofHandler(grid)
+    left, right = SubDofHandler(dh, Set(1)), SubDofHandler(dh, Set(2))
+    add!(left, :u, ip)
+    @test_throws "incompatible dof definitions on shared vertices" add!(right, :u, ip)
+
+    # Differences at the two unshared vertices do not prevent sharing the other dofs.
+    dh = DofHandler(grid)
+    left, right = SubDofHandler(dh, Set(1)), SubDofHandler(dh, Set(2))
+    add!(left, :u, VertexFunctionalTriangle((derivative, value, value)))
+    add!(right, :u, VertexFunctionalTriangle((value, derivative, value)))
+    close!(dh)
+    @test ndofs(dh) == 4
+    @test celldofs(dh, 1)[2:3] == celldofs(dh, 2)[[1, 3]]
+end
+
 @testset "DofHandler construction" begin
     grid = generate_grid(Quadrilateral, (2, 1))
     dh = DofHandler(grid)

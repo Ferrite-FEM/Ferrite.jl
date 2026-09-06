@@ -196,8 +196,7 @@ function BCValues(::Type{Tv}, ::Type{Ti}, func_interpol::Interpolation{refshape}
     # set up quadrature rules for each boundary entity with dof-positions
     # (determined by func_interpol) as the quadrature points
     interpolation_coords = reference_coordinates(func_interpol)
-    # `functional === nothing` means no filtering; the filter must mirror the one in
-    # `_local_facet_dofs_for_bc` to keep dof lists and quadrature points index-aligned
+    # Use the same filtering as `_local_facet_dofs_for_bc`.
     functionals = functional === nothing ? nothing : dof_functionals(func_interpol)
 
     qrs = QuadratureRule{refshape, Vector{Tv}, Vector{Vec{dim, Tv}}}[]

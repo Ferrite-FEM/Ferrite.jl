@@ -380,6 +380,12 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
     if name in sdh.dh.algebraic_names
         error("an algebraic variable with the name :$name already exists in the DofHandler; spatial fields and algebraic variables share one namespace")
     end
+    # Check the cell shape before comparing entity layouts.
+    refshape_sdh = getrefshape(getcells(sdh.dh.grid, first(sdh.cellset)))
+    if refshape_sdh !== getrefshape(ip)
+        error("The refshape of the interpolation $(getrefshape(ip)) is incompatible with the refshape $refshape_sdh of the cells.")
+    end
+
     # Verify that fields with the same name in other SubDofHandler have compatible
     # interpolation
     for _sdh in sdh.dh.subdofhandlers
@@ -396,91 +402,67 @@ function add!(sdh::SubDofHandler, name::Symbol, ip::Interpolation)
         end
     end
 
-    # Check that interpolation is compatible with cells it it added to
-    refshape_sdh = getrefshape(getcells(sdh.dh.grid, first(sdh.cellset)))
-    if refshape_sdh !== getrefshape(ip)
-        error("The refshape of the interpolation $(getrefshape(ip)) is incompatible with the refshape $refshape_sdh of the cells.")
-    end
-
     # Store in the SubDofHandler, it is collected to the parent DofHandler in close!.
     push!(sdh.field_names, name)
     push!(sdh.field_interpolations, ip)
     return sdh
 end
 
-# Dof distribution reuses entity dofs positionally. Check every entity class that may be
-# shared, including a 2D cell's interior face when coupled to a 3D cell.
-function _check_shared_dof_definitions(name::Symbol, ip::Interpolation, _ip::Interpolation, sdh::SubDofHandler, _sdh::SubDofHandler)
-    max_rdim = max(getrefdim(ip), getrefdim(_ip))
-    for (class, entity_dim, entity_functionals) in (
-            ("vertices", 0, vertexdof_functionals),
-            ("edges", 1, edgedof_functionals),
-            ("faces", 2, facedof_functionals),
+# Compare local entity layouts first; inspect the mesh only for potentially incompatible pairs.
+function _check_shared_dof_definitions(name::Symbol, ip::Interpolation, other_ip::Interpolation, sdh::SubDofHandler, other_sdh::SubDofHandler)
+    max_rdim = max(getrefdim(ip), getrefdim(other_ip))
+    for (entity_dim, entity_functionals) in (
+            (0, vertexdof_functionals), (1, edgedof_functionals), (2, facedof_functionals),
         )
         entity_dim < max_rdim || continue
-        functional_layouts = entity_functionals(ip)
-        _functional_layouts = entity_functionals(_ip)
-        sigs = unique(filter(!isempty, collect(functional_layouts)))
-        _sigs = unique(filter(!isempty, collect(_functional_layouts)))
-        # An entity carrying dofs from only one of the interpolations is never shared
-        (isempty(sigs) || isempty(_sigs)) && continue
-        _subdomains_share_entity(get_grid(sdh.dh), sdh.cellset, _sdh.cellset, entity_dim) || continue
-        compatible = if length(sigs) == 1 && length(_sigs) == 1
-            sigs[1] == _sigs[1]
-        else
-            # Entity-heterogeneous layouts can only be compared positionally
-            getrefshape(ip) === getrefshape(_ip) &&
-                collect(functional_layouts) == collect(_functional_layouts)
-        end
-        if compatible
-            positional = !(length(sigs) == 1 && length(_sigs) == 1)
-            compatible = _point_locations_compatible(get_base_interpolation(ip), get_base_interpolation(_ip), entity_dim, positional)
-        end
-        if !compatible
-            error(
-                "Field :$name has incompatible dof definitions on shared $class: " *
-                    "$(Tuple(sigs)) vs $(Tuple(_sigs)). Point dofs must have matching " *
-                    "entity-local coordinates; use a different field name."
-            )
-        end
+        layouts = entity_functionals(ip)
+        other_layouts = entity_functionals(other_ip)
+        (all(isempty, layouts) || all(isempty, other_layouts)) && continue
+
+        locations = _entity_point_locations(get_base_interpolation(ip), entity_dim)
+        other_locations = _entity_point_locations(get_base_interpolation(other_ip), entity_dim)
+        # An entity with dofs on only one side does not share any dof numbers.
+        compatible = [
+            isempty(a) || isempty(b) || (a == b && _same_point_locations(locations[i], other_locations[j]))
+                for (i, a) in pairs(layouts), (j, b) in pairs(other_layouts)
+        ]
+        all(compatible) && continue
+        pair = _incompatible_shared_entity(get_grid(sdh.dh), sdh.cellset, other_sdh.cellset, Val(entity_dim), compatible)
+        pair === nothing && continue
+        i, j = pair
+        entity_name = ("vertices", "edges", "faces")[entity_dim + 1]
+        error(
+            "Field :$name has incompatible dof definitions on shared $entity_name: " *
+                "$(layouts[i]) vs $(other_layouts[j]). Point dofs must have matching " *
+                "entity-local coordinates; use a different field name."
+        )
     end
     return
-end
-
-function _point_locations_compatible(ip::Interpolation, _ip::Interpolation, entity_dim::Int, positional::Bool)
-    locations = filter(!isempty, collect(_entity_point_locations(ip, entity_dim)))
-    _locations = filter(!isempty, collect(_entity_point_locations(_ip, entity_dim)))
-    # Moment weights and normalization are not modeled.
-    (
-        all(all(isnothing, location) for location in locations) &&
-            all(all(isnothing, location) for location in _locations)
-    ) && return true
-    if positional
-        length(locations) == length(_locations) || return false
-        return all(_same_point_locations(a, b) for (a, b) in zip(locations, _locations))
-    end
-    # Uniform layouts can be compared across different reference shapes.
-    all(_same_point_locations(first(locations), location) for location in locations) || return false
-    all(_same_point_locations(first(_locations), location) for location in _locations) || return false
-    return _same_point_locations(first(locations), first(_locations))
 end
 
 # Entity-local coordinates of the point-supported dofs (`nothing` for other dofs) of a
 # non-vectorized interpolation.
 function _entity_point_locations(ip::Interpolation, entity_dim::Int)
-    functionals = entity_dim == 0 ? vertexdof_functionals(ip) :
-        entity_dim == 1 ? edgedof_functionals(ip) : facedof_functionals(ip)
+    entity_functionals = (vertexdof_functionals, edgedof_functionals, facedof_functionals)[entity_dim + 1]
+    functionals = entity_functionals(ip)
     all(all(f -> !(f isa Union{PointValue, PointDerivative}), fs) for fs in functionals) &&
         return map(fs -> ntuple(_ -> nothing, length(fs)), functionals)
 
-    dof_indices = entity_dim == 0 ? vertexdof_indices(ip) :
-        entity_dim == 1 ? edgedof_interior_indices(ip) : facedof_interior_indices(ip)
+    entity_indices = (vertexdof_indices, edgedof_interior_indices, facedof_interior_indices)[entity_dim + 1]
+    dof_indices = entity_indices(ip)
     dof_coordinates = reference_coordinates(ip)
+    # Linear Lagrange nodes are the reference shape's vertices, regardless of the field interpolation.
     vertex_coordinates = reference_coordinates(Lagrange{getrefshape(ip), 1}())
-    reference_entities = entity_dim == 0 ? map(i -> (i,), reference_vertices(getrefshape(ip))) :
-        entity_dim == 1 ? reference_edges(getrefshape(ip)) : reference_faces(getrefshape(ip))
+    refshape = getrefshape(ip)
+    reference_entities = if entity_dim == 0
+        map(i -> (i,), reference_vertices(refshape))
+    elseif entity_dim == 1
+        reference_edges(refshape)
+    else
+        reference_faces(refshape)
+    end
     return map(functionals, dof_indices, reference_entities) do fs, dofs, entity_vertices
-        entity_coordinates = vertex_coordinates[[entity_vertices...]]
+        entity_coordinates = map(i -> vertex_coordinates[i], entity_vertices)
         return map(fs, dofs) do f, dof
             f isa Union{PointValue, PointDerivative} || return nothing
             return _entity_local_coordinate(dof_coordinates[dof], entity_coordinates, entity_dim)
@@ -521,30 +503,39 @@ function _same_point_coordinate(x::Tuple, y::Tuple)
     return all(isapprox(a, b) for (a, b) in zip(x, y))
 end
 
-# Only an actual shared entity can alias global dofs between two cellsets.
-function _subdomains_share_entity(grid::AbstractGrid, cellset, _cellset, entity_dim::Int)
-    entities = Set{Any}()
+# Keep all local entity indices: the same global vertex can have different local indices
+# in different cells of a subdomain.
+function _incompatible_shared_entity(grid::AbstractGrid, cellset, other_cellset, entity_dim::Val, compatible)
+    first_entity = first(_cell_entities(getcells(grid, first(cellset)), entity_dim))
+    Key = typeof(_canonical_entity(first_entity, entity_dim))
+    entities = Dict{Key, BitSet}()
     for cellid in cellset
-        for entity in _cell_entities(getcells(grid, cellid), entity_dim)
-            push!(entities, _canonical_entity(entity, entity_dim))
+        for (i, entity) in pairs(_cell_entities(getcells(grid, cellid), entity_dim))
+            all(@view compatible[i, :]) && continue
+            key = _canonical_entity(entity, entity_dim)
+            indices = get!(BitSet, entities, key)
+            push!(indices, i)
         end
     end
-    for cellid in _cellset
-        for entity in _cell_entities(getcells(grid, cellid), entity_dim)
-            _canonical_entity(entity, entity_dim) in entities && return true
+    for cellid in other_cellset
+        for (j, entity) in pairs(_cell_entities(getcells(grid, cellid), entity_dim))
+            key = _canonical_entity(entity, entity_dim)
+            indices = get(entities, key, nothing)
+            indices === nothing && continue
+            for i in indices
+                compatible[i, j] || return (i, j)
+            end
         end
     end
-    return false
+    return nothing
 end
 
 _cell_entities(cell, ::Val{0}) = vertices(cell)
 _cell_entities(cell, ::Val{1}) = edges(cell)
 _cell_entities(cell, ::Val{2}) = faces(cell)
-_cell_entities(cell, entity_dim::Int) = _cell_entities(cell, Val(entity_dim))
 _canonical_entity(entity, ::Val{0}) = entity
 _canonical_entity(entity, ::Val{1}) = first(sortedge(entity))
 _canonical_entity(entity, ::Val{2}) = first(sortface(entity))
-_canonical_entity(entity, entity_dim::Int) = _canonical_entity(entity, Val(entity_dim))
 
 """
     add!(dh::DofHandler, name::Symbol, ip::Interpolation)

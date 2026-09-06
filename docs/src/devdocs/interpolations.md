@@ -62,7 +62,8 @@ coordinates. Otherwise, `add!` errors instead of silently aliasing unrelated dof
 Moment functionals do not encode their weight or normalization, so equal signatures from
 different interpolation families do not guarantee identical functionals. A
 `VectorizedInterpolation` repeats each scalar-base functional with its vector direction
-in scalar-dof-major, direction-minor order.
+in scalar-dof-major, direction-minor order. Its `reference_coordinates` are stored once
+per scalar dof; vectorized dof `i` uses coordinate `fld1(i, n_components(ip))`.
 
 ```@docs; canonical=false
 Ferrite.DofFunctional
