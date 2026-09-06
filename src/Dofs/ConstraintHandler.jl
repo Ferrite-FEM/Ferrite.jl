@@ -1092,6 +1092,9 @@ function create_constraint_matrix(ch::ConstraintHandler{dh, T}) where {dh, T}
         dofcoef = ch.dofcoefficients[i]
         if dofcoef !== nothing #if affine constraint
             for (d, v) in dofcoef
+                # Prescribed masters are already included in the effective
+                # inhomogeneity computed by update!, not in the free-dof map.
+                ch.isconstrained[d] && continue
                 push!(I, pdof)
                 j = searchsortedfirst(ch.free_dofs, d)
                 push!(J, j)

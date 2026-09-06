@@ -1,6 +1,39 @@
 # Imports for parallel (isolated) test execution:
 using LinearAlgebra, SparseArrays, Logging
 
+@testset "constraint matrix with prescribed masters" begin
+    grid = generate_grid(Line, (2,))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefLine, 1}())
+    close!(dh)
+    for master in (1, 3), weight in (0.0, -2.0)
+        free = 4 - master
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(master, Pair{Int, Float64}[], 2.0))
+        entries = [master => 3.0]
+        iszero(weight) || push!(entries, free => weight)
+        add!(ch, AffineConstraint(2, entries, 1.0))
+        close!(ch)
+        C, g = Ferrite.create_constraint_matrix(ch)
+        @test size(C) == (3, 1)
+        for value in (0.0, 5.0)
+            u = zeros(3)
+            u[free] = value
+            apply!(u, ch)
+            @test C * [value] + g == u
+        end
+    end
+
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint(1, Pair{Int, Float64}[], 2.0))
+    add!(ch, AffineConstraint(2, [1 => 3.0], 1.0))
+    add!(ch, AffineConstraint(3, Pair{Int, Float64}[], 5.0))
+    close!(ch)
+    C, g = Ferrite.create_constraint_matrix(ch)
+    @test size(C) == (3, 0)
+    @test C * Float64[] + g == apply!(zeros(3), ch)
+end
+
 # Minimal atomic assembler used to verify that `apply_assemble!` propagates its atomic
 # mode into the non-local constraint condensation before regular assembly.
 struct AtomicApplyAssembler{M, V} <: Ferrite.AbstractAssembler{Float64}
