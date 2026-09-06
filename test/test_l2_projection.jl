@@ -3,6 +3,37 @@ using LinearAlgebra
 import SHA
 import Ferrite: getrefdim
 
+@testset "complex L2 projection" begin
+    for nonconforming in (false, true)
+        grid = generate_grid(Quadrilateral, (2, 2))
+        if nonconforming
+            forest = ForestBWG(grid, 3)
+            Ferrite.refine!(forest, [1])
+            Ferrite.balanceforest!(forest)
+            grid = Ferrite.creategrid(forest)
+        end
+        ip = Lagrange{RefQuadrilateral, 1}()
+        qr = QuadratureRule{RefQuadrilateral}(2)
+        cv = CellValues(qr, ip)
+        proj = L2Projector(ip, grid)
+        for T in (ComplexF32, ComplexF64), value_shape in (identity, z -> Vec((z, 2z)), z -> SymmetricTensor{2, 2}((z, 2z, 3z)))
+            f(x) = value_shape(T(1 + x[1] + (2 - x[2]) * im))
+            data = map(1:getncells(grid)) do cellid
+                coords = getcoordinates(grid, cellid)
+                reinit!(cv, coords)
+                [f(spatial_coordinate(cv, qp, coords)) for qp in 1:getnquadpoints(cv)]
+            end
+            projected = project(proj, data, qr)
+            @test eltype(projected) == typeof(f(zero(Vec{2})))
+            for cell in CellIterator(proj.dh)
+                for (dof, x) in zip(celldofs(cell), getcoordinates(cell))
+                    @test all(a ≈ b for (a, b) in zip(projected[dof], f(x)))
+                end
+            end
+        end
+    end
+end
+
 # Tests a L2-projection of integration point values (to nodal values),
 # determined from the function y = 1 + x[1]^2 + (2x[2])^2
 function test_projection(order, refshape)

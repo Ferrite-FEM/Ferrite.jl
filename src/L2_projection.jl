@@ -296,7 +296,7 @@ function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDic
 end
 
 function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Union{AbstractVector, AbstractDict}, M::Integer, ::Type{T}) where {T}
-    f = zeros(ndofs(proj.dh), M)
+    f = zeros(promote_type(eltype(proj.M_cholesky), eltype(T)), ndofs(proj.dh), M)
     for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
         ip_fun = only(sdh.field_interpolations)
         ip_geo = geometric_interpolation(getcelltype(sdh))
@@ -331,7 +331,7 @@ function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandle
     # The number of columns corresponds to the length of the data-tuple in the tensor x̂.
     M = size(f, 2)
     n = getnbasefunctions(cellvalues)
-    fe = zeros(n, M)
+    fe = zeros(eltype(f), n, M)
     nqp = getnquadpoints(cellvalues)
 
     get_data(x::AbstractTensor, i) = x.data[i]
