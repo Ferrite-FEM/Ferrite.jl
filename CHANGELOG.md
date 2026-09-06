@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v1.7.0] - 2026-08-31
+## [Next] - xxxx-xx-xx
 
 ### Added
  - Each local dof of an interpolation now has a queryable *dof functional* describing
@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    dof definitions on shared entities (different functionals, counts, or point locations;
    e.g. `Lagrange^2` vs `RaviartThomas`, or `Lagrange` of order 2 vs 3) is now an error
    instead of silently assigning the same dof numbers to unrelated dofs. ([#1493])
+
+## [v1.7.0] - 2026-08-31
+
+### Added
  - Added mesh-free [`AlgebraicVariable`s](https://ferrite-fem.github.io/Ferrite.jl/dev/topics/algebraic_variables/)
    and coupling descriptors for small global unknowns such as Lagrange multipliers and
    homogenized quantities. See the documentation for details. ([#1422])
