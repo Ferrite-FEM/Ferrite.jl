@@ -256,3 +256,37 @@ using Ferrite: reference_shape_value
         end
     end
 end
+
+
+@testset "Adapt Quadrature Rule to Macro Element" begin
+    # Integrate f(x) = x[1] + x[2] over the element, with both the macro element and the sub element and compare results.
+    for ip_macro in (P1isoP2{RefLine, 1}(), P1isoP2{RefTriangle, 1}(), P1isoP2{RefQuadrilateral, 1}())
+        ip_macro = P1isoP2{RefLine, 1}()
+        shape = Ferrite.getrefshape(ip_macro)
+        ip_sub = Lagrange{shape, 1}()
+        macro_coords = [x + 0.01 * rand(x) for x in Ferrite.reference_coordinates(ip_sub)]
+
+        qr_base = QuadratureRule{shape}(2)
+        qr_macro = adapt_quadrature_rule_to_macro_element(qr_base, ip_macro)
+        cv_macro = CellValues(qr_macro, ip_macro)
+        cv_sub = CellValues(qr_base, ip_sub)
+
+        #Macro integral
+        macro_integral = 0.0
+        reinit!(cv_macro, macro_coords)
+        for iqp in 1:getnquadpoints(cv_macro)
+            macro_integral += sum(spatial_coordinate(cv_macro, iqp, macro_coords)) * getdetJdV(cv_macro, iqp)
+        end
+
+        #Sub integral
+        sub_integral = 0.0
+        for coords_sub_ref in Ferrite.get_sub_elements(ip_macro)
+            coords_sub = [spatial_coordinate(ip_sub, ξ, macro_coords) for ξ in coords_sub_ref]
+            reinit!(cv_sub, coords_sub)
+            for iqp in 1:getnquadpoints(cv_sub)
+                sub_integral += sum(spatial_coordinate(cv_sub, iqp, coords_sub)) * getdetJdV(cv_sub, iqp)
+            end
+        end
+        @test macro_integral ≈ sub_integral
+    end
+end

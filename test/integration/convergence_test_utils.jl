@@ -23,6 +23,7 @@ get_quadrature_order(::Serendipity{shape, order}) where {shape, order} = max(2 *
 get_quadrature_order(::CrouzeixRaviart{shape, order}) where {shape, order} = max(2 * order - 1, 2)
 get_quadrature_order(::RannacherTurek{shape, order}) where {shape, order} = max(2 * order - 1, 2)
 get_quadrature_order(::BubbleEnrichedLagrange{shape, order}) where {shape, order} = max(2 * order - 1, 2)
+get_quadrature_order(::P1isoP2{shape, order}) where {shape, order} = 2
 
 get_num_elements(::Ferrite.Interpolation{shape, 1}) where {shape} = 21
 get_num_elements(::Ferrite.Interpolation{shape, 2}) where {shape} = 7
@@ -167,6 +168,9 @@ function run_convergence_analysis(interpolation)
         qr_order = get_quadrature_order(interpolation)
         qr_name = get_quadrature_rule_name(getrefshape(interpolation), qr_order)
         qr = QuadratureRule{getrefshape(interpolation)}(qr_name, qr_order)
+        if Ferrite.is_macro_element(interpolation)
+            qr = adapt_quadrature_rule_to_macro_element(qr, interpolation)
+        end
         # ... and then pray to the gods of convergence.
         dh, ch, cellvalues = setup_poisson_problem(grid, interpolation, interpolation_geo, qr)
         u = solve(dh, ch, cellvalues)

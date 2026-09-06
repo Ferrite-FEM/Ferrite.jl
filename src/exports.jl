@@ -20,6 +20,7 @@ export
     Nedelec,
     RaviartThomas,
     BrezziDouglasMarini,
+    P1isoP2,
     getnbasefunctions,
     getrefshape,
 
@@ -27,6 +28,7 @@ export
     QuadratureRule,
     FacetQuadratureRule,
     getnquadpoints,
+    adapt_quadrature_rule_to_macro_element,
 
     # FEValues
     AbstractCellValues,

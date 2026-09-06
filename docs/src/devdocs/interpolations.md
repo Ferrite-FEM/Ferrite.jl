@@ -47,6 +47,13 @@ Ferrite.mapping_type
 Ferrite.get_direction
 ```
 
+#### Macro elements
+For macro elements, you must also define
+```@docs
+Ferrite.is_macro_element
+Ferrite.get_sub_elements
+```
+
 #### Interpolations that cannot be constructed from their type
 For interpolations, `ip`, for which `ip == typeof(ip)()` is false (or doesn't work), the following must be implemented manually
 ```@docs

@@ -51,6 +51,10 @@ using Ferrite: reference_shape_value, reference_shape_gradient
             CrouzeixRaviart{RefTetrahedron, 1}(),
             RannacherTurek{RefQuadrilateral, 1}(),
             RannacherTurek{RefHexahedron, 1}(),
+            #
+            P1isoP2{RefLine, 1}(),
+            P1isoP2{RefTriangle, 1}(),
+            P1isoP2{RefQuadrilateral, 1}(),
         )
         # Standard test all base interpolations must fulfill
         test_interpolation_properties(interpolation)

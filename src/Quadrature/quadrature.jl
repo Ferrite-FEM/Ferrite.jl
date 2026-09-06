@@ -322,3 +322,54 @@ getrefshape(::QuadratureRule{RefShape}) where {RefShape} = RefShape
 
 # TODO: This is used in copy(::(Cell|Facet)Values), but it it useful to get an actual copy?
 Base.copy(qr::Union{QuadratureRule, FacetQuadratureRule}) = qr
+
+"""
+    adapt_quadrature_rule_to_macro_element(qr::QuadratureRule, ip::Interpolation)
+
+Adapt a standard quadrature rule `qr` for a macro-element `ip` by duplicating
+and mapping it to all sub-elements that comprise the macro-element.
+
+Both the integration points and weights are adjusted: points are mapped into the
+respective sub-element's local reference space, and weights are scaled by the
+determinant of the Jacobian of the sub-element mapping. The resulting quadrature rule 
+conforms to the macro-element's coordinate system and size.
+"""
+function adapt_quadrature_rule_to_macro_element(qr::QuadratureRule{shape}, ip::P1isoP2{shape}) where {shape}
+    @assert is_macro_element(ip)
+    sub_elements = get_sub_elements(ip)
+    geo_ip = Lagrange{shape, 1}()
+
+    T = eltype(qr.points)
+    dim = length(first(qr.points))
+
+    new_weights = Float64[]
+    new_points = T[]
+
+    for sub_coords in sub_elements
+        for (w, p) in zip(qr.weights, qr.points)
+
+            # 1. Map standard integration point `p` into the sub-element's space
+            mapped_p = zero(T)
+            for i in 1:length(sub_coords)
+                N_i = reference_shape_value(geo_ip, p, i)
+                mapped_p += N_i * sub_coords[i]
+            end
+
+            # 2. Compute Jacobian of the affine mapping to scale the weight correctly
+            # J = dx/dξ = sum( V_i ⊗ ∇N_i )
+            J_mat = zero(Tensor{2, dim, Float64})
+            for i in 1:length(sub_coords)
+                dN_i = reference_shape_gradient(geo_ip, p, i)
+                J_mat += sub_coords[i] ⊗ dN_i
+            end
+
+            # 3. Apply the determinant mapping factor to the quadrature weight
+            detJ = det(J_mat)
+
+            push!(new_points, mapped_p)
+            push!(new_weights, w * detJ)
+        end
+    end
+
+    return QuadratureRule{shape}(new_weights, new_points)
+end
