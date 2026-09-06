@@ -616,6 +616,7 @@ conditions specified in `ch` such that `K \\ rhs` gives the expected solution.
 SparseMatricesCSR loaded) or a `BlockMatrix` of any of these (with BlockArrays loaded). Other
 matrix types are supported as soon as they implement the internal constraint interface, see
 [the devdocs on assembly](@ref devdocs-assembly).
+Symmetric matrices backed by `SparseMatrixCSC` must use upper-triangle storage (`Symmetric(K, :U)`).
 
 !!! note
     `apply!(K, rhs, ch)` essentially calculates
@@ -721,6 +722,7 @@ end
 function apply!(KK::AbstractMatrix, f::AbstractVector, ch::ConstraintHandler, applyzero::Bool = false)
     @assert isclosed(ch)
     sym = isa(KK, Symmetric)
+    KK isa Symmetric{<:Any, <:SparseMatrixCSC} && _check_upper_triangle(KK)
     K = sym ? KK.data : KK
     @assert length(f) == 0 || length(f) == size(K, 1)
     @boundscheck checkbounds(K, ch.prescribed_dofs, ch.prescribed_dofs)
@@ -826,6 +828,7 @@ function _add_inhomogeneities_minors!(f::AbstractVector, K::AbstractSparseMatrix
 end
 
 function add_inhomogeneities!(f::AbstractVector, KK::Symmetric{<:Any, <:SparseMatrixCSC}, ch::ConstraintHandler)
+    _check_upper_triangle(KK)
     (; inhomogeneities, prescribed_dofs, dofmapping) = ch
     K = KK.data
 

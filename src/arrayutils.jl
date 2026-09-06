@@ -169,3 +169,8 @@ function fillzero!(A::Symmetric{T, <:AbstractSparseMatrix}) where {T}
     fillzero!(A.data)
     return A
 end
+
+function _check_upper_triangle(K::Symmetric)
+    K.uplo == 'U' || throw(ArgumentError("Only upper-triangle Symmetric storage is supported. Use Symmetric(K, :U)."))
+    return
+end

@@ -1,6 +1,24 @@
 # Imports for parallel (isolated) test execution:
 using LinearAlgebra, SparseArrays, Logging
 
+@testset "symmetric constraint storage validation" begin
+    grid = generate_grid(Line, (1,))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefLine, 1}())
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint(1, Pair{Int, Float64}[], 2.0))
+    close!(ch)
+    K = Symmetric(sparse([1.0 2.0; 2.0 3.0]), :L)
+    f = [4.0, 5.0]
+    @test_throws ArgumentError apply!(K, f, ch)
+    @test_throws ArgumentError apply_zero!(K, f, ch)
+    @test_throws ArgumentError apply!(K, ch)
+    @test_throws ArgumentError Ferrite.add_inhomogeneities!(f, K, ch)
+    @test parent(K) == [1.0 2.0; 2.0 3.0]
+    @test f == [4.0, 5.0]
+end
+
 @testset "constraint matrix with prescribed masters" begin
     grid = generate_grid(Line, (2,))
     dh = DofHandler(grid)

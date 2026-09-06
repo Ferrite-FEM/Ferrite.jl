@@ -255,6 +255,7 @@ Create a `CSCAssembler{Tv}` from the matrix `K` and optional vector `f` with val
     start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}, f::Vector = Tv[]; fillzero = true, atomic = false) -> SymmetricCSCAssembler{Tv}
 
 Create a `SymmetricCSCAssembler{Tv}` from the matrix `K` and optional vector `f` with value type `Tv`.
+Only upper-triangle storage (`Symmetric(K, :U)`) is supported.
 
 `CSCAssembler` and `SymmetricCSCAssembler` allocate workspace
 necessary for efficient matrix assembly. To assemble the contribution from an element, use
@@ -290,6 +291,7 @@ Base.@constprop :aggressive function start_assemble(K::AbstractSparseMatrixCSC{T
     return CSCAssembler{T, Ti, typeof(K), atomic}(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 Base.@constprop :aggressive function start_assemble(K::Symmetric{T, <:SparseMatrixCSC{T, Ti}}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T, Ti}
+    _check_upper_triangle(K)
     _check_atomic_eltype(atomic, T)
     fillzero && (fillzero!(K); fillzero!(f))
     permutation = zeros(Int, maxcelldofs_hint)

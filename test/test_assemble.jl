@@ -1,6 +1,16 @@
 using Ferrite, SparseArrays
 import LinearAlgebra: Symmetric
 
+@testset "symmetric assembly storage validation" begin
+    for atomic in (false, true), fillzero in (false, true)
+        K = Symmetric(sparse([1.0 2.0; 2.0 3.0]), :L)
+        f = [4.0, 5.0]
+        @test_throws ArgumentError start_assemble(K, f; atomic, fillzero)
+        @test parent(K) == [1.0 2.0; 2.0 3.0]
+        @test f == [4.0, 5.0]
+    end
+end
+
 @testset "symmetric assembly dof validation" begin
     K = Symmetric(sparse(ones(4, 4)))
     f = ones(4)
