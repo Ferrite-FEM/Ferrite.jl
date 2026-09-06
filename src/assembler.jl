@@ -383,6 +383,33 @@ end
 # search instead of the linear merge walk in `_assemble_inner!`.
 const SPARSE_COLUMN_SEARCH_RATIO = 8
 
+@inline function _has_repeated_dofs(sorteddofs)
+    repeated = false
+    @inbounds @simd for i in 2:length(sorteddofs)
+        repeated |= sorteddofs[i] == sorteddofs[i - 1]
+    end
+    return repeated
+end
+
+# Repeated interface dofs need multiple additions into the same stored entry.
+# Use independent lookups for this uncommon case, leaving the merge walk for
+# ordinary elements unchanged. Test the global triangle, including every local
+# contribution to a repeated global diagonal dof.
+@noinline function _assemble_repeated!(K, Ke, sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
+    for (j, col) in pairs(sortedcoldofs), (i, row) in pairs(sortedrowdofs)
+        sym && row > col && continue
+        val = Ke[rowpermutation[i], colpermutation[j]]
+        iszero(val) && continue
+        try
+            addindex!(K, convert(eltype(K), val), row, col, atomic)
+        catch err
+            err isa SparsityError || rethrow()
+            _missing_sparsity_pattern_error(row + rowoffset, col + coloffset)
+        end
+    end
+    return
+end
+
 """
     Ferrite._assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
 
@@ -391,7 +418,7 @@ Scatter the element matrix `Ke` into the (already allocated) entries of `K`, i.e
 and sorted ascending (`sortedrowdofs`, `sortedcoldofs`), the latter together with the
 permutations mapping a sorted position back to its index in `Ke`, so that a format storing
 its entries in sorted order can walk them and the element matrix in a single pass. If `sym`
-is `true` only the upper triangle of `Ke` is read. `atomic` is a `Val{Bool}` selecting
+is `true` only contributions to the global upper triangle are read. `atomic` is a `Val{Bool}` selecting
 whether the accumulation is concurrency safe.
 
 `rowoffset` and `coloffset` place the matrix within a larger system; they are only used to
@@ -425,6 +452,10 @@ end
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
         sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
     )
+    if _has_repeated_dofs(sortedrowdofs)
+        return _assemble_repeated!(K, Ke, sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
+    end
+
     current_col = 1
     Krows = rowvals(K)
     Kvals = nonzeros(K)

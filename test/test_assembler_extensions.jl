@@ -2,6 +2,26 @@ using Ferrite
 import SparseMatricesCSR: SparseMatrixCSR, sparsecsr
 using SparseArrays, LinearAlgebra
 
+@testset "CSR assembly with repeated dofs" begin
+    for mode in (:dense, :merge, :binary), atomic in (false, true)
+        rdofs, cdofs = [3, 1, 3], [2, 4, 2, 1]
+        pattern = mode === :dense ? ones(40, 40) : zeros(40, 40)
+        if mode === :binary
+            pattern[:, 1:39] .= 1
+        else
+            pattern[rdofs, cdofs] .= 1
+        end
+        K = SparseMatrixCSR(sparse(pattern))
+        Ke = reshape(1.0:12.0, 3, 4)
+        expected = zeros(40, 40)
+        for (j, J) in pairs(cdofs), (i, I) in pairs(rdofs)
+            expected[I, J] += Ke[i, j]
+        end
+        assemble!(start_assemble(K; atomic), rdofs, cdofs, Ke)
+        @test K == expected
+    end
+end
+
 @testset "SparseMatricesCSR extension" begin
 
     @testset "apply!(::SparseMatrixCSR,...)" begin

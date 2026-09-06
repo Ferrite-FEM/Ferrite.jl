@@ -18,6 +18,10 @@ end
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
         sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
     )
+    if Ferrite._has_repeated_dofs(sortedcoldofs)
+        return Ferrite._assemble_repeated!(K, Ke, sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
+    end
+
     current_row = 1
     ld = length(coldofs)
     ncols = size(K, 2)
