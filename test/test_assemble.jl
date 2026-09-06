@@ -1,6 +1,30 @@
 using Ferrite, SparseArrays
 import LinearAlgebra: Symmetric
 
+@testset "symmetric assembly dof validation" begin
+    K = Symmetric(sparse(ones(4, 4)))
+    f = ones(4)
+    a = start_assemble(K, f; fillzero = false)
+    for (rdofs, cdofs) in (([1, 2], [3, 4]), ([1], [2, 3]), ([1, 2, 3], [4]))
+        @test_throws ArgumentError assemble!(a, rdofs, cdofs, ones(length(rdofs), length(cdofs)), ones(length(rdofs)))
+        @test all(isone, K)
+        @test all(isone, f)
+    end
+    @test_throws ArgumentError assemble!(a, [1, 2], ones(2, 3), ones(2))
+    @test all(isone, K)
+    @test all(isone, f)
+
+    # Equal but distinct vectors must use the same local ordering and triangle.
+    a = start_assemble(K, f)
+    dofs = [3, 1]
+    Ke = [2.0 4.0; 4.0 6.0]
+    assemble!(a, dofs, copy(dofs), Ke, [7.0, 8.0])
+    expected = zeros(4, 4)
+    expected[dofs, dofs] = Ke
+    @test K == expected
+    @test f == [8.0, 0.0, 7.0, 0.0]
+end
+
 @testset "assemble" begin
     dofs = [1, 3, 5, 7]
     maxd = maximum(dofs)

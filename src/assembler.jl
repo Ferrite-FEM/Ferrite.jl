@@ -316,6 +316,9 @@ This is equivalent to `K[dofs, dofs] += Ke` and `f[dofs] += fe`, where `K` is th
 Assemble the element stiffness matrix `Ke` (and optional force vector `fe`) into the global
 stiffness (and force) in `A`, given the element row degrees of freedom, `rowdofs`, and element column degrees of freedom, `coldofs`.
 This is equivalent to `K[rowdofs, coldofs] += Ke` and `f[rowdofs] += fe`, but more efficient.
+
+For a symmetric assembler, `rowdofs` and `coldofs` must be equal. To assemble
+rectangular blocks with different row and column dofs, use a nonsymmetric assembler.
 """
 assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix, ::AbstractVector)
 
@@ -327,7 +330,12 @@ end
     return _assemble!(A, rowdofs, coldofs, Ke, fe, false)
 end
 @propagate_inbounds function assemble!(A::SymmetricCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
+    size(Ke, 1) == size(Ke, 2) || throw(ArgumentError("Ke must be square for symmetric assembly."))
     return _assemble!(A, dofs, dofs, Ke, fe, true)
+end
+@propagate_inbounds function assemble!(A::SymmetricCSCAssembler, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
+    rowdofs == coldofs || throw(ArgumentError("Symmetric assembly requires equal row and column dofs. Use a nonsymmetric assembler for rectangular blocks."))
+    return assemble!(A, rowdofs, Ke, fe)
 end
 
 """
