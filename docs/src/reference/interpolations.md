@@ -5,6 +5,9 @@ DocTestSetup = :(using Ferrite)
 
 # [Interpolations](@id reference-interpolation)
 
+For visual definitions, selectable SVG basis plots, and dof diagrams,
+see the [element atlas](@ref element-atlas).
+
 ```@docs
 Interpolation
 getnbasefunctions(::Interpolation)
