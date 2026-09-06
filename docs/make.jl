@@ -25,6 +25,10 @@ haskey(ENV, "GKSwstype") || (ENV["GKSwstype"] = "100")
 # Generate tutorials and how-to guides
 include("generate.jl")
 
+# Reference-element pages and SVGs, evaluated from this checkout's interpolations.
+include("element_atlas/generate.jl")
+element_atlas_pages = @timeit dto "element atlas" ElementAtlas.generate()
+
 # Changelog
 Changelog.generate(
     Changelog.Documenter(),
@@ -47,6 +51,8 @@ codeblocks_plugin = CodeBlocks(
     format = Documenter.HTML(
         assets = [
             "assets/custom.css",
+            "assets/element-atlas.css",
+            "assets/element-atlas.js",
             "assets/favicon.ico",
         ],
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
@@ -94,6 +100,7 @@ codeblocks_plugin = CodeBlocks(
             "topics/export.md",
             "topics/amr.md",
         ],
+        "Element atlas" => element_atlas_pages,
         "API reference" => [
             "Reference overview" => "reference/index.md",
             "reference/quadrature.md",

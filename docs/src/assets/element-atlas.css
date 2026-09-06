@@ -1,0 +1,132 @@
+/* Scoped additions: inherit Documenter's fonts, math engine, and theme. */
+.atlas-kicker {
+    color: #00838a;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .13em;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+    margin: 1.2rem 0;
+}
+.atlas-kicker span, .atlas-tag {
+    color: inherit;
+    background: rgba(40, 151, 151, .1);
+    border: 1px solid rgba(40, 151, 151, .22);
+    padding: .3rem .65rem;
+    border-radius: 5px;
+    font-size: .72rem;
+    letter-spacing: .02em;
+    font-weight: 500;
+}
+#documenter .atlas-lead {
+    font-size: 1.65rem;
+    font-weight: 500;
+    line-height: 1.35;
+    max-width: 40rem;
+    margin: 1rem 0 1.5rem;
+}
+.atlas-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .6rem 1.4rem;
+    padding: 1rem 0;
+    border-block: 1px solid rgba(128, 128, 128, .2);
+    font-size: .82rem;
+    margin-bottom: 1rem;
+}
+.atlas-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1.35rem;
+    align-items: center;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid rgba(128, 128, 128, .2);
+}
+.atlas-card-image {
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid rgba(128, 128, 128, .2);
+}
+/* Crop the preview to the field panel; complete diagrams are on each page. */
+#documenter .atlas-card-image img {
+    width: 178%;
+    max-width: none;
+    vertical-align: middle;
+}
+#documenter .atlas-card-copy h3 { margin: .8rem 0 .5rem; }
+#documenter .atlas-card-copy p { font-size: .9rem; margin-bottom: .6rem; }
+#documenter .atlas-card-copy code { font-size: .7rem; overflow-wrap: anywhere; }
+.atlas-explorer {
+    margin: 1.5rem 0;
+    border: 1px solid rgba(128, 128, 128, .25);
+    border-radius: 14px;
+    overflow: hidden;
+}
+.atlas-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .7rem;
+    padding: 1rem 1.2rem;
+    border-bottom: 1px solid rgba(128, 128, 128, .2);
+    font-size: .85rem;
+}
+.atlas-controls[hidden], .atlas-basis[hidden] { display: none; }
+.atlas-controls label { font-weight: 600; }
+.atlas-controls select {
+    font: inherit;
+    color: inherit;
+    background-color: transparent;
+    border: 1px solid rgba(128, 128, 128, .5);
+    border-radius: 6px;
+    padding: .4rem .6rem;
+    max-width: 100%;
+}
+.atlas-controls select:focus-visible { outline: 3px solid #2caaa2; outline-offset: 3px; }
+.atlas-controls option { color: #243944; background: #f7fafb; }
+.atlas-counter { margin-left: auto; font-variant-numeric: tabular-nums; opacity: .7; }
+#documenter .atlas-basis figure { margin: 0; }
+#documenter .atlas-basis img { width: 100%; vertical-align: middle; }
+.atlas-diagram { position: relative; width: 100%; aspect-ratio: 960 / 440; line-height: 0; }
+.atlas-dof-controls { display: none; position: absolute; inset: 0; pointer-events: none; }
+.atlas-explorer[data-initialized] .atlas-dof-controls { display: block; }
+.atlas-dof-button {
+    position: absolute;
+    pointer-events: auto;
+    cursor: pointer;
+    padding: 0;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    touch-action: manipulation;
+}
+.atlas-dof-button:hover { background: rgba(40, 151, 151, .12); border-color: #2caaa2; }
+.atlas-dof-button:focus-visible { outline: 3px solid #2caaa2; outline-offset: 2px; }
+#documenter .atlas-basis figcaption {
+    margin: .75rem 1.2rem;
+    font-size: .8rem;
+    opacity: .8;
+}
+#documenter .atlas-download { margin: .75rem 1.2rem 1rem; font-size: .75rem; }
+#documenter .atlas-basis .math-container { margin-inline: 1.2rem; }
+#documenter :is(.atlas-figure, .atlas-card-image) img[src$="-dark.svg"] { display: none; }
+html:is(.theme--documenter-dark, .theme--catppuccin-frappe, .theme--catppuccin-macchiato, .theme--catppuccin-mocha) #documenter :is(.atlas-figure, .atlas-card-image) img[src$="-light.svg"] { display: none; }
+html:is(.theme--documenter-dark, .theme--catppuccin-frappe, .theme--catppuccin-macchiato, .theme--catppuccin-mocha) #documenter :is(.atlas-figure, .atlas-card-image) img[src$="-dark.svg"] { display: inline; }
+html:is(.theme--documenter-dark, .theme--catppuccin-frappe, .theme--catppuccin-macchiato, .theme--catppuccin-mocha) .atlas-kicker { color: #54d2c5; }
+@media (max-width: 42rem) {
+    .atlas-card { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+    #documenter .atlas-lead { font-size: 1.3rem; }
+    .atlas-controls { padding: .8rem; }
+    /* Preserve readable SVG labels on narrow screens; allow local scrolling. */
+    .atlas-figure { overflow-x: auto; }
+    #documenter .atlas-figure img { min-width: 640px; }
+    .atlas-diagram { min-width: 640px; }
+    .atlas-controls::after {
+        content: "Swipe the figures to see both panels.";
+        flex-basis: 100%;
+        font-size: .75rem;
+        opacity: .7;
+    }
+}

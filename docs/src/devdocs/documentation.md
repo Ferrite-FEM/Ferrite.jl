@@ -96,3 +96,51 @@ and only need regenerating when a figure changes, with
 Prefer explaining notation in the page over lettering it into the figure: text in the
 markdown is selectable, searchable, and typeset by KaTeX, and it does not need a second
 color variant.
+
+## Element atlas
+
+The [element atlas](@ref element-atlas) presents one representative example per
+family shipped by Ferrite. It is generated during
+`docs/make.jl`; the generated Markdown and SVGs in `docs/src/elements/` are gitignored,
+like the generated tutorials.
+
+- `docs/element_atlas/catalog.jl` describes the families and their examples.
+- `docs/element_atlas/generate.jl` evaluates Ferrite's basis functions and the explicit
+  dof functionals, verifies duality, and writes the pages and SVGs. `functionals.jl`
+  specifies moment weights and orientations: the `DofFunctional` types alone do not
+  encode these details.
+- `docs/element_atlas/render.jl` draws scalar surfaces, vector fields, edge moment
+  densities as standalone, accessible SVGs. The geometry is shared
+  by the light and dark palettes. No plotting dependency or external asset is needed.
+- `docs/src/assets/element-atlas.css` styles the section; `element-atlas.js` synchronizes
+  the basis selector with clickable dof markers. The markers use native buttons
+  positioned from the SVG renderer's coordinates.
+  They support Enter and Space and retain focus when the basis changes. Downloaded SVGs
+  remain standalone figures. With JavaScript disabled, every basis is visible.
+  Math uses Documenter's existing KaTeX renderer.
+
+To regenerate only the atlas and run its mathematical checks, from the repository root:
+
+```sh
+jld --project=docs --idle-timeout=2h eval 'include("docs/element_atlas/generate.jl"); ElementAtlas.generate()'
+```
+
+To preview it within the complete documentation without executing the tutorials or
+deploying, build in the existing draft mode:
+
+```sh
+jld --project=docs --idle-timeout=2h eval 'push!(ARGS, "liveserver"); include("docs/make.jl")'
+python3 -m http.server --directory docs/build 8000
+```
+
+Then open `http://localhost:8000/elements/`. A normal docs build generates the same
+atlas. `ElementAtlas.generate(; prettyurls = false)` also supports a flat-URL
+Documenter build; this setting must agree with `Documenter.HTML(prettyurls = ...)`
+because the figures and download links use raw HTML.
+
+To extend the catalogue, add a representative example in `catalog.jl`, specify its
+space and functionals including weights and orientation, and choose a visualization
+suitable for those functionals. Every example must pass the complete duality check
+before generation. Do not infer moment weights from `NormalMoment` or
+`TangentialMoment` alone. Review new figures in both themes and compare displayed
+dof ordering against Ferrite's entity ordering.

@@ -22,6 +22,7 @@ LiveServer.servedocs(;
         # Watch the src and ext folder so docstrings can be Revise'd
         joinpath(repo_root, "src"),
         joinpath(repo_root, "ext"),
+        joinpath(repo_root, "docs", "element_atlas"),
     ],
     skip_dirs = [
         # Skip the folder where Literate.jl output is written. This is needed
@@ -30,6 +31,7 @@ LiveServer.servedocs(;
         joinpath(repo_root, "docs/src/tutorials"),
         joinpath(repo_root, "docs/src/howto"),
         joinpath(repo_root, "docs/src/gallery"),
+        joinpath(repo_root, "docs/src/elements"),
     ],
     include_files = [
         joinpath(repo_root, "docs/generate.jl"),
