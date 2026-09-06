@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" role="img" aria-labelledby="title desc"><title id="title">Brezzi–Douglas–Marini: basis 5</title><desc id="desc">Two weighted flux moments per edge determine a linear vector field. Selected dof 5 is orange; all numbers use Ferrite local ordering.</desc><rect width="960" height="440" rx="16" fill="#f7fafb"/><g font-family="system-ui, sans-serif">
+<text x="26.0" y="34.0" fill="#243944" font-size="16" text-anchor="start">Vector basis · arrows = direction and magnitude</text>
+<polygon points="398.0,350.0 88.0,70.0 88.0,350.0" fill="#f7fafb" stroke="#d5e0e5" stroke-width="2" stroke-linejoin="round"/>
+<path d="M 119.0,322.0 L 117.763,340.559" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="117.404,345.947 115.109,339.781 120.497,340.14" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 150.0,322.0 L 147.695,335.831" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="146.807,341.157 145.13,334.795 150.457,335.683" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 181.0,322.0 L 177.918,331.245" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="176.211,336.368 175.547,329.822 180.669,331.53" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 212.0,322.0 L 207.913,328.13" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="205.614,331.579 206.444,326.598 209.893,328.897" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 243.0,322.0 L 237.891,325.065" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="235.018,326.789 237.349,323.437 239.073,326.31" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 274.0,322.0 L 267.87,322.0" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="264.421,322.0 268.253,320.276 268.253,323.724" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 305.0,322.0 L 297.848,318.935" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="293.825,317.211 299.157,317.115 297.433,321.138" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 336.0,322.0 L 327.548,315.661" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="323.228,312.421 329.648,313.861 326.408,318.181" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 119.0,294.0 L 117.818,309.37" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="117.404,314.754 115.172,308.565 120.556,308.979" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 150.0,294.0 L 147.866,304.669" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="146.807,309.965 145.336,303.552 150.631,304.611" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 181.0,294.0 L 177.935,301.152" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="176.211,305.175 176.115,299.843 180.138,301.567" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 212.0,294.0 L 207.913,298.087" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="205.614,300.386 207.019,296.682 209.318,298.981" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 243.0,294.0 L 237.891,295.022" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="235.018,295.596 237.923,293.521 238.498,296.395" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 274.0,294.0 L 267.87,291.957" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="264.421,290.807 268.827,290.36 267.678,293.808" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 305.0,294.0 L 297.848,288.891" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="293.825,286.018 299.732,287.199 296.858,291.222" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 119.0,266.0 L 117.892,278.183" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="117.404,283.561 115.258,277.341 120.636,277.83" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 150.0,266.0 L 147.957,274.174" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="146.807,278.772 145.785,273.088 150.383,274.238" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 181.0,266.0 L 177.935,271.109" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="176.211,273.982 176.69,269.927 179.563,271.651" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 212.0,266.0 L 207.913,268.043" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="205.614,269.193 207.594,266.766 208.743,269.065" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 243.0,266.0 L 237.891,264.978" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="235.018,264.404 238.498,263.605 237.923,266.479" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 274.0,266.0 L 267.87,261.913" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="264.421,259.614 269.402,260.444 267.103,263.893" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 119.0,238.0 L 117.978,247.196" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="117.404,252.368 115.456,246.334 120.628,246.908" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 150.0,238.0 L 147.957,244.13" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="146.807,247.579 146.36,243.173 149.808,244.322" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 181.0,238.0 L 177.935,241.065" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="176.211,242.789 177.264,240.012 178.988,241.736" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 212.0,238.0 L 207.913,238.0" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="205.614,238.0 208.169,236.851 208.169,239.149" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 243.0,238.0 L 237.891,234.935" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="235.018,233.211 239.073,233.69 237.349,236.563" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 119.0,210.0 L 117.978,217.152" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="117.404,221.175 116.031,216.418 120.054,216.992" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 150.0,210.0 L 147.957,214.087" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="146.807,216.386 146.935,213.257 149.234,214.406" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 181.0,210.0 L 177.935,211.022" fill="none" stroke="#007f86" stroke-width="1.5145313828820155" stroke-dasharray=""/>
+<polygon points="176.211,211.596 177.839,210.096 178.414,211.82" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 212.0,210.0 L 207.913,207.957" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="205.614,206.807 208.743,206.935 207.594,209.234" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 119.0,182.0 L 117.978,187.109" fill="none" stroke="#007f86" stroke-width="1.8" stroke-dasharray=""/>
+<polygon points="117.404,189.982 116.605,186.502 119.479,187.077" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 150.0,182.0 L 147.957,184.043" fill="none" stroke="#007f86" stroke-width="1.3546380504723816" stroke-dasharray=""/>
+<polygon points="146.807,185.193 147.51,183.341 148.659,184.49" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 181.0,182.0 L 177.935,180.978" fill="none" stroke="#007f86" stroke-width="1.5145313828820128" stroke-dasharray=""/>
+<polygon points="176.211,180.404 178.414,180.18 177.839,181.904" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 119.0,154.0 L 117.978,157.065" fill="none" stroke="#007f86" stroke-width="1.5145313828820142" stroke-dasharray=""/>
+<polygon points="117.404,158.789 117.18,156.586 118.904,157.161" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 150.0,154.0 L 147.957,154.0" fill="none" stroke="#007f86" stroke-width="0.9578737515423457" stroke-dasharray=""/>
+<polygon points="146.807,154.0 148.084,153.425 148.084,154.575" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<path d="M 119.0,126.0 L 117.978,127.022" fill="none" stroke="#007f86" stroke-width="0.6773190252361908" stroke-dasharray=""/>
+<polygon points="117.404,127.596 117.755,126.671 118.329,127.245" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<text x="92.0" y="378.0" fill="#607782" font-size="13" text-anchor="start">0</text>
+<text x="405.0" y="364.0" fill="#607782" font-size="15" text-anchor="start">x</text>
+<text x="73.0" y="64.0" fill="#607782" font-size="15" text-anchor="start">y</text>
+<path d="M 100.0,403.0 L 118.6,403.0" fill="none" stroke="#007f86" stroke-width="2.0" stroke-dasharray=""/>
+<polygon points="124.0,403.0 118.0,405.7 118.0,400.3" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<text x="136.0" y="408.0" fill="#607782" font-size="13" text-anchor="start">3.007 field units</text>
+<text x="585.0" y="34.0" fill="#243944" font-size="17" text-anchor="start">Degrees of freedom</text>
+<polygon points="875.0,286.0 630.0,86.0 630.0,286.0" fill="#f7fafb" stroke="#d5e0e5" stroke-width="2" stroke-linejoin="round"/>
+<text x="865.0" y="308.0" fill="#607782" font-size="11" text-anchor="start">v1</text>
+<text x="620.0" y="108.0" fill="#607782" font-size="11" text-anchor="start">v2</text>
+<text x="620.0" y="308.0" fill="#607782" font-size="11" text-anchor="start">v3</text>
+<path d="M 796.6,222.0 L 810.459,208.141" fill="none" stroke="#007f86" stroke-width="2.0" stroke-dasharray=""/>
+<polygon points="814.278,204.322 811.944,210.474 808.126,206.656" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<text x="822.278" y="199.322" fill="#007f86" font-size="15" text-anchor="start">1</text>
+<path d="M 708.4,150.0 L 722.259,136.141" fill="none" stroke="#007f86" stroke-width="2.0" stroke-dasharray=""/>
+<polygon points="726.078,132.322 723.744,138.474 719.926,134.656" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<text x="734.078" y="127.322" fill="#007f86" font-size="15" text-anchor="start">2</text>
+<path d="M 630.0,150.0 L 610.4,150.0" fill="none" stroke="#007f86" stroke-width="2.0" stroke-dasharray=""/>
+<polygon points="605.0,150.0 611.0,147.3 611.0,152.7" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<text x="613.0" y="145.0" fill="#007f86" font-size="15" text-anchor="start">3</text>
+<path d="M 630.0,222.0 L 610.4,222.0" fill="none" stroke="#007f86" stroke-width="2.0" stroke-dasharray=""/>
+<polygon points="605.0,222.0 611.0,219.3 611.0,224.7" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<text x="613.0" y="217.0" fill="#007f86" font-size="15" text-anchor="start">4</text>
+<path d="M 708.4,286.0 L 708.4,305.6" fill="none" stroke="#cf6943" stroke-width="3.5" stroke-dasharray=""/>
+<polygon points="708.4,311.0 705.7,305.0 711.1,305.0" fill="#cf6943" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<text x="716.4" y="306.0" fill="#cf6943" font-size="15" text-anchor="start">5</text>
+<path d="M 796.6,286.0 L 796.6,305.6" fill="none" stroke="#007f86" stroke-width="2.0" stroke-dasharray=""/>
+<polygon points="796.6,311.0 793.9,305.0 799.3,305.0" fill="#007f86" stroke="none" stroke-width="1" stroke-linejoin="round"/>
+<text x="804.6" y="306.0" fill="#007f86" font-size="15" text-anchor="start">6</text>
+<text x="585.0" y="338.0" fill="#607782" font-size="13" text-anchor="start">Arrows mark moments, not sampling points.</text>
+<text x="585.0" y="361.0" fill="#607782" font-size="13" text-anchor="start">Ferrite local numbering · reference cell</text>
+</g></svg>
