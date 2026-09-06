@@ -445,8 +445,18 @@ end
 function _entity_point_locations(ip::Interpolation, entity_dim::Int)
     entity_functionals = (vertexdof_functionals, edgedof_functionals, facedof_functionals)[entity_dim + 1]
     functionals = entity_functionals(ip)
-    all(all(f -> !(f isa Union{PointValue, PointDerivative}), fs) for fs in functionals) &&
-        return map(fs -> ntuple(_ -> nothing, length(fs)), functionals)
+    has_point_dofs = false
+    for entity_dofs in functionals, functional in entity_dofs
+        if functional isa Union{PointValue, PointDerivative}
+            has_point_dofs = true
+            break
+        end
+    end
+    if !has_point_dofs
+        return map(functionals) do entity_dofs
+            return map(_ -> nothing, entity_dofs)
+        end
+    end
 
     entity_indices = (vertexdof_indices, edgedof_interior_indices, facedof_interior_indices)[entity_dim + 1]
     dof_indices = entity_indices(ip)
