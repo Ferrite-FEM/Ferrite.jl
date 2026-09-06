@@ -116,6 +116,96 @@ end
     @test_throws ErrorException("components [2, 3] not within range of field :v (2 dimension(s))") add!(ConstraintHandler(dh), pdbc)
 end
 
+# Hermite dof layout; shape evaluation is unnecessary for prescribing the dofs.
+struct HermiteLineLayout <: ScalarInterpolation{RefLine, 3} end
+Ferrite.getnbasefunctions(::HermiteLineLayout) = 4
+Ferrite.vertexdof_indices(::HermiteLineLayout) = ((1, 2), (3, 4))
+Ferrite.edgedof_interior_indices(::HermiteLineLayout) = ((),)
+Ferrite.facedof_interior_indices(::HermiteLineLayout) = ()
+Ferrite.adjust_dofs_during_distribution(::HermiteLineLayout) = false
+Ferrite.reference_coordinates(::HermiteLineLayout) = [Vec((-1.0,)), Vec((-1.0,)), Vec((1.0,)), Vec((1.0,))]
+Ferrite.dof_functionals(::HermiteLineLayout) = (PointValue(), PointDerivative((1,)), PointValue(), PointDerivative((1,)))
+
+@testset "Dirichlet on value and derivative dofs" begin
+    grid = generate_grid(Line, (2,))
+    boundary = union(getfacetset(grid, "left"), getfacetset(grid, "right"))
+    for ncomponents in (1, 2)
+        dh = DofHandler(grid)
+        add!(dh, :offset, Lagrange{RefLine, 1}())
+        ip = ncomponents == 1 ? HermiteLineLayout() : HermiteLineLayout()^ncomponents
+        add!(dh, :u, ip)
+        close!(dh)
+        for selector in (PointDerivative, PointDerivative{1}, PointDerivative((1,)))
+            ch = ConstraintHandler(dh)
+            add!(ch, Dirichlet(:u, boundary, (x, t) -> x[1] + t, [ncomponents]; functional = selector))
+            close!(ch)
+            update!(ch, 2.0)
+            a = zeros(ndofs(dh))
+            apply!(a, ch)
+            left_dof = celldofs(dh, 1)[2 + 2ncomponents]
+            right_dof = celldofs(dh, 2)[2 + 4ncomponents]
+            @test Set(ch.prescribed_dofs) == Set((left_dof, right_dof))
+            @test a[left_dof] == 1.0
+            @test a[right_dof] == 3.0
+            @test count(!iszero, a) == 2
+        end
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:u, boundary, x -> x[1], [ncomponents]; functional = (PointValue(), PointDerivative{1})))
+        close!(ch)
+        @test length(ch.prescribed_dofs) == 4
+        @test sort(ch.inhomogeneities) == [-1.0, -1.0, 1.0, 1.0]
+        @test_throws ArgumentError add!(ConstraintHandler(dh), Dirichlet(:u, Set(1:3), Returns(0.0)))
+        @test_throws "all point values" apply_analytical!(zeros(ndofs(dh)), dh, :u, Returns(0.0))
+    end
+end
+
+@testset "Dirichlet functional selector" begin
+    grid = generate_grid(Triangle, (2, 2))
+    Γ = getfacetset(grid, "left")
+    dh = DofHandler(grid)
+    add!(dh, :s, Lagrange{RefTriangle, 1}())
+    close!(dh)
+    # The default preserves the existing behavior.
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:s, Γ, x -> 1.0))
+    close!(ch)
+    update!(ch, 0.0)
+    @test length(ch.prescribed_dofs) == 3
+    @test all(ch.inhomogeneities .== 1.0)
+    # The selector must match a boundary dof.
+    ch = ConstraintHandler(dh)
+    @test_throws ErrorException add!(ch, Dirichlet(:s, Γ, x -> 0.0; functional = PointDerivative))
+    # Moment dofs require projection.
+    dhq = DofHandler(grid)
+    add!(dhq, :q, RaviartThomas{RefTriangle, 1}())
+    close!(dhq)
+    ch = ConstraintHandler(dhq)
+    @test_throws ErrorException add!(ch, Dirichlet(:q, Γ, x -> 0.0; functional = NormalMoment()))
+    # Nodesets require purely nodal interpolations.
+    ch = ConstraintHandler(dhq)
+    @test_throws ArgumentError add!(ch, Dirichlet(:q, Set(1:3), x -> 0.0))
+
+    # For vectorized interpolations the selector picks the scalar functional and
+    # `components` picks the direction.
+    dhv = DofHandler(grid)
+    add!(dhv, :u, Lagrange{RefTriangle, 1}()^2)
+    close!(dhv)
+    ch = ConstraintHandler(dhv)
+    add!(ch, Dirichlet(:u, Γ, x -> 2.0, [2]; functional = PointValue()))
+    close!(ch)
+    @test length(ch.prescribed_dofs) == 3
+    @test all(ch.inhomogeneities .== 2.0)
+    @test ch.dbcs[1].components == [2]
+    ch = ConstraintHandler(dhv)
+    @test_throws ErrorException add!(ch, Dirichlet(:u, Γ, x -> 0.0; functional = PointDerivative))
+    ch = ConstraintHandler(dhv)
+    @test_throws ArgumentError add!(ch, Dirichlet(:u, Γ, x -> 0.0; functional = VectorizedFunctional(PointValue(), 2)))
+    ch = ConstraintHandler(dhv)
+    @test_throws ArgumentError add!(ch, Dirichlet(:u, Γ, x -> 0.0; functional = (PointValue(), VectorizedFunctional)))
+    ch = ConstraintHandler(dhv)
+    @test_throws ErrorException add!(ch, Dirichlet(:u, Set(1:3), x -> 0.0; functional = PointDerivative))
+end
+
 @testset "node bc" begin
     grid = generate_grid(Triangle, (1, 1))
     addnodeset!(grid, "nodeset", x -> x[2] == -1 || x[1] == -1)

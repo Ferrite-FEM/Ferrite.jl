@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Next] - xxxx-xx-xx
+
+### Added
+ - Each local dof of an interpolation now has a queryable *dof functional* describing
+   how it evaluates a function (`PointValue`, `PointDerivative`, `NormalMoment`, ...), see
+   `Ferrite.dof_functionals`. Dofs of vectorized interpolations wrap the scalar functional
+   in `VectorizedFunctional` together with the direction. `Dirichlet` accepts a new
+   `functional` keyword to select which dofs to constrain (default `PointValue()`, i.e.
+   unchanged behavior); for vectorized interpolations `components` selects the direction
+   as before. ([#1493])
+ - Sharing a field name between `SubDofHandler`s whose interpolations put incompatible
+   dof definitions on shared entities (different functionals, counts, or point locations;
+   e.g. `Lagrange^2` vs `RaviartThomas`, or `Lagrange` of order 2 vs 3) is now an error
+   instead of silently assigning the same dof numbers to unrelated dofs. ([#1493])
+
 ## [v1.7.0] - 2026-08-31
 
 ### Added
@@ -1455,3 +1470,4 @@ poking into Ferrite internals:
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
+[#1493]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1493

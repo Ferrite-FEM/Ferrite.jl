@@ -68,6 +68,20 @@ function test_interpolation_properties(ip::Interpolation{RefShape, FunOrder}) wh
         # Test that property functions are defined, runs, and, if possible, give expected type
         Ferrite.mapping_type(ip) # Dry-run just to catch if it isn't defined
         @test Ferrite.conformity(ip) isa Union{Ferrite.L2Conformity, Ferrite.HdivConformity, Ferrite.HcurlConformity, Ferrite.H1Conformity}
+
+        # Dof functionals and point-value duality
+        fs = Ferrite.dof_functionals(ip)
+        @test fs isa NTuple{getnbasefunctions(ip), DofFunctional}
+        if all(f -> f isa PointValue, fs)
+            # Point-value dofs must satisfy the Kronecker delta property at their
+            # reference coordinates
+            coords = Ferrite.reference_coordinates(ip)
+            @test length(coords) == length(fs)
+            for j in 1:getnbasefunctions(ip), i in 1:getnbasefunctions(ip)
+                Nij = Ferrite.reference_shape_value(ip, coords[j], i)
+                @test isapprox(Nij, i == j ? one(Nij) : zero(Nij); atol = 200 * eps(Float64))
+            end
+        end
     end
 end
 

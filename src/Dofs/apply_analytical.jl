@@ -47,6 +47,9 @@ function apply_analytical!(
             intersect(BitSet(sdh.cellset), BitSet(cellset))
         end
         isempty(set_intersection) && continue
+        if !all(fl -> _base_functional(fl) isa PointValue, dof_functionals(ip_fun))
+            error("apply_analytical! is only supported for interpolations whose dofs are all point values, got $(ip_fun).")
+        end
         _apply_analytical!(a, dh, celldofinds, field_dim, ip_fun, ip_geo, f, set_intersection)
     end
     return a
