@@ -3,6 +3,17 @@
 #----------------------------------------------------------------------#
 SUITE["mesh"] = BenchmarkGroup()
 
+# Repeated traversal must not recompute grid-wide reference dimensions when the
+# cell vector has an abstract element type. Construction is outside the timing.
+SUITE["mesh"]["InterfaceIterator"] = BenchmarkGroup()
+let g = SUITE["mesh"]["InterfaceIterator"]
+    grid = generate_grid(Quadrilateral, (40, 40))
+    for (name, cells) in (("concrete", grid.cells), ("abstract", Ferrite.AbstractCell[grid.cells...]))
+        iterator = InterfaceIterator(Grid(cells, grid.nodes))
+        g[name] = @benchmarkable FerriteBenchmarkHelpers.interface_sweep($iterator) evals = 1
+    end
+end
+
 # Grid generation for one geometry per structurally different generator: 2D quadrilateral
 # (tensor product), 3D hexahedron (tensor product with face sets in 3D) and 3D tetrahedron
 # (subdivision of hexahedra). Sizes are picked to land well above the noise floor.

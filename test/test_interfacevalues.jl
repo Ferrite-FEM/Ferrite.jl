@@ -1,6 +1,28 @@
 # Imports for parallel (isolated) test execution:
 include(joinpath(@__DIR__, "test_utils.jl"))
 
+@testset "interface iteration with abstract cell storage" begin
+    function interface_facets(iterator)
+        result = Tuple{FacetIndex, FacetIndex}[]
+        for ic in iterator
+            push!(result, (FacetIndex(cellid(ic.a), ic.a.current_facet_id), FacetIndex(cellid(ic.b), ic.b.current_facet_id)))
+        end
+        return result
+    end
+    grid = generate_grid(Quadrilateral, (4, 3))
+    abstract_grid = Grid(Ferrite.AbstractCell[grid.cells...], grid.nodes)
+    expected = interface_facets(InterfaceIterator(grid))
+    @test length(expected) == 17
+    iterator = InterfaceIterator(abstract_grid)
+    @test interface_facets(iterator) == expected
+    @test interface_facets(iterator) == expected # Iteration can be restarted.
+    @test isempty(interface_facets(InterfaceIterator(generate_grid(Quadrilateral, (1, 1)))))
+
+    # Caching must retain the error for mixed reference dimensions.
+    mixed = Grid(Ferrite.AbstractCell[grid.cells[1], Line((1, 2))], grid.nodes)
+    @test_throws ArgumentError InterfaceIterator(mixed)
+end
+
 @testset "InterfaceValues" begin
     @testset "construction from one FacetValues" begin
         grid = generate_grid(Quadrilateral, (2, 1))
