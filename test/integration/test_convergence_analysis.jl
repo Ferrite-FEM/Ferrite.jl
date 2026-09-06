@@ -23,6 +23,10 @@ include(joinpath(@__DIR__, "convergence_test_utils.jl"))
             CrouzeixRaviart{RefTetrahedron, 1}(),
             RannacherTurek{RefQuadrilateral, 1}(),
             RannacherTurek{RefHexahedron, 1}(),
+            #
+            P1isoP2{RefLine, 1}(),
+            P1isoP2{RefTriangle, 1}(),
+            P1isoP2{RefQuadrilateral, 1}(),
         )
         ConvergenceTestHelper.run_convergence_analysis(interpolation)
     end

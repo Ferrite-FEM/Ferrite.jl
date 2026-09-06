@@ -502,6 +502,31 @@ dirichlet_boundarydof_indices(::Type{FacetIndex}) = dirichlet_facetdof_indices
 get_edge_direction(cell, edgenr) = get_edge_direction(edges(cell)[edgenr])
 get_face_direction(cell, facenr) = get_face_direction(faces(cell)[facenr])
 
+"""
+    is_macro_element(::Interpolation)
+
+Return `true` if the interpolation is a macro-element (i.e., composed of multiple
+sub-elements or split domains), and `false` otherwise.
+"""
+is_macro_element(ip::Interpolation) = false
+
+"""
+    get_sub_elements(::Interpolation)
+
+Return a tuple of tuples containing the local reference coordinates of the vertices
+for each sub-element that comprises the macro-element. Each sub-element shares the
+same reference shape type as the parent macro-element.
+"""
+get_sub_elements(ip::Interpolation)
+
+"""
+    find_sub_element(::Interpolation, xi::Vec)
+
+Determine and return the integer index of the sub-element within a macro-element
+in which the given local reference coordinate `ξ` lies.
+"""
+find_sub_element(ip::Interpolation, ξ::Vec)
+
 #########################
 # DiscontinuousLagrange #
 #########################
@@ -1773,6 +1798,7 @@ struct VectorizedInterpolation{vdim, refshape, order, SI <: ScalarInterpolation{
     end
 end
 conformity(ip::VectorizedInterpolation) = conformity(ip.ip)
+is_macro_element(ip::VectorizedInterpolation) = is_macro_element(ip.ip)
 
 adjust_dofs_during_distribution(ip::VectorizedInterpolation) = adjust_dofs_during_distribution(ip.ip)
 interior_facedofs_on_lattice(ip::VectorizedInterpolation) = interior_facedofs_on_lattice(ip.ip)
@@ -2163,4 +2189,240 @@ adjust_dofs_during_distribution(::Nedelec{RefHexahedron, 1}) = false
 
 function get_direction(::Nedelec{RefHexahedron, 1}, shape_nr, cell)
     return get_edge_direction(cell, shape_nr) # shape_nr = edge_nr
+end
+
+#####################################
+# P1isoP2                           #
+#####################################
+struct P1isoP2{shape, order} <: ScalarInterpolation{shape, order} end
+
+adjust_dofs_during_distribution(::P1isoP2) = false
+conformity(::P1isoP2) = H1Conformity()
+is_macro_element(::P1isoP2) = true
+
+############################
+# P1isoP2 RefLine          #
+############################
+getnbasefunctions(::P1isoP2{RefLine, 1}) = 3
+vertexdof_indices(::P1isoP2{RefLine, 1}) = ((1,), (2,))
+edgedof_interior_indices(::P1isoP2{RefLine, 1}) = ((3,),)
+facedof_interior_indices(::P1isoP2{RefLine, 1}) = ()
+volumedof_interior_indices(::P1isoP2{RefLine, 1}) = ()
+
+function reference_coordinates(::P1isoP2{RefLine, 1})
+    return [
+        Vec{1, Float64}((-1.0,)), # Node 1: Left
+        Vec{1, Float64}((1.0,)),  # Node 2: Right
+        Vec{1, Float64}((0.0,)),  # Node 3: Center
+    ]
+end
+
+function find_sub_element(::P1isoP2{RefLine, 1}, ξ::Vec{1})
+    return ξ[1] < 0.0 ? 1 : 2
+end
+
+function reference_shape_value(ip::P1isoP2{RefLine, 1}, ξ::Vec{1, T}, i::Int) where {T}
+    e = find_sub_element(ip, ξ)
+    ξ_x = ξ[1]
+    if i == 1
+        e == 1 && return -ξ_x
+        return T(0.0)
+    elseif i == 2
+        e == 2 && return ξ_x
+        return T(0.0)
+    elseif i == 3
+        e == 1 && return 1 + ξ_x
+        e == 2 && return 1 - ξ_x
+        return T(0.0)
+    end
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+function get_sub_elements(::P1isoP2{RefLine})
+    v1 = Vec{1, Float64}((-1.0,)) # Left
+    v2 = Vec{1, Float64}((1.0,)) # Right
+    v3 = Vec{1, Float64}((0.0,)) # Center
+
+    return (
+        (v1, v3), # Sub-element 1: [-1, 0]
+        (v3, v2), # Sub-element 2: [0, 1]
+    )
+end
+
+############################
+# P1isoP2 RefTriangle      #
+############################
+getnbasefunctions(::P1isoP2{RefTriangle, 1}) = 6
+vertexdof_indices(::P1isoP2{RefTriangle, 1}) = ((1,), (2,), (3,))
+edgedof_interior_indices(::P1isoP2{RefTriangle, 1}) = ((4,), (5,), (6,))
+
+function reference_coordinates(::P1isoP2{RefTriangle, 1})
+    return [
+        Vec{2, Float64}((1.0, 0.0)), # Node 1: v1
+        Vec{2, Float64}((0.0, 1.0)), # Node 2: v2
+        Vec{2, Float64}((0.0, 0.0)), # Node 3: v3
+        Vec{2, Float64}((0.5, 0.5)), # Node 4: e1 mid
+        Vec{2, Float64}((0.0, 0.5)), # Node 5: e2 mid
+        Vec{2, Float64}((0.5, 0.0)), # Node 6: e3 mid
+    ]
+end
+
+function find_sub_element(::P1isoP2{RefTriangle, 1}, ξ::Vec{2})
+    ξ1, ξ2 = ξ[1], ξ[2]
+    if ξ1 >= 0.5
+        return 1
+    elseif ξ2 >= 0.5
+        return 2
+    elseif ξ1 + ξ2 <= 0.5
+        return 3
+    else
+        return 4
+    end
+end
+
+function reference_shape_value(ip::P1isoP2{RefTriangle, 1}, ξ::Vec{2, T}, i::Int) where {T}
+    e = find_sub_element(ip, ξ)
+    ξ1, ξ2 = ξ[1], ξ[2]
+
+    if i == 1
+        e == 1 && return 2 * ξ1 - 1
+        return T(0.0)
+    elseif i == 2
+        e == 2 && return 2 * ξ2 - 1
+        return T(0.0)
+    elseif i == 3
+        e == 3 && return 1 - 2 * ξ1 - 2 * ξ2
+        return T(0.0)
+    elseif i == 4
+        e == 1 && return 2 * ξ2
+        e == 2 && return 2 * ξ1
+        e == 4 && return 2 * ξ1 + 2 * ξ2 - 1
+        return T(0.0)
+    elseif i == 5
+        e == 2 && return 2 * (1 - ξ1 - ξ2)
+        e == 3 && return 2 * ξ2
+        e == 4 && return 1 - 2 * ξ1
+        return T(0.0)
+    elseif i == 6
+        e == 1 && return 2 * (1 - ξ1 - ξ2)
+        e == 3 && return 2 * ξ1
+        e == 4 && return 1 - 2 * ξ2
+        return T(0.0)
+    end
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+function get_sub_elements(::P1isoP2{RefTriangle})
+    v1 = Vec{2, Float64}((1.0, 0.0))
+    v2 = Vec{2, Float64}((0.0, 1.0))
+    v3 = Vec{2, Float64}((0.0, 0.0))
+    v4 = Vec{2, Float64}((0.5, 0.5))
+    v5 = Vec{2, Float64}((0.0, 0.5))
+    v6 = Vec{2, Float64}((0.5, 0.0))
+
+    # Ordering strictly matches the standard Ferrite RefTriangle (1,0), (0,1), (0,0)
+    return (
+        (v1, v4, v6), # Sub-element 1 (near v1)
+        (v4, v2, v5), # Sub-element 2 (near v2)
+        (v6, v5, v3), # Sub-element 3 (near v3)
+        (v4, v5, v6), # Sub-element 4 (Center sub-triangle)
+    )
+end
+
+############################
+# P1isoP2 RefQuadrilateral #
+############################
+getnbasefunctions(::P1isoP2{RefQuadrilateral, 1}) = 9
+vertexdof_indices(::P1isoP2{RefQuadrilateral, 1}) = ((1,), (2,), (3,), (4,))
+edgedof_interior_indices(::P1isoP2{RefQuadrilateral, 1}) = ((5,), (6,), (7,), (8,))
+facedof_interior_indices(::P1isoP2{RefQuadrilateral, 1}) = ((9,),)
+volumedof_interior_indices(::P1isoP2{RefQuadrilateral, 1}) = ()
+
+function reference_coordinates(::P1isoP2{RefQuadrilateral, 1})
+    return [
+        Vec{2, Float64}((-1.0, -1.0)), # Node 1: v1
+        Vec{2, Float64}((1.0, -1.0)), # Node 2: v2
+        Vec{2, Float64}((1.0, 1.0)), # Node 3: v3
+        Vec{2, Float64}((-1.0, 1.0)), # Node 4: v4
+        Vec{2, Float64}((0.0, -1.0)), # Node 5: e1 mid
+        Vec{2, Float64}((1.0, 0.0)), # Node 6: e2 mid
+        Vec{2, Float64}((0.0, 1.0)), # Node 7: e3 mid
+        Vec{2, Float64}((-1.0, 0.0)), # Node 8: e4 mid
+        Vec{2, Float64}((0.0, 0.0)), # Node 9: Face center
+    ]
+end
+
+function find_sub_element(::P1isoP2{RefQuadrilateral, 1}, ξ::Vec{2})
+    ξ1, ξ2 = ξ[1], ξ[2]
+    if ξ1 <= 0.0 && ξ2 <= 0.0
+        return 1 # Bottom-left
+    elseif ξ1 >= 0.0 && ξ2 <= 0.0
+        return 2 # Bottom-right
+    elseif ξ1 >= 0.0 && ξ2 >= 0.0
+        return 3 # Top-right
+    else
+        return 4 # Top-left
+    end
+end
+
+function reference_shape_value(ip::P1isoP2{RefQuadrilateral, 1}, ξ::Vec{2, T}, i::Int) where {T}
+    e = find_sub_element(ip, ξ)
+    ξ1, ξ2 = ξ[1], ξ[2]
+    if i == 1
+        e == 1 && return ξ1 * ξ2
+        return T(0.0)
+    elseif i == 2
+        e == 2 && return -ξ1 * ξ2
+        return T(0.0)
+    elseif i == 3
+        e == 3 && return ξ1 * ξ2
+        return T(0.0)
+    elseif i == 4
+        e == 4 && return -ξ1 * ξ2
+        return T(0.0)
+    elseif i == 5
+        e == 1 && return -ξ2 - ξ1 * ξ2
+        e == 2 && return -ξ2 + ξ1 * ξ2
+        return T(0.0)
+    elseif i == 6
+        e == 2 && return ξ1 + ξ1 * ξ2
+        e == 3 && return ξ1 - ξ1 * ξ2
+        return T(0.0)
+    elseif i == 7
+        e == 3 && return ξ2 - ξ1 * ξ2
+        e == 4 && return ξ2 + ξ1 * ξ2
+        return T(0.0)
+    elseif i == 8
+        e == 4 && return -ξ1 + ξ1 * ξ2
+        e == 1 && return -ξ1 - ξ1 * ξ2
+        return T(0.0)
+    elseif i == 9
+        e == 1 && return 1 + ξ1 + ξ2 + ξ1 * ξ2
+        e == 2 && return 1 - ξ1 + ξ2 - ξ1 * ξ2
+        e == 3 && return 1 - ξ1 - ξ2 + ξ1 * ξ2
+        e == 4 && return 1 + ξ1 - ξ2 - ξ1 * ξ2
+        return T(0.0)
+    end
+    throw(ArgumentError("no shape function $i for interpolation $ip"))
+end
+
+# 2D Quadrilateral (RefCube, 2)
+function get_sub_elements(::P1isoP2{RefQuadrilateral, 1})
+    v1 = Vec{2, Float64}((-1.0, -1.0))
+    v2 = Vec{2, Float64}((1.0, -1.0))
+    v3 = Vec{2, Float64}((1.0, 1.0))
+    v4 = Vec{2, Float64}((-1.0, 1.0))
+    v5 = Vec{2, Float64}((0.0, -1.0))
+    v6 = Vec{2, Float64}((1.0, 0.0))
+    v7 = Vec{2, Float64}((0.0, 1.0))
+    v8 = Vec{2, Float64}((-1.0, 0.0))
+    v9 = Vec{2, Float64}((0.0, 0.0))
+
+    # Ordering strictly matches standard Ferrite RefCube (-1,-1), (1,-1), (1,1), (-1,1)
+    return (
+        (v1, v5, v9, v8), # Sub-element 1 (Bottom-left)
+        (v5, v2, v6, v9), # Sub-element 2 (Bottom-right)
+        (v9, v6, v3, v7), # Sub-element 3 (Top-right)
+        (v8, v9, v7, v4), # Sub-element 4 (Top-left)
+    )
 end
