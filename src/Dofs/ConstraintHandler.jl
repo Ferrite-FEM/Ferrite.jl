@@ -446,7 +446,7 @@ end
 function _add!(ch::ConstraintHandler{<:Any, <:Any, Ti}, dbc::Dirichlet, bcnodes::AbstractVecOrSet{<:Integer}, interpolation::Interpolation, field_dim::Int, offset::Integer, bcvalue::BCValues, cellset::AbstractVecOrSet{<:Integer} = OrderedSet{Int}(1:getncells(get_grid(ch.dh)))) where {Ti}
     grid = get_grid(ch.dh)
     if interpolation !== geometric_interpolation(getcelltype(grid, first(cellset)))
-        @warn("adding constraint to nodeset is not recommended for sub/super-parametric approximations.")
+        @warn "adding constraint to nodeset is not recommended for sub/super-parametric approximations." maxlog = 1
     end
 
     ncomps = length(dbc.components)
