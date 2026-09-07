@@ -20,6 +20,18 @@ let g = SUITE["postprocessing"]["L2Projector"]
     proj = build_projector(grid, ip, qr)
     qp_data = [[rand(SymmetricTensor{2, 2}) for _ in 1:getnquadpoints(qr)] for _ in 1:getncells(grid)]
     g["project tensor data (Triangle 30×30)"] = @benchmarkable project($proj, $qp_data) evals = 1
+
+    # Isolate RHS assembly from the solve to track allocations in the cell scatter.
+    sdh = only(proj.dh.subdofhandlers)
+    cv = CellValues(qr, ip; update_gradients = false)
+    scalar_data = [rand(getnquadpoints(qr)) for _ in 1:getncells(grid)]
+    for (name, data, ncomponents) in (("scalar", scalar_data, 1), ("tensor", qp_data, 3))
+        rhs = zeros(ndofs(proj.dh), ncomponents)
+        g["assemble $name RHS (Triangle 30×30)"] = @benchmarkable(
+            Ferrite.assemble_proj_rhs!($rhs, $cv, $sdh, $data),
+            setup = (fill!($rhs, 0)), evals = 1,
+        )
+    end
 end
 
 # Evaluating a finite element field at arbitrary points in the domain: locating the points

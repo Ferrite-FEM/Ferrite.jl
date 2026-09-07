@@ -1,6 +1,81 @@
 using Ferrite, SparseArrays
 import LinearAlgebra: Symmetric
 
+@testset "assembly with repeated dofs" begin
+    # Exercise dense columns, the merge walk, and binary search separately.
+    for mode in (:dense, :merge, :binary), sym in (false, true), atomic in (false, true)
+        dofs = [3, 1, 3]
+        pattern = mode === :dense ? ones(40, 40) : zeros(40, 40)
+        if mode === :binary
+            pattern[1:39, :] .= 1
+        else
+            pattern[dofs, dofs] .= 1
+        end
+        K = sym ? Symmetric(sparse(pattern)) : sparse(pattern)
+        f = zeros(40)
+        Ke = [1.0 2.0 3.0; 2.0 5.0 6.0; 3.0 6.0 9.0]
+        fe = [2.0, 3.0, 5.0]
+        expected = zeros(40, 40)
+        expected_f = zeros(40)
+        for (j, J) in pairs(dofs), (i, I) in pairs(dofs)
+            expected[I, J] += Ke[i, j]
+        end
+        for (i, I) in pairs(dofs)
+            expected_f[I] += fe[i]
+        end
+        assemble!(start_assemble(K, f; atomic), dofs, Ke, fe)
+        @test K == expected
+        @test f == expected_f
+    end
+
+    # Repetitions can occur independently in rectangular row and column lists.
+    for atomic in (false, true)
+        rdofs, cdofs = [3, 1, 3], [2, 4, 2, 1]
+        expected = zeros(5, 5)
+        Ke = reshape(1.0:12.0, 3, 4)
+        for (j, J) in pairs(cdofs), (i, I) in pairs(rdofs)
+            expected[I, J] += Ke[i, j]
+        end
+        K = sparse(expected)
+        assemble!(start_assemble(K; atomic), rdofs, cdofs, Ke)
+        @test K == expected
+    end
+end
+
+@testset "symmetric assembly storage validation" begin
+    for atomic in (false, true), fillzero in (false, true)
+        K = Symmetric(sparse([1.0 2.0; 2.0 3.0]), :L)
+        f = [4.0, 5.0]
+        @test_throws ArgumentError start_assemble(K, f; atomic, fillzero)
+        @test parent(K) == [1.0 2.0; 2.0 3.0]
+        @test f == [4.0, 5.0]
+    end
+end
+
+@testset "symmetric assembly dof validation" begin
+    K = Symmetric(sparse(ones(4, 4)))
+    f = ones(4)
+    a = start_assemble(K, f; fillzero = false)
+    for (rdofs, cdofs) in (([1, 2], [3, 4]), ([1], [2, 3]), ([1, 2, 3], [4]))
+        @test_throws ArgumentError assemble!(a, rdofs, cdofs, ones(length(rdofs), length(cdofs)), ones(length(rdofs)))
+        @test all(isone, K)
+        @test all(isone, f)
+    end
+    @test_throws ArgumentError assemble!(a, [1, 2], ones(2, 3), ones(2))
+    @test all(isone, K)
+    @test all(isone, f)
+
+    # Equal but distinct vectors must use the same local ordering and triangle.
+    a = start_assemble(K, f)
+    dofs = [3, 1]
+    Ke = [2.0 4.0; 4.0 6.0]
+    assemble!(a, dofs, copy(dofs), Ke, [7.0, 8.0])
+    expected = zeros(4, 4)
+    expected[dofs, dofs] = Ke
+    @test K == expected
+    @test f == [8.0, 0.0, 7.0, 0.0]
+end
+
 @testset "assemble" begin
     dofs = [1, 3, 5, 7]
     maxd = maximum(dofs)

@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixes
+
+ - Symmetric CSC assembly now rejects incompatible row/column dof lists and
+   lower-triangle storage before modifying the system. Constraint application also
+   rejects unsupported lower-triangle CSC storage.
+ - Constraint matrices correctly account for affine constraints with prescribed masters.
+ - CSC and CSR assembly correctly accumulate repeated interface dofs.
+ - Fixed the single-argument `InterfaceValues(facetvalues)` constructor.
+ - L2 projection supports complex scalar and tensor data.
+ - `ArrayOfVectorViews` validates offsets before constructing unchecked views.
+
+### Performance
+
+ - `InterfaceIterator` caches topology lookups, avoiding quadratic traversal for grids
+   with abstract cell storage. Recreate the iterator after changing the grid or topology.
+ - L2 right-hand-side assembly avoids temporary row-slice allocations.
+
 ## [v1.7.0] - 2026-08-31
 
 ### Added

@@ -255,6 +255,7 @@ Create a `CSCAssembler{Tv}` from the matrix `K` and optional vector `f` with val
     start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}, f::Vector = Tv[]; fillzero = true, atomic = false) -> SymmetricCSCAssembler{Tv}
 
 Create a `SymmetricCSCAssembler{Tv}` from the matrix `K` and optional vector `f` with value type `Tv`.
+Only upper-triangle storage (`Symmetric(K, :U)`) is supported.
 
 `CSCAssembler` and `SymmetricCSCAssembler` allocate workspace
 necessary for efficient matrix assembly. To assemble the contribution from an element, use
@@ -290,6 +291,7 @@ Base.@constprop :aggressive function start_assemble(K::AbstractSparseMatrixCSC{T
     return CSCAssembler{T, Ti, typeof(K), atomic}(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 Base.@constprop :aggressive function start_assemble(K::Symmetric{T, <:SparseMatrixCSC{T, Ti}}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T, Ti}
+    _check_upper_triangle(K)
     _check_atomic_eltype(atomic, T)
     fillzero && (fillzero!(K); fillzero!(f))
     permutation = zeros(Int, maxcelldofs_hint)
@@ -316,6 +318,9 @@ This is equivalent to `K[dofs, dofs] += Ke` and `f[dofs] += fe`, where `K` is th
 Assemble the element stiffness matrix `Ke` (and optional force vector `fe`) into the global
 stiffness (and force) in `A`, given the element row degrees of freedom, `rowdofs`, and element column degrees of freedom, `coldofs`.
 This is equivalent to `K[rowdofs, coldofs] += Ke` and `f[rowdofs] += fe`, but more efficient.
+
+For a symmetric assembler, `rowdofs` and `coldofs` must be equal. To assemble
+rectangular blocks with different row and column dofs, use a nonsymmetric assembler.
 """
 assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix, ::AbstractVector)
 
@@ -327,7 +332,12 @@ end
     return _assemble!(A, rowdofs, coldofs, Ke, fe, false)
 end
 @propagate_inbounds function assemble!(A::SymmetricCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
+    size(Ke, 1) == size(Ke, 2) || throw(ArgumentError("Ke must be square for symmetric assembly."))
     return _assemble!(A, dofs, dofs, Ke, fe, true)
+end
+@propagate_inbounds function assemble!(A::SymmetricCSCAssembler, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
+    rowdofs == coldofs || throw(ArgumentError("Symmetric assembly requires equal row and column dofs. Use a nonsymmetric assembler for rectangular blocks."))
+    return assemble!(A, rowdofs, Ke, fe)
 end
 
 """
@@ -373,6 +383,33 @@ end
 # search instead of the linear merge walk in `_assemble_inner!`.
 const SPARSE_COLUMN_SEARCH_RATIO = 8
 
+@inline function _has_repeated_dofs(sorteddofs)
+    repeated = false
+    @inbounds @simd for i in 2:length(sorteddofs)
+        repeated |= sorteddofs[i] == sorteddofs[i - 1]
+    end
+    return repeated
+end
+
+# Repeated interface dofs need multiple additions into the same stored entry.
+# Use independent lookups for this uncommon case, leaving the merge walk for
+# ordinary elements unchanged. Test the global triangle, including every local
+# contribution to a repeated global diagonal dof.
+@noinline function _assemble_repeated!(K, Ke, sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
+    for (j, col) in pairs(sortedcoldofs), (i, row) in pairs(sortedrowdofs)
+        sym && row > col && continue
+        val = Ke[rowpermutation[i], colpermutation[j]]
+        iszero(val) && continue
+        try
+            addindex!(K, convert(eltype(K), val), row, col, atomic)
+        catch err
+            err isa SparsityError || rethrow()
+            _missing_sparsity_pattern_error(row + rowoffset, col + coloffset)
+        end
+    end
+    return
+end
+
 """
     Ferrite._assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
 
@@ -381,7 +418,7 @@ Scatter the element matrix `Ke` into the (already allocated) entries of `K`, i.e
 and sorted ascending (`sortedrowdofs`, `sortedcoldofs`), the latter together with the
 permutations mapping a sorted position back to its index in `Ke`, so that a format storing
 its entries in sorted order can walk them and the element matrix in a single pass. If `sym`
-is `true` only the upper triangle of `Ke` is read. `atomic` is a `Val{Bool}` selecting
+is `true` only contributions to the global upper triangle are read. `atomic` is a `Val{Bool}` selecting
 whether the accumulation is concurrency safe.
 
 `rowoffset` and `coloffset` place the matrix within a larger system; they are only used to
@@ -415,6 +452,10 @@ end
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
         sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
     )
+    if _has_repeated_dofs(sortedrowdofs)
+        return _assemble_repeated!(K, Ke, sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
+    end
+
     current_col = 1
     Krows = rowvals(K)
     Kvals = nonzeros(K)

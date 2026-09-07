@@ -83,7 +83,7 @@ function InterfaceValues(
     )
 end
 # From FacetValue(s)
-InterfaceValues(facetvalues_here::FVA, facetvalues_there::FVB = deepcopy(FacetValues_here)) where {FVA <: FacetValues, FVB <: FacetValues} =
+InterfaceValues(facetvalues_here::FVA, facetvalues_there::FVB = deepcopy(facetvalues_here)) where {FVA <: FacetValues, FVB <: FacetValues} =
     InterfaceValues{FVA, FVB}(facetvalues_here, facetvalues_there)
 
 function Base.copy(iv::InterfaceValues)
