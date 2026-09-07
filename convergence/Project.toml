@@ -1,0 +1,7 @@
+[deps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Ferrite = "c061ca5d-56c9-439f-9c0e-210fe06d3992"
+LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
