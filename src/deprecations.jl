@@ -217,7 +217,7 @@ end
 
 # TODO: Are these needed to be deprecated - harder? with the new parameterization
 # (Cell|Face)Values with vector dofs
-const _VectorValues = Union{CellValues{<:FV}, FacetValues{<:FV}} where {FV <: FunctionValues{<:Any, <:VectorInterpolation}}
+const _VectorValues = Union{CellValues{Nothing, Tuple{FV}}, FacetValues{<:FV}} where {FV <: FunctionValues{<:Any, <:VectorInterpolation}}
 function function_value(::_VectorValues, ::Int, ::AbstractVector{Vec{dim, T}}) where {dim, T}
     throw(DeprecationError("function_value(fe_v::VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}})" => "function_value(fe_v, q_point, reinterpret(T, u))"))
 end

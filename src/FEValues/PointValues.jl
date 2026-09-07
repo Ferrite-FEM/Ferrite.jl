@@ -25,7 +25,7 @@ struct PointValues{CV} <: AbstractValues
     PointValues{CV}(cv::CV) where {CV} = new{CV}(cv)
 end
 
-function PointValues(cv::CellValues)
+function PointValues(cv::SingleFieldCellValues)
     T = typeof(getdetJdV(cv, 1))
     ip_fun = function_interpolation(cv)
     ip_geo = geometric_interpolation(cv)
@@ -78,7 +78,7 @@ function reinit!(
     qr_points = getpoints(pv.cv.qr)
     qr_points[1] = ξ
     # Precompute all values again to reflect the updated ξ coordinate
-    precompute_values!(pv.cv.fun_values, qr_points)
+    precompute_values!(_single_fun_values(pv.cv), qr_points)
     precompute_values!(pv.cv.geo_mapping, qr_points)
     # Regular reinit
     reinit!(pv.cv, cell, x)
