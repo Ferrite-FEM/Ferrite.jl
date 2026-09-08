@@ -407,11 +407,12 @@ nothing # hide
 # cell loop, [`create_interface_coloring`](@ref) partitions the interfaces into colors
 # such that all interfaces of one color can be assembled concurrently.
 #
-# For a purely discontinuous discretization (all dofs interior to the cells) pass
-# `discontinuous = true`: two interfaces then conflict only if they share a cell, which
-# needs very few colors (about the maximum number of facet neighbors of a cell plus
-# one). Note that in this case the accompanying *cell* loop needs no coloring at all,
-# since no dofs are shared between cells.
+# When no dofs are shared between cells -- every field has all dofs interior to the
+# cells, e.g. `DiscontinuousLagrange` -- pass `shared_dofs = false`: two interfaces
+# then conflict only if they share a cell, which needs very few colors (about the
+# maximum number of facet neighbors of a cell plus one). Note that in this case the
+# accompanying *cell* loop needs no coloring at all, since the write sets of any two
+# cells are disjoint.
 #
 # The threaded loop follows the same pattern as the cell loop above: task local scratch
 # data holding an [`InterfaceCache`](@ref) (instead of a `CellCache`), an
@@ -454,7 +455,7 @@ nothing # hide
 #
 # ## Usage:
 # topology = ExclusiveTopology(grid)
-# colors = create_interface_coloring(grid, topology; discontinuous = true)
+# colors = create_interface_coloring(grid, topology; shared_dofs = false)
 # assemble_interfaces!(K, dh, colors, iv)
 # ```
 #

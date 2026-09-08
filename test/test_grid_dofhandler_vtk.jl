@@ -783,8 +783,8 @@ end
         cellvec = sort!(unique!(collect(Int, cellset)))
         ref = Set(reference_interfaces(grid, topology, cellvec))
         for alg in (ColoringAlgorithm.WorkStream, ColoringAlgorithm.Greedy)
-            for disc in (true, false)
-                colors = create_interface_coloring(grid, topology, cellset; alg, discontinuous = disc)
+            for shared_dofs in (false, true)
+                colors = create_interface_coloring(grid, topology, cellset; alg, shared_dofs)
                 # Partition: every interface exactly once
                 seen = Set{NTuple{2, FacetIndex}}()
                 for color in colors, i in color
@@ -797,8 +797,8 @@ end
                     for x in 1:length(color), y in (x + 1):length(color)
                         ax, bx = color[x][1][1], color[x][2][1]
                         ay, by = color[y][1][1], color[y][2][1]
-                        if disc
-                            # Purely discontinuous: conflict iff sharing a cell
+                        if !shared_dofs
+                            # No shared dofs: conflict iff sharing a cell
                             @test isempty(intersect((ax, bx), (ay, by)))
                         else
                             # Conservative: conflict iff any cells node-adjacent/equal
@@ -837,22 +837,22 @@ end
         end
         @test visited == skeleton
         # Colors partition the skeleton
-        colors = create_interface_coloring(grid, topology; discontinuous = true)
+        colors = create_interface_coloring(grid, topology; shared_dofs = false)
         @test sum(length, colors; init = 0) == length(skeleton)
         @test Set(Iterators.flatten(colors)) == Set(skeleton)
     end
 
-    # For purely discontinuous fields greedy coloring of the interface ("line") graph
+    # Without shared dofs greedy coloring of the interface ("line") graph
     # needs few colors (about Δ + 1 where Δ is the max number of facet neighbors)
     let grid = generate_grid(Hexahedron, (4, 4, 4))
-        colors = create_interface_coloring(grid; alg = ColoringAlgorithm.Greedy, discontinuous = true)
+        colors = create_interface_coloring(grid; alg = ColoringAlgorithm.Greedy, shared_dofs = false)
         @test length(colors) <= 7 # Δ = 6
     end
 
     # Determinism
     let grid = generate_grid(Hexahedron, (4, 4, 4)), topology = ExclusiveTopology(grid)
-        @test create_interface_coloring(grid, topology; discontinuous = true) ==
-            create_interface_coloring(grid, topology; discontinuous = true)
+        @test create_interface_coloring(grid, topology; shared_dofs = false) ==
+            create_interface_coloring(grid, topology; shared_dofs = false)
     end
 
     # InterfaceIterator over an explicit set of interfaces (e.g. one color)
@@ -861,7 +861,7 @@ end
         add!(dh, :u, DiscontinuousLagrange{RefQuadrilateral, 1}())
         close!(dh)
         ninterfaces = count(Returns(true), InterfaceIterator(dh, topology))
-        colors = create_interface_coloring(grid, topology; discontinuous = true)
+        colors = create_interface_coloring(grid, topology; shared_dofs = false)
         total = 0
         for color in colors
             n = 0
@@ -879,13 +879,13 @@ end
     end
 
     # Colored threaded interface assembly matches a serial sweep in the same color
-    # order bitwise (within a color the write sets are disjoint for discontinuous
+    # order bitwise (within a color the write sets are disjoint for cell-interior-dof
     # interpolations), and skeleton-order serial assembly up to summation order.
     let grid = generate_grid(Hexahedron, (4, 4, 4)), topology = ExclusiveTopology(grid)
         dh = DofHandler(grid)
         add!(dh, :u, DiscontinuousLagrange{RefHexahedron, 1}())
         close!(dh)
-        colors = create_interface_coloring(grid, topology; discontinuous = true)
+        colors = create_interface_coloring(grid, topology; shared_dofs = false)
         ndpc = ndofs_per_cell(dh)
         Ki = [i * 1.0e-3 + j * 1.0e-6 for i in 1:(2 * ndpc), j in 1:(2 * ndpc)]
         function assemble_interfaces(dh, iterators, K)

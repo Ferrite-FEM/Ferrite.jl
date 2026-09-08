@@ -433,7 +433,7 @@ end
 """
     create_interface_coloring(
         grid::AbstractGrid, [topology::ExclusiveTopology], [cellset];
-        alg::ColoringAlgorithm, discontinuous::Bool = false,
+        alg::ColoringAlgorithm, shared_dofs::Bool = true,
     )
 
 Create a coloring of the *interfaces* of the grid such that no two conflicting
@@ -458,19 +458,22 @@ end
 ```
 
 An interface writes to the dofs of its two cells. With the default
-`discontinuous = false` the coloring is conservative: it is safe also when the interface
-terms write to dofs of continuous fields, which are shared with all node neighbors of
-the two cells. If *all* fields written by the interface assembly are discontinuous (all
-dofs interior to the cells) this can be sharpened by passing `discontinuous = true`, in
-which case two interfaces conflict only if they share a cell, resulting in
-significantly fewer colors.
+`shared_dofs = true` the coloring is conservative: it is safe also when dofs are shared
+between cells (continuous fields place dofs on vertices, edges, and faces, shared with
+all node neighbors of the cell). If *no* dofs are shared between cells -- every field
+written by the interface assembly has all dofs interior to the cells, e.g.
+[`DiscontinuousLagrange`](@ref) -- this can be sharpened by passing
+`shared_dofs = false`, in which case two interfaces conflict only if they share a cell,
+resulting in significantly fewer colors. Note that a discretization being
+"discontinuous" is not sufficient: e.g. `CrouzeixRaviart` is discontinuous but places
+(shared) dofs on the facets.
 
 If `cellset` is given, only interfaces between two cells of the set are colored (cf.
 [`create_coloring`](@ref)).
 
-Note that for a purely discontinuous discretization the accompanying *cell* loop needs
-no coloring at all -- no dofs are shared between cells -- and with continuous fields
-present the standard [`create_coloring`](@ref) covers it. Constraint condensation
+Note that when no dofs are shared between cells the accompanying *cell* loop needs no
+coloring at all -- the write sets of any two cells are disjoint -- and with shared dofs
+the standard [`create_coloring`](@ref) covers it. Constraint condensation
 during assembly ([`apply_assemble!`](@ref) with e.g. [`AffineConstraint`](@ref)s) can
 write outside of the interface dofs and is not accounted for here.
 """
@@ -478,7 +481,7 @@ function create_interface_coloring(
         grid::AbstractGrid, topology::ExclusiveTopology = ExclusiveTopology(grid),
         cellset = 1:getncells(grid);
         alg::ColoringAlgorithm.T = ColoringAlgorithm.WorkStream,
-        discontinuous::Bool = false,
+        shared_dofs::Bool = true,
     )
     cellvec = _sorted_cellvec(cellset)
     interfaces = _enumerate_interfaces(grid, topology, cellvec)
@@ -488,7 +491,7 @@ function create_interface_coloring(
     end
     iptr, iadj = _cell_to_interface_map(getncells(grid), interfaces)
     local colptr, rowval
-    if discontinuous
+    if !shared_dofs
         colptr, rowval = _chunked_gather!(ninterfaces, 1:ninterfaces) do counts, chunk
             _gather_interface_cell_chunk!(counts, interfaces, chunk, iptr, iadj)
         end

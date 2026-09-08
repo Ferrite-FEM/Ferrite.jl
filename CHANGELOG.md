@@ -40,9 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - New function `create_interface_coloring` for coloring the interfaces of a grid,
    for multithreading assembly loops over interfaces (e.g. interface terms in DG
    methods). The returned colors partition `interfaceskeleton` such that concurrent
-   assembly of the interfaces within one color is safe. For purely discontinuous
-   discretizations (`discontinuous = true`) two interfaces conflict only if they share
-   a cell, resulting in very few colors. See the updated
+   assembly of the interfaces within one color is safe. When no dofs are shared
+   between cells (`shared_dofs = false`, e.g. for `DiscontinuousLagrange`
+   discretizations) two interfaces conflict only if they share a cell, resulting in
+   very few colors. See the updated
    [multithreaded assembly how-to](https://ferrite-fem.github.io/Ferrite.jl/dev/howto/threaded_assembly/)
    for usage. ([#1501])
  - Added mesh-free [`AlgebraicVariable`s](https://ferrite-fem.github.io/Ferrite.jl/dev/topics/algebraic_variables/)
