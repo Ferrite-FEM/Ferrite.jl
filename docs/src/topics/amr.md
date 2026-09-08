@@ -5,10 +5,10 @@ It involves dynamically adjusting the mesh resolution based on some criteria.
 By refining the mesh in regions where the solution exhibits features of interest, AMR ensures that computational resources are concentrated where they are most needed, leading to more accurate results without a proportional increase in computational cost.
 This refinement can be achieved in different fashions by either adjusting the mesh size (h-adaptivity), the polynomial order of the Ansatz functions (p-adaptivity) or the nodal positions (r-adaptivity).
 
-Ferrite.jl supports efficient h-adaptivity through a p4est type of implementation.
-This approach is designed to handle unstructured hexahedral (in 3D) and quadrilateral (in 2D) meshes.
-A further restriction of the p4est type of implementation is isotropic refinement, meaning that an element is always subdivided uniformly in all directions: a quadrilateral is split into four and a hexahedron into eight children.
-Anisotropic refinement, where an element is subdivided along only some of its axes, is not supported.
+Ferrite.jl supports efficient h-adaptivity through a forest-of-trees implementation: every cell of a conforming coarse grid becomes the root of a refinement tree.
+Unstructured hexahedral and quadrilateral meshes are handled with a p4est type of implementation, unstructured tetrahedral and triangular meshes with the tetrahedral space-filling curve of Burstedde and Holke ([BH2016](@citet)), where every simplex is red-refined into `2^dim` children following Bey's rule.
+Both are isotropic refinements, meaning that an element is always subdivided uniformly: a quadrilateral or triangle is split into four and a hexahedron or tetrahedron into eight children.
+Anisotropic refinement, where an element is subdivided along only some of its axes, is not supported, and mixed grids are not supported either — all cells of the coarse grid must be of the same type.
 
 In AMR different phenomena and vocabulary emerge which we group into the following aspects
 
@@ -62,7 +62,8 @@ To address the issues introduced by hanging nodes, specific strategies and const
 The degrees of freedom (DoFs) associated with hanging nodes are constrained based on the surrounding coarser mesh elements.
 For example, in a linear finite element method, the value at a hanging node can be constrained to be the average of the values at the adjacent vertices of the coarser element.
 As for the example above node 13 could be constrained to $\boldsymbol{u}[13]=0.5\boldsymbol{u}[5]+0.5\boldsymbol{u}[2]$.
-In general, for linear ($Q_1$) interpolations each hanging node is constrained to the average of its masters — weight `1/length(masters)`, i.e. `1/2` for an edge midpoint and `1/4` for a face center in 3D — which is exactly the value that makes the field continuous across the non-conforming interface.
+In general, for linear ($Q_1$ or $P_1$) interpolations each hanging node is constrained to the average of its masters — weight `1/length(masters)`, i.e. `1/2` for an edge midpoint and `1/4` for a face center of a hexahedron — which is exactly the value that makes the field continuous across the non-conforming interface.
+On triangular and tetrahedral grids the red refinement only ever introduces edge midpoints, so every hanging node has exactly two masters.
 As soon as higher polynomial degrees are involved, things become more involved.
 In Ferrite, a conformity constraint can be constructed with the ConstraintHandler when using a DofHandler which has been constructed with a grid passed from `creategrid(adaptive_grid::ForestBWG)`.
 This conformity constraint ensures that each hanging node is constrained appropriately.
@@ -127,7 +128,7 @@ x-----x--x--x           |               x-----x--x--x-----x-----|
 x-----x-----x-----------x               x-----x-----x-----------x
 ```
 
-In Ferrite's p4est implementation, one must call `balanceforest!` to balance the adaptive grid to ensure all algorithms work correctly.
+In Ferrite's forest implementation, one must call `balanceforest!` to balance the adaptive grid to ensure all algorithms work correctly; `creategrid` refuses an unbalanced forest.
 
 ```julia
 balanceforest!(adaptive_grid)
