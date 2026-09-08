@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 306" width="620" height="306">
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+        orient="auto-start-reverse"><path d="M0,0.6 L10,5 L0,9.4 z" fill="#1c2024"/></marker>
+<pattern id="hatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+<line x1="0" y1="0" x2="0" y2="7" stroke="#5d6773" stroke-width="1.1"/></pattern>
+</defs>
+<rect x="60.0" y="95.0" width="220.0" height="110.0" rx="0" fill="#0072b2" fill-opacity="0.08" stroke="none" stroke-width="2.0"/>
+<path d="M60.0,95.0 H280.0 V205.0 H60.0 Z" fill="none" stroke="#1c2024" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<line x1="170.0" y1="95.0" x2="170.0" y2="205.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<text x="115.0" y="197.0" fill="#5d6773" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="400" font-style="normal" text-anchor="middle">1</text>
+<text x="158.0" y="154.0" fill="#009e73" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="700" font-style="normal" text-anchor="middle">2</text>
+<text x="115.0" y="113.0" fill="#5d6773" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="400" font-style="normal" text-anchor="middle">3</text>
+<text x="72.0" y="154.0" fill="#5d6773" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="400" font-style="normal" text-anchor="middle">4</text>
+<text x="225.0" y="197.0" fill="#5d6773" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="400" font-style="normal" text-anchor="middle">1</text>
+<text x="268.0" y="154.0" fill="#5d6773" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="400" font-style="normal" text-anchor="middle">2</text>
+<text x="225.0" y="113.0" fill="#5d6773" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="400" font-style="normal" text-anchor="middle">3</text>
+<text x="182.0" y="154.0" fill="#009e73" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="700" font-style="normal" text-anchor="middle">4</text>
+<rect x="102.0" y="139.5" width="26.0" height="21.0" rx="10.5" fill="#d55e00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="115.0" y="155.25" fill="#ffffff" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">5</text>
+<rect x="212.0" y="139.5" width="26.0" height="21.0" rx="10.5" fill="#d55e00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="225.0" y="155.25" fill="#ffffff" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">6</text>
+<text x="170.0" y="262.0" fill="#1c2024" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="400" font-style="normal" text-anchor="middle">EdgeIndex(5, 2) ↔ EdgeIndex(6, 4)</text>
+<text x="170.0" y="284.0" fill="#5d6773" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" font-style="normal" text-anchor="middle">two views of the same edge</text>
+<rect x="380.0" y="60.0" width="180.0" height="180.0" rx="0" fill="#0072b2" fill-opacity="0.08" stroke="none" stroke-width="2.0"/>
+<path d="M380.0,60.0 H560.0 V240.0 H380.0 Z" fill="none" stroke="#1c2024" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<line x1="470.0" y1="60.0" x2="470.0" y2="240.0" stroke="#1c2024" stroke-width="2.0" stroke-linecap="round"/>
+<line x1="380.0" y1="150.0" x2="560.0" y2="150.0" stroke="#1c2024" stroke-width="2.0" stroke-linecap="round"/>
+<text x="458.0" y="170.0" fill="#009e73" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="700" font-style="normal" text-anchor="end">3</text>
+<text x="482.0" y="170.0" fill="#009e73" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="700" font-style="normal" text-anchor="start">4</text>
+<text x="458.0" y="138.0" fill="#009e73" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="700" font-style="normal" text-anchor="end">2</text>
+<text x="482.0" y="138.0" fill="#009e73" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="700" font-style="normal" text-anchor="start">1</text>
+<circle cx="470.0" cy="150.0" r="7.5" fill="#009e73"/>
+<rect x="412.0" y="184.5" width="26.0" height="21.0" rx="10.5" fill="#d55e00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="425.0" y="200.25" fill="#ffffff" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">5</text>
+<rect x="502.0" y="184.5" width="26.0" height="21.0" rx="10.5" fill="#d55e00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="515.0" y="200.25" fill="#ffffff" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">6</text>
+<rect x="412.0" y="94.5" width="26.0" height="21.0" rx="10.5" fill="#d55e00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="425.0" y="110.25" fill="#ffffff" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">8</text>
+<rect x="502.0" y="94.5" width="26.0" height="21.0" rx="10.5" fill="#d55e00" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<text x="515.0" y="110.25" fill="#ffffff" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" font-style="normal" text-anchor="middle">9</text>
+<text x="470.0" y="262.0" fill="#1c2024" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="400" font-style="normal" text-anchor="middle">VertexIndex: (5, 3), (6, 4), (8, 2), (9, 1)</text>
+<text x="470.0" y="284.0" fill="#5d6773" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" font-style="normal" text-anchor="middle">four views of the same vertex</text>
+</svg>
