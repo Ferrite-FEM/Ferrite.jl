@@ -345,23 +345,16 @@ end
 # Interface coloring #
 ######################
 
-# Enumerate the interfaces of the grid -- pairs of facets `(facet_here, facet_there)` --
-# restricted to interfaces where both cells are in the cellset, in the same order as
-# `InterfaceIterator` visits them.
+# The interfaces of the grid (`interfaceskeleton`) restricted to interfaces where both
+# cells are in the cellset, preserving the skeleton enumeration order.
 function _enumerate_interfaces(grid::AbstractGrid, topology, cellvec)
-    neighborhood = get_facet_facet_neighborhood(topology, grid)
-    interfaces = NTuple{2, FacetIndex}[]
-    for facet_a in facetskeleton(topology, grid)
-        neighbors = neighborhood[facet_a[1], facet_a[2]]
-        isempty(neighbors) && continue
-        length(neighbors) > 1 && error("multiple neighboring facets not supported yet")
-        facet_b = neighbors[1]
-        (insorted(facet_a[1], cellvec) && insorted(facet_b[1], cellvec)) || continue
-        # Canonicalize to FacetIndex: depending on the grid dimension the skeleton and
-        # neighborhood are in terms of e.g. EdgeIndex.
-        push!(interfaces, (FacetIndex(facet_a[1], facet_a[2]), FacetIndex(facet_b[1], facet_b[2])))
+    skeleton = interfaceskeleton(topology, grid)
+    if cellvec isa AbstractUnitRange{Int} && cellvec == 1:getncells(grid)
+        return skeleton # all cells: nothing to filter (do not modify -- cached in the topology!)
     end
-    return interfaces
+    return filter(skeleton) do (facet_a, facet_b)
+        insorted(facet_a[1], cellvec) && insorted(facet_b[1], cellvec)
+    end
 end
 
 # Map from cell id to the ids (indices into `interfaces`) of the interfaces incident to
@@ -450,7 +443,8 @@ counterpart of [`create_coloring`](@ref), for threading assembly loops over
 [`InterfaceIterator`](@ref) (e.g. interface terms in DG methods).
 
 Returns a vector of vectors of interfaces, where each interface is a tuple of the two
-facets `(facet_here, facet_there)`. Each color can be iterated with
+facets `(facet_here, facet_there)`. The colors partition [`interfaceskeleton`](@ref),
+and each color (or any chunk of it) can be iterated with
 `InterfaceIterator(grid_or_dh, color)`:
 
 ```julia

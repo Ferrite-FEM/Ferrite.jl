@@ -396,6 +396,75 @@ nothing # hide
 # the timings above, the atomic version doesn't pay for the grid coloring itself, which
 # for this grid takes about 0.3 seconds).
 
+# ### [Threaded assembly of interface terms](@id howto-threaded-assembly-interfaces)
+#
+# Interface terms in discontinuous Galerkin methods (see the
+# [Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation) tutorial) are
+# assembled in a separate loop over the *interfaces* of the grid -- the interior facets,
+# materialized by [`interfaceskeleton`](@ref) as pairs of facets
+# `(facet_here, facet_there)`. An interface writes to the dofs of both its cells, so
+# concurrent assembly of two interfaces sharing a cell would race. Analogously to the
+# cell loop, [`create_interface_coloring`](@ref) partitions the interfaces into colors
+# such that all interfaces of one color can be assembled concurrently.
+#
+# For a purely discontinuous discretization (all dofs interior to the cells) pass
+# `discontinuous = true`: two interfaces then conflict only if they share a cell, which
+# needs very few colors (about the maximum number of facet neighbors of a cell plus
+# one). Note that in this case the accompanying *cell* loop needs no coloring at all,
+# since no dofs are shared between cells.
+#
+# The threaded loop follows the same pattern as the cell loop above: task local scratch
+# data holding an [`InterfaceCache`](@ref) (instead of a `CellCache`), an
+# `InterfaceValues` (instead of a `CellValues`), the local matrix, and an assembler.
+# Since the interfaces of a color are just a `Vector` of facet pairs, the chunking can
+# also be done manually, with the scratches allocated once outside of the color loop:
+#
+# ```julia
+# function assemble_interfaces!(
+#         K::SparseMatrixCSC, dh::DofHandler, colors, iv_template::InterfaceValues;
+#         ntasks = Threads.nthreads()
+#     )
+#     ni = 2 * ndofs_per_cell(dh) # dofs per interface (both cells)
+#     ## Allocate the scratches once, before the color loop
+#     scratches = [
+#         (;
+#             cache = InterfaceCache(dh), iv = copy(iv_template),
+#             Ki = zeros(ni, ni), assembler = start_assemble(K; fillzero = false),
+#         )
+#             for _ in 1:ntasks
+#     ]
+#     for color in colors
+#         ## Chunk the interfaces of this color and process each chunk in a task
+#         chunks = collect(Iterators.partition(color, cld(length(color), ntasks)))
+#         @sync for (i, chunk) in enumerate(chunks)
+#             Threads.@spawn begin
+#                 (; cache, iv, Ki, assembler) = scratches[$i]
+#                 for (facet_here, facet_there) in $chunk
+#                     reinit!(cache, facet_here, facet_there)
+#                     reinit!(iv, cache)
+#                     fill!(Ki, 0)
+#                     assemble_interface!(Ki, iv) # the element routine
+#                     assemble!(assembler, interfacedofs(cache), Ki)
+#                 end
+#             end
+#         end
+#     end
+#     return K
+# end
+#
+# ## Usage:
+# topology = ExclusiveTopology(grid)
+# colors = create_interface_coloring(grid, topology; discontinuous = true)
+# assemble_interfaces!(K, dh, colors, iv)
+# ```
+#
+# For serial code, or simple per-task loops, each color can also be iterated with
+# `InterfaceIterator(dh, color)` -- the [`InterfaceIterator`](@ref) accepts any subset
+# of the interface skeleton. Just like for the cell loop, atomic assembly
+# (`start_assemble(K; atomic = true)`) is an alternative that needs no interface
+# coloring at all: a single parallel loop over `interfaceskeleton(topology, grid)` can
+# then be used.
+
 using Test                                               #src
 nK1, nf1, aK1, af1 = main(; n = 5, ntasks = 1)           #src
 nK2, nf2, aK2, af2 = main(; n = 5, ntasks = 2)           #src

@@ -46,6 +46,7 @@ Ferrite.entity_codim
 ExclusiveTopology
 getneighborhood
 facetskeleton
+interfaceskeleton
 vertex_star_stencils
 getstencil
 ```

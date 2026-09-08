@@ -30,13 +30,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    both keyword arguments behave exactly as before. ([#1468])
 
 ### Added
- - New function `create_interface_coloring` for coloring the *interfaces* of a grid,
+ - New function `interfaceskeleton(topology, grid)` returning the *interfaces* of the
+   grid -- the interior facets, i.e. the subset of `facetskeleton` shared between two
+   cells -- as a `Vector` of facet pairs `(facet_here, facet_there)`. Like the facet
+   skeleton the result is cached in the topology. `InterfaceIterator` now iterates this
+   materialized skeleton, and gains methods taking an explicit subset of it,
+   `InterfaceIterator(grid_or_dh, set)`, analogous to passing a cellset to
+   `CellIterator`. ([#1501])
+ - New function `create_interface_coloring` for coloring the interfaces of a grid,
    for multithreading assembly loops over interfaces (e.g. interface terms in DG
-   methods). Each color is a vector of facet pairs which can be iterated with the new
-   `InterfaceIterator(grid_or_dh, set)` methods, analogous to passing a cellset to
-   `CellIterator`. For purely discontinuous discretizations (`discontinuous = true`)
-   two interfaces conflict only if they share a cell, resulting in very few colors.
-   ([#1501])
+   methods). The returned colors partition `interfaceskeleton` such that concurrent
+   assembly of the interfaces within one color is safe. For purely discontinuous
+   discretizations (`discontinuous = true`) two interfaces conflict only if they share
+   a cell, resulting in very few colors. See the updated
+   [multithreaded assembly how-to](https://ferrite-fem.github.io/Ferrite.jl/dev/howto/threaded_assembly/)
+   for usage. ([#1501])
  - Added mesh-free [`AlgebraicVariable`s](https://ferrite-fem.github.io/Ferrite.jl/dev/topics/algebraic_variables/)
    and coupling descriptors for small global unknowns such as Lagrange multipliers and
    homogenized quantities. See the documentation for details. ([#1422])

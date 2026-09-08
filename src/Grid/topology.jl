@@ -61,6 +61,7 @@ mutable struct ExclusiveTopology <: AbstractTopology
     # vertex_vertex_neighbor[cellid,local_vertex_id] -> exclusive connected entities to the given vertex
     vertex_vertex_neighbor::ArrayOfVectorViews{VertexIndex, 2}
     facet_skeleton::Union{Vector{FacetIndex}, Nothing}
+    interface_skeleton::Union{Vector{NTuple{2, FacetIndex}}, Nothing}
 end
 
 function ExclusiveTopology(grid::AbstractGrid{sdim}) where {sdim}
@@ -125,7 +126,7 @@ function ExclusiveTopology(grid::AbstractGrid{sdim}) where {sdim}
     face_face_neighbor = ArrayOfVectorViews(face_face_neighbor_buf)
     edge_edge_neighbor = ArrayOfVectorViews(edge_edge_neighbor_buf)
     vertex_vertex_neighbor = ArrayOfVectorViews(vertex_vertex_neighbor_buf)
-    return ExclusiveTopology(vertex_to_cell, cell_neighbor, face_face_neighbor, edge_edge_neighbor, vertex_vertex_neighbor, nothing)
+    return ExclusiveTopology(vertex_to_cell, cell_neighbor, face_face_neighbor, edge_edge_neighbor, vertex_vertex_neighbor, nothing, nothing)
 end
 
 function get_facet_facet_neighborhood(t::ExclusiveTopology, g::AbstractGrid)
@@ -540,6 +541,40 @@ function facetskeleton(top::ExclusiveTopology, grid::AbstractGrid)
         end
     end
     return top.facet_skeleton
+end
+
+"""
+    interfaceskeleton(top::ExclusiveTopology, grid::AbstractGrid)
+
+Materializes the *interfaces* of the grid -- the interior facets, i.e. facets shared
+between two cells -- as a `Vector` of facet pairs `(facet_here, facet_there)`, where
+both facets are described by `FacetIndex`.
+
+This is the subset of [`facetskeleton`](@ref) that excludes boundary facets, with the
+neighboring facet attached to each entry. The enumeration order matches the order in
+which [`InterfaceIterator`](@ref) visits the interfaces, and subsets of the returned
+vector can be iterated with `InterfaceIterator(grid_or_dh, subset)`, e.g. for
+multithreaded assembly of interface terms (see [`create_interface_coloring`](@ref)).
+
+Like `facetskeleton` the result is cached in the topology, so repeated calls return the
+same vector (which therefore must not be modified).
+"""
+function interfaceskeleton(top::ExclusiveTopology, grid::AbstractGrid)
+    if top.interface_skeleton === nothing
+        neighborhood = get_facet_facet_neighborhood(top, grid)
+        skeleton = NTuple{2, FacetIndex}[]
+        for facet_a in facetskeleton(top, grid)
+            neighbors = neighborhood[facet_a[1], facet_a[2]]
+            isempty(neighbors) && continue # boundary facet
+            length(neighbors) > 1 && error("multiple neighboring facets not supported yet")
+            facet_b = neighbors[1]
+            # Depending on the grid dimension the neighborhood is in terms of e.g.
+            # EdgeIndex, so canonicalize both sides to FacetIndex.
+            push!(skeleton, (FacetIndex(facet_a[1], facet_a[2]), FacetIndex(facet_b[1], facet_b[2])))
+        end
+        top.interface_skeleton = skeleton
+    end
+    return top.interface_skeleton
 end
 
 """

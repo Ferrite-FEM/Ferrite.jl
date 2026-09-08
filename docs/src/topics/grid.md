@@ -241,9 +241,11 @@ length(skeleton)
 For this grid the skeleton contains 24 unique facets (12 interior and 12 on the
 boundary), compared to the 9 × 4 = 36 cell-local facets. The skeleton is
 useful when something should be computed once per facet, e.g. integrals over material
-interfaces. For integrating jump and average terms over interior facets, as needed in
-discontinuous Galerkin methods, the [`InterfaceIterator`](@ref) (which uses the topology
-internally) is more convenient, see the
+interfaces. The interior facets alone -- the *interfaces* between two cells -- are
+returned by [`interfaceskeleton`](@ref) as pairs of facets `(facet_here, facet_there)`.
+For integrating jump and average terms over interfaces, as needed in
+discontinuous Galerkin methods, the [`InterfaceIterator`](@ref) (which iterates the
+interface skeleton, or any subset of it) is more convenient, see the
 [Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation) tutorial.
 
 ### Mixed reference dimensions

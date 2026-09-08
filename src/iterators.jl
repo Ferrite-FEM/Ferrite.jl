@@ -338,30 +338,24 @@ for ic in InterfaceIterator(grid, topology)
     # ...
 end
 ```
-is thus simply convenience for the following equivalent snippet for grids of dimensions > 1:
+is thus simply convenience for the following equivalent snippet:
 ```julia
 ic = InterfaceCache(grid)
-neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
-for facet in facetskeleton(topology, grid)
-    neighbors = neighborhood[facet[1], facet[2]]
-    isempty(neighbors) && continue
-    neighbor_facet = neighbors[1]
-    reinit!(ic, facet, neighbor_facet)
+for (facet_here, facet_there) in interfaceskeleton(topology, grid)
+    reinit!(ic, facet_here, facet_there)
     # ...
 end
 ```
 The methods taking an explicit `set` of interfaces -- pairs of facets `(facet_here,
-facet_there)` -- iterate exactly the given interfaces, analogously to passing a cellset
-to [`CellIterator`](@ref). This is useful e.g. for iterating one color from
-[`create_interface_coloring`](@ref).
+facet_there)`, i.e. a subset of [`interfaceskeleton`](@ref) -- iterate exactly the
+given interfaces, analogously to passing a cellset to [`CellIterator`](@ref). This is
+useful e.g. for iterating one color from [`create_interface_coloring`](@ref).
 !!! warning
     `InterfaceIterator` is stateful and should not be used for things other than `for`-looping
     (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
 """
-struct InterfaceIterator{IC <: InterfaceCache, G <: AbstractGrid, TopologyType <: Union{AbstractTopology, Nothing}, SetType <: Union{AbstractVector{NTuple{2, FacetIndex}}, Nothing}}
+struct InterfaceIterator{IC <: InterfaceCache, SetType <: AbstractVector{NTuple{2, FacetIndex}}}
     cache::IC
-    grid::G
-    topology::TopologyType
     set::SetType
 end
 
@@ -370,45 +364,25 @@ function InterfaceIterator(
         topology::ExclusiveTopology = ExclusiveTopology(gridordh isa Grid ? gridordh : get_grid(gridordh))
     )
     grid = gridordh isa Grid ? gridordh : get_grid(gridordh)
-    return InterfaceIterator(InterfaceCache(gridordh), grid, topology, nothing)
+    return InterfaceIterator(InterfaceCache(gridordh), interfaceskeleton(topology, grid))
 end
 
 function InterfaceIterator(
         gridordh::Union{Grid, AbstractDofHandler},
         set::AbstractVector{NTuple{2, FacetIndex}}
     )
-    grid = gridordh isa Grid ? gridordh : get_grid(gridordh)
-    return InterfaceIterator(InterfaceCache(gridordh), grid, nothing, set)
+    return InterfaceIterator(InterfaceCache(gridordh), set)
 end
 
 # Iterator interface
-@inline function Base.iterate(ii::InterfaceIterator, i::Integer)
-    # Iteration over an explicit set of interfaces (the branch is compile-time since
-    # `ii.set` is concretely typed)
-    if ii.set !== nothing
-        i > length(ii.set) && return nothing
-        facet_a, facet_b = ii.set[i]
-        reinit!(ii.cache, facet_a, facet_b)
-        return ii.cache, i + 1
-    end
-    # Iteration over all interfaces from the topology
-    return _iterate_all_interfaces(ii, i)
+@inline function Base.iterate(ii::InterfaceIterator, i::Integer = 1)
+    i > length(ii.set) && return nothing
+    facet_a, facet_b = ii.set[i]
+    reinit!(ii.cache, facet_a, facet_b)
+    return ii.cache, i + 1
 end
-@inline function _iterate_all_interfaces(ii::InterfaceIterator, i::Integer)
-    neighborhood = get_facet_facet_neighborhood(ii.topology, ii.grid) # TODO: This could be moved to InterfaceIterator constructor (potentially type-instable for non-union or mixed grids)
-    skeleton = facetskeleton(ii.topology, ii.grid)
-    while i <= length(skeleton)
-        facet_a = skeleton[i]; i += 1
-        neighbors = neighborhood[facet_a[1], facet_a[2]]
-        isempty(neighbors) && continue
-        length(neighbors) > 1 && error("multiple neighboring facets not supported yet")
-        facet_b = neighbors[1]
-        reinit!(ii.cache, facet_a, facet_b)
-        return ii.cache, i
-    end
-    return nothing
-end
-@inline Base.iterate(ii::InterfaceIterator) = iterate(ii, 1)
+@inline _getcache(ii::InterfaceIterator) = ii.cache
+@inline _getset(ii::InterfaceIterator) = ii.set
 
 # Iterator interface for CellIterator/FacetIterator
 const GridIterators{C} = Union{CellIterator{C}, FacetIterator{C}, InterfaceIterator{C}}

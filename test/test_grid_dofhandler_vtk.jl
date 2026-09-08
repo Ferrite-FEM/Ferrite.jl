@@ -764,10 +764,10 @@ end
         na = Set(Ferrite.get_node_ids(getcells(grid, a)))
         return a == b || any(v -> v in na, Ferrite.get_node_ids(getcells(grid, b)))
     end
-    # Interfaces of the grid (restricted to cellset), independently derived following
-    # the reference implementation in the InterfaceIterator docstring
+    # Interfaces of the grid (restricted to cellset), independently derived from the
+    # facet skeleton and the facet neighborhood
     function reference_interfaces(grid, topology, cellvec)
-        ref = Set{NTuple{2, FacetIndex}}()
+        ref = NTuple{2, FacetIndex}[]
         neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
         for facet in Ferrite.facetskeleton(topology, grid)
             neighbors = neighborhood[facet[1], facet[2]]
@@ -781,7 +781,7 @@ end
     function check_interface_coloring(grid; cellset = 1:getncells(grid))
         topology = ExclusiveTopology(grid)
         cellvec = sort!(unique!(collect(Int, cellset)))
-        ref = reference_interfaces(grid, topology, cellvec)
+        ref = Set(reference_interfaces(grid, topology, cellvec))
         for alg in (ColoringAlgorithm.WorkStream, ColoringAlgorithm.Greedy)
             for disc in (true, false)
                 colors = create_interface_coloring(grid, topology, cellset; alg, discontinuous = disc)
@@ -820,6 +820,27 @@ end
     check_interface_coloring(generate_grid(Quadrilateral, (5, 4)); cellset = 1:10)
     check_interface_coloring(generate_grid(Quadrilateral, (5, 4)); cellset = [1, 2, 3, 7, 8, 20])
     check_interface_coloring(generate_grid(Quadrilateral, (5, 4)); cellset = Int[])
+
+    # interfaceskeleton: matches the reference enumeration (content *and* order), is
+    # cached in the topology, and is what InterfaceIterator visits
+    for grid in (generate_grid(Quadrilateral, (5, 4)), generate_grid(Tetrahedron, (2, 2, 2)), generate_grid(Line, (5,)))
+        topology = ExclusiveTopology(grid)
+        skeleton = interfaceskeleton(topology, grid)
+        @test skeleton == reference_interfaces(grid, topology, 1:getncells(grid))
+        @test interfaceskeleton(topology, grid) === skeleton # cached
+        @test length(InterfaceIterator(grid, topology)) == length(skeleton)
+        visited = NTuple{2, FacetIndex}[]
+        for ic in InterfaceIterator(grid, topology)
+            fa = FacetIndex(cellid(ic.a), ic.a.current_facet_id)
+            fb = FacetIndex(cellid(ic.b), ic.b.current_facet_id)
+            push!(visited, (fa, fb))
+        end
+        @test visited == skeleton
+        # Colors partition the skeleton
+        colors = create_interface_coloring(grid, topology; discontinuous = true)
+        @test sum(length, colors; init = 0) == length(skeleton)
+        @test Set(Iterators.flatten(colors)) == Set(skeleton)
+    end
 
     # For purely discontinuous fields greedy coloring of the interface ("line") graph
     # needs few colors (about Δ + 1 where Δ is the max number of facet neighbors)
