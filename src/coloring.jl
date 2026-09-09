@@ -8,6 +8,27 @@ end
 _sorted_cellvec(cellset::AbstractUnitRange{Int}) = cellset
 _sorted_cellvec(cellset) = unique!(sort!(collect(Int, cellset)))
 
+# Sort the gathered candidates and append them, deduplicated, to `buf`, counting into
+# `colcount[cellid]`. The candidate list must not contain `cellid` itself.
+function _append_candidates_sorted_unique!(buf, colcount, candidates, cellid)
+    # QuickSort sorts in-place without allocations. The default algorithm dispatches
+    # to counting/radix sort which allocates a workspace on each call so we use QuickSort
+    # which performs better here.
+    sort!(candidates; alg = QuickSort)
+    # A candidate may occur multiple times (e.g. a neighbor sharing k nodes with the cell
+    # occurs k times). After sorting, duplicates are adjacent and can be skipped by
+    # comparing with the previous entry (a unique! fused with the counting).
+    prev = 0
+    for cell_neighbour in candidates
+        if cell_neighbour != prev
+            push!(buf, cell_neighbour)
+            colcount[cellid] += 1
+            prev = cell_neighbour
+        end
+    end
+    return buf
+end
+
 function _gather_neighbor_chunk!(colcount, grid, cellvec, chunk, nodeptr, nodecells)
     buf = Int[]
     candidates = Int[]
@@ -23,35 +44,13 @@ function _gather_neighbor_chunk!(colcount, grid, cellvec, chunk, nodeptr, nodece
                 cell_neighbour == cellid || push!(candidates, cell_neighbour)
             end
         end
-        # QuickSort sorts in-place without allocations. The default algorithm dispatches
-        # to counting/radix sort which allocates a workspace on each call so we use QuickSort
-        # which performs better here.
-        sort!(candidates; alg = QuickSort)
-        # Each per-node cell list in nodecells is duplicate-free, but candidates
-        # concatenates the lists of all nodes of this cell, so a neighbor sharing k nodes
-        # with the cell occurs k times. After sorting, duplicates are adjacent and can be
-        # skipped by comparing with the previous entry (a unique! fused with the counting).
-        prev = 0
-        for cell_neighbour in candidates
-            if cell_neighbour != prev
-                push!(buf, cell_neighbour)
-                colcount[cellid] += 1
-                prev = cell_neighbour
-            end
-        end
+        _append_candidates_sorted_unique!(buf, colcount, candidates, cellid)
     end
     return buf
 end
 
-# Incidence matrix for element connections in the grid
-function create_incidence_matrix(grid::AbstractGrid, cellset = 1:getncells(grid))
-    ncells = getncells(grid)
-    cellvec = _sorted_cellvec(cellset)
-    if isempty(cellvec)
-        return SparseArrays.spzeros(Bool, Int, ncells, ncells)
-    end
-
-    # Map from node id to the cells in the cellset containing it, in CSR-like form.
+# Map from node id to the cells in `cellvec` containing it, in CSR-like form.
+function _build_node_to_cell_map(grid::AbstractGrid, cellvec)
     nnodes = getnnodes(grid)
     nodeptr = zeros(Int, nnodes + 1)
     nodeptr[1] = 1
@@ -71,32 +70,54 @@ function create_incidence_matrix(grid::AbstractGrid, cellset = 1:getncells(grid)
             cursor[v] += 1
         end
     end
+    return nodeptr, nodecells
+end
 
-    # For each cell, gather the unique cells sharing at least one node with it.
-    # Since `cellvec` is sorted, each chunk corresponds to a contiguous range of
-    # columns in the CSC structure, so the chunk buffers can be computed in
-    # parallel and afterwards concatenated to form rowval.
+# Run `gather!(counts, chunk) -> buf` over contiguous chunks of `cellvec` in parallel and
+# assemble the per-chunk buffers into a CSR-like (ptr, adj) structure over all cells.
+# Since `cellvec` is sorted and the chunks are contiguous, each chunk's buffer is a
+# contiguous range of the output, which makes the result independent of the number of
+# threads.
+function _chunked_gather!(gather!::F, ncells::Int, cellvec) where {F}
     chunks = collect(_color_chunks(length(cellvec), Threads.nthreads()))
-    colcount = zeros(Int, ncells)
+    counts = zeros(Int, ncells)
     buffers = Vector{Vector{Int}}(undef, length(chunks))
     @sync for (ci, chunk) in enumerate(chunks)
         Threads.@spawn begin
-            buffers[$ci] = _gather_neighbor_chunk!(colcount, grid, cellvec, $chunk, nodeptr, nodecells)
+            buffers[$ci] = gather!(counts, $chunk)
         end
     end
-
-    colptr = Vector{Int}(undef, ncells + 1)
-    colptr[1] = 1
+    ptr = Vector{Int}(undef, ncells + 1)
+    ptr[1] = 1
     for c in 1:ncells
-        colptr[c + 1] = colptr[c] + colcount[c]
+        ptr[c + 1] = ptr[c] + counts[c]
     end
-    rowval = Vector{Int}(undef, colptr[end] - 1)
-    @assert length(rowval) == sum(length, buffers; init = 0)
+    adj = Vector{Int}(undef, ptr[end] - 1)
+    @assert length(adj) == sum(length, buffers; init = 0)
     # This loop is trivially parallelizable but it is just a memcpy so there is no
     # measurable speedup from doing so.
     for (ci, chunk) in enumerate(chunks)
         buf = buffers[ci]
-        copyto!(rowval, colptr[cellvec[first(chunk)]], buf, 1, length(buf))
+        copyto!(adj, ptr[cellvec[first(chunk)]], buf, 1, length(buf))
+    end
+    return ptr, adj
+end
+
+# Incidence matrix for element connections in the grid
+function create_incidence_matrix(grid::AbstractGrid, cellset = 1:getncells(grid))
+    ncells = getncells(grid)
+    cellvec = _sorted_cellvec(cellset)
+    if isempty(cellvec)
+        return SparseArrays.spzeros(Bool, Int, ncells, ncells)
+    end
+
+    nodeptr, nodecells = _build_node_to_cell_map(grid, cellvec)
+
+    # For each cell, gather the unique cells sharing at least one node with it. The
+    # chunked gather makes the result independent of the number of threads (see
+    # `_chunked_gather!`).
+    colptr, rowval = _chunked_gather!(ncells, cellvec) do counts, chunk
+        _gather_neighbor_chunk!(counts, grid, cellvec, chunk, nodeptr, nodecells)
     end
     nzval = fill(true, length(rowval))
     return SparseMatrixCSC(ncells, ncells, colptr, rowval, nzval)
@@ -268,12 +289,26 @@ const GREEDY = ColoringAlgorithm.Greedy
 const WORKSTREAM = ColoringAlgorithm.WorkStream
 
 """
-    create_coloring(g::Grid, cellset = 1:getncells(g); alg::ColoringAlgorithm)
+    create_coloring(
+        grid::AbstractGrid, set = 1:getncells(grid);
+        alg::ColoringAlgorithm, cells_share_dofs::Bool = true
+    )
 
-Create a coloring of the cells in grid `g` such that no neighboring cells
-have the same color. If only a subset of cells should be colored, the cells to color can be specified by `cellset`.
+Create a coloring of the items in `set` such that no two conflicting items -- items
+whose (concurrent) assembly may write to the same entries of the global matrix and
+vector -- have the same color. The returned colors partition `set`, and all items of
+one color can therefore be assembled concurrently.
 
-Returns a vector of vectors with cell indexes, e.g.:
+The items to color are determined by the element type of `set`:
+ - cells (`Int`), e.g. a cellset (default: all cells of the grid). A cell writes to the
+   dofs of the cell.
+ - facets (`FacetIndex`), e.g. a facetset for assembly of boundary terms. A facet
+   writes to the dofs of its cell.
+ - interfaces (`NTuple{2, FacetIndex}`), e.g. [`interfaceskeleton`](@ref) or a subset
+   of it for assembly of interface terms in DG methods. An interface writes to the dofs
+   of its two cells.
+
+Returns a vector of vectors of items, e.g. for cells:
 
 ```julia
 ret = [
@@ -282,14 +317,37 @@ ret = [
 ]
 ```
 
+The colors are processed one after another, with the items of each color distributed
+over concurrent tasks. See the [multithreaded assembly how-to](@ref howto-threaded-assembly)
+for complete examples.
+
+With the default `cells_share_dofs = true` the coloring is conservative: two items conflict
+if a cell of one is node-adjacent to (or equal to) a cell of the other, which is safe
+also when dofs are shared between cells (continuous fields place dofs on vertices,
+edges, and faces, shared with all node neighbors of the cell). If *no* dofs are shared
+between cells -- every field written by the assembly has all dofs interior to the
+cells, e.g. [`DiscontinuousLagrange`](@ref) -- this can be sharpened by passing
+`cells_share_dofs = false`, in which case two items conflict only if they write to the same
+cell, resulting in significantly fewer colors. In particular, cells then never conflict
+and the cell loop needs no coloring (a single color is returned). Note that a
+discretization being "discontinuous" is not sufficient: e.g. `CrouzeixRaviart` is
+discontinuous but places (shared) dofs on the facets.
+
+Conflicts are only considered among the items in `set`, since only these are assembled
+by the corresponding loop. Duplicate cells in a cellset are ignored, while facets and
+interfaces must appear at most once in `set` (and interfaces in one orientation).
+Constraint condensation during assembly ([`apply_assemble!`](@ref) with e.g.
+[`AffineConstraint`](@ref)s) can write outside of the item dofs and is not accounted
+for here.
+
 Two different algorithms are available, specified with the `alg` keyword argument:
  - `alg = ColoringAlgorithm.WorkStream` (default): Three step algorithm from
    Turcksin et al. [Turcksin2016](@cite), albeit with a greedy coloring in the second step. Generally results in more colors than
-   `ColoringAlgorithm.Greedy`, however the cells are more equally distributed among the colors.
+   `ColoringAlgorithm.Greedy`, however the items are more equally distributed among the colors.
  - `alg = ColoringAlgorithm.Greedy`: greedy algorithm that works well for structured quadrilateral grids such as
    e.g. quadrilateral grids from `generate_grid`.
 
-The resulting colors can be visualized using [`Ferrite.write_cell_colors`](@ref).
+The resulting cell colors can be visualized using [`Ferrite.write_cell_colors`](@ref).
 
 !!! note "Cell to color mapping"
     In a previous version of Ferrite this function returned a dictionary mapping
@@ -305,8 +363,46 @@ The resulting colors can be visualized using [`Ferrite.write_cell_colors`](@ref)
 # References
  - [Turcksin2016](@cite) Turcksin et al. ACM Trans. Math. Softw. 43 (2016).
 """
-function create_coloring(g::AbstractGrid, cellset = 1:getncells(g); alg::ColoringAlgorithm.T = ColoringAlgorithm.WorkStream)
-    incidence_matrix = create_incidence_matrix(g, cellset)
+function create_coloring(
+        grid::AbstractGrid, set = 1:getncells(grid);
+        alg::ColoringAlgorithm.T = ColoringAlgorithm.WorkStream,
+        cells_share_dofs::Bool = true,
+    )
+    return _create_coloring(eltype(set), grid, set, alg, cells_share_dofs)
+end
+
+# Cells
+function _create_coloring(
+        ::Type{<:Integer}, grid::AbstractGrid, cellset, alg::ColoringAlgorithm.T,
+        cells_share_dofs::Bool
+    )
+    if !cells_share_dofs
+        # The write sets of any two (distinct) cells are disjoint
+        cellvec = _sorted_cellvec(cellset)
+        return isempty(cellvec) ? Vector{Int}[] : Vector{Int}[collect(Int, cellvec)]
+    end
+    incidence_matrix = create_incidence_matrix(grid, cellset)
+    return _color_incidence_matrix(incidence_matrix, cellset, alg)
+end
+
+# Facets and interfaces
+function _create_coloring(
+        ::Type{T}, grid::AbstractGrid, set, alg::ColoringAlgorithm.T, cells_share_dofs::Bool
+    ) where {T <: Union{FacetIndex, NTuple{2, FacetIndex}}}
+    items = set isa AbstractVector{T} ? set : collect(T, set)
+    ncells = getncells(grid)
+    for item in items
+        if !all(c -> 1 <= c <= ncells, _item_cells(item))
+            throw(ArgumentError("$item refers to a cell id out of range for a grid with $ncells cells"))
+        end
+    end
+    if !allunique(items)
+        throw(ArgumentError("the set contains duplicate entries"))
+    end
+    return _color_items(grid, items, alg, cells_share_dofs)
+end
+
+function _color_incidence_matrix(incidence_matrix, cellset, alg::ColoringAlgorithm.T)
     if alg === ColoringAlgorithm.WorkStream
         return workstream_coloring(incidence_matrix, cellset)
     elseif alg === ColoringAlgorithm.Greedy
@@ -314,4 +410,119 @@ function create_coloring(g::AbstractGrid, cellset = 1:getncells(g); alg::Colorin
     else
         error("impossible")
     end
+end
+
+################################
+# Facet and interface coloring #
+################################
+
+# The cells an item writes to
+_item_cells(facet::FacetIndex) = (facet[1],)
+_item_cells((facet_a, facet_b)::NTuple{2, FacetIndex}) = (facet_a[1], facet_b[1])
+
+# Map from cell id to the ids (indices into `items`) of the items writing to it, in
+# CSR-like form. Since items are enumerated in order the per-cell lists are sorted.
+function _cell_to_item_map(ncells::Int, items)
+    ptr = zeros(Int, ncells + 1)
+    ptr[1] = 1
+    for item in items
+        for c in _item_cells(item)
+            ptr[c + 1] += 1
+        end
+    end
+    for i in 2:(ncells + 1)
+        ptr[i] += ptr[i - 1]
+    end
+    adj = Vector{Int}(undef, ptr[end] - 1)
+    cursor = copy(ptr)
+    for (k, item) in pairs(items)
+        for c in _item_cells(item)
+            adj[cursor[c]] = k
+            cursor[c] += 1
+        end
+    end
+    return ptr, adj
+end
+
+# Conflict gather for items when all dofs written are cell-interior (purely
+# discontinuous fields): two items conflict iff they write to a common cell. For
+# interfaces this is the "line graph" of the facet adjacency, which needs at most Δ + 1
+# colors where Δ is the maximum number of facet neighbors of a cell.
+function _gather_item_cell_chunk!(count, items, chunk, iptr, iadj)
+    buf = Int[]
+    candidates = Int[]
+    for k in chunk
+        empty!(candidates)
+        for c in _item_cells(items[k])
+            for r in iptr[c]:(iptr[c + 1] - 1)
+                j = iadj[r]
+                j == k || push!(candidates, j)
+            end
+        end
+        _append_candidates_sorted_unique!(buf, count, candidates, k)
+    end
+    return buf
+end
+
+# Conservative conflict gather for items: when continuous fields are written the item
+# also writes dofs shared with the node neighbors of its cells, so two items conflict iff
+# a cell of one is node-adjacent to (or equal to) a cell of the other. This is a superset
+# of the common-cell graph above.
+function _gather_item_node_chunk!(count, grid, items, chunk, nodeptr, nodecells, iptr, iadj)
+    buf = Int[]
+    candidates = Int[]
+    for k in chunk
+        empty!(candidates)
+        for c in _item_cells(items[k])
+            for v in get_node_ids(getcells(grid, c))
+                for r in nodeptr[v]:(nodeptr[v + 1] - 1)
+                    # Cell node-adjacent to (or equal to) c: all its items conflict
+                    d = nodecells[r]
+                    for r2 in iptr[d]:(iptr[d + 1] - 1)
+                        j = iadj[r2]
+                        j == k || push!(candidates, j)
+                    end
+                end
+            end
+        end
+        _append_candidates_sorted_unique!(buf, count, candidates, k)
+    end
+    return buf
+end
+
+# The sorted unique cells written to by the items
+function _item_cellvec(items)
+    cells = Int[]
+    for item in items
+        append!(cells, _item_cells(item))
+    end
+    return unique!(sort!(cells))
+end
+
+function _color_items(
+        grid::AbstractGrid, items::AbstractVector{T}, alg::ColoringAlgorithm.T,
+        cells_share_dofs::Bool
+    ) where {T}
+    nitems = length(items)
+    if nitems == 0
+        return Vector{T}[]
+    end
+    iptr, iadj = _cell_to_item_map(getncells(grid), items)
+    local colptr, rowval
+    if !cells_share_dofs
+        colptr, rowval = _chunked_gather!(nitems, 1:nitems) do counts, chunk
+            _gather_item_cell_chunk!(counts, items, chunk, iptr, iadj)
+        end
+    else
+        # Only node sharing between cells of the given items matters (other cells are
+        # not assembled), so the node map over those cells captures all conflicts.
+        cellvec = _item_cellvec(items)
+        nodeptr, nodecells = _build_node_to_cell_map(grid, cellvec)
+        colptr, rowval = _chunked_gather!(nitems, 1:nitems) do counts, chunk
+            _gather_item_node_chunk!(counts, grid, items, chunk, nodeptr, nodecells, iptr, iadj)
+        end
+    end
+    incidence_matrix = SparseMatrixCSC(nitems, nitems, colptr, rowval, fill(true, length(rowval)))
+    id_colors = _color_incidence_matrix(incidence_matrix, 1:nitems, alg)
+    return Vector{T}[items[ids] for ids in id_colors]
 end

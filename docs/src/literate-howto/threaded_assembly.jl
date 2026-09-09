@@ -405,6 +405,135 @@ nothing # hide
 # the timings above, the atomic version doesn't pay for the grid coloring itself, which
 # for this grid takes about 0.3 seconds).
 
+# ### [Threaded assembly of interface terms](@id howto-threaded-assembly-interfaces)
+#
+# Interface terms in discontinuous Galerkin methods (see the
+# [Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation) tutorial) are
+# assembled in a separate loop over the *interfaces* of the grid (the interior facets,
+# materialized by [`interfaceskeleton`](@ref) as pairs of facets
+# `(facet_here, facet_there)`). An interface writes to the dofs of both its cells, so
+# concurrent assembly of two interfaces sharing a cell would race. Analogously to the
+# cell loop, passing the interfaces to [`create_coloring`](@ref), i.e.
+# `create_coloring(grid, interfaceskeleton(topology, grid))`, partitions them into
+# colors such that all interfaces of one color can be assembled concurrently. (In the
+# same way, passing a facetset colors the facets for a threaded boundary loop over
+# [`FacetIterator`](@ref).)
+#
+# When no dofs are shared between cells (every field has all dofs interior to the
+# cells, e.g. `DiscontinuousLagrange`) pass `cells_share_dofs = false`: two interfaces
+# then conflict only if they share a cell, which needs very few colors (about the
+# maximum number of facet neighbors of a cell plus one). Note that in this case the
+# accompanying *cell* loop needs no coloring at all, since the write sets of any two
+# cells are disjoint (`create_coloring(grid; cells_share_dofs = false)` returns a single
+# color).
+#
+# As an example we assemble the interface terms of the symmetric interior penalty
+# method for the heat equation, with the same element routine as in the
+# [Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation) tutorial
+# (refer to the tutorial for the theory; here we use a constant penalty parameter `μ`
+# since the grid is uniform):
+
+function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
+    for q_point in 1:getnquadpoints(iv)
+        normal = getnormal(iv, q_point)
+        dΓ = getdetJdV(iv, q_point)
+        for i in 1:getnbasefunctions(iv)
+            δu_jump = shape_value_jump(iv, q_point, i) * (-normal)
+            ∇δu_avg = shape_gradient_average(iv, q_point, i)
+            for j in 1:getnbasefunctions(iv)
+                u_jump = shape_value_jump(iv, q_point, j) * (-normal)
+                ∇u_avg = shape_gradient_average(iv, q_point, j)
+                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump) * dΓ + μ * (δu_jump ⋅ u_jump) * dΓ
+            end
+        end
+    end
+    return Ki
+end
+nothing # hide
+
+# The threaded loop follows the same pattern as the cell loop above, with an
+# [`InterfaceCache`](@ref) instead of a `CellCache` and an `InterfaceValues` instead of a
+# `CellValues` as task local scratch data. Since the interfaces of a color are just a
+# `Vector` of facet pairs `(facet_here, facet_there)` we loop over them directly and
+# `reinit!` the cache with each pair:
+
+function assemble_interfaces!(
+        K::SparseMatrixCSC, dh::DofHandler, colors, iv::InterfaceValues, μ::Float64;
+        ntasks = Threads.nthreads()
+    )
+    ## Create the assembler (which zeroes out existing data in K) once, before the
+    ## parallel loop
+    assembler = start_assemble(K)
+    ## Interface cache and local matrix
+    cache = InterfaceCache(dh)
+    ni = 2 * ndofs_per_cell(dh) # dofs per interface (both cells)
+    Ki = zeros(ni, ni)
+    ## Loop over the colors
+    for color in colors
+        scheduler = OhMyThreads.DynamicScheduler(; ntasks)
+        ## Parallelize the loop over the interfaces in this color
+        OhMyThreads.@tasks for (facet_here, facet_there) in color
+            @set scheduler = scheduler
+            ## Task local scratch data, created once for each task
+            @local begin
+                cache = task_local_copy(cache)
+                iv = task_local_copy(iv)
+                Ki = task_local_copy(Ki)
+                assembler = task_local_copy(assembler)
+            end
+            ## Reinitialize the interface cache and then the interface values
+            reinit!(cache, facet_here, facet_there)
+            reinit!(iv, cache)
+            fill!(Ki, 0)
+            ## Compute and assemble the local contribution of the interface
+            assemble_interface!(Ki, iv, μ)
+            assemble!(assembler, interfacedofs(cache), Ki)
+        end
+    end
+    return K
+end
+nothing # hide
+
+# Finally we set up a discontinuous discretization and assemble. Note that the cell
+# contributions (not shown here) could be assembled in a single parallel loop over all
+# cells without any coloring, as discussed above.
+
+function main_interfaces(; n = 8, ntasks = Threads.nthreads())
+    ## Grid, dofs and topology
+    grid = generate_grid(Hexahedron, (n, n, n))
+    ip = DiscontinuousLagrange{RefHexahedron, 1}()
+    dh = DofHandler(grid)
+    add!(dh, :u, ip)
+    close!(dh)
+    topology = ExclusiveTopology(grid)
+    ## Color the interfaces: all dofs are interior to the cells, so we can pass
+    ## `cells_share_dofs = false` for the minimal number of colors
+    colors = create_coloring(grid, interfaceskeleton(topology, grid); cells_share_dofs = false)
+    ## Global matrix with interface entries in the sparsity pattern
+    K = allocate_matrix(dh; topology, interface_coupling = trues(1, 1))
+    ## InterfaceValues and penalty parameter
+    iv = InterfaceValues(FacetQuadratureRule{RefHexahedron}(2), ip)
+    μ = 8 / (2 / n) # (1 + order)^dim / h_e for this uniform grid
+    ## Compile and time the interface assembly
+    assemble_interfaces!(K, dh, colors, iv, μ; ntasks)
+    @time assemble_interfaces!(K, dh, colors, iv, μ; ntasks)
+    return K
+end
+
+main_interfaces();
+
+# For serial code, or simple per-task loops, each color can also be iterated with
+# `InterfaceIterator(dh, color)`, since the [`InterfaceIterator`](@ref) accepts any
+# subset of the interface skeleton.
+#
+# Finally, just like for the cell loop,
+# [atomic assembly](@ref howto-threaded-assembly-atomic) works for interface assembly
+# too: with `start_assemble(K; atomic = true)` no interface coloring is needed and all
+# of `interfaceskeleton(topology, grid)` can be processed in a single parallel loop, in
+# natural order and without synchronization between colors. The trade-offs are the same
+# as discussed for the cell loop above, in particular that the accumulation order, and
+# thereby the result, depends on the task scheduling.
+
 using Test                                               #src
 nK1, nf1, aK1, af1 = main(; n = 5, ntasks = 1)           #src
 nK2, nf2, aK2, af2 = main(; n = 5, ntasks = 2)           #src
@@ -419,6 +548,31 @@ nK4, nf4, aK4, af4 = main(; n = 5, ntasks = 4)           #src
 @test af2 ≈ nf1                                          #src
 @test aK4 ≈ nK1                                          #src
 @test af4 ≈ nf1                                          #src
+## Colored interface assembly is deterministic (bitwise identical for any ntasks,     #src
+## since the write sets within a color are disjoint and the color order is fixed)     #src
+iK1 = main_interfaces(; n = 4, ntasks = 1)               #src
+iK2 = main_interfaces(; n = 4, ntasks = 2)               #src
+iK4 = main_interfaces(; n = 4, ntasks = 4)               #src
+@test iK1.nzval == iK2.nzval == iK4.nzval                #src
+## ... and matches a serial loop over all interfaces up to summation order            #src
+let grid = generate_grid(Hexahedron, (4, 4, 4)),         #src
+        topology = ExclusiveTopology(grid)               #src
+    ip = DiscontinuousLagrange{RefHexahedron, 1}()       #src
+    dh = DofHandler(grid)                                #src
+    add!(dh, :u, ip)                                     #src
+    close!(dh)                                           #src
+    K = allocate_matrix(dh; topology, interface_coupling = trues(1, 1)) #src
+    iv = InterfaceValues(FacetQuadratureRule{RefHexahedron}(2), ip)     #src
+    Ki = zeros(2 * ndofs_per_cell(dh), 2 * ndofs_per_cell(dh))          #src
+    assembler = start_assemble(K)                        #src
+    for ic in InterfaceIterator(dh, topology)            #src
+        reinit!(iv, ic)                                  #src
+        fill!(Ki, 0)                                     #src
+        assemble_interface!(Ki, iv, 8 / (2 / 4))         #src
+        assemble!(assembler, interfacedofs(ic), Ki)      #src
+    end                                                  #src
+    @test K.nzval ≈ iK1.nzval                            #src
+end                                                      #src
 
 #md # ## [Plain program](@id threaded_assembly-plain-program)
 #md #
