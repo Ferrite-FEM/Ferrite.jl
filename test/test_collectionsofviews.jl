@@ -1,4 +1,25 @@
 @testset "ArrayOfVectorViews" begin
+    @testset "checked offsets" begin
+        for indices in ([0, 2], [-1, 2], [1, 3], [2, 1], [typemin(Int), 1], [1, typemax(Int)])
+            @test_throws ArgumentError Ferrite.ArrayOfVectorViews(indices, [1.0], LinearIndices((1,)))
+        end
+        for indices in (Int[], [1], [1, 2, 2])
+            @test_throws DimensionMismatch Ferrite.ArrayOfVectorViews(indices, [1.0], LinearIndices((1,)))
+        end
+        for dims in ((0,), (0, 2))
+            a = Ferrite.ArrayOfVectorViews([1], Float64[], LinearIndices(dims))
+            @test size(a) == dims
+            @test isempty(a)
+        end
+        a = Ferrite.ArrayOfVectorViews([1, 1, 2, 2], [10.0], LinearIndices((3,)))
+        @test isempty(a[1])
+        @test a[2] == [10.0]
+        @test isempty(a[3])
+        # Views may use only part of the backing data.
+        a = Ferrite.ArrayOfVectorViews([2, 3], [10.0, 20.0, 30.0], LinearIndices((1,)))
+        @test a[1] == [20.0]
+    end
+
     # Create a vector sorting integers into bins and check
     test_ints = rand(0:99, 100)
     # Create for 3 different sizehints
@@ -43,4 +64,25 @@
             @test count(x -> all(map((z, r) -> z ∈ r, x, intervals)), tvals) == length(v)
         end
     end
+end
+
+@testset "insert_sorted_at_index!" begin
+    using Ferrite.CollectionsOfViews: ConstructionBuffer, insert_sorted_at_index!
+    # Insert random values (with duplicates) at random indices; every view must equal the
+    # sorted-unique values inserted at that index, for good and bad sizehints.
+    vals = rand(0:99, 500)
+    idxs = rand(1:10, 500)
+    for sizehint in (1, 4, 64)
+        b = ConstructionBuffer(Int[], (10,), sizehint)
+        for (idx, v) in zip(idxs, vals)
+            insert_sorted_at_index!(b, v, idx)
+        end
+        aov = Ferrite.ArrayOfVectorViews(b)
+        for i in 1:10
+            expected = sort!(unique!(vals[idxs .== i]))
+            @test aov[i] == expected
+        end
+    end
+    # Only defined for one-dimensional buffers
+    @test_throws MethodError insert_sorted_at_index!(ConstructionBuffer(Int[], (3, 3), 2), 1, 2, 3)
 end

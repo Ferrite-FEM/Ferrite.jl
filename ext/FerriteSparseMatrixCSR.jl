@@ -1,7 +1,7 @@
 module FerriteSparseMatrixCSR
 
 using Ferrite, SparseArrays, SparseMatricesCSR
-import Ferrite: AbstractSparsityPattern, CSRAssembler, FastSparsityPattern, getnrows, getncols
+import Ferrite: AbstractSparsityPattern, CSRAssembler, DofCoefficients, getnrows, getncols
 import Base: @propagate_inbounds
 
 # Could be generalized if https://github.com/JuliaSparse/SparseArrays.jl/pull/546 is merged
@@ -16,8 +16,12 @@ end
         K::SparseMatrixCSR, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-        sym::Bool, atomic::Val = Val(false)
+        sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
     )
+    if Ferrite._has_repeated_dofs(sortedcoldofs)
+        return Ferrite._assemble_repeated!(K, Ke, sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
+    end
+
     current_row = 1
     ld = length(coldofs)
     ncols = size(K, 2)
@@ -53,7 +57,7 @@ end
                 else
                     # No entry exists in the global matrix for this column, which is
                     # allowed as long as the value which would have been inserted is zero.
-                    iszero(Ke[Kerow, colpermutation[ci]]) || Ferrite._missing_sparsity_pattern_error(Krow, Kecol_dof)
+                    iszero(Ke[Kerow, colpermutation[ci]]) || Ferrite._missing_sparsity_pattern_error(Krow + rowoffset, Kecol_dof + coloffset)
                     lo = C
                 end
             end
@@ -78,7 +82,7 @@ end
             else # Kcol > Kecol_dof
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
-                iszero(Ke[Kerow, colpermutation[ci]]) || Ferrite._missing_sparsity_pattern_error(Krow, Kecol_dof)
+                iszero(Ke[Kerow, colpermutation[ci]]) || Ferrite._missing_sparsity_pattern_error(Krow + rowoffset, Kecol_dof + coloffset)
                 # Advance the local matrix row pointer
                 ci += 1
             end
@@ -86,30 +90,69 @@ end
         # Make sure that remaining entries in this column of the local matrix are all zero
         for i in ci:maxlookups
             if !iszero(Ke[Kerow, colpermutation[i]])
-                Ferrite._missing_sparsity_pattern_error(Krow, sortedcoldofs[i])
+                Ferrite._missing_sparsity_pattern_error(Krow + rowoffset, sortedcoldofs[i] + coloffset)
             end
         end
         current_row += 1
     end
 end
 
-function Ferrite.zero_out_rows!(K::SparseMatrixCSR, ch::ConstraintHandler)
-    @debug @assert issorted(ch.prescribed_dofs)
-    for row in ch.prescribed_dofs
-        r = nzrange(K, row)
-        K.nzval[r] .= 0.0
-    end
-    return
+###########################################################
+## Constraint application (see the devdocs on assembly)  ##
+###########################################################
+
+# CSR is the mirror image of CSC: the rows are stored contiguously ("the majors") and the
+# stored column indices are the minors. That is all the shared kernels in Ferrite need to know,
+# so every method below is a one-liner picking the major or the minor variant.
+#
+# Restricted to `SparseMatrixCSR{1}` throughout: `colvals` returns the raw index array, which
+# for `Bi = 0` holds 0-based column indices, and the kernels index it as a 1-based dof number.
+Ferrite.minor_indices(K::SparseMatrixCSR{1}) = colvals(K)
+
+function Ferrite.zero_out_rows!(K::SparseMatrixCSR{1}, rows::AbstractVector{<:Integer}, ::AbstractVector{Bool})
+    return Ferrite._zero_out_majors!(K, rows)
 end
 
-function Ferrite.zero_out_columns!(K::SparseMatrixCSR, ch::ConstraintHandler)
-    @boundscheck checkbounds(ch.isconstrained, axes(K, 2))
-    colval = K.colval
-    nzval = K.nzval
-    return @inbounds for (i, col) in pairs(colval)
-        if ch.isconstrained[col]
-            nzval[i] = 0
-        end
+function Ferrite.zero_out_columns!(K::SparseMatrixCSR{1}, ::AbstractVector{<:Integer}, mask::AbstractVector{Bool})
+    @boundscheck checkbounds(mask, axes(K, 2))
+    return Ferrite._zero_out_minors!(K, mask)
+end
+
+# The prescribed columns are minors here, so they are spread over all rows and every stored
+# entry has to be visited.
+function Ferrite.add_inhomogeneities!(f::AbstractVector, K::SparseMatrixCSR{1}, columns::AbstractVector{<:Integer}, inhomogeneities::AbstractVector)
+    return Ferrite._add_inhomogeneities_minors!(f, K, columns, inhomogeneities)
+end
+
+function Ferrite.condense_into!(
+        Kdst::AbstractMatrix, K::SparseMatrixCSR{1}, rowoffset::Int, coloffset::Int,
+        dofcoefficients::Vector, dofmapping::Dict{<:Integer, <:Integer},
+    )
+    return Ferrite._condense_majors!(Kdst, K, Ferrite.MajorIsRow(), rowoffset, coloffset, dofcoefficients, dofmapping)
+end
+
+function Ferrite._condense!(K::SparseMatrixCSR{1}, f::AbstractVector, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, dofmapping::Dict{<:Integer, <:Integer}, sym::Bool = false) where {T, Ti}
+    return Ferrite._condense_sparse!(K, f, dofcoefficients, dofmapping, sym)
+end
+
+# Mirror of `Ferrite.addindex!(::SparseMatrixCSC, ...)` in src/arrayutils.jl. Needed to write
+# the affine contributions of `condense_into!`/`_condense_local!` into a CSR matrix, and to
+# assemble into CSR blocks of a blocked matrix.
+function Ferrite.addindex!(A::SparseMatrixCSR{Bi, Tv}, v::Tv, i::Int, j::Int, ::Val{atomic} = Val(false)) where {Bi, Tv, atomic}
+    @boundscheck checkbounds(A, i, j)
+    # Return early if v is 0
+    iszero(v) && return A
+    # Search row i for column j
+    nzr = nzrange(A, i)
+    stored_j = j - (1 - Bi)
+    searchk = searchsortedfirst(A.colval, stored_j, first(nzr), last(nzr), Base.Order.Forward)
+    if searchk <= last(nzr) && A.colval[searchk] == stored_j
+        # Row i contains entry A[i,j]. Update and return.
+        Ferrite.addindex!(A.nzval, v, searchk, Val{atomic}())
+        return A
+    else
+        # (i, j) not stored. Throw.
+        throw(Ferrite.SparsityError())
     end
 end
 
@@ -121,69 +164,71 @@ function Ferrite.allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::Abstrac
     return _allocate_matrix(SparseMatrixCSR{1, Tv, Ti}, sp, false)
 end
 
+# Copy one pattern row into `dest` starting at `k` (only used by _allocate_matrix below):
+# bulk copy for `AbstractVector` rows (e.g. `SparsityPattern`), iteration fallback for other
+# iterables (e.g. `BlockSparsityPattern`'s lazy rows).
+function _copyto!(dest::Vector, k::Int, colidxs::AbstractVector)
+    copyto!(dest, k, colidxs, 1, length(colidxs))
+    return k + length(colidxs)
+end
+function _copyto!(dest::Vector, k::Int, colidxs)
+    for col in colidxs
+        dest[k] = col
+        k += 1
+    end
+    return k
+end
+
+# The pattern rows are exactly CSR's rows: `eachrow` hands out the sorted column indices
+# (for `SparsityPattern` this sorts the rows lazily, a no-op if already sorted), so `rowptr`
+# follows from the row lengths and each row is copied straight into `colval`.
 function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::AbstractSparsityPattern, sym::Bool) where {Tv, Ti}
+    sym && throw(ArgumentError("Symmetric SparseMatrixCSR is not supported"))
+    nrows = Ferrite.getnrows(sp)
     # 1. Setup rowptr
-    rowptr = zeros(Ti, Ferrite.getnrows(sp) + 1)
+    rowptr = Vector{Ti}(undef, nrows + 1)
     rowptr[1] = 1
     for (row, colidxs) in enumerate(Ferrite.eachrow(sp))
-        for col in colidxs
-            sym && row > col && continue
-            rowptr[row + 1] += 1
-        end
+        rowptr[row + 1] = rowptr[row] + length(colidxs)
     end
-    cumsum!(rowptr, rowptr)
-    nnz = rowptr[end] - 1
+    nnz = Int(rowptr[end]) - 1
     # 2. Allocate colval and nzval now that nnz is known
     colval = Vector{Ti}(undef, nnz)
     nzval = zeros(Tv, nnz)
-    # 3. Populate colval.
+    # 3. Populate colval
+    _fill_colval!(colval, rowptr, sp)
+    return SparseMatrixCSR{1}(nrows, Ferrite.getncols(sp), rowptr, colval, nzval)
+end
+
+# Generic AbstractSparsityPattern: the interface only promises whole-pattern row iteration
+# (rows may be lazy generators, and implementations need not support concurrent row
+# access), so the rows are copied serially in iteration order.
+function _fill_colval!(colval::Vector, rowptr::Vector, sp::AbstractSparsityPattern)
     k = 1
-    for (row, colidxs) in zip(1:Ferrite.getnrows(sp), Ferrite.eachrow(sp)) # pairs(eachrow(sp))
-        for col in colidxs
-            sym && row > col && continue
-            colval[k] = col
-            k += 1
-        end
+    for colidxs in Ferrite.eachrow(sp)
+        k = _copyto!(colval, k, colidxs)
     end
-    S = SparseMatrixCSR{1}(Ferrite.getnrows(sp), Ferrite.getncols(sp), rowptr, colval, nzval)
-    return S
+    # The copy pass must consume exactly the row lengths that built rowptr
+    @assert k == rowptr[end]
+    return
 end
 
-## ================= ##
-# FastSparsityPattern #
-## ================= ##
-
-function _allocate_matrix(::Type{SparseMatrixCSR{1, Tv, Ti}}, sp::FastSparsityPattern{Ti}, sym::Bool) where {Tv, Ti}
-    sym && throw(ArgumentError("FastSparsityPattern does not support symmetric matrices yet"))
-    sp.is_colidx_sorted || sort_rows_threaded!(sp) # Require sorted rows
-    nzval = zeros(Tv, length(sp.colidx))
-    return SparseMatrixCSR{1}(getnrows(sp), getncols(sp), sp.rowptr, sp.colidx, nzval)
+# SparsityPattern: the rows are random-access views of disjoint slices, so each chunk of
+# rows is copied concurrently into its disjoint slice of colval.
+function _fill_colval!(colval::Vector{Ti}, rowptr::Vector{Ti}, sp::Ferrite.SparsityPattern) where {Ti}
+    Ferrite._ensure_sorted!(sp)
+    @sync for rowrange in Ferrite._task_chunks(Ferrite.getnrows(sp))
+        Threads.@spawn _fill_colval_chunk!(colval, rowptr, sp, rowrange)
+    end
+    return
 end
 
-function sort_rows!(sp::FastSparsityPattern, rowrange::UnitRange)
+function _fill_colval_chunk!(colval::Vector{Ti}, rowptr::Vector{Ti}, sp::Ferrite.SparsityPattern, rowrange::UnitRange{Int}) where {Ti}
     @inbounds for row in rowrange
-        i1 = sp.rowptr[row]
-        i2 = sp.rowptr[row + 1] - 1
-        if i1 < i2
-            sort!(view(sp.colidx, i1:i2); alg = QuickSort)
-        end
+        colidxs = Ferrite._row_view(sp, row)
+        copyto!(colval, Int(rowptr[row]), colidxs, 1, length(colidxs))
     end
-    return sp
-end
-
-function sort_rows_threaded!(
-        sp::FastSparsityPattern, # Default ΔN ≥ 1000 and `n_tasks ≥ 1`
-        ntasks = max(min(Threads.nthreads() * 100, getnrows(sp) ÷ 1000), 1)
-    )               # Otherwise, 100 per thread for load balancing
-    nrows = getnrows(sp)
-    ΔN = cld(nrows, ntasks)
-    Threads.@threads for taskid in 1:ntasks
-        first_idx = 1 + ΔN * (taskid - 1)
-        last_idx = min(first_idx + ΔN - 1, nrows)
-        sort_rows!(sp, first_idx:last_idx)
-    end
-    sp.is_colidx_sorted = true
-    return sp
+    return
 end
 
 end

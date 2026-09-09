@@ -453,7 +453,7 @@ end
         return false
     end
     function is_stored(sparsity_pattern::SparsityPattern, i, j)
-        return findfirst(k -> k == j, sparsity_pattern.rows[i]) !== nothing
+        return findfirst(k -> k == j, Ferrite.eachrow(sparsity_pattern, i)) !== nothing
     end
 
     # Full coupling (default)

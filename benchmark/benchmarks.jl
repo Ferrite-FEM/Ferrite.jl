@@ -1,5 +1,5 @@
-# Entry point for the benchmark suite, defining `SUITE` as expected by PkgBenchmark and
-# Tachometer. See benchmark/README.md for the design of the suite.
+# Entry point for the benchmark suite, defining `SUITE` as expected by Tachometer.
+# See benchmark/README.md for the design of the suite.
 #
 # The suite deliberately does NOT sweep over all combinations of element type,
 # interpolation, order etc. -- each benchmark group picks the few configurations that
@@ -46,9 +46,8 @@ end
 
 # Runtime is controlled by explicit parameters instead of tuning:
 #  - `evals = 1` is declared on every benchmark (everything measures well above the timer
-#    resolution). This also marks `evals_set`, which makes `tune!` a no-op, so regenerating
-#    tune.json with `make tune` takes seconds. The file still has to exist because
-#    Tachometer falls back to `tune!` without it.
+#    resolution). This also marks `evals_set`, which makes Tachometer skip tuning
+#    entirely.
 #  - `samples`/`seconds` default to 1000/0.5 s below, which bounds a full pass by roughly
 #    0.5 s per benchmark. Benchmarks that declare other values (e.g. `seconds = 1.0` for
 #    the ones with millisecond runtimes or expensive `setup`) keep them.

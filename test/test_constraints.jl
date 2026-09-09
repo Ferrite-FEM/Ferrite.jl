@@ -1,6 +1,92 @@
 # Imports for parallel (isolated) test execution:
 using LinearAlgebra, SparseArrays, Logging
 
+@testset "symmetric constraint storage validation" begin
+    grid = generate_grid(Line, (1,))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefLine, 1}())
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint(1, Pair{Int, Float64}[], 2.0))
+    close!(ch)
+    K = Symmetric(sparse([1.0 2.0; 2.0 3.0]), :L)
+    f = [4.0, 5.0]
+    @test_throws ArgumentError apply!(K, f, ch)
+    @test_throws ArgumentError apply_zero!(K, f, ch)
+    @test_throws ArgumentError apply!(K, ch)
+    @test_throws ArgumentError Ferrite.add_inhomogeneities!(f, K, ch)
+    @test parent(K) == [1.0 2.0; 2.0 3.0]
+    @test f == [4.0, 5.0]
+end
+
+@testset "constraint matrix with prescribed masters" begin
+    grid = generate_grid(Line, (2,))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefLine, 1}())
+    close!(dh)
+    for master in (1, 3), weight in (0.0, -2.0)
+        free = 4 - master
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(master, Pair{Int, Float64}[], 2.0))
+        entries = [master => 3.0]
+        iszero(weight) || push!(entries, free => weight)
+        add!(ch, AffineConstraint(2, entries, 1.0))
+        close!(ch)
+        C, g = Ferrite.create_constraint_matrix(ch)
+        @test size(C) == (3, 1)
+        for value in (0.0, 5.0)
+            u = zeros(3)
+            u[free] = value
+            apply!(u, ch)
+            @test C * [value] + g == u
+        end
+    end
+
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint(1, Pair{Int, Float64}[], 2.0))
+    add!(ch, AffineConstraint(2, [1 => 3.0], 1.0))
+    add!(ch, AffineConstraint(3, Pair{Int, Float64}[], 5.0))
+    close!(ch)
+    C, g = Ferrite.create_constraint_matrix(ch)
+    @test size(C) == (3, 0)
+    @test C * Float64[] + g == apply!(zeros(3), ch)
+end
+
+# Minimal atomic assembler used to verify that `apply_assemble!` propagates its atomic
+# mode into the non-local constraint condensation before regular assembly.
+struct AtomicApplyAssembler{M, V} <: Ferrite.AbstractAssembler{Float64}
+    K::M
+    f::V
+end
+struct AtomicProbeArray{N} <: AbstractArray{Float64, N}
+    data::Array{Float64, N}
+    atomics::Vector{Bool}
+end
+AtomicProbeArray(data::Array{Float64, N}) where {N} = AtomicProbeArray{N}(data, Bool[])
+Base.size(A::AtomicProbeArray) = size(A.data)
+Base.getindex(A::AtomicProbeArray, I...) = getindex(A.data, I...)
+Base.setindex!(A::AtomicProbeArray, v, I...) = setindex!(A.data, v, I...)
+
+Ferrite.matrix_handle(a::AtomicApplyAssembler) = a.K
+Ferrite.vector_handle(a::AtomicApplyAssembler) = a.f
+Ferrite._is_atomic(::AtomicApplyAssembler) = true
+function Ferrite.assemble!(
+        ::AtomicApplyAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix,
+        ::AbstractVector
+    )
+    return
+end
+function Ferrite.addindex!(A::AtomicProbeArray{1}, v::Float64, i::Int, ::Val{atomic} = Val(false)) where {atomic}
+    push!(A.atomics, atomic)
+    A.data[i] += v
+    return A
+end
+function Ferrite.addindex!(A::AtomicProbeArray{2}, v::Float64, i::Int, j::Int, ::Val{atomic} = Val(false)) where {atomic}
+    push!(A.atomics, atomic)
+    A.data[i, j] += v
+    return A
+end
+
 # misc constraint tests
 
 @testset "constructors and error checking" begin
@@ -1657,6 +1743,27 @@ end # testset
         end
     end
 end # testset
+
+@testset "atomic local constraint condensation" begin
+    grid = generate_grid(Line, (2,))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefLine, 1}())
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint(1, [3 => 1.0], 0.0))
+    close!(ch)
+
+    dofs = celldofs(dh, 1)
+    K = AtomicProbeArray(zeros(3, 3))
+    f = AtomicProbeArray(zeros(3))
+    assembler = AtomicApplyAssembler(K, f)
+    apply_assemble!(assembler, ch, dofs, ones(2, 2), ones(2))
+
+    @test !isempty(K.atomics)
+    @test !isempty(f.atomics)
+    @test all(K.atomics)
+    @test all(f.atomics)
+end
 
 @testset "Sparsity pattern without constrained dofs" begin
     grid = generate_grid(Triangle, (5, 5))

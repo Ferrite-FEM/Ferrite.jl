@@ -3,7 +3,8 @@
 # ![](computational_homogenization-light.png)
 # ![](computational_homogenization-dark.png)
 #
-# *Figure 1*: von Mises stress in an RVE with 5 stiff inclusions embedded in a softer matrix
+# [[*Figure 1*](@ref tutorial-computational-homogenization-figure-1)](@id tutorial-computational-homogenization-figure-1):
+# von Mises stress in an RVE with 5 stiff inclusions embedded in a softer matrix
 # material that is loaded in shear. The problem is solved by using homogeneous Dirichlet
 # boundary conditions (left) and (strong) periodic boundary conditions (right).
 #
@@ -18,7 +19,7 @@
 # In this example we will solve the Representative Volume Element (RVE) problem for
 # computational homogenization of linear elasticity and compute the effective/homogenized
 # stiffness of an RVE with 5 stiff circular inclusions embedded in a softer matrix material
-# (see Figure 1).
+# (see [Figure 1](@ref tutorial-computational-homogenization-figure-1)).
 #
 # It is possible to obtain upper and lower bounds on the stiffness analytically, see for
 # example [Rule of mixtures](https://en.wikipedia.org/wiki/Rule_of_mixtures). An upper
@@ -176,6 +177,13 @@
 # \frac{1}{|\Omega_\Box|} \int_{\Omega_\Box}
 # \mathsf{E} : \boldsymbol{\varepsilon}[\boldsymbol{u}]\ \mathrm{d}\Omega.
 # ```
+#
+# In this tutorial the macroscopic strain ``\bar{\boldsymbol{\varepsilon}}`` is
+# *prescribed* -- the RVE problem is strain-driven. The complementary, stress-driven,
+# case -- prescribing the average stress and solving for the then unknown
+# ``\bar{\boldsymbol{\varepsilon}}`` -- is treated in the
+# [stress-driven homogenization](@ref tutorial-stress-driven-homogenization) tutorial,
+# which builds on this one.
 
 
 # ## Commented program

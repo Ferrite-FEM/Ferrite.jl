@@ -751,6 +751,12 @@ end
     #Special case with one and zero elements in the sets
     test_coloring(generate_grid(Quadrilateral, (2, 2)), [1])
     test_coloring(generate_grid(Quadrilateral, (2, 2)), [])
+
+    # duplicate entries in the cellset are ignored
+    let grid = generate_grid(Quadrilateral, (3, 3))
+        @test create_coloring(grid, [2, 2, 4]) == create_coloring(grid, [2, 4])
+        @test create_coloring(grid, [5, 5]) == create_coloring(grid, [5])
+    end
 end
 
 @testset "High order dof distribution" begin

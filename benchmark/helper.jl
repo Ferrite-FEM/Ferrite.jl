@@ -4,11 +4,19 @@
 # kernels, mirroring how the documented tutorials write them.
 #
 # Everything lives in a module so that including the benchmark files into `Main` (as
-# PkgBenchmark and Tachometer do) does not leak helper names.
+# Tachometer does) does not leak helper names.
 module FerriteBenchmarkHelpers
 
 using Ferrite
 using LinearAlgebra: norm
+
+function interface_sweep(iterator)
+    checksum = 0
+    for ic in iterator
+        checksum += cellid(ic.a) + cellid(ic.b)
+    end
+    return checksum
+end
 
 # Coordinates for `n` cells, cycling through the grid if it has fewer.
 function cell_coordinate_batch(grid, n)
@@ -115,6 +123,21 @@ function neighbor_index_sum(top::ExclusiveTopology)
     acc = neighbor_index_sum(top.vertex_vertex_neighbor)
     acc += neighbor_index_sum(top.edge_edge_neighbor)
     acc += neighbor_index_sum(top.face_face_neighbor)
+    return acc
+end
+
+# getneighborhood through the EdgeIndex path for every edge of every cell. For cells with
+# reference dimension 3 only the exclusive edge neighborhood is stored, so the full
+# neighborhood is recomputed for each query.
+function edge_neighborhood_sweep(top, grid)
+    acc = 0
+    for c in 1:getncells(grid)
+        for e in 1:Ferrite.nedges(getcells(grid, c))
+            for n in getneighborhood(top, grid, EdgeIndex(c, e))
+                acc += n[1] + n[2]
+            end
+        end
+    end
     return acc
 end
 
@@ -240,6 +263,30 @@ function elasticity_kernel!(Ke, cv, C)
             for j in 1:getnbasefunctions(cv)
                 εⱼ = shape_symmetric_gradient(cv, q_point, j)
                 Ke[i, j] += (εᵢ ⊡ C ⊡ εⱼ) * dΩ
+            end
+        end
+    end
+    return Ke
+end
+
+# The (u, p) Stokes saddle point system. Unlike the single field kernels above this fills all
+# the coupling blocks of the element matrix, which is the shape of problem that a blocked
+# global matrix exists for. `range_u` and `range_p` are the `dof_range`s of the two fields.
+function stokes_kernel!(Ke, cmv, range_u, range_p)
+    fill!(Ke, 0)
+    cvu, cvp = cmv.u, cmv.p
+    for q_point in 1:getnquadpoints(cmv)
+        dΩ = getdetJdV(cmv, q_point)
+        for (i, I) in pairs(range_u)
+            ∇φi = shape_gradient(cvu, q_point, i)
+            divφi = shape_divergence(cvu, q_point, i)
+            for (j, J) in pairs(range_u)
+                Ke[I, J] += (∇φi ⊡ shape_gradient(cvu, q_point, j)) * dΩ
+            end
+            for (j, J) in pairs(range_p)
+                v = -divφi * shape_value(cvp, q_point, j) * dΩ
+                Ke[I, J] += v
+                Ke[J, I] += v
             end
         end
     end

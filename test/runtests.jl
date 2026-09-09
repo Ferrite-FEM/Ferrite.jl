@@ -3,6 +3,12 @@ using ParallelTestRunner
 
 const TESTDIR = @__DIR__
 
+using Test
+
+if isdefined(Test, :detect_closure_boxes)
+    @test isempty(Test.detect_closure_boxes(Ferrite))
+end
+
 # `find_tests` auto-discovers every `.jl` file in `test/` (recursively). Each is
 # run in its own isolated worker process, so files must be self-contained: they
 # carry their own `using`/`import` and `include("test_utils.jl")` when needed.

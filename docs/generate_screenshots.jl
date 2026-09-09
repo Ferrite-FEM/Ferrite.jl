@@ -38,6 +38,7 @@ const EXAMPLES = Dict(
     "hyperelasticity" => "literate-tutorials/hyperelasticity.jl",
     "stokes-flow" => "literate-tutorials/stokes-flow.jl",
     "computational_homogenization" => "literate-tutorials/computational_homogenization.jl",
+    "stress_driven_homogenization" => "literate-tutorials/stress_driven_homogenization.jl",
     "linear_shell" => "literate-tutorials/linear_shell.jl",
     "heat_adaptivity" => "literate-tutorials/heat_adaptivity.jl",
     "darcy_flow" => "literate-tutorials/darcy_flow.jl",

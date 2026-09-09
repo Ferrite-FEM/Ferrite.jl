@@ -1,8 +1,8 @@
 # Ferrite.jl benchmark suite
 
 The suite is run on every PR by [Tachometer.jl](https://github.com/KristofferC/Tachometer.jl)
-(see `.github/workflows/Benchmarks.yml`) and can be run locally with `make benchmark`
-(or `make benchmark-<group>` for a single group).
+(see `.github/workflows/Benchmarks.yml`), which is also the tool for running it locally --
+see the [performance devdocs](https://ferrite-fem.github.io/Ferrite.jl/stable/devdocs/performance/).
 
 ## Design
 
@@ -24,12 +24,11 @@ benchmark above ~5 µs, and below ~10 ms where possible so that it gets enough s
 its time budget.
 
 **Explicit parameters instead of tuning.** Every `@benchmarkable` declares `evals = 1`
-(anything above the noise floor needs no more), which makes `tune!` a no-op. `samples` and
-`seconds` are defaulted globally at the bottom of `benchmarks.jl`; benchmarks with
-millisecond runtimes or expensive `setup` declare `seconds = 1.0` themselves. This bounds a
-full pass at roughly 0.5 s per benchmark. `tune.json` is committed only because the CI
-runner falls back to a slow `tune!` when it is missing — regenerate it with `make tune`
-(fast) whenever benchmarks are added, removed or renamed.
+(anything above the noise floor needs no more), which makes Tachometer skip tuning
+entirely; `benchmarks.jl` errors on any benchmark that forgets it. `samples` and `seconds` are
+defaulted globally at the bottom of `benchmarks.jl`; benchmarks with millisecond runtimes
+or expensive `setup` declare `seconds = 1.0` themselves. This bounds a full pass at roughly
+0.5 s per benchmark.
 
 **Runtime budget.** The PR workflow runs the suite four times (two interleaved passes per
 revision), so every second added to a pass costs four in CI. A full pass should stay under
@@ -48,8 +47,9 @@ revision), so every second added to a pass costs four in CI. A full pass should 
 | `postprocessing`   | `L2Projector`, `PointEvalHandler`, `evaluate_at_grid_nodes`, `apply_analytical!` |
 | `amr`              | `refine!`, `balanceforest!` (2D/3D), `creategrid` (2D/3D), `ConformityConstraint` |
 
-Run a single group locally with e.g. `make benchmark-assembly`, or set the environment
-variable `FERRITE_SELECTED_BENCHMARKS=assembly` when including `benchmarks.jl` directly.
+Run a single group locally by setting the environment variable
+`FERRITE_SELECTED_BENCHMARKS=assembly`, both under Tachometer and when including
+`benchmarks.jl` directly.
 
 ## Deliberately not covered
 
