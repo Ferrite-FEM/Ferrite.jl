@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+ - New function `interfaceskeleton(topology, grid)` returning the *interfaces* of the
+   grid (the interior facets, i.e. the subset of `facetskeleton` shared between two
+   cells) as a `Vector` of facet pairs `(facet_here, facet_there)`. Like the facet
+   skeleton the result is cached in the topology. `InterfaceIterator` now iterates this
+   materialized skeleton, and gains methods taking an explicit subset of it,
+   `InterfaceIterator(grid_or_dh, set)`, analogous to passing a cellset to
+   `CellIterator`. ([#1522])
+
 ### Fixes
 
  - Untangle the tangled `AffineConstraints` in `close!` ([#1327])
@@ -1473,5 +1483,6 @@ poking into Ferrite internals:
 [#1474]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1474
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
+[#1522]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1522
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
