@@ -33,8 +33,8 @@ function untangle_constraints!(ch::ConstraintHandler)
         end
     end
 
-    copy!(C, LinearAlgebra.ldiv(luA, C))
-    _update_dof_coefficients!(new_dofcoefficients, C, affine_equation_ordering, affine_fdof_ordering)
+    luAC = _sparse_column_wise_solve(luA, C)
+    _update_dof_coefficients!(new_dofcoefficients, luAC, affine_equation_ordering, affine_fdof_ordering)
 
     # TODO: making affine constraint inhomogeneities time dependent requires (?) saving
     # `A⁻¹` or `luA` as it will be needed in update!
@@ -235,4 +235,30 @@ end
 
 function _assign_new_index!(d::Dict{Int, Int}, key::Int)
     return get!(d, key, length(d) + 1)
+end
+
+"""
+    _sparse_column_wise_solve(luA::SparseArrays.UMFPACK.UmfpackLU{T, Int}, C::SparseMatrixCSC{T, Int}) where {T}
+
+Perform a column wise solve of `AX = C` where `X` is expected to be a sparse matrix, this avoids the dense construction of `X`.
+"""
+function _sparse_column_wise_solve(luA::SparseArrays.UMFPACK.UmfpackLU{T, Int}, C::SparseMatrixCSC{T, Int}) where {T}
+    (m, n) = size(C)
+    I = Int[]; J = Int[]; V = T[]
+    sh = SparseArrays.nnz(C)
+    sizehint!(I, sh; shrink = false); sizehint!(J, sh; shrink = false); sizehint!(V, sh; shrink = false)
+    sol = zeros(T, m)
+    rhs = SparseArrays.SparseVector{T, Int}(undef, m) # zeros(T, n)
+    for j in axes(C, 2)
+        iszero(C[:, j]) && continue
+        copy!(rhs, C[:, j])
+        ldiv!(sol, luA, rhs)
+        for (i, v) in pairs(sol)
+            v == T(0) && continue
+            push!(I, i)
+            push!(J, j)
+            push!(V, v)
+        end
+    end
+    return SparseArrays.sparse(I, J, V, m, n)
 end
