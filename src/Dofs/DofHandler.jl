@@ -536,18 +536,32 @@ function __close!(dh::DofHandler)
     # Set initial values
     nextdof = 1  # next free dof to distribute
 
+    # Each dof is written into its cell-local slot rather than pushed in distribution order,
+    # so the size of `cell_dofs` is known before distributing anything: allocate it once
+    # here instead of growing it per SubDofHandler. The slots are left uninitialized because
+    # every one of them is written exactly once -- `_close_subdofhandler!` asserts that the
+    # interpolation's entity dofs cover `1:getnbasefunctions(ip)`, and every entity of the
+    # cell is visited below.
+    for sdh in dh.subdofhandlers
+        sdh.ndofs_per_cell = sum(getnbasefunctions, sdh.field_interpolations; init = 0)::Int
+    end
+    resize!(dh.cell_dofs, sum(sdh -> sdh.ndofs_per_cell * length(sdh.cellset), dh.subdofhandlers; init = 0))
+
     @debug println("\n\nCreating dofs\n")
+    celldofs_offset = 1 # index into `dh.cell_dofs` where the current subdomain starts
     for (sdhi, sdh) in pairs(dh.subdofhandlers)
         nextdof = _close_subdofhandler!(
             dh,
             sdh,
             sdhi, # TODO: Store in the SubDofHandler?
+            celldofs_offset,
             nextdof,
             vertexdicts,
             edgedicts,
             facedicts,
             field_ncells,
         )
+        celldofs_offset += sdh.ndofs_per_cell * length(sdh.cellset)
     end
     # Dofs are written into their cell-local slot rather than pushed in distribution order,
     # so check that the spatial distribution covered exactly the dofs handed out above.
@@ -574,16 +588,14 @@ function __close!(dh::DofHandler)
 end
 
 """
-    _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts, field_ncells) where {sdim}
+    _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, celldofs_offset::Int, nextdof::Int, vertexdicts, edgedicts, facedicts, field_ncells) where {sdim}
 
 Main entry point to distribute dofs for a single [`SubDofHandler`](@ref) on its subdomain with the same interpolation kind per cell.
+The dofs are written into `dh.cell_dofs` starting at `celldofs_offset`, which `close!` has already sized.
 """
-function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, nextdof::Int, vertexdicts, edgedicts, facedicts, field_ncells) where {sdim}
-    # First we allocate space to store the indices.
-    sdh.ndofs_per_cell = sum([getnbasefunctions(ip) for ip in sdh.field_interpolations]; init = 0)::Int
+function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_index::Int, celldofs_offset::Int, nextdof::Int, vertexdicts, edgedicts, facedicts, field_ncells) where {sdim}
+    # Where each field starts within the dofs of a single cell
     field_offsets_cell = cumsum([1; [getnbasefunctions(ip) for ip in sdh.field_interpolations]])::Vector{Int}
-
-    subdomain_cell_dofs = zeros(Int, sdh.ndofs_per_cell * length(sdh.cellset))
 
     ip_infos = InterpolationInfo[]
     for interpolation in sdh.field_interpolations
@@ -602,13 +614,13 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
     # Mapping between the local field index and the global field index
     global_fidxs = Int[findfirst(gname -> gname === lname, dh.field_names) for lname in sdh.field_names]
 
-    nextdof = _distribute_dofs_on_subdomain!(
+    return _distribute_dofs_on_subdomain!(
         get_grid(dh),
         sdh,
         sdh_index,
-        length(dh.cell_dofs),
+        celldofs_offset,
         field_offsets_cell,
-        subdomain_cell_dofs,
+        dh.cell_dofs,
         dh.cell_to_subdofhandler,
         dh.cell_dofs_offset,
         ip_infos,
@@ -619,19 +631,15 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
         facedicts,
         field_ncells,
     )
-
-    append!(dh.cell_dofs, subdomain_cell_dofs)
-
-    return nextdof
 end
 
 function _distribute_dofs_on_subdomain!(
         grid::AbstractGrid,
         sdh::SubDofHandler,
         sdh_index::Int,
-        subdomain_celldofs_offset::Int,
+        celldofs_offset::Int,
         field_offsets_cell,
-        subdomain_cell_dofs,
+        cell_dofs,
         cell_to_subdofhandler,
         cell_dofs_offsets,
         ip_infos::Vector{InterpolationInfo},
@@ -642,7 +650,7 @@ function _distribute_dofs_on_subdomain!(
         facedicts,
         field_ncells,
     )
-    current_celldofs_offset = 1
+    current_celldofs_offset = celldofs_offset
     # Reserve capacity in the edge/face dicts up front to avoid repeatedly rehashing them
     # while dofs are distributed. The number of unique edges/faces is within a small factor
     # of the number of cells carrying the field (`field_ncells`, which spans all the
@@ -671,7 +679,7 @@ function _distribute_dofs_on_subdomain!(
 
         # We do set this information in this function to prevent looping a second time over the cellsets.
         # Technically we could also fully eliminate this array and just store the subdomain offsets in the subdofhandlers.
-        cell_dofs_offsets[ci] = subdomain_celldofs_offset + current_celldofs_offset
+        cell_dofs_offsets[ci] = current_celldofs_offset
 
         # TODO: _check_cellset_intersections can be removed in favor of this assertion
         @assert cell_to_subdofhandler[ci] == 0
@@ -679,14 +687,15 @@ function _distribute_dofs_on_subdomain!(
 
         cell = getcells(grid, ci)
 
-        cell_dof_local_view = @view subdomain_cell_dofs[current_celldofs_offset:(current_celldofs_offset + sdh.ndofs_per_cell - 1)]
-
         for (local_field_idx, ip_info) in pairs(ip_infos)
             global_fidx = global_fidxs[local_field_idx]
             @debug println("\tfield: $(sdh.field_names[local_field_idx])")
 
-            local_range = field_offsets_cell[local_field_idx]:(field_offsets_cell[local_field_idx + 1] - 1)
-            cell_dof_field_view = @view cell_dof_local_view[local_range]
+            # A view straight into `cell_dofs`; going through a per-cell view first would
+            # make every write below translate through two levels of `SubArray`.
+            field_start = current_celldofs_offset + field_offsets_cell[local_field_idx] - 1
+            field_stop = current_celldofs_offset + field_offsets_cell[local_field_idx + 1] - 2
+            cell_dof_field_view = @view cell_dofs[field_start:field_stop]
 
             nextdof = _distribute_field_dofs_for_cell!(
                 cell_dof_field_view,
@@ -743,6 +752,11 @@ function _distribute_field_dofs_for_cell!(cell_field_dofs, cell::AbstractCell, i
     return nextdof
 end
 
+# The `add_*_dofs` helpers below and `permute_and_set!` scatter into `cell_dofs`, the slice
+# of the cell dofs belonging to one field, at `n_copies * (local dof - 1) + d`. The
+# assertions in `_close_subdofhandler!` establish that the interpolation's entity dof
+# indices are exactly `1:N` and that `n_copies * N == length(cell_dofs)`, so every index
+# computed that way is in bounds and the stores can skip the check.
 function add_vertex_dofs(cell_dofs, cell::AbstractCell, vertexdict, allvdofs::Vector{Int}, offsets::Vector{Int}, nextdof::Int, n_copies::Int)
     for (vi, vertex) in pairs(vertices(cell))
         vdofs = @view allvdofs[offsets[vi]:(offsets[vi + 1] - 1)]
@@ -750,7 +764,7 @@ function add_vertex_dofs(cell_dofs, cell::AbstractCell, vertexdict, allvdofs::Ve
         @debug println("\t\tvertex #$vertex")
         first_dof = vertexdict[vertex]
         if first_dof > 0 # reuse dof
-            for lvi in 1:length(vdofs), d in 1:n_copies
+            @inbounds for lvi in 1:length(vdofs), d in 1:n_copies
                 # (Re)compute the next dof from first_dof by adding n_copies dofs from the
                 # (lvi-1) previous vertex dofs and the (d-1) dofs already distributed for
                 # the current vertex dof
@@ -759,7 +773,7 @@ function add_vertex_dofs(cell_dofs, cell::AbstractCell, vertexdict, allvdofs::Ve
             end
         else # create dofs
             vertexdict[vertex] = nextdof
-            for lvi in 1:length(vdofs), d in 1:n_copies
+            @inbounds for lvi in 1:length(vdofs), d in 1:n_copies
                 cell_dofs[n_copies * (vdofs[lvi] - 1) + d] = nextdof
                 nextdof += 1
             end
@@ -823,7 +837,7 @@ end
 
 function add_volume_dofs(cell_dofs, volumedofs::Vector{Int}, nextdof::Int, n_copies::Int)
     @debug println("\t\tvolumedofs #$nextdof:$(nextdof + length(volumedofs) * n_copies - 1)")
-    for vdof in volumedofs, d in 1:n_copies
+    @inbounds for vdof in volumedofs, d in 1:n_copies
         cell_dofs[n_copies * (vdof - 1) + d] = nextdof
         nextdof += 1
     end
@@ -872,7 +886,7 @@ described therein.
         # Reverse the dofs for the path
         dofs = reverse(dofs)
     end
-    for (i, dof) in enumerate(dofs)
+    @inbounds for (i, dof) in enumerate(dofs)
         for d in 1:n_copies
             j = n_copies * (local_dof_table[i] - 1) + d
             cell_dofs[j] = (dof - 1) + d
@@ -1004,7 +1018,7 @@ methodology described therein.
                 l += 1 # local lattice index, matching the traversal order documented above
                 k = _canonical_facedof_index_triangle(t1, t2, q, orientation)
                 dof = dofs[k]
-                for d in 1:n_copies
+                @inbounds for d in 1:n_copies
                     di = n_copies * (local_dof_table[l] - 1) + d
                     cell_dofs[di] = (dof - 1) + d
                 end
@@ -1019,7 +1033,7 @@ methodology described therein.
                 l += 1 # local lattice index, matching the traversal order documented above
                 k = _canonical_facedof_index_quadrilateral(i, j, m, orientation)
                 dof = dofs[k]
-                for d in 1:n_copies
+                @inbounds for d in 1:n_copies
                     di = n_copies * (local_dof_table[l] - 1) + d
                     cell_dofs[di] = (dof - 1) + d
                 end
@@ -1029,7 +1043,7 @@ methodology described therein.
         end
     else
         # No permutation: local index and canonical index coincide.
-        for (l, dof) in enumerate(dofs)
+        @inbounds for (l, dof) in enumerate(dofs)
             for d in 1:n_copies
                 di = n_copies * (local_dof_table[l] - 1) + d
                 cell_dofs[di] = (dof - 1) + d

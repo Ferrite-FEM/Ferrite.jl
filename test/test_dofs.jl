@@ -1285,3 +1285,19 @@ Ferrite.conformity(ip::MatrixizedTestInterpolation) = Ferrite.conformity(ip.ip)
     @test length(dof_range(dh, :gradient)) == 12
     @test sort(unique(dh.cell_dofs)) == collect(1:ndofs(dh))
 end
+
+# An interpolation that claims more base functions than it attaches to entities. `close!`
+# sizes one cell dof slot per base function, leaves them uninitialized and writes each of
+# them without a bounds check, so it has to reject this up front rather than leave a slot
+# unwritten.
+struct UndercoveringTestInterpolation <: Ferrite.ScalarInterpolation{RefTriangle, 1} end
+Ferrite.getnbasefunctions(::UndercoveringTestInterpolation) = 4
+Ferrite.vertexdof_indices(::UndercoveringTestInterpolation) = ((1,), (2,), (3,))
+Ferrite.conformity(::UndercoveringTestInterpolation) = Ferrite.H1Conformity()
+Ferrite.adjust_dofs_during_distribution(::UndercoveringTestInterpolation) = false
+
+@testset "close! rejects an interpolation that leaves base functions unattached" begin
+    dh = DofHandler(generate_grid(Triangle, (2, 2)))
+    add!(dh, :u, UndercoveringTestInterpolation())
+    @test_throws AssertionError close!(dh)
+end
