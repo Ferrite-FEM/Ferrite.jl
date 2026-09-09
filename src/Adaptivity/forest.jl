@@ -83,15 +83,15 @@ struct ForestBWG{dim, C <: OctreeBWG, T <: Real, MC <: Ferrite.AbstractCell} <: 
     mcache::MaterializedForest{dim, MC, T}
 end
 
-# The materialized cell type is a pure function of the dimension.
-_materialized_celltype(::Val{2}) = Quadrilateral
-_materialized_celltype(::Val{3}) = Hexahedron
+# The cell type a tree materializes into: the hypercube of the tree's dimension.
+_materialized_celltype(::Type{<:OctreeBWG{2}}) = Quadrilateral
+_materialized_celltype(::Type{<:OctreeBWG{3}}) = Hexahedron
 
 function ForestBWG(
         cells::Vector{C}, nodes::Vector{Node{dim, T}}, cellsets, nodesets, facetsets,
         vertexsets, topology::ExclusiveTopology
     ) where {dim, C <: OctreeBWG, T}
-    MC = _materialized_celltype(Val(dim))
+    MC = _materialized_celltype(C)
     return ForestBWG{dim, C, T, MC}(
         cells, nodes, cellsets, nodesets, facetsets, vertexsets, topology,
         MaterializedForest{dim, MC, T}()
@@ -157,7 +157,7 @@ accessor overrides on `ForestBWG` go through this. Requires a 2:1-balanced fores
     return state
 end
 
-Ferrite.has_hanging_nodes(::ForestBWG) = true
+Ferrite.is_nonconforming(::ForestBWG) = true
 
 """
     conformity_info(forest::ForestBWG) -> Dict{Int, Vector{Int}}
@@ -2547,7 +2547,7 @@ end
 # the facade.
 function _materialize_snapshot(forest::ForestBWG{dim, C, T}) where {dim, C, T}
     node_map = dim == 2 ? node_map₂ : node_map₃
-    celltype = _materialized_celltype(Val(dim))
+    celltype = _materialized_celltype(C)
     NV = 2^dim
     ncells = getncells(forest)
     ntrees = length(forest.cells)
@@ -2597,7 +2597,7 @@ function _materialize_snapshot(forest::ForestBWG{dim, C, T}) where {dim, C, T}
             final_of_prov[E[m3[2], m3[1]]], final_of_prov[E[m4[2], m4[1]]],
         ]
     end
-    MC = _materialized_celltype(Val(dim))
+    MC = _materialized_celltype(C)
     return ForestSnapshot{dim, MC, T}(
         cells, Node.(nodecoords), hnodes,
         reconstruct_facetsets(forest), reconstruct_cellsets(forest),

@@ -49,9 +49,9 @@ using LinearAlgebra, SparseArrays
     # conformity information through the documented accessor, never via snapshot fields
     @test Ferrite.AMR.conformity_info(forest) == ref.conformity_info
     @test Ferrite.AMR.conformity_info(ref) == ref.conformity_info
-    @test Ferrite.has_hanging_nodes(forest)
-    @test Ferrite.has_hanging_nodes(ref)
-    @test !Ferrite.has_hanging_nodes(grid)
+    @test Ferrite.is_nonconforming(forest)
+    @test Ferrite.is_nonconforming(ref)
+    @test !Ferrite.is_nonconforming(grid)
 end
 
 @testset "hard errors: ExclusiveTopology and transform_coordinates!" begin

@@ -130,13 +130,13 @@ end
     close!(proj::L2Projector)
 
 Close `proj` which assembles and calculates the left-hand-side of the projection equation, before doing a Cholesky factorization
-of the mass-matrix. For grids with hanging nodes (see `has_hanging_nodes`), a
+of the mass-matrix. For non-conforming grids (see `is_nonconforming`), a
 [`ConformityConstraint`](@ref) is automatically added to ensure continuity across hanging nodes.
 """
 function close!(proj::L2Projector)
     close!(proj.dh)
     grid = get_grid(proj.dh)
-    if has_hanging_nodes(grid)
+    if is_nonconforming(grid)
         ch = ConstraintHandler(proj.dh)
         add!(ch, ConformityConstraint(:_))
         close!(ch)

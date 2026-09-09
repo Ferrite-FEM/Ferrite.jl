@@ -465,15 +465,16 @@ state. Internal-but-stable API.
 grid_epoch(::AbstractGrid) = 0
 
 """
-    has_hanging_nodes(grid::AbstractGrid) -> Bool
+    is_nonconforming(grid::AbstractGrid) -> Bool
 
-Trait: whether the grid can contain hanging (constrained, non-conforming) nodes. `false`
-for conforming grids; `true` for non-conforming ones (e.g. `Ferrite.AMR.ForestBWG` and
-`Ferrite.AMR.NonConformingGrid`). A `DofHandler` retains its entity → dof maps after
-[`close!`](@ref) exactly when this holds, so that conformity (hanging-node) constraints can
-be built from them.
+Trait: whether the grid can be non-conforming, i.e. contain interfaces where the
+discretization must be constrained to stay conforming (hanging nodes from h-refinement, but
+also e.g. degree mismatches from p-refinement). `false` for conforming grids; `true` for
+non-conforming ones (e.g. `Ferrite.AMR.ForestBWG` and `Ferrite.AMR.NonConformingGrid`). A
+`DofHandler` retains its entity → dof maps after [`close!`](@ref) exactly when this holds, so
+that conformity constraints can be built from them.
 """
-has_hanging_nodes(::AbstractGrid) = false
+is_nonconforming(::AbstractGrid) = false
 
 """
     get_reference_dimension(grid::AbstractGrid) -> Union{Int, Symbol}

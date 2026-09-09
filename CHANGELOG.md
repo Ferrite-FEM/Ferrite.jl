@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    dof distribution. The new exported `reclose!(dh)` re-distributes the dofs against the
    current grid state (currently for a single whole-domain `SubDofHandler`). New
    internal-but-stable accessors: `Ferrite.grid_epoch(grid)` (cache-invalidation key for
-   downstream packages), `Ferrite.has_hanging_nodes(grid)` (trait replacing dispatch on
+   downstream packages), `Ferrite.is_nonconforming(grid)` (trait replacing dispatch on
    `NonConformingGrid`) and `Ferrite.AMR.conformity_info(grid)` (hanging node -> masters
    mapping). ([#1413])
 

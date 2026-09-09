@@ -38,7 +38,7 @@ refinement and is re-distributed with [`reclose!`](@ref).
 
 ```@docs
 Ferrite.grid_epoch
-Ferrite.has_hanging_nodes
+Ferrite.is_nonconforming
 Ferrite.AMR.conformity_info
 Ferrite.AMR.MaterializedForest
 Ferrite.AMR.ForestSnapshot

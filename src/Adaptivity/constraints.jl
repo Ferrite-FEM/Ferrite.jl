@@ -20,7 +20,7 @@ end
 # `ForestBWG` facade and the (deprecated) `NonConformingGrid` take the same path.
 function Ferrite.add!(ch::ConstraintHandler{<:DofHandler}, cc::ConformityConstraint)
     grid = Ferrite.get_grid(ch.dh)
-    if Ferrite.has_hanging_nodes(grid)
+    if Ferrite.is_nonconforming(grid)
         _add_conformity_constraints!(ch, grid, cc)
     else
         @warn "Trying to add conformity constraint to $(cc.field_name) on a conforming grid. Skipping."

@@ -100,7 +100,7 @@ end
 
 Maps from grid entities (vertices, edges, faces) to the first dof distributed on that entity,
 one entry per field. Produced as scratch storage while distributing dofs and retained by a
-[`DofHandler`](@ref) only when its grid has hanging nodes (see `has_hanging_nodes`), where it
+[`DofHandler`](@ref) only when its grid is non-conforming (see `is_nonconforming`), where it
 is needed to build the affine constraints that tie hanging nodes to their masters.
 
 - `vertices[f][v]` is the first dof on vertex `v` for field `f` (`0` if unvisited).
@@ -125,8 +125,8 @@ mutable struct DofHandler{dim, G <: AbstractGrid{dim}} <: AbstractDofHandler
     const grid::G
     ndofs::Int
     # Maps from entity to dofs. These are scratch structures during dof distribution and are
-    # only retained afterwards for grids with hanging nodes (to build conformity constraints,
-    # see `has_hanging_nodes`), otherwise this is `nothing`. See [`EntityMaps`](@ref).
+    # only retained afterwards for non-conforming grids (to build conformity constraints,
+    # see `is_nonconforming`), otherwise this is `nothing`. See [`EntityMaps`](@ref).
     entitymaps::Union{Nothing, EntityMaps}
     # The grid's epoch (see `grid_epoch`) at the time of `close!`. `0` means the grid is not
     # epoch-tracked; for epoch-tracked (adaptive) grids, `_check_epoch` compares this
@@ -491,9 +491,9 @@ function __close!(dh::DofHandler{dim}) where {dim}
     dh.ndofs = nextdof - 1
     dh.closed = true
 
-    # Retain the entity maps only for grids with hanging nodes, where they are needed to
+    # Retain the entity maps only for non-conforming grids, where they are needed to
     # build the conformity constraints. Conforming grids discard them.
-    if has_hanging_nodes(get_grid(dh))
+    if is_nonconforming(get_grid(dh))
         dh.entitymaps = EntityMaps(vertexdicts, edgedicts, facedicts)
     end
 

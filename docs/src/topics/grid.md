@@ -121,7 +121,7 @@ the required set is:
 - sets (needed for boundary conditions and subdomains): `getcellset(s)`, `getfacetset(s)`,
   `getnodeset(s)`, `getvertexset(s)`
 
-Optional traits with fallbacks: `has_hanging_nodes(grid)` (default `false`; return `true`
+Optional traits with fallbacks: `is_nonconforming(grid)` (default `false`; return `true`
 for non-conforming grids so the `DofHandler` retains the entity → dof maps needed for
 conformity constraints) and `grid_epoch(grid)` (default `0`, i.e. not epoch-tracked; adaptive
 grids return a counter incremented on every mutation so that stale `DofHandler` use errors,

@@ -58,7 +58,7 @@ end
 # definition here would create a separate `AMR.get_coordinate_type` instead of extending it.
 Ferrite.get_coordinate_type(::NonConformingGrid{dim, C, T}) where {dim, C, T} = Vec{dim, T}
 
-Ferrite.has_hanging_nodes(::NonConformingGrid) = true
+Ferrite.is_nonconforming(::NonConformingGrid) = true
 
 # See the docstring at `conformity_info(::ForestBWG)` in forest.jl.
 conformity_info(g::NonConformingGrid) = g.conformity_info
