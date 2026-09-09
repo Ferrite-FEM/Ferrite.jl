@@ -588,13 +588,14 @@ function _close_subdofhandler!(dh::DofHandler{sdim}, sdh::SubDofHandler, sdh_ind
     ip_infos = InterpolationInfo[]
     for interpolation in sdh.field_interpolations
         ip_info = InterpolationInfo(interpolation)
-        base_ip = get_base_interpolation(interpolation)
         alldofs = [ip_info.lvertexdofs; ip_info.ledgedofs; ip_info.lfacedofs; ip_info.lvolumedofs]
         @assert length(alldofs) == length(Set(alldofs)) "Interpolation has non-unique dof assignment."
         @assert maximum(alldofs) == length(alldofs) && minimum(alldofs) == 1 "Interpolation is not continuously numbered."
-        # The cell dof slots are allocated from `getnbasefunctions`, so a base function that
-        # is attached to no entity would leave its slot unwritten.
-        @assert length(alldofs) == getnbasefunctions(base_ip) "Interpolation does not distribute all of its $(getnbasefunctions(base_ip)) base functions."
+        # The cell dof slots for the field are sized from `getnbasefunctions` and written at
+        # `n_copies * (local dof - 1) + d`, so a base function attached to no entity would
+        # leave its slot unwritten. `ip_info` already accounts for the copies of a
+        # vectorized (or otherwise repeated) interpolation.
+        @assert ip_info.n_copies * length(alldofs) == getnbasefunctions(interpolation) "Interpolation does not distribute all of its $(getnbasefunctions(interpolation)) base functions."
         push!(ip_infos, ip_info)
     end
 

@@ -1239,3 +1239,49 @@ end
         end
     end
 end
+
+# Mirrors FerriteViz's `MatrixizedInterpolation`: a wrapper that repeats a base
+# interpolation `n_copies` times per base function and declares that through
+# `getnbasefunctions`, `get_n_copies` and `InterpolationInfo` only -- notably *not*
+# `get_base_interpolation`, which is not part of the interpolation interface.
+struct MatrixizedTestInterpolation{vdim1, vdim2, shape, order, IP} <: Ferrite.Interpolation{shape, order}
+    ip::IP
+    function MatrixizedTestInterpolation{v1, v2}(ip::IP) where {v1, v2, shape, order, IP <: Ferrite.ScalarInterpolation{shape, order}}
+        return new{v1, v2, shape, order, IP}(ip)
+    end
+end
+Ferrite.get_n_copies(::MatrixizedTestInterpolation{v1, v2}) where {v1, v2} = v1 * v2
+Ferrite.n_components(::MatrixizedTestInterpolation{v1, v2}) where {v1, v2} = v1 * v2
+Ferrite.getnbasefunctions(ip::MatrixizedTestInterpolation{v1, v2}) where {v1, v2} = v1 * v2 * getnbasefunctions(ip.ip)
+Ferrite.InterpolationInfo(ip::MatrixizedTestInterpolation) = Ferrite.InterpolationInfo(ip.ip, Ferrite.get_n_copies(ip))
+Ferrite.adjust_dofs_during_distribution(ip::MatrixizedTestInterpolation) = Ferrite.adjust_dofs_during_distribution(ip.ip)
+Ferrite.conformity(ip::MatrixizedTestInterpolation) = Ferrite.conformity(ip.ip)
+
+@testset "dof distribution for a wrapper interpolation with n_copies" begin
+    grid = generate_grid(Triangle, (2, 2))
+    # This is what FerriteViz's `interpolate_gradient_field` builds for the gradient of a
+    # `Lagrange{RefTriangle, 2}^2` field in 2D: 4 components on a discontinuous linear base,
+    # i.e. 12 base functions carried by 3 local dofs with n_copies = 4.
+    ip = MatrixizedTestInterpolation{2, 2}(DiscontinuousLagrange{RefTriangle, 1}())
+    @test getnbasefunctions(ip) == 12
+    dh = DofHandler(grid)
+    add!(dh, :gradient, ip)
+    close!(dh)
+    @test ndofs_per_cell(dh) == 12
+    @test ndofs(dh) == 12 * getncells(grid)
+    # Discontinuous, so every cell owns its own dofs and every local slot is filled
+    @test sort(dh.cell_dofs) == collect(1:ndofs(dh))
+    for cc in 1:getncells(grid)
+        @test celldofs(dh, cc) == collect((12 * (cc - 1) + 1):(12 * cc))
+    end
+
+    # Combined with a regular field, to check that the field offsets stay right
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefTriangle, 1}()^2)
+    add!(dh, :gradient, ip)
+    close!(dh)
+    @test ndofs_per_cell(dh) == 6 + 12
+    @test length(dof_range(dh, :u)) == 6
+    @test length(dof_range(dh, :gradient)) == 12
+    @test sort(unique(dh.cell_dofs)) == collect(1:ndofs(dh))
+end
