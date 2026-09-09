@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-### Fixes
+### Added
+ - Allow generic (but continuous) local dof orderings for interpolations. ([#1188])
 
+### Fixes
  - Symmetric CSC assembly now rejects incompatible row/column dof lists and
    lower-triangle storage before modifying the system. Constraint application also
    rejects unsupported lower-triangle CSC storage.
@@ -19,7 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - `ArrayOfVectorViews` validates offsets before constructing unchecked views.
 
 ### Performance
-
  - `InterfaceIterator` caches topology lookups, avoiding quadratic traversal for grids
    with abstract cell storage. Recreate the iterator after changing the grid or topology.
  - L2 right-hand-side assembly avoids temporary row-slice allocations.
@@ -39,7 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    common facet dimension across the whole grid. ([#843])
  - Experimental CUDA GPU support for assembly using type-stable, non-allocating element
    routines. ([#1291])
- - Allow generic (but continuous) local dof orderings for interpolations. ([#1188])
  - Atomic assembly (`start_assemble(K, f; atomic = true)`) now supports `Float16` and
    `Complex` of `Float16`/`Float32`/`Float64` as value types, in addition to `Float32`
    and `Float64`. ([#1474])
