@@ -653,14 +653,13 @@ function _distribute_dofs_on_subdomain!(
     # rehashes during distribution. We only size a dict the first time it is touched (while
     # still empty) so that a second SubDofHandler does not re-hint — and possibly shrink — a
     # dict that another SubDofHandler already filled.
-    ncells = length(sdh.cellset)
     for (lidx, gidx) in pairs(global_fidxs)
         info = ip_infos[lidx]
         ncf = field_ncells[gidx]
-        if any(>(0), length(info.ledgedofs)) && isempty(edgedicts[gidx])
+        if !isempty(info.ledgedofs) && isempty(edgedicts[gidx])
             sizehint!(edgedicts[gidx], 2 * ncf)
         end
-        if any(>(0), length(info.lfacedofs)) && isempty(facedicts[gidx])
+        if !isempty(info.lfacedofs) && isempty(facedicts[gidx])
             sizehint!(facedicts[gidx], info.reference_dim == 3 ? 2 * ncf : ncf)
         end
     end
@@ -674,7 +673,7 @@ function _distribute_dofs_on_subdomain!(
         cell_dofs_offsets[ci] = subdomain_celldofs_offset + current_celldofs_offset
 
         # TODO: _check_cellset_intersections can be removed in favor of this assertion
-        @assert cell_to_subdofhandler[ci] == 0 || cell_to_subdofhandler[ci] == sdh_index
+        @assert cell_to_subdofhandler[ci] == 0
         cell_to_subdofhandler[ci] = sdh_index
 
         cell = getcells(grid, ci)
@@ -822,7 +821,7 @@ function add_edge_dofs(cell_dofs, cell::AbstractCell, edgedict::Dict, alledofs::
 end
 
 function add_volume_dofs(cell_dofs, volumedofs::Vector{Int}, nextdof::Int, n_copies::Int)
-    # @debug println("\t\tvolumedofs #$nextdof:$(nvolumedofs * n_copies - 1)")
+    @debug println("\t\tvolumedofs #$nextdof:$(nextdof + length(volumedofs) * n_copies - 1)")
     for vdof in volumedofs, d in 1:n_copies
         cell_dofs[n_copies * (vdof - 1) + d] = nextdof
         nextdof += 1
