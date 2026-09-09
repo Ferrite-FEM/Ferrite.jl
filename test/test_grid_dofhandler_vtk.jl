@@ -820,6 +820,181 @@ end
     end
 end
 
+@testset "interface coloring" begin
+    function node_adjacent(grid, a, b)
+        na = Set(Ferrite.get_node_ids(getcells(grid, a)))
+        return a == b || any(v -> v in na, Ferrite.get_node_ids(getcells(grid, b)))
+    end
+    # Interfaces of the grid (restricted to cellset), independently derived from the
+    # facet skeleton and the facet neighborhood
+    function reference_interfaces(grid, topology, cellvec)
+        ref = NTuple{2, FacetIndex}[]
+        neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
+        for facet in Ferrite.facetskeleton(topology, grid)
+            neighbors = neighborhood[facet[1], facet[2]]
+            isempty(neighbors) && continue
+            fb = neighbors[1]
+            (insorted(facet[1], cellvec) && insorted(fb[1], cellvec)) || continue
+            push!(ref, (FacetIndex(facet[1], facet[2]), FacetIndex(fb[1], fb[2])))
+        end
+        return ref
+    end
+    function check_interface_coloring(grid; cellset = 1:getncells(grid))
+        topology = ExclusiveTopology(grid)
+        cellvec = sort!(unique!(collect(Int, cellset)))
+        ref = Set(reference_interfaces(grid, topology, cellvec))
+        for alg in (ColoringAlgorithm.WorkStream, ColoringAlgorithm.Greedy)
+            for shared_dofs in (false, true)
+                colors = create_interface_coloring(grid, topology, cellset; alg, shared_dofs)
+                # Partition: every interface exactly once
+                seen = Set{NTuple{2, FacetIndex}}()
+                for color in colors, i in color
+                    @test i ∉ seen
+                    push!(seen, i)
+                end
+                @test seen == ref
+                # Validity: no two interfaces of the same color conflict
+                for color in colors
+                    for x in 1:length(color), y in (x + 1):length(color)
+                        ax, bx = color[x][1][1], color[x][2][1]
+                        ay, by = color[y][1][1], color[y][2][1]
+                        if !shared_dofs
+                            # No shared dofs: conflict iff sharing a cell
+                            @test isempty(intersect((ax, bx), (ay, by)))
+                        else
+                            # Conservative: conflict iff any cells node-adjacent/equal
+                            for p in (ax, bx), q in (ay, by)
+                                @test !node_adjacent(grid, p, q)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return
+    end
+    check_interface_coloring(generate_grid(Quadrilateral, (5, 4)))
+    check_interface_coloring(generate_grid(Triangle, (4, 4)))
+    check_interface_coloring(generate_grid(Hexahedron, (3, 3, 3)))
+    check_interface_coloring(generate_grid(Tetrahedron, (3, 3, 3)))
+    check_interface_coloring(generate_grid(Line, (10,)))
+    check_interface_coloring(generate_grid(Quadrilateral, (5, 4)); cellset = 1:10)
+    check_interface_coloring(generate_grid(Quadrilateral, (5, 4)); cellset = [1, 2, 3, 7, 8, 20])
+    check_interface_coloring(generate_grid(Quadrilateral, (5, 4)); cellset = Int[])
+
+    # Colors partition interfaceskeleton
+    for grid in (generate_grid(Quadrilateral, (5, 4)), generate_grid(Tetrahedron, (2, 2, 2)))
+        topology = ExclusiveTopology(grid)
+        skeleton = interfaceskeleton(topology, grid)
+        colors = create_interface_coloring(grid, topology; shared_dofs = false)
+        @test sum(length, colors; init = 0) == length(skeleton)
+        @test Set(Iterators.flatten(colors)) == Set(skeleton)
+    end
+
+    # Coloring an explicit vector of interfaces (arbitrary subset of the skeleton)
+    for grid in (generate_grid(Quadrilateral, (5, 4)), generate_grid(Tetrahedron, (2, 2, 2)))
+        topology = ExclusiveTopology(grid)
+        skeleton = interfaceskeleton(topology, grid)
+        subset = skeleton[1:3:end]
+        for shared_dofs in (false, true)
+            colors = create_interface_coloring(grid, subset; shared_dofs)
+            # Partition of exactly the given interfaces
+            @test sum(length, colors; init = 0) == length(subset)
+            @test Set(Iterators.flatten(colors)) == Set(subset)
+            # Validity within each color
+            for color in colors
+                for x in 1:length(color), y in (x + 1):length(color)
+                    ax, bx = color[x][1][1], color[x][2][1]
+                    ay, by = color[y][1][1], color[y][2][1]
+                    if !shared_dofs
+                        @test isempty(intersect((ax, bx), (ay, by)))
+                    else
+                        for p in (ax, bx), q in (ay, by)
+                            @test !node_adjacent(grid, p, q)
+                        end
+                    end
+                end
+            end
+        end
+        # Full skeleton as an explicit vector gives the same coloring as the topology method
+        @test create_interface_coloring(grid, collect(skeleton); shared_dofs = false) ==
+            create_interface_coloring(grid, topology; shared_dofs = false)
+        # Input validation
+        @test_throws ArgumentError create_interface_coloring(grid, [skeleton[1], skeleton[1]])
+        badinterface = (FacetIndex(getncells(grid) + 1, 1), FacetIndex(1, 1))
+        @test_throws ArgumentError create_interface_coloring(grid, [badinterface])
+    end
+
+    # Without shared dofs greedy coloring of the interface ("line") graph
+    # needs few colors (about Δ + 1 where Δ is the max number of facet neighbors)
+    let grid = generate_grid(Hexahedron, (4, 4, 4))
+        colors = create_interface_coloring(grid; alg = ColoringAlgorithm.Greedy, shared_dofs = false)
+        @test length(colors) <= 7 # Δ = 6
+    end
+
+    # Determinism
+    let grid = generate_grid(Hexahedron, (4, 4, 4)), topology = ExclusiveTopology(grid)
+        @test create_interface_coloring(grid, topology; shared_dofs = false) ==
+            create_interface_coloring(grid, topology; shared_dofs = false)
+    end
+
+    # InterfaceIterator over an explicit set of interfaces (e.g. one color)
+    let grid = generate_grid(Quadrilateral, (5, 4)), topology = ExclusiveTopology(grid)
+        dh = DofHandler(grid)
+        add!(dh, :u, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        close!(dh)
+        ninterfaces = count(Returns(true), InterfaceIterator(dh, topology))
+        colors = create_interface_coloring(grid, topology; shared_dofs = false)
+        total = 0
+        for color in colors
+            n = 0
+            for ic in InterfaceIterator(dh, color)
+                n += 1
+                @test length(interfacedofs(ic)) == 8
+                @test (FacetIndex(cellid(ic.a), ic.a.current_facet_id[]), FacetIndex(cellid(ic.b), ic.b.current_facet_id[])) in color
+            end
+            @test n == length(color)
+            total += n
+        end
+        @test total == ninterfaces
+        # Grid based iterator with a set works too
+        @test count(Returns(true), InterfaceIterator(grid, first(colors))) == length(first(colors))
+    end
+
+    # Colored threaded interface assembly matches a serial sweep in the same color
+    # order bitwise (within a color the write sets are disjoint for cell-interior-dof
+    # interpolations), and skeleton-order serial assembly up to summation order.
+    let grid = generate_grid(Hexahedron, (4, 4, 4)), topology = ExclusiveTopology(grid)
+        dh = DofHandler(grid)
+        add!(dh, :u, DiscontinuousLagrange{RefHexahedron, 1}())
+        close!(dh)
+        colors = create_interface_coloring(grid, topology; shared_dofs = false)
+        ndpc = ndofs_per_cell(dh)
+        Ki = [i * 1.0e-3 + j * 1.0e-6 for i in 1:(2 * ndpc), j in 1:(2 * ndpc)]
+        function assemble_interfaces(dh, iterators, K)
+            for it in iterators
+                assembler = start_assemble(K; fillzero = false)
+                for ic in it
+                    assemble!(assembler, interfacedofs(ic), Ki)
+                end
+            end
+            return K
+        end
+        K0 = allocate_matrix(dh; topology, interface_coupling = trues(1, 1))
+        Kserial = assemble_interfaces(dh, (InterfaceIterator(dh, topology),), copy(K0))
+        Kcolorserial = assemble_interfaces(dh, (InterfaceIterator(dh, color) for color in colors), copy(K0))
+        Kthreaded = copy(K0)
+        for color in colors
+            chunks = collect(Iterators.partition(color, max(1, cld(length(color), Threads.nthreads()))))
+            Threads.@threads for chunk in chunks
+                assemble_interfaces(dh, (InterfaceIterator(dh, collect(chunk)),), Kthreaded)
+            end
+        end
+        @test Kcolorserial.nzval == Kthreaded.nzval
+        @test Kserial.nzval ≈ Kthreaded.nzval
+    end
+end
+
 @testset "High order dof distribution" begin
     # 3-----4
     # | \   |

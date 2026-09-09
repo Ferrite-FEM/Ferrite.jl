@@ -353,8 +353,8 @@ end
 The methods taking an explicit `set` of interfaces (an iterable of facet pairs
 `(facet_here, facet_there)`, e.g. a subset of [`interfaceskeleton`](@ref)) iterate
 exactly the given interfaces, analogously to passing a cellset to
-[`CellIterator`](@ref). This is useful e.g. for multithreaded assembly, where each
-task processes its own subset of the interfaces.
+[`CellIterator`](@ref). This is useful e.g. for iterating one color from
+[`create_interface_coloring`](@ref).
 !!! warning
     `InterfaceIterator` is stateful and should not be used for things other than `for`-looping
     (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
