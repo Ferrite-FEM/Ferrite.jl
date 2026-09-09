@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
  - Allow generic (but continuous) local dof orderings for interpolations. ([#1188])
 
+### Changed
+ - `Lagrange{RefTriangle, 3}`, `Lagrange{RefTriangle, 4}`, `Lagrange{RefTriangle, 5}`,
+   `Lagrange{RefTetrahedron, 3}`, `Lagrange{RefTetrahedron, 4}` and
+   `Lagrange{RefHexahedron, 3}` now number their local dofs in the natural lattice order of
+   the basis (running over the reference coordinate directions, ξ₁ fastest) instead of
+   vertices-then-edges-then-faces-then-volume. These interpolations previously permuted the
+   basis into the latter ordering on every evaluation, which is no longer necessary now that
+   the local dof ordering of an interpolation is free ([#1188]). The interpolations, the
+   global dof numbering and the sparsity pattern are unchanged, but the *local* index of a
+   shape function is not: element routines that hard code local indices for these
+   interpolations (rather than using `vertexdof_indices`, `dof_range` and friends) need
+   updating. ([#1188])
+
 ### Fixes
  - Symmetric CSC assembly now rejects incompatible row/column dof lists and
    lower-triangle storage before modifying the system. Constraint application also

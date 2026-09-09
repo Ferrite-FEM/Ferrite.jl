@@ -129,18 +129,26 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         end
 
         # regression for https://github.com/Ferrite-FEM/Ferrite.jl/issues/520
+        # The leading (vertex) entries of the entity dof tuples must describe the same
+        # vertices, in the same order, as the linear interpolation on the same reference
+        # shape. Since the local dof numbering of an interpolation is free, compare the
+        # reference coordinates the dofs sit at rather than the dof indices.
+        # TensorProductQ9TestInterpolation is excluded because it has no order parameter to
+        # construct a first order counterpart from.
         interpolation_type = typeof(interpolation).name.wrapper
         if func_order > 1 && interpolation_type ∉ (Ferrite.Serendipity, TensorProductQ9TestInterpolation)
             first_order = interpolation_type{ref_shape, 1}()
+            x_high = Ferrite.reference_coordinates(interpolation)
+            x_first = Ferrite.reference_coordinates(first_order)
             for (highorderface, firstorderface) in zip(Ferrite.facedof_indices(interpolation), Ferrite.facedof_indices(first_order))
                 for (h_node, f_node) in zip(highorderface, firstorderface)
-                    @test h_node == f_node
+                    @test x_high[h_node] ≈ x_first[f_node]
                 end
             end
             if ref_dim > 2
                 for (highorderedge, firstorderedge) in zip(Ferrite.edgedof_indices(interpolation), Ferrite.edgedof_indices(first_order))
                     for (h_node, f_node) in zip(highorderedge, firstorderedge)
-                        @test h_node == f_node
+                        @test x_high[h_node] ≈ x_first[f_node]
                     end
                 end
             end
@@ -170,6 +178,36 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                 @test isa(Ferrite.getlowerorder(v_interpolation_1), Interpolation{ref_shape, func_order - 1})
                 @test isa(Ferrite.getlowerorder(v_interpolation_2), Interpolation{ref_shape, func_order - 1})
                 @test isa(Ferrite.getlowerorder(v_interpolation_3), Interpolation{ref_shape, func_order - 1})
+            end
+        end
+    end
+
+    @testset "nodal entity dof placement" begin
+        # The local dof numbering of an interpolation is free, so the entity tuples are what
+        # tie a dof to its place on the reference cell. Check that the vertex dofs and the
+        # interior edge dofs sit at the nodes they claim, and that the interior edge dofs are
+        # listed along the local edge direction -- which Ferrite.permute_and_set! relies on
+        # when it reverses them for a cell that traverses the edge the other way.
+        for ip in (
+                Lagrange{RefLine, 2}(),
+                Lagrange{RefQuadrilateral, 2}(), Lagrange{RefQuadrilateral, 3}(),
+                Lagrange{RefTriangle, 2}(), Lagrange{RefTriangle, 3}(),
+                Lagrange{RefTriangle, 4}(), Lagrange{RefTriangle, 5}(),
+                Lagrange{RefTetrahedron, 2}(), Lagrange{RefTetrahedron, 3}(), Lagrange{RefTetrahedron, 4}(),
+                Lagrange{RefHexahedron, 2}(), Lagrange{RefHexahedron, 3}(),
+                Lagrange{RefPrism, 2}(), Lagrange{RefPyramid, 2}(),
+            )
+            refshape = Ferrite.getrefshape(ip)
+            order = Ferrite.getorder(ip)
+            vx = Ferrite.reference_coordinates(Lagrange{refshape, 1}())
+            coords = Ferrite.reference_coordinates(ip)
+            for (v, vdofs) in pairs(Ferrite.vertexdof_indices(ip))
+                @test coords[only(vdofs)] ≈ vx[v]
+            end
+            for ((a, b), edofs) in zip(Ferrite.reference_edges(refshape), Ferrite.edgedof_interior_indices(ip))
+                for (k, d) in pairs(edofs)
+                    @test coords[d] ≈ ((order - k) * vx[a] + k * vx[b]) / order
+                end
             end
         end
     end

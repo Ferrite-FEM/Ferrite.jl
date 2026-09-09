@@ -167,6 +167,10 @@ end
 
 calculate_volume(ip::VectorizedInterpolation, x) = calculate_volume(ip.ip, x)
 
+# The local dof numbering of an interpolation is free -- only the entity tuples say which
+# dof sits where -- so look the corner nodes up instead of assuming they come first.
+vertex_coordinates(ip::Ferrite.Interpolation, x::AbstractVector) = map(dofs -> x[only(dofs)], Ferrite.vertexdof_indices(ip))
+
 function calculate_volume(::Lagrange{RefLine, 1}, x::Vector{Vec{dim, T}}) where {T, dim}
     vol = norm(x[2] - x[1])
     return vol
@@ -209,13 +213,15 @@ function calculate_volume(::Lagrange{RefTriangle, 2}, x::Vector{Vec{dim, T}}) wh
 end
 
 # TODO: Only correct for linear sides
-function calculate_volume(::Lagrange{RefTriangle, O}, x::Vector{Vec{dim, T}}) where {T, dim, O}
-    vol = norm((x[1] - x[3]) × (x[2] - x[3])) * 0.5
+function calculate_volume(ip::Lagrange{RefTriangle, O}, x::Vector{Vec{dim, T}}) where {T, dim, O}
+    v = vertex_coordinates(ip, x)
+    vol = norm((v[1] - v[3]) × (v[2] - v[3])) * 0.5
     return vol
 end
 
-function calculate_volume(::Lagrange{RefTetrahedron, order}, x::Vector{Vec{3, T}}) where {T, order}
-    vol = norm((x[2] - x[1]) ⋅ ((x[3] - x[1]) × (x[4] - x[1]))) / 6.0
+function calculate_volume(ip::Lagrange{RefTetrahedron, order}, x::Vector{Vec{3, T}}) where {T, order}
+    v = vertex_coordinates(ip, x)
+    vol = norm((v[2] - v[1]) ⋅ ((v[3] - v[1]) × (v[4] - v[1]))) / 6.0
     return vol
 end
 
@@ -229,16 +235,17 @@ function calculate_volume(::Lagrange{RefHexahedron, 1}, x::Vector{Vec{3, T}}) wh
 end
 
 # Only correct for straight-sided hexahedra, where the volume is determined by the eight
-# vertex nodes (indices 1:8). Error out for curved geometries, where every higher-order node
-# would have to lie on the trilinear map of the vertices, since the result would be wrong.
+# vertex nodes. Error out for curved geometries, where every higher-order node would have to
+# lie on the trilinear map of the vertices, since the result would be wrong.
 function calculate_volume(ip::Lagrange{RefHexahedron, order}, x::Vector{Vec{3, T}}) where {T, order}
     lin = Lagrange{RefHexahedron, 1}()
+    v = collect(vertex_coordinates(ip, x))
     for (i, ξ) in pairs(Ferrite.reference_coordinates(ip))
-        x_straight = sum(reference_shape_value(lin, ξ, k) * x[k] for k in 1:8)
+        x_straight = sum(reference_shape_value(lin, ξ, k) * v[k] for k in 1:8)
         isapprox(x[i], x_straight; atol = 1.0e-10) ||
             error("calculate_volume for Lagrange{RefHexahedron, $order} only supports straight-sided hexahedra")
     end
-    return calculate_volume(lin, x)
+    return calculate_volume(lin, v)
 end
 
 function calculate_volume(::Lagrange{RefPrism, order}, x::Vector{Vec{3, T}}) where {T, order}
