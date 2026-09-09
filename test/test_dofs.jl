@@ -1018,7 +1018,7 @@ end
 end
 
 @testset "canonical facedof index helpers" begin
-    # Brute-force geometric checks of the helpers used by Ferrite.permute_and_push! to
+    # Brute-force geometric checks of the helpers used by Ferrite.permute_and_set! to
     # adjust face dofs to the orientation of the local face: the local lattice point must
     # map to the index of the canonical lattice point at the same location.
 
@@ -1079,21 +1079,27 @@ end
 
     orientation = Ferrite.SurfaceOrientationInfo((2, 3, 1)) # a rotated triangular face
     dofs = 1:1:3 # three interior face dofs, n_copies = 1
+    table = [1, 2, 3] # identity local dof table
     # rdim = 3, adjust = true, multiple dofs, not on lattice => error
-    @test_throws ErrorException Ferrite.permute_and_push!(Int[], dofs, orientation, true, false, 3, 3)
+    @test_throws ErrorException Ferrite.permute_and_set!(zeros(Int, 3), table, dofs, orientation, true, false, 3, 3)
     # On a lattice it permutes the three dofs without error
-    cell_dofs = Int[]
-    Ferrite.permute_and_push!(cell_dofs, dofs, orientation, true, true, 3, 3)
-    @test length(cell_dofs) == 3
+    cell_dofs = zeros(Int, 3)
+    Ferrite.permute_and_set!(cell_dofs, table, dofs, orientation, true, true, 3, 3)
+    @test sort(cell_dofs) == collect(dofs)
     # A lattice interpolation on a 2D cell uses the same canonical face ordering so it can
     # share these dofs with a 3D face.
-    cell_dofs_2d = Int[]
-    Ferrite.permute_and_push!(cell_dofs_2d, dofs, orientation, true, true, 3, 2)
+    cell_dofs_2d = zeros(Int, 3)
+    Ferrite.permute_and_set!(cell_dofs_2d, table, dofs, orientation, true, true, 3, 2)
     @test cell_dofs_2d == cell_dofs
     # Non-lattice face dofs on a 2D cell retain their local ordering.
-    cell_dofs_2d_nonlattice = Int[]
-    Ferrite.permute_and_push!(cell_dofs_2d_nonlattice, dofs, orientation, true, false, 3, 2)
+    cell_dofs_2d_nonlattice = zeros(Int, 3)
+    Ferrite.permute_and_set!(cell_dofs_2d_nonlattice, table, dofs, orientation, true, false, 3, 2)
     @test cell_dofs_2d_nonlattice == collect(dofs)
+    # A non-identity local dof table relocates the same values within the cell dofs: slot
+    # table[l] receives what slot l received with the identity table.
+    cell_dofs_permuted = zeros(Int, 3)
+    Ferrite.permute_and_set!(cell_dofs_permuted, [3, 1, 2], dofs, orientation, true, true, 3, 3)
+    @test cell_dofs_permuted == cell_dofs[[2, 3, 1]]
 end
 
 @testset "dof distribution on shared faces" begin
@@ -1101,7 +1107,7 @@ end
     # on the entity, regardless of the relative orientation of the cells. For
     # Lagrange{RefTetrahedron, 3} this requires adjusting multiple dofs per edge, and for
     # Lagrange{RefTetrahedron, 4} additionally multiple dofs per face, see
-    # Ferrite.permute_and_push!.
+    # Ferrite.permute_and_set!.
     all_permutations(t::NTuple{4, Int}) = [
         (t[i], t[j], t[k], t[l]) for i in 1:4 for j in 1:4 for k in 1:4 for l in 1:4
             if length(unique((i, j, k, l))) == 4
@@ -1157,7 +1163,7 @@ end
     # Two hexahedra sharing a quadrilateral face must associate the same global dof with the
     # same location on the face for any relative orientation of the cells. For
     # Lagrange{RefHexahedron, 3} the shared face carries multiple interior dofs, exercising
-    # the quadrilateral branch of Ferrite.permute_and_push!.
+    # the quadrilateral branch of Ferrite.permute_and_set!.
 
     # Centered coordinates of the 8 hex corners in Ferrite (reference) node ordering.
     corner = (
@@ -1232,4 +1238,66 @@ end
             @test ndofs(dh) == 2 * getnbasefunctions(ip) - nshared
         end
     end
+end
+
+# Mirrors FerriteViz's `MatrixizedInterpolation`: a wrapper that repeats a base
+# interpolation `n_copies` times per base function and declares that through
+# `getnbasefunctions`, `get_n_copies` and `InterpolationInfo` only -- notably *not*
+# `get_base_interpolation`, which is not part of the interpolation interface.
+struct MatrixizedTestInterpolation{vdim1, vdim2, shape, order, IP} <: Ferrite.Interpolation{shape, order}
+    ip::IP
+    function MatrixizedTestInterpolation{v1, v2}(ip::IP) where {v1, v2, shape, order, IP <: Ferrite.ScalarInterpolation{shape, order}}
+        return new{v1, v2, shape, order, IP}(ip)
+    end
+end
+Ferrite.get_n_copies(::MatrixizedTestInterpolation{v1, v2}) where {v1, v2} = v1 * v2
+Ferrite.n_components(::MatrixizedTestInterpolation{v1, v2}) where {v1, v2} = v1 * v2
+Ferrite.getnbasefunctions(ip::MatrixizedTestInterpolation{v1, v2}) where {v1, v2} = v1 * v2 * getnbasefunctions(ip.ip)
+Ferrite.InterpolationInfo(ip::MatrixizedTestInterpolation) = Ferrite.InterpolationInfo(ip.ip, Ferrite.get_n_copies(ip))
+Ferrite.adjust_dofs_during_distribution(ip::MatrixizedTestInterpolation) = Ferrite.adjust_dofs_during_distribution(ip.ip)
+Ferrite.conformity(ip::MatrixizedTestInterpolation) = Ferrite.conformity(ip.ip)
+
+@testset "dof distribution for a wrapper interpolation with n_copies" begin
+    grid = generate_grid(Triangle, (2, 2))
+    # This is what FerriteViz's `interpolate_gradient_field` builds for the gradient of a
+    # `Lagrange{RefTriangle, 2}^2` field in 2D: 4 components on a discontinuous linear base,
+    # i.e. 12 base functions carried by 3 local dofs with n_copies = 4.
+    ip = MatrixizedTestInterpolation{2, 2}(DiscontinuousLagrange{RefTriangle, 1}())
+    @test getnbasefunctions(ip) == 12
+    dh = DofHandler(grid)
+    add!(dh, :gradient, ip)
+    close!(dh)
+    @test ndofs_per_cell(dh) == 12
+    @test ndofs(dh) == 12 * getncells(grid)
+    # Discontinuous, so every cell owns its own dofs and every local slot is filled
+    @test sort(dh.cell_dofs) == collect(1:ndofs(dh))
+    for cc in 1:getncells(grid)
+        @test celldofs(dh, cc) == collect((12 * (cc - 1) + 1):(12 * cc))
+    end
+
+    # Combined with a regular field, to check that the field offsets stay right
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefTriangle, 1}()^2)
+    add!(dh, :gradient, ip)
+    close!(dh)
+    @test ndofs_per_cell(dh) == 6 + 12
+    @test length(dof_range(dh, :u)) == 6
+    @test length(dof_range(dh, :gradient)) == 12
+    @test sort(unique(dh.cell_dofs)) == collect(1:ndofs(dh))
+end
+
+# An interpolation that claims more base functions than it attaches to entities. `close!`
+# sizes one cell dof slot per base function, leaves them uninitialized and writes each of
+# them without a bounds check, so it has to reject this up front rather than leave a slot
+# unwritten.
+struct UndercoveringTestInterpolation <: Ferrite.ScalarInterpolation{RefTriangle, 1} end
+Ferrite.getnbasefunctions(::UndercoveringTestInterpolation) = 4
+Ferrite.vertexdof_indices(::UndercoveringTestInterpolation) = ((1,), (2,), (3,))
+Ferrite.conformity(::UndercoveringTestInterpolation) = Ferrite.H1Conformity()
+Ferrite.adjust_dofs_during_distribution(::UndercoveringTestInterpolation) = false
+
+@testset "close! rejects an interpolation that leaves base functions unattached" begin
+    dh = DofHandler(generate_grid(Triangle, (2, 2)))
+    add!(dh, :u, UndercoveringTestInterpolation())
+    @test_throws AssertionError close!(dh)
 end

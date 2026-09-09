@@ -4,6 +4,8 @@ using Ferrite, SparseArrays, ForwardDiff, Test
 import LinearAlgebra: diag
 import Ferrite: getrefdim, geometric_interpolation
 
+include(joinpath(@__DIR__, "..", "test_utils.jl"))
+
 get_geometry(::Ferrite.Interpolation{RefLine}) = Line
 get_geometry(::Ferrite.Interpolation{RefQuadrilateral}) = Quadrilateral
 get_geometry(::Ferrite.Interpolation{RefTriangle}) = Triangle
@@ -23,6 +25,7 @@ get_quadrature_order(::Serendipity{shape, order}) where {shape, order} = max(2 *
 get_quadrature_order(::CrouzeixRaviart{shape, order}) where {shape, order} = max(2 * order - 1, 2)
 get_quadrature_order(::RannacherTurek{shape, order}) where {shape, order} = max(2 * order - 1, 2)
 get_quadrature_order(::BubbleEnrichedLagrange{shape, order}) where {shape, order} = max(2 * order - 1, 2)
+get_quadrature_order(::TensorProductQ9TestInterpolation) = 3
 
 get_num_elements(::Ferrite.Interpolation{shape, 1}) where {shape} = 21
 get_num_elements(::Ferrite.Interpolation{shape, 2}) where {shape} = 7

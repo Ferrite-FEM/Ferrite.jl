@@ -780,8 +780,8 @@ end
     dh = DofHandler(grid)
     add!(dh, :u, Lagrange{RefTriangle, 3}())
     close!(dh)
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 9, 8, 10]
-    @test celldofs(dh, 2) == [2, 11, 3, 12, 13, 15, 14, 7, 6, 16]
+    @test celldofs(dh, 1) == [3, 9, 8, 1, 7, 10, 4, 6, 5, 2]
+    @test celldofs(dh, 2) == [3, 7, 6, 2, 14, 16, 12, 15, 13, 11]
     # Should also agree with the remaining celldofs API
     dofs = zeros(Int, 10)
     celldofs!(dofs, dh, 1)
@@ -806,8 +806,8 @@ end
     dh = DofHandler(grid)
     add!(dh, :u, Lagrange{RefTriangle, 3}()^2)
     close!(dh)
-    @test celldofs(dh, 1) == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 17, 18, 15, 16, 19, 20]
-    @test celldofs(dh, 2) == [3, 4, 21, 22, 5, 6, 23, 24, 25, 26, 29, 30, 27, 28, 13, 14, 11, 12, 31, 32]
+    @test celldofs(dh, 1) == [5, 6, 17, 18, 15, 16, 1, 2, 13, 14, 19, 20, 7, 8, 11, 12, 9, 10, 3, 4]
+    @test celldofs(dh, 2) == [5, 6, 13, 14, 11, 12, 3, 4, 27, 28, 31, 32, 23, 24, 29, 30, 25, 26, 21, 22]
     # Should also agree with the remaining celldofs API
     dofs = zeros(Int, 20)
     celldofs!(dofs, dh, 1)
@@ -828,6 +828,7 @@ end
         grid = generate_grid(Line, (2,))
 
         Ferrite.vertexdof_indices(::VectorLagrangeTest{RefLine, 1, 2}) = ((1, 2), (3, 4))
+        Ferrite.getnbasefunctions(::VectorLagrangeTest{RefLine, 1, 2}) = 4
         dh1 = DofHandler(grid)
         add!(dh1, :u, VectorLagrangeTest{RefLine, 1, 2}())
         close!(dh1)
@@ -838,6 +839,7 @@ end
         @test dh1.cell_dofs == dh2.cell_dofs
 
         Ferrite.vertexdof_indices(::VectorLagrangeTest{RefLine, 1, 3}) = ((1, 2, 3), (4, 5, 6))
+        Ferrite.getnbasefunctions(::VectorLagrangeTest{RefLine, 1, 3}) = 6
         dh1 = DofHandler(grid)
         add!(dh1, :u, VectorLagrangeTest{RefLine, 1, 3}())
         close!(dh1)
@@ -851,6 +853,7 @@ end
     @testset "2d" begin
         grid = generate_grid(Quadrilateral, (2, 2))
         Ferrite.vertexdof_indices(::VectorLagrangeTest{RefQuadrilateral, 1, 2}) = ((1, 2), (3, 4), (5, 6), (7, 8))
+        Ferrite.getnbasefunctions(::VectorLagrangeTest{RefQuadrilateral, 1, 2}) = 8
         dh1 = DofHandler(grid)
         add!(dh1, :u, VectorLagrangeTest{RefQuadrilateral, 1, 2}())
         close!(dh1)
@@ -860,7 +863,7 @@ end
         @test dh1.cell_dofs == dh2.cell_dofs
 
         Ferrite.vertexdof_indices(::VectorLagrangeTest{RefQuadrilateral, 1, 3}) = ((1, 2, 3), (4, 5, 6), (7, 8, 9), (10, 11, 12))
-        Ferrite.facedof_indices(::VectorLagrangeTest{RefQuadrilateral, 1, 3}) = ((1, 2, 3, 4, 5, 6), (4, 5, 6, 7, 8, 9), (7, 8, 9, 10, 11, 12), (10, 11, 12, 1, 2, 3))
+        Ferrite.getnbasefunctions(::VectorLagrangeTest{RefQuadrilateral, 1, 3}) = 12
         dh1 = DofHandler(grid)
         add!(dh1, :u, VectorLagrangeTest{RefQuadrilateral, 1, 3}())
         close!(dh1)

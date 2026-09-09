@@ -23,6 +23,8 @@ include(joinpath(@__DIR__, "convergence_test_utils.jl"))
             CrouzeixRaviart{RefTetrahedron, 1}(),
             RannacherTurek{RefQuadrilateral, 1}(),
             RannacherTurek{RefHexahedron, 1}(),
+            # Tensor-product form
+            ConvergenceTestHelper.TensorProductQ9TestInterpolation(),
         )
         ConvergenceTestHelper.run_convergence_analysis(interpolation)
     end
