@@ -351,11 +351,20 @@ end
 !!! warning
     `InterfaceIterator` is stateful and should not be used for things other than `for`-looping
     (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
+    Construct a new iterator after changing the grid or its topology.
 """
-struct InterfaceIterator{IC <: InterfaceCache, G <: AbstractGrid, TopologyType <: AbstractTopology}
+struct InterfaceIterator{IC <: InterfaceCache, G <: AbstractGrid, TopologyType <: AbstractTopology, N, S}
     cache::IC
     grid::G
     topology::TopologyType
+    neighborhood::N
+    skeleton::S
+end
+
+function InterfaceIterator(cache::InterfaceCache, grid::AbstractGrid, topology::AbstractTopology)
+    neighborhood = get_facet_facet_neighborhood(topology, grid)
+    skeleton = facetskeleton(topology, grid)
+    return InterfaceIterator(cache, grid, topology, neighborhood, skeleton)
 end
 
 function InterfaceIterator(
@@ -368,8 +377,8 @@ end
 
 # Iterator interface
 @inline function Base.iterate(ii::InterfaceIterator, i::Integer)
-    neighborhood = get_facet_facet_neighborhood(ii.topology, ii.grid) # TODO: This could be moved to InterfaceIterator constructor (potentially type-instable for non-union or mixed grids)
-    skeleton = facetskeleton(ii.topology, ii.grid)
+    neighborhood = ii.neighborhood
+    skeleton = ii.skeleton
     while i <= length(skeleton)
         facet_a = skeleton[i]; i += 1
         neighbors = neighborhood[facet_a[1], facet_a[2]]

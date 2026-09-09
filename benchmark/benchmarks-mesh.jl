@@ -3,6 +3,17 @@
 #----------------------------------------------------------------------#
 SUITE["mesh"] = BenchmarkGroup()
 
+# Repeated traversal must not recompute grid-wide reference dimensions when the
+# cell vector has an abstract element type. Construction is outside the timing.
+SUITE["mesh"]["InterfaceIterator"] = BenchmarkGroup()
+let g = SUITE["mesh"]["InterfaceIterator"]
+    grid = generate_grid(Quadrilateral, (40, 40))
+    for (name, cells) in (("concrete", grid.cells), ("abstract", Ferrite.AbstractCell[grid.cells...]))
+        iterator = InterfaceIterator(Grid(cells, grid.nodes))
+        g[name] = @benchmarkable FerriteBenchmarkHelpers.interface_sweep($iterator) evals = 1
+    end
+end
+
 # Grid generation for one geometry per structurally different generator: 2D quadrilateral
 # (tensor product), 3D hexahedron (tensor product with face sets in 3D) and 3D tetrahedron
 # (subdivision of hexahedra). Sizes are picked to land well above the noise floor.
@@ -14,15 +25,23 @@ let g = SUITE["mesh"]["generate_grid"]
 end
 
 # Topology: construction and neighborhood queries. Hexahedra exercise the 3D path with
-# faces and edges, triangles the simplex path where cells share only vertices diagonally.
+# faces and edges, triangles and tetrahedra the simplex paths where cells share only
+# vertices diagonally (with many more neighbors per cell in 3D).
 SUITE["mesh"]["topology"] = BenchmarkGroup()
 let g = SUITE["mesh"]["topology"]
     hexgrid = generate_grid(Hexahedron, (10, 10, 10))
+    quadgrid = generate_grid(Quadrilateral, (25, 25))
     trigrid = generate_grid(Triangle, (25, 25))
+    tetgrid = generate_grid(Tetrahedron, (8, 8, 8))
     hextopo = ExclusiveTopology(hexgrid)
     g["ExclusiveTopology (Hexahedron 10×10×10)"] = @benchmarkable ExclusiveTopology($hexgrid) evals = 1
+    g["ExclusiveTopology (Quadrilateral 25×25)"] = @benchmarkable ExclusiveTopology($quadgrid) evals = 1
     g["ExclusiveTopology (Triangle 25×25)"] = @benchmarkable ExclusiveTopology($trigrid) evals = 1
+    g["ExclusiveTopology (Tetrahedron 8×8×8)"] = @benchmarkable ExclusiveTopology($tetgrid) evals = 1
     g["getneighborhood all cells (Hexahedron 10×10×10)"] = @benchmarkable FerriteBenchmarkHelpers.neighborhood_sweep($hextopo, $hexgrid) evals = 1
+    # getneighborhood through the EdgeIndex path, which recomputes the full neighborhood
+    # for each query since only the exclusive neighbors are stored for 3D cells.
+    g["getneighborhood all edges (Hexahedron 10×10×10)"] = @benchmarkable FerriteBenchmarkHelpers.edge_neighborhood_sweep($hextopo, $hexgrid) evals = 1
     # Iteration over the raw vertex/edge/face adjacency storage (issue #1019).
     g["neighbor iteration (Hexahedron 10×10×10)"] = @benchmarkable FerriteBenchmarkHelpers.neighbor_index_sum($hextopo) evals = 1
     # getneighborhood through the FacetIndex path for every skeleton facet (issue #1019).
@@ -55,10 +74,19 @@ let g = SUITE["mesh"]["sets"]
     )
 end
 
-# Grid coloring, used to set up threaded assembly.
+# Grid coloring, used to set up threaded assembly. The 3D grids gather many more
+# node-sharing neighbor candidates per cell than the 2D grid (quadrilateral ~12,
+# hexahedron ~56, tetrahedron ~92), so they weight the sort/dedup path of the incidence
+# matrix construction differently.
 SUITE["mesh"]["coloring"] = BenchmarkGroup()
 let g = SUITE["mesh"]["coloring"]
-    grid = generate_grid(Quadrilateral, (50, 50))
-    g["workstream (Quadrilateral 50×50)"] = @benchmarkable create_coloring($grid; alg = ColoringAlgorithm.WorkStream) evals = 1
-    g["greedy (Quadrilateral 50×50)"] = @benchmarkable create_coloring($grid; alg = ColoringAlgorithm.Greedy) evals = 1
+    quadgrid = generate_grid(Quadrilateral, (50, 50))
+    g["workstream (Quadrilateral 50×50)"] = @benchmarkable create_coloring($quadgrid; alg = ColoringAlgorithm.WorkStream) evals = 1
+    g["greedy (Quadrilateral 50×50)"] = @benchmarkable create_coloring($quadgrid; alg = ColoringAlgorithm.Greedy) evals = 1
+    hexgrid = generate_grid(Hexahedron, (15, 15, 15))
+    g["workstream (Hexahedron 15×15×15)"] = @benchmarkable create_coloring($hexgrid; alg = ColoringAlgorithm.WorkStream) evals = 1
+    g["greedy (Hexahedron 15×15×15)"] = @benchmarkable create_coloring($hexgrid; alg = ColoringAlgorithm.Greedy) evals = 1
+    tetgrid = generate_grid(Tetrahedron, (8, 8, 8))
+    g["workstream (Tetrahedron 8×8×8)"] = @benchmarkable create_coloring($tetgrid; alg = ColoringAlgorithm.WorkStream) evals = 1
+    g["greedy (Tetrahedron 8×8×8)"] = @benchmarkable create_coloring($tetgrid; alg = ColoringAlgorithm.Greedy) evals = 1
 end

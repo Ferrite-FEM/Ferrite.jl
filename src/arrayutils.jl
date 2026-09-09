@@ -31,9 +31,9 @@ end
 function addindex!(A::AbstractMatrix{T}, v::T, i::Int, j::Int, ::Val{atomic}) where {T, atomic}
     iszero(v) && return A
     if atomic
-        A[i, j] += v
-    else
         error("Atomic addindex! not supported for matrices.")
+    else
+        A[i, j] += v
     end
     return A
 end
@@ -47,12 +47,14 @@ end
 # This is written with `llvmcall` since the built-in alternatives in Julia currently
 # generate bad code for floating point addition: `Core.Intrinsics.atomic_pointermodify`
 # (and thus `@atomic`) lowers `+` on floats to a compare-exchange loop with a non-inlined
-# call to `+` inside, whereas this generates a single `atomicrmw fadd` instruction.
+# call to `+` inside, whereas this generates a single `atomicrmw fadd` instruction. (For
+# Float16 there is no atomic add instruction on typical CPUs and LLVM legalizes the
+# `atomicrmw fadd` to a compare-exchange loop.)
 #
 # Monotonic ordering is sufficient since no other memory is synchronized through these
 # additions -- the task join at the end of a threaded assembly loop is the synchronization
 # point that makes the accumulated values visible.
-for (T, llvmT) in ((Float64, "double"), (Float32, "float"))
+for (T, llvmT) in ((Float64, "double"), (Float32, "float"), (Float16, "half"))
     ir = if VERSION >= v"1.12.0-DEV"
         """
         %rv = atomicrmw fadd ptr %0, $llvmT %1 monotonic
@@ -65,21 +67,39 @@ for (T, llvmT) in ((Float64, "double"), (Float32, "float"))
         ret void
         """
     end
-    @eval @propagate_inbounds function _atomic_add!(x::Vector{$T}, v::$T, i::Int)
-        @boundscheck checkbounds(x, i)
-        GC.@preserve x begin
-            p = pointer(x, i)
-            Base.llvmcall($ir, Cvoid, Tuple{Ptr{$T}, $T}, p, v)
-        end
+    @eval @inline function _atomic_fadd!(p::Ptr{$T}, v::$T)
+        Base.llvmcall($ir, Cvoid, Tuple{Ptr{$T}, $T}, p, v)
         return
     end
 end
 
+# Eltypes supported by atomic assembly (see `start_assemble`).
+const AtomicEltypes = Union{Float16, Float32, Float64, Complex{Float16}, Complex{Float32}, Complex{Float64}}
+
+@propagate_inbounds function _atomic_add!(x::Vector{T}, v::T, i::Int) where {T <: Union{Float16, Float32, Float64}}
+    @boundscheck checkbounds(x, i)
+    GC.@preserve x _atomic_fadd!(pointer(x, i), v)
+    return
+end
+
+# Complex addition is component-wise and assembly only accumulates -- no task reads the
+# values until after the task join -- so the real and imaginary parts can be accumulated
+# with two independent atomic additions.
+@propagate_inbounds function _atomic_add!(x::Vector{Complex{T}}, v::Complex{T}, i::Int) where {T <: Union{Float16, Float32, Float64}}
+    @boundscheck checkbounds(x, i)
+    GC.@preserve x begin
+        p = convert(Ptr{T}, pointer(x, i))
+        _atomic_fadd!(p, real(v))
+        _atomic_fadd!(p + sizeof(T), imag(v))
+    end
+    return
+end
+
 # Accumulate `v` into `x[i]`, atomically if `atomic` is `Val(true)`. This is the only
-# point where the atomic and non-atomic matrix assembly kernels differ.
+# point where the atomic and non-atomic assembly kernels differ.
 @propagate_inbounds function addindex!(x::AbstractVector, v, i::Int, ::Val{atomic} = Val(false)) where {atomic}
     if atomic
-        _atomic_add!(x, v, i)
+        _atomic_add!(x, convert(eltype(x), v), i)
     else
         x[i] += v
     end
@@ -98,6 +118,25 @@ fillzero!(A)
 function fillzero!(A::AbstractVecOrMat{T}) where {T}
     return fill!(A, zero(T))
 end
+
+"""
+    Ferrite.minor_indices(K::AbstractSparseMatrix)
+
+For a sparse matrix that stores the entries of one index contiguously ("the major"), return the
+vector of the *other* index ("the minor") of every stored entry, parallel to `nonzeros(K)`. This
+is `rowvals(K)` for column-compressed storage (CSC) and `colvals(K)` for row-compressed storage
+(CSR).
+
+This is an internal helper shared by the CSC and CSR implementations of the constraint
+application interface (see the devdocs on assembly); it is *not* part of that interface. A format
+that does not store scalar entries in flat arrays parallel to `nonzeros` -- a blocked format such
+as BSR, for instance -- simply does not define it, and implements the interface functions
+directly.
+"""
+function minor_indices end
+
+minor_indices(K::AbstractSparseMatrixCSC) = rowvals(K)
+
 
 ##################################
 ## SparseArrays.SparseMatrixCSC ##
@@ -129,4 +168,9 @@ end
 function fillzero!(A::Symmetric{T, <:AbstractSparseMatrix}) where {T}
     fillzero!(A.data)
     return A
+end
+
+function _check_upper_triangle(K::Symmetric)
+    K.uplo == 'U' || throw(ArgumentError("Only upper-triangle Symmetric storage is supported. Use Symmetric(K, :U)."))
+    return
 end

@@ -3,7 +3,8 @@
 # ![Shows the von Mises stress distribution in a cantilever beam.](plasticity-light.png)
 # ![Shows the von Mises stress distribution in a cantilever beam.](plasticity-dark.png)
 #
-# *Figure 1.* A coarse mesh solution of a cantilever beam subjected to a load
+# [[*Figure 1*](@ref tutorial-plasticity-figure-1)](@id tutorial-plasticity-figure-1):
+# A coarse mesh solution of a cantilever beam subjected to a load
 # causing plastic deformations. The initial yield limit is 200 MPa but due to
 # hardening it increases up to approximately 240 MPa.
 #
@@ -375,7 +376,8 @@ plot(
 ylabel!("Traction [Pa]")
 xlabel!("Maximum deflection [m]")
 
-# *Figure 2.* Load-displacement-curve for the beam, showing a clear decrease
+# [[*Figure 2*](@ref tutorial-plasticity-figure-2)](@id tutorial-plasticity-figure-2):
+# Load-displacement-curve for the beam, showing a clear decrease
 # in stiffness as more material starts to yield.
 
 ## test the result                       #src

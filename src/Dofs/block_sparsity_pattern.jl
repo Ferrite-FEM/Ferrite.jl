@@ -66,7 +66,6 @@ function BlockSparsityPattern(blk_sizes::AbstractVector{<:Integer})
     block_sizes = collect(Int, blk_sizes)
     nrows = ncols = sum(block_sizes)
     nblocks = length(block_sizes)
-    # TODO: Maybe all of these could/should share the same PoolAllocator?
     blocks = [SparsityPattern(block_sizes[i], block_sizes[j]) for i in 1:nblocks, j in 1:nblocks]
     return BlockSparsityPattern(nrows, ncols, block_sizes, blocks)
 end
@@ -124,6 +123,14 @@ function Base.iterate(it::BSPRowIterator, state = (1, 1))
         offset = sum((bsp.block_sizes[i] for i in 1:(col_block - 1)); init = 0)
         return offset + col_local, (col_block, idx + 1)
     end
+end
+
+function Base.length(it::BSPRowIterator)
+    bsp = it.bsp
+    return sum(
+        length(eachrow(bsp.blocks[it.row_block, col_block], it.row_local))
+            for col_block in 1:length(bsp.block_sizes)
+    )
 end
 
 # TODO: eltype of the generator do not infer; might need another auxiliary struct.

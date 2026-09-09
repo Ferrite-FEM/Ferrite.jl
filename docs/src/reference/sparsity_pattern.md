@@ -15,6 +15,7 @@ init_sparsity_pattern
 add_sparsity_entries!
 add_cell_entries!
 add_interface_entries!
+add_coupling_entries!
 add_constraint_entries!
 Ferrite.add_entry!
 ```

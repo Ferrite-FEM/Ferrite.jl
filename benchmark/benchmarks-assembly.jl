@@ -3,6 +3,7 @@
 #----------------------------------------------------------------------#
 using SparseArrays: SparseMatrixCSC
 using SparseMatricesCSR: SparseMatrixCSR
+using BlockArrays: BlockMatrix
 using LinearAlgebra: Symmetric
 
 SUITE["assembly"] = BenchmarkGroup()
@@ -82,6 +83,32 @@ let g = SUITE["assembly"]["global loop"]
         $assemble!($K, $f, $dh, $cv, $(FerriteBenchmarkHelpers.elasticity_kernel!), $C),
         evals = 1, seconds = 1.0,
     )
+
+    # A mixed u-p (Stokes) system assembled into a blocked matrix, i.e. one block per field,
+    # which is what the BlockArrays extension exists for.
+    quadgrid = generate_grid(Quadrilateral, (20, 20))
+    dh = DofHandler(quadgrid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 2}()^2)
+    add!(dh, :p, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+    renumber!(dh, DofOrder.FieldWise())
+    cmv = MultiFieldCellValues(
+        QuadratureRule{RefQuadrilateral}(3),
+        (u = Lagrange{RefQuadrilateral, 2}()^2, p = Lagrange{RefQuadrilateral, 1}()),
+    )
+    ndu = 2 * (2 * 20 + 1)^2 # Lagrange{2}^2 on a 20×20 quadrilateral grid
+    ndp = (20 + 1)^2         # Lagrange{1} on the same grid
+    bsp = BlockSparsityPattern([ndu, ndp])
+    add_sparsity_entries!(bsp, dh)
+    KB = allocate_matrix(BlockMatrix, bsp)
+    fB = similar(KB, axes(KB, 1))
+    stokes! = FerriteBenchmarkHelpers.stokes_kernel!
+    range_u = dof_range(dh, :u)
+    range_p = dof_range(dh, :p)
+    g["Stokes Lagrange{2}²×Lagrange{1} BlockMatrix (Quadrilateral 20×20)"] = @benchmarkable(
+        $assemble!($KB, $fB, $dh, $cmv, $stokes!, $range_u, $range_p),
+        evals = 1, seconds = 1.0,
+    )
 end
 
 # Scatter-only loops with a precomputed element matrix, isolating the sparse `assemble!`
@@ -109,6 +136,27 @@ let g = SUITE["assembly"]["scatter"]
 
     Kcsr = allocate_matrix(SparseMatrixCSR{1, Float64, Int}, dh)
     g["SparseMatrixCSR (Quadrilateral 40×40)"] = @benchmarkable $scatter!($Kcsr, $dofs_batch, $Ke) evals = 1
+
+    # The blocked formats scatter block by block, so a mixed u-p system with the fields in
+    # separate blocks is what exercises them. The same system in an unblocked matrix is not
+    # benchmarked: it is the CSC/CSR path above at the same per-entry cost, only with a
+    # larger element matrix.
+    updh = DofHandler(grid)
+    add!(updh, :u, Lagrange{RefQuadrilateral, 2}()^2)
+    add!(updh, :p, Lagrange{RefQuadrilateral, 1}())
+    close!(updh)
+    renumber!(updh, DofOrder.FieldWise())
+    updofs_batch = FerriteBenchmarkHelpers.celldofs_batch(updh, getncells(grid))
+    upKe = rand(ndofs_per_cell(updh), ndofs_per_cell(updh))
+    ndu = 2 * (2 * 40 + 1)^2 # Lagrange{2}^2 on a 40×40 quadrilateral grid
+    ndp = (40 + 1)^2         # Lagrange{1} on the same grid
+    bsp = BlockSparsityPattern([ndu, ndp])
+    add_sparsity_entries!(bsp, updh)
+
+    for (name, BT) in ("CSC" => SparseMatrixCSC{Float64, Int}, "CSR" => SparseMatrixCSR{1, Float64, Int})
+        KB = allocate_matrix(BlockMatrix{Float64, Matrix{BT}}, bsp)
+        g["BlockMatrix of $name (Quadrilateral 40×40, u-p)"] = @benchmarkable $scatter!($KB, $updofs_batch, $upKe) evals = 1
+    end
 end
 
 # Boundary load assembly: FacetIterator, FacetValues reinit! and vector scatter.

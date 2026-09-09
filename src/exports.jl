@@ -124,6 +124,14 @@ export
     # Dofs
     DofHandler,
     SubDofHandler,
+    AlgebraicVariable,
+    AlgebraicValues,
+    algebraic_dofs,
+    algebraic_value,
+    algebraic_basis_value,
+    CellCoupling,
+    FacetCoupling,
+    AlgebraicCoupling,
     close!,
     ndofs,
     ndofs_per_cell,
@@ -143,6 +151,7 @@ export
     add_sparsity_entries!,
     add_cell_entries!,
     add_interface_entries!,
+    add_coupling_entries!,
     add_constraint_entries!,
     allocate_matrix,
 

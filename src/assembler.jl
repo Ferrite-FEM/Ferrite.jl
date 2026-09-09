@@ -224,8 +224,8 @@ _is_atomic(::SymmetricCSCAssembler{<:Any, <:Any, <:Any, atomic}) where {atomic} 
 _is_atomic(::AbstractAssembler) = false
 
 function _check_atomic_eltype(atomic::Bool, ::Type{T}) where {T}
-    if atomic && !(T <: Union{Float32, Float64})
-        throw(ArgumentError("atomic assembly is only supported for eltypes Float32 and Float64, got $T"))
+    if atomic && !(T <: AtomicEltypes)
+        throw(ArgumentError("atomic assembly is only supported for eltypes Float16, Float32, Float64, and Complex of these, got $T"))
     end
     return
 end
@@ -255,6 +255,7 @@ Create a `CSCAssembler{Tv}` from the matrix `K` and optional vector `f` with val
     start_assemble(K::Symmetric{AbstractSparseMatrixCSC{Tv}}, f::Vector = Tv[]; fillzero = true, atomic = false) -> SymmetricCSCAssembler{Tv}
 
 Create a `SymmetricCSCAssembler{Tv}` from the matrix `K` and optional vector `f` with value type `Tv`.
+Only upper-triangle storage (`Symmetric(K, :U)`) is supported.
 
 `CSCAssembler` and `SymmetricCSCAssembler` allocate workspace
 necessary for efficient matrix assembly. To assemble the contribution from an element, use
@@ -268,8 +269,9 @@ The keyword argument `atomic` can be set to `true` to make the accumulation into
 *without* partitioning the cells into independent sets ("grid coloring"), at the cost of
 some overhead and a non-deterministic result: the order in which contributions are added
 to a given entry depends on the task scheduling, and floating point addition is not
-associative. Atomic accumulation is only supported for value types `Float32` and
-`Float64` (other value types throw an `ArgumentError`). Note that each task still needs
+associative. Atomic accumulation is only supported for the value types `Float16`,
+`Float32`, and `Float64`, and `Complex` of these (other value types throw an
+`ArgumentError`). Note that each task still needs
 its own assembler since the assembler contains buffers that are modified during
 `assemble!`. Note also that the value of `atomic` determines a type parameter of the
 returned assembler, so for a type stable setup the value should be a literal (or
@@ -289,6 +291,7 @@ Base.@constprop :aggressive function start_assemble(K::AbstractSparseMatrixCSC{T
     return CSCAssembler{T, Ti, typeof(K), atomic}(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
 end
 Base.@constprop :aggressive function start_assemble(K::Symmetric{T, <:SparseMatrixCSC{T, Ti}}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T, Ti}
+    _check_upper_triangle(K)
     _check_atomic_eltype(atomic, T)
     fillzero && (fillzero!(K); fillzero!(f))
     permutation = zeros(Int, maxcelldofs_hint)
@@ -315,6 +318,9 @@ This is equivalent to `K[dofs, dofs] += Ke` and `f[dofs] += fe`, where `K` is th
 Assemble the element stiffness matrix `Ke` (and optional force vector `fe`) into the global
 stiffness (and force) in `A`, given the element row degrees of freedom, `rowdofs`, and element column degrees of freedom, `coldofs`.
 This is equivalent to `K[rowdofs, coldofs] += Ke` and `f[rowdofs] += fe`, but more efficient.
+
+For a symmetric assembler, `rowdofs` and `coldofs` must be equal. To assemble
+rectangular blocks with different row and column dofs, use a nonsymmetric assembler.
 """
 assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractMatrix, ::AbstractVector)
 
@@ -326,7 +332,12 @@ end
     return _assemble!(A, rowdofs, coldofs, Ke, fe, false)
 end
 @propagate_inbounds function assemble!(A::SymmetricCSCAssembler, dofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
+    size(Ke, 1) == size(Ke, 2) || throw(ArgumentError("Ke must be square for symmetric assembly."))
     return _assemble!(A, dofs, dofs, Ke, fe, true)
+end
+@propagate_inbounds function assemble!(A::SymmetricCSCAssembler, rowdofs::AbstractVector{<:Integer}, coldofs::AbstractVector{<:Integer}, Ke::AbstractMatrix, fe::Union{AbstractVector, Nothing} = nothing)
+    rowdofs == coldofs || throw(ArgumentError("Symmetric assembly requires equal row and column dofs. Use a nonsymmetric assembler for rectangular blocks."))
+    return assemble!(A, rowdofs, Ke, fe)
 end
 
 """
@@ -372,12 +383,79 @@ end
 # search instead of the linear merge walk in `_assemble_inner!`.
 const SPARSE_COLUMN_SEARCH_RATIO = 8
 
+@inline function _has_repeated_dofs(sorteddofs)
+    repeated = false
+    @inbounds @simd for i in 2:length(sorteddofs)
+        repeated |= sorteddofs[i] == sorteddofs[i - 1]
+    end
+    return repeated
+end
+
+# Repeated interface dofs need multiple additions into the same stored entry.
+# Use independent lookups for this uncommon case, leaving the merge walk for
+# ordinary elements unchanged. Test the global triangle, including every local
+# contribution to a repeated global diagonal dof.
+@noinline function _assemble_repeated!(K, Ke, sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
+    for (j, col) in pairs(sortedcoldofs), (i, row) in pairs(sortedrowdofs)
+        sym && row > col && continue
+        val = Ke[rowpermutation[i], colpermutation[j]]
+        iszero(val) && continue
+        try
+            addindex!(K, convert(eltype(K), val), row, col, atomic)
+        catch err
+            err isa SparsityError || rethrow()
+            _missing_sparsity_pattern_error(row + rowoffset, col + coloffset)
+        end
+    end
+    return
+end
+
+"""
+    Ferrite._assemble_inner!(K, Ke, rowdofs, sortedrowdofs, rowpermutation, coldofs, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
+
+Scatter the element matrix `Ke` into the (already allocated) entries of `K`, i.e.
+`K[rowdofs, coldofs] += Ke`. The dofs are passed both in element order (`rowdofs`, `coldofs`)
+and sorted ascending (`sortedrowdofs`, `sortedcoldofs`), the latter together with the
+permutations mapping a sorted position back to its index in `Ke`, so that a format storing
+its entries in sorted order can walk them and the element matrix in a single pass. If `sym`
+is `true` only contributions to the global upper triangle are read. `atomic` is a `Val{Bool}` selecting
+whether the accumulation is concurrency safe.
+
+`rowoffset` and `coloffset` place the matrix within a larger system; they are only used to
+report global indices when an entry is missing from the sparsity pattern, and are nonzero
+when `K` is used as a *block* of a blocked matrix.
+
+The default implementation writes the entries one by one with [`Ferrite.addindex!`](@ref),
+which is all a custom format has to provide. A format that stores its entries sorted should
+specialize this and walk them together with the element matrix, as CSC and CSR do.
+"""
+@propagate_inbounds function _assemble_inner!(
+        K::AbstractMatrix, Ke::AbstractMatrix,
+        rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
+        coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
+        sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
+    )
+    ld = length(rowdofs)
+    @inbounds for (current_col, Kcol) in pairs(sortedcoldofs)
+        Kecol = colpermutation[current_col]
+        maxlookups = sym ? current_col : ld
+        for ri in 1:maxlookups
+            addindex!(K, Ke[rowpermutation[ri], Kecol], sortedrowdofs[ri], Kcol, atomic)
+        end
+    end
+    return
+end
+
 @propagate_inbounds function _assemble_inner!(
         K::SparseMatrixCSC, Ke::AbstractMatrix,
         rowdofs::AbstractVector, sortedrowdofs::AbstractVector, rowpermutation::AbstractVector,
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
-        sym::Bool, atomic::Val = Val(false)
+        sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
     )
+    if _has_repeated_dofs(sortedrowdofs)
+        return _assemble_repeated!(K, Ke, sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
+    end
+
     current_col = 1
     Krows = rowvals(K)
     Kvals = nonzeros(K)
@@ -392,7 +470,7 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
             offset = first(nzr) - 1
             for ri in 1:maxlookups
                 val = Ke[rowpermutation[ri], Kecol]
-                iszero(val) || _addindex!(Kvals, offset + sortedrowdofs[ri], val, atomic)
+                iszero(val) || addindex!(Kvals, val, offset + sortedrowdofs[ri], atomic)
             end
             current_col += 1
             continue
@@ -407,12 +485,12 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
                 R = searchsortedfirst(Krows, Kerow_dof, lo, hi, Base.Order.Forward)
                 if R <= hi && Krows[R] == Kerow_dof
                     val = Ke[rowpermutation[ri], Kecol]
-                    iszero(val) || _addindex!(Kvals, R, val, atomic)
+                    iszero(val) || addindex!(Kvals, val, R, atomic)
                     lo = R + 1
                 else
                     # No entry exists in the global matrix for this row, which is allowed
                     # as long as the value which would have been inserted is zero.
-                    iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol)
+                    iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof + rowoffset, Kcol + coloffset)
                     lo = R
                 end
             end
@@ -439,7 +517,7 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
             else # Krow > Kerow_dof
                 # No match: no entry exist in the global matrix for this row. This is
                 # allowed as long as the value which would have been inserted is zero.
-                iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof, Kcol)
+                iszero(Ke[rowpermutation[ri], Kecol]) || _missing_sparsity_pattern_error(Kerow_dof + rowoffset, Kcol + coloffset)
                 # Advance the local matrix row pointer
                 ri += 1
             end
@@ -447,54 +525,10 @@ const SPARSE_COLUMN_SEARCH_RATIO = 8
         # Make sure that remaining entries in this column of the local matrix are all zero
         for i in ri:maxlookups
             if !iszero(Ke[rowpermutation[i], Kecol])
-                _missing_sparsity_pattern_error(sortedrowdofs[i], Kcol)
+                _missing_sparsity_pattern_error(sortedrowdofs[i] + rowoffset, Kcol + coloffset)
             end
         end
         current_col += 1
-    end
-    return
-end
-
-# Atomic accumulation primitive used for assembling with `atomic = true`.
-#
-# This is written with `llvmcall` since the built-in alternatives in Julia currently
-# generate bad code for floating point addition: `Core.Intrinsics.atomic_pointermodify`
-# (and thus `@atomic`) lowers `+` on floats to a compare-exchange loop with a non-inlined
-# call to `+` inside, whereas this generates a single `atomicrmw fadd` instruction.
-#
-# Monotonic ordering is sufficient since no other memory is synchronized through these
-# additions -- the task join at the end of a threaded assembly loop is the synchronization
-# point that makes the accumulated values visible.
-for (T, llvmT) in ((Float64, "double"), (Float32, "float"))
-    ir = if VERSION >= v"1.12.0-DEV"
-        """
-        %rv = atomicrmw fadd ptr %0, $llvmT %1 monotonic
-        ret void
-        """
-    else
-        """
-        %p = inttoptr i$(Sys.WORD_SIZE) %0 to $(llvmT)*
-        %rv = atomicrmw fadd $(llvmT)* %p, $llvmT %1 monotonic
-        ret void
-        """
-    end
-    @eval @propagate_inbounds function _atomic_add!(x::Vector{$T}, i::Int, v::$T)
-        @boundscheck checkbounds(x, i)
-        GC.@preserve x begin
-            p = pointer(x, i)
-            Base.llvmcall($ir, Cvoid, Tuple{Ptr{$T}, $T}, p, v)
-        end
-        return
-    end
-end
-
-# Accumulate `v` into `x[i]`, atomically if `atomic` is `Val(true)`. This is the only
-# point where the atomic and non-atomic matrix assembly kernels differ.
-@propagate_inbounds function _addindex!(x::AbstractVector, i::Integer, v, ::Val{atomic}) where {atomic}
-    if atomic
-        _atomic_add!(x, Int(i), convert(eltype(x), v))
-    else
-        x[i] += v
     end
     return
 end
@@ -537,9 +571,10 @@ function apply_assemble!(
         local_matrix::AbstractMatrix, local_vector::AbstractVector;
         apply_zero::Bool = false
     )
+    atomic = Val(_is_atomic(assembler))
     _apply_local!(
         local_matrix, local_vector, global_dofs, ch, apply_zero,
-        matrix_handle(assembler), vector_handle(assembler),
+        matrix_handle(assembler), vector_handle(assembler), atomic,
     )
     assemble!(assembler, global_dofs, local_matrix, local_vector)
     return

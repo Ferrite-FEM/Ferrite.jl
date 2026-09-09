@@ -38,6 +38,7 @@ const EXAMPLES = Dict(
     "hyperelasticity" => "literate-tutorials/hyperelasticity.jl",
     "stokes-flow" => "literate-tutorials/stokes-flow.jl",
     "computational_homogenization" => "literate-tutorials/computational_homogenization.jl",
+    "stress_driven_homogenization" => "literate-tutorials/stress_driven_homogenization.jl",
     "linear_shell" => "literate-tutorials/linear_shell.jl",
     "heat_adaptivity" => "literate-tutorials/heat_adaptivity.jl",
     "darcy_flow" => "literate-tutorials/darcy_flow.jl",
@@ -76,6 +77,7 @@ const POSTRUN = Dict(
 # belong to a scene when uploading a subset.
 const OUTPUTS = Dict(
     "linear_elasticity" => ["linear_elasticity", "linear_elasticity_stress"],
+    "incompressible_elasticity" => ["incompressible_elasticity", "incompressible_elasticity_pressure"],
     "elastodynamics" => ["elastodynamics", "elastodynamics_modes"],
     "landau" => ["landau_orig", "landau_opt"],
     "postprocessing" => ["postprocessing", "postprocessing_cutline"],

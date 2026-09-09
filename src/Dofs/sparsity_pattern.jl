@@ -39,14 +39,16 @@ function eachrow end
     eachrow(sp::AbstractSparsityPattern)
 
 Return an iterator over the rows of the sparsity pattern `sp`.
-Each element of the iterator iterates indices of the stored *columns* for that row.
+Each element of the iterator iterates the indices of the stored *columns* for that row, in
+sorted order.
 """
 eachrow(sp::AbstractSparsityPattern)
 
 """
     eachrow(sp::AbstractSparsityPattern, row::Int)
 
-Return an iterator over *column* indices in row `row` of the sparsity pattern.
+Return an iterator over the stored *column* indices in row `row` of the sparsity pattern,
+in sorted order.
 
 Conceptually this is equivalent to [`eachrow(sp)[row]`](@ref
 eachrow(::AbstractSparsityPattern)). However, the iterator `eachrow(sp)` isn't always
@@ -68,28 +70,32 @@ See the constructor [`SparsityPattern(::Int, ::Int)`](@ref) for the user-facing
 documentation.
 
 # Struct fields
- - `nrows::Int`: number of rows
- - `ncols::Int`: number of column
- - `rows::Vector{Vector{Int}}`: vector of length `nrows`, where `rows[i]` is a
-   *sorted* vector of column indices for non zero entries in row `i`.
+ - `nrows::Int`: number of rows.
+ - `ncols::Int`: number of columns.
+ - `buffer::CollectionsOfViews.ConstructionBuffer{Int, 1}`: contiguous storage where each row's
+   column indices live as a slice. Backing all rows with a single growable buffer (plus an
+   isbits metadata array) keeps GC pressure low.
+ - `sorted::Bool`: whether each row's column indices are currently sorted. Rows are filled unsorted
+   by the counting build in `add_sparsity_entries!` and sorted lazily on demand (see `eachrow`/`add_entry!`).
 
 !!! warning "Internal struct"
     The specific implementation of this struct, such as struct fields, type layout and type
     parameters, are internal and should not be relied upon.
 """
-struct SparsityPattern <: AbstractSparsityPattern
-    nrows::Int
-    ncols::Int
-    mempool::PoolAllocator.MemoryPool{Int}
-    rows::Vector{PoolAllocator.PoolVector{Int}}
+mutable struct SparsityPattern <: AbstractSparsityPattern
+    const nrows::Int
+    const ncols::Int
+    buffer::CollectionsOfViews.ConstructionBuffer{Int, 1}
+    sorted::Bool
 end
 
 """
     SparsityPattern(nrows::Int, ncols::Int; nnz_per_row::Int = 8)
 
 Create an empty [`SparsityPattern`](@ref) with `nrows` rows and `ncols` columns.
-`nnz_per_row` is used as a memory hint for the number of non zero entries per
-row.
+`nnz_per_row` is used as a memory hint for the number of non zero entries per row: it is the
+initial reservation for a row that receives its first entry through [`add_entry!`](@ref
+Ferrite.add_entry!), and the minimum increment when a full row has to grow.
 
 `SparsityPattern` is the default sparsity pattern type for the standard DofHandler and is
 therefore commonly constructed using [`init_sparsity_pattern`](@ref) instead of with this
@@ -115,13 +121,8 @@ more details):
    the pattern. The default matrix type is `SparseMatrixCSC{Float64, Int}`.
 """
 function SparsityPattern(nrows::Int, ncols::Int; nnz_per_row::Int = 8)
-    mempool = PoolAllocator.MemoryPool{Int}()
-    rows = Vector{PoolAllocator.PoolVector{Int}}(undef, nrows)
-    for i in 1:nrows
-        rows[i] = PoolAllocator.resize(PoolAllocator.malloc(mempool, nnz_per_row), 0)
-    end
-    sp = SparsityPattern(nrows, ncols, mempool, rows)
-    return sp
+    buffer = ConstructionBuffer(Int[], (nrows,), nnz_per_row)
+    return SparsityPattern(nrows, ncols, buffer, true)
 end
 
 function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern)
@@ -146,9 +147,9 @@ function Base.show(io::IO, ::MIME"text/plain", sp::SparsityPattern)
     avg_entries = round(stored_entries / getnrows(sp) * 10) / 10
     println(iob, " - Entries per row (min, max, avg): $(min_entries), $(max_entries), $(avg_entries)")
     # Compute memory estimate
-    @assert getnrows(sp) * sizeof(eltype(sp.rows)) == sizeof(sp.rows)
-    bytes_used = sizeof(sp.rows) + stored_entries * sizeof(Int)
-    bytes_allocated = sizeof(sp.rows) + PoolAllocator.mempool_stats(sp.mempool)[2]
+    meta_bytes = sizeof(sp.buffer.indices)
+    bytes_used = meta_bytes + stored_entries * sizeof(Int)
+    bytes_allocated = meta_bytes + length(sp.buffer.data) * sizeof(Int)
     print(iob, " - Memory estimate: $(Base.format_bytes(bytes_used)) used, $(Base.format_bytes(bytes_allocated)) allocated")
     write(io, seekstart(iob))
     return
@@ -157,24 +158,130 @@ end
 getnrows(sp::SparsityPattern) = sp.nrows
 getncols(sp::SparsityPattern) = sp.ncols
 
-@inline function add_entry!(sp::SparsityPattern, row::Int, col::Int)
-    @boundscheck (1 <= row <= getnrows(sp) && 1 <= col <= getncols(sp)) || throw(BoundsError(sp, (row, col)))
-    r = @inbounds sp.rows[row]
-    r = insert_sorted(r, col)
-    @inbounds sp.rows[row] = r
+## Storage helpers ##
+
+# The sorted, de-duplicating insert (with geometric growth on overflow) is
+# `CollectionsOfViews.insert_sorted_at_index!`. A row that overflows its reservation relocates to
+# the end of `data`, leaving a transient hole.
+
+# Lay out `data` so each row gets its own exact block [start, start+cap): one allocation, no holes.
+function _presize_buffer(rowlen::Vector{Int}, sizehint::Int)
+    n = length(rowlen)
+    indices = Vector{AdaptiveRange}(undef, n)
+    total = 0
+    @inbounds for r in 1:n
+        total += max(rowlen[r], 1)
+    end
+    data = Vector{Int}(undef, total)
+    start = 1
+    @inbounds for r in 1:n
+        cap = max(rowlen[r], 1)
+        indices[r] = AdaptiveRange(start, 0, cap)
+        start += cap
+    end
+    return ConstructionBuffer{Int, 1}(indices, data, sizehint)
+end
+
+# Split `1:n` into at most `nthreads()` contiguous chunks of at least `minchunk` items.
+function _task_chunks(n::Int, minchunk::Int = 1000)
+    return Iterators.partition(1:n, max(minchunk, cld(n, Threads.nthreads())))
+end
+
+# Hot-path guard: kept tiny so that it inlines into callers; the actual sorting is out of
+# line in _sort_pattern! and only runs when the pattern is unsorted.
+@inline function _ensure_sorted!(sp::SparsityPattern)
+    sp.sorted || _sort_pattern!(sp)
+    return sp
+end
+
+# Sort each row's slice in place (rows are already deduplicated). Rows are disjoint slices of
+# `data`, so they can be sorted in parallel by chunking the rows over tasks.
+@noinline function _sort_pattern!(sp::SparsityPattern)
+    @sync for rowrange in _task_chunks(getnrows(sp))
+        Threads.@spawn _sort_rows!(sp, rowrange)
+    end
+    sp.sorted = true
+    return sp
+end
+
+# QuickSort explicitly since the default sorting algorithm (radix) allocates.
+function _sort_rows!(sp::SparsityPattern, rowrange::UnitRange{Int})
+    b = sp.buffer
+    data = b.data
+    @inbounds for row in rowrange
+        r = b.indices[row]
+        r.ncurrent > 1 && sort!(data, r.start, r.start + r.ncurrent - 1, QuickSort, Base.Order.Forward)
+    end
     return
 end
 
-@inline function insert_sorted(x::PoolAllocator.PoolVector{Int}, item::Int)
-    k = searchsortedfirst(x, item)
-    if k == length(x) + 1 || @inbounds(x[k]) != item
-        x = PoolAllocator.insert(x, k, item)
-    end
-    return x
+# The counting build behind add_sparsity_entries!: count exact per-row sizes with a column
+# marker, presize the buffer, then marker-dedup
+# fill each row UNSORTED (sorted lazily). Always includes the diagonal. Non-full `coupling` and
+# `keep_constrained = false` are handled by applying the expanded coupling masks and the
+# constrained-dof filter identically in the count and the fill pass (see _visit_row_candidates!).
+function _build_pattern!(
+        sp::SparsityPattern, dh::DofHandler,
+        couplings::Union{Nothing, Vector{Matrix{Bool}}} = nothing,
+        isconstrained::Union{Nothing, Vector{Bool}} = nothing,
+        neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
+        interface_couplings::Union{Nothing, Matrix{Matrix{Bool}}} = nothing;
+        oldbuffer::Union{Nothing, ConstructionBuffer{Int, 1}} = nothing,
+    )
+    nrows = getnrows(sp)
+    #...
+    cell_dofs = create_celldofs(dh)
+    # The local-index map only exists to index the expanded coupling masks; skip building it
+    # when no mask is in play (`_visit_row_candidates!` never reads it then).
+    row_to_cells, row_to_localidx = create_row_to_cells(
+        cell_dofs, nrows, couplings !== nothing || interface_couplings !== nothing
+    )
+    rowlen = zeros(Int, nrows)
+    cell_to_sdh = dh.cell_to_subdofhandler
+    _visit_row_candidates_chunked!(
+        rowlen, nothing, nothing, getncols(sp), row_to_cells, row_to_localidx, cell_dofs,
+        cell_to_sdh, couplings, isconstrained, neighbor_cells, interface_couplings, oldbuffer
+    )
+    buffer = _presize_buffer(rowlen, sp.buffer.sizehint)
+    _visit_row_candidates_chunked!(
+        rowlen, buffer.data, buffer.indices, getncols(sp), row_to_cells, row_to_localidx, cell_dofs,
+        cell_to_sdh, couplings, isconstrained, neighbor_cells, interface_couplings, oldbuffer
+    )
+    sp.buffer = buffer
+    sp.sorted = false
+    return sp
 end
 
-eachrow(sp::SparsityPattern) = sp.rows
-eachrow(sp::SparsityPattern, row::Int) = sp.rows[row]
+@inline function _row_view(sp::SparsityPattern, row::Int)
+    r = @inbounds sp.buffer.indices[row]
+    r.ncurrent == 0 && return view(sp.buffer.data, 1:0)
+    return view(sp.buffer.data, r.start:(r.start + r.ncurrent - 1))
+end
+
+## AbstractSparsityPattern interface ##
+
+@inline function add_entry!(sp::SparsityPattern, row::Int, col::Int)
+    @boundscheck (1 <= row <= getnrows(sp) && 1 <= col <= getncols(sp)) || throw(BoundsError(sp, (row, col)))
+    _ensure_sorted!(sp) # a sorted insert needs the row sorted
+    insert_sorted_at_index!(sp.buffer, col, row)
+    return
+end
+
+function eachrow(sp::SparsityPattern, row::Int)
+    _ensure_sorted!(sp)
+    return _row_view(sp, row)
+end
+function eachrow(sp::SparsityPattern)
+    _ensure_sorted!(sp)
+    return (_row_view(sp, row) for row in 1:getnrows(sp))
+end
+
+# Internal variant of `eachrow` with no ordering guarantee, for consumers that do not need
+# sorted rows. The default is `eachrow`; `SparsityPattern` hands out its raw row slices
+# without triggering the lazy sort (this is what keeps the common
+# pattern-to-SparseMatrixCSC path sort-free).
+_eachrow_anyorder(sp::AbstractSparsityPattern) = eachrow(sp)
+_eachrow_anyorder(sp::SparsityPattern) = (_row_view(sp, row) for row in 1:getnrows(sp))
 
 
 ################################################
@@ -193,7 +300,7 @@ Initialize an empty [`SparsityPattern`](@ref) with `ndofs(dh)` rows and `ndofs(d
 function init_sparsity_pattern(
         dh::DofHandler;
         # TODO: What is a good estimate for nnz_per_row?
-        nnz_per_row::Int = 2 * ndofs_per_cell(dh.subdofhandlers[1]), # FIXME
+        nnz_per_row::Int = isempty(dh.subdofhandlers) ? 8 : 2 * ndofs_per_cell(dh.subdofhandlers[1]), # FIXME
     )
     sp = SparsityPattern(ndofs(dh), ndofs(dh); nnz_per_row = nnz_per_row)
     return sp
@@ -208,14 +315,24 @@ end
         keep_constrained::Bool = true,
         coupling = nothing,
         interface_coupling = nothing,
+        algebraic_couplings = (),
     )
 
 Convenience method for doing the common task of calling [`add_cell_entries!`](@ref),
-[`add_interface_entries!`](@ref), and [`add_constraint_entries!`](@ref), depending on what
-arguments are passed:
+[`add_interface_entries!`](@ref), [`add_coupling_entries!`](@ref), and
+[`add_constraint_entries!`](@ref), depending on what arguments are passed:
  - `add_cell_entries!` is always called
- - `add_interface_entries!` is called if `topology` is provided (i.e. not `nothing`)
+ - `add_interface_entries!` is called if `interface_coupling` is provided (i.e. not
+   `nothing`). Passing `topology` is optional, but recommended for performance reasons
+   (see [`add_interface_entries!`](@ref)).
+ - `add_coupling_entries!` is called for every coupling descriptor in `algebraic_couplings`
+   (a [`CellCoupling`](@ref), [`FacetCoupling`](@ref), or [`AlgebraicCoupling`](@ref), or
+   any iterable of them, e.g. a named tuple)
  - `add_constraint_entries!` is called if the ConstraintHandler is provided
+
+Note that `coupling` controls the ordinary cell entries and keeps its meaning, while
+`algebraic_couplings` only *adds* structural entries: the resulting pattern is the union of
+all contributions.
 
 For more details about arguments and keyword arguments, see the respective functions.
 """
@@ -223,25 +340,99 @@ function add_sparsity_entries!(
         sp::AbstractSparsityPattern, dh::DofHandler,
         ch::Union{ConstraintHandler, Nothing} = nothing;
         keep_constrained::Bool = true,
-        coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
+        coupling = nothing,
         interface_coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
         topology = nothing,
+        algebraic_couplings = (),
     )
     # Argument checking
     isclosed(dh) || error("the DofHandler must be closed")
     if getnrows(sp) < ndofs(dh) || getncols(sp) < ndofs(dh)
         error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
     end
+    _check_coupling_kwarg(coupling)
+    keep_constrained || _check_keep_constrained_args(dh, ch)
     # Add all entries
     add_diagonal_entries!(sp)
-    add_cell_entries!(sp, dh, ch; keep_constrained, coupling)
-    if topology !== nothing
+    _add_cell_entries!(sp, dh, ch, keep_constrained, _coupling_to_local_dof_coupling(dh, coupling))
+    if interface_coupling !== nothing
         add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
     end
-    if ch !== nothing
-        add_constraint_entries!(sp, ch; keep_constrained)
+    return _add_post_cell_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
+end
+
+# Specialized method for the concrete SparsityPattern.
+# This builds the pattern in bulk: cell entries (including the diagonal, respecting
+# `coupling` and `keep_constrained`), interface entries (interface_coupling), and any
+# pre-existing entries are exactly counted, the buffer is presized in one allocation, and
+# rows are filled with a marker-dedup append. Only the coupling descriptor entries and the
+# constraint entries layer on afterwards through add_entry!.
+function add_sparsity_entries!(
+        sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
+        keep_constrained::Bool = true,
+        coupling = nothing,
+        interface_coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
+        topology = nothing,
+        algebraic_couplings = (),
+    )
+    isclosed(dh) || error("the DofHandler must be closed")
+    if getnrows(sp) < ndofs(dh) || getncols(sp) < ndofs(dh)
+        error("number of rows ($(getnrows(sp))) or columns ($(getncols(sp))) in the sparsity pattern is smaller than number of dofs ($(ndofs(dh)))")
+    end
+    _check_coupling_kwarg(coupling)
+    keep_constrained || _check_keep_constrained_args(dh, ch)
+    couplings = _coupling_to_local_dof_coupling(dh, coupling)
+    isconstrained = keep_constrained ? nothing : _isconstrained_by_dof(ch, getnrows(sp))
+    if interface_coupling === nothing
+        neighbor_cells = interface_couplings = nothing
+    else
+        if topology === nothing
+            topology = ExclusiveTopology(get_grid(dh))
+        end
+        neighbor_cells = create_cell_to_neighbors(dh.grid, topology)
+        interface_couplings = _interface_coupling_to_local_dof_couplings(dh, interface_coupling)
+    end
+    oldbuffer = isempty(sp.buffer.data) ? nothing : sp.buffer
+    _build_pattern!(sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings; oldbuffer)
+    return _add_post_cell_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
+end
+
+# Layers applied after the cell entries, shared by the add_sparsity_entries! methods.
+# Coupling descriptor entries must be added before the constraint entries since constraint
+# expansion depends on all pre-existing structural entries.
+function _add_post_cell_entries!(
+        sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
+        @nospecialize(algebraic_couplings), keep_constrained::Bool,
+    )
+    _add_algebraic_coupling_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
+    ch !== nothing && add_constraint_entries!(sp, ch; keep_constrained)
+    return sp
+end
+
+# Validate the `algebraic_couplings` keyword and add the entries of each descriptor.
+function _add_algebraic_coupling_entries!(
+        sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
+        @nospecialize(algebraic_couplings), keep_constrained::Bool,
+    )
+    for descriptor in _iterate_algebraic_couplings(algebraic_couplings)
+        descriptor isa AbstractCoupling || error("`algebraic_couplings` must contain coupling descriptors (`CellCoupling`, `FacetCoupling`, `AlgebraicCoupling`), got $(repr(descriptor))")
+        add_coupling_entries!(sp, dh, descriptor, ch; keep_constrained)
     end
     return sp
+end
+
+# Catch coupling descriptors passed to `coupling` instead of `algebraic_couplings`.
+function _check_coupling_kwarg(coupling)
+    coupling === nothing && return
+    iscoupling = coupling isa AbstractCoupling ||
+        (coupling isa Union{Tuple, NamedTuple, AbstractVector} && any(x -> x isa AbstractCoupling, coupling))
+    if iscoupling
+        error("coupling descriptors (`CellCoupling`, `FacetCoupling`, `AlgebraicCoupling`) must be passed to the `algebraic_couplings` keyword argument, not to `coupling`")
+    end
+    if !(coupling isa AbstractMatrix{Bool})
+        throw(ArgumentError("`coupling` must be an `AbstractMatrix{Bool}`, got $(repr(coupling))"))
+    end
+    return
 end
 
 """
@@ -262,29 +453,45 @@ described by the DofHandler `dh`.
    pattern. `keep_constrained = false` requires passing the ConstraintHandler `ch`.
  - `coupling`: the coupling between fields/components within each cell. By default
    (`coupling = nothing`) it is assumed that all DoFs in each cell couple with each other.
+   `coupling[f1, f2] == true` means that the equation for field `f1` (i.e. the rows
+   corresponding to the test functions of `f1`) contains the unknown field `f2` (i.e. the
+   columns corresponding to the trial functions of `f2`).
 """
 function add_cell_entries!(
         sp::AbstractSparsityPattern,
         dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
-        keep_constrained::Bool = true, coupling::Union{AbstractMatrix{Bool}, Nothing} = nothing,
+        keep_constrained::Bool = true, coupling = nothing,
     )
-    # Expand coupling from nfields × nfields to ndofs_per_cell × ndofs_per_cell
+    _check_coupling_kwarg(coupling)
+    # Expand coupling from nfields x nfields to ndofs_per_cell x ndofs_per_cell
+    # (nothing and full masks expand to nothing = no restriction).
     # TODO: Perhaps this can be done in the loop over SubDofHandlers instead.
-    if coupling !== nothing
-        coupling = _coupling_to_local_dof_coupling(dh, coupling)
-    end
-    if !keep_constrained
-        ch === nothing && error("must pass ConstraintHandler when `keep_constrained = true`")
-        isclosed(ch) || error("the ConstraintHandler must be closed")
-        ch.dh === dh || error("the DofHandler and the ConstraintHandler's DofHandler must be the same")
-    end
+    coupling = _coupling_to_local_dof_coupling(dh, coupling)
+    keep_constrained || _check_keep_constrained_args(dh, ch)
     return _add_cell_entries!(sp, dh, ch, keep_constrained, coupling)
+end
+
+# Argument checking for methods with `keep_constrained = false`
+function _check_keep_constrained_args(dh::DofHandler, ch::Union{ConstraintHandler, Nothing})
+    ch === nothing && error("must pass ConstraintHandler when `keep_constrained = false`")
+    isclosed(ch) || error("the ConstraintHandler must be closed")
+    ch.dh === dh || error("the DofHandler and the ConstraintHandler's DofHandler must be the same")
+    return
+end
+
+# Boolean mask for whether the row is constrained or not
+function _isconstrained_by_dof(ch::ConstraintHandler, nrows::Int)
+    isconstrained = zeros(Bool, nrows)
+    for d in keys(ch.dofmapping)
+        isconstrained[d] = true
+    end
+    return isconstrained
 end
 
 """
     add_interface_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing};
-        topology::ExclusiveTopology, keep_constrained::Bool = true,
+        topology::Union{ExclusiveTopology, Nothing} = nothing, keep_constrained::Bool = true,
         interface_coupling::AbstractMatrix{Bool},
     )
 
@@ -292,7 +499,10 @@ Add entries to the sparsity pattern `sp` corresponding to DoF couplings on the i
 between cells as described by the DofHandler `dh`.
 
 # Keyword arguments
- - `topology`: the topology corresponding to the grid.
+ - `topology`: the topology corresponding to the grid. If not passed it is constructed
+   from the grid. Since the construction is relatively expensive it is recommended to
+   pass an existing topology, in particular since one is typically needed for e.g.
+   [`InterfaceIterator`](@ref) in the assembly loop anyway.
  - `keep_constrained`: whether or not entries for constrained DoFs should be kept
    (`keep_constrained = true`) or eliminated (`keep_constrained = false`) from the sparsity
    pattern. `keep_constrained = false` requires passing the ConstraintHandler `ch`.
@@ -304,13 +514,12 @@ between cells as described by the DofHandler `dh`.
 """
 function add_interface_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
-        topology::ExclusiveTopology, keep_constrained::Bool = true,
+        topology::Union{ExclusiveTopology, Nothing} = nothing, keep_constrained::Bool = true,
         interface_coupling::AbstractMatrix{Bool},
     )
-    if !keep_constrained
-        ch === nothing && error("must pass ConstraintHandler when `keep_constrained = true`")
-        isclosed(ch) || error("the ConstraintHandler must be closed")
-        ch.dh === dh || error("the DofHandler and the ConstraintHandler's DofHandler must be the same")
+    keep_constrained || _check_keep_constrained_args(dh, ch)
+    if topology === nothing
+        topology = ExclusiveTopology(get_grid(dh))
     end
     return _add_interface_entries!(sp, dh, ch, topology, keep_constrained, interface_coupling)
 end
@@ -417,12 +626,6 @@ arguments `args` and keyword arguments `kwargs`.
     copy(K)`) instead.
 """
 function allocate_matrix(::Type{MatrixType}, dh::DofHandler, args...; kwargs...) where {MatrixType}
-    _get_Ti(::Type{<:AbstractMatrix}) = Int
-    _get_Ti(::Type{<:AbstractSparseMatrix{<:Any, Ti}}) where {Ti} = Ti
-    if _can_use_fastsp(MatrixType, args...; kwargs...)
-        fsp = FastSparsityPattern(_get_Ti(MatrixType), dh, args...; kwargs...)
-        return allocate_matrix(MatrixType, fsp)
-    end
     sp = init_sparsity_pattern(dh)
     add_sparsity_entries!(sp, dh, args...; kwargs...)
     return allocate_matrix(MatrixType, sp)
@@ -451,10 +654,43 @@ end
 # ii) (ncomponents × ncomponents) specifying coupling between components, or iii)
 # (ndofs_per_cell × ndofs_per_cell) specifying coupling between all local dofs, i.e. a
 # "template" local matrix.
+# Validate the dimensions of a user-provided coupling mask without expanding it (the same
+# checks the expansion below performs). Used before the full-mask normalization in
+# add_sparsity_entries!, which skips the expansion where validation normally happens.
+function _check_coupling_dims(dh::DofHandler, coupling::AbstractMatrix{Bool})
+    sz = size(coupling, 1)
+    sz == size(coupling, 2) || error("coupling not square")
+    sz == length(dh.field_names) && return # coupling by fields
+    sz == sum(fieldname -> n_components(dh, fieldname), dh.field_names) && return # by components
+    all(sdh -> sz == ndofs_per_cell(sdh), dh.subdofhandlers) && return # template local matrix
+    error("could not create coupling")
+end
+
+_coupling_to_local_dof_coupling(::DofHandler, ::Nothing) = nothing
 function _coupling_to_local_dof_coupling(dh::DofHandler, coupling::AbstractMatrix{Bool})
+    _check_coupling_dims(dh, coupling)
+    # A full mask does not restrict anything: normalize to `nothing`, which all consumers
+    # treat as every-pair-passes, so that mask evaluation is skipped entirely.
+    all(coupling) && return nothing
     # Return one matrix per (potential) sub-domain
     return Matrix{Bool}[
         _coupling_to_local_dof_coupling(dh, coupling, sdh, sdh) for sdh in dh.subdofhandlers
+    ]
+end
+
+# Expand the interface coupling to one rectangular mask per (SubDofHandler, SubDofHandler)
+# pair: entry (k, l) has rows in sdh k's local dof layout and columns in sdh l's, so the
+# candidate walk can gate a facet neighbor in any subdofhandler (the diagonal entries are
+# the square per-sdh masks used for the same-side blocks). As above, nothing/full masks
+# normalize to `nothing` = no restriction.
+_interface_coupling_to_local_dof_couplings(::DofHandler, ::Nothing) = nothing
+function _interface_coupling_to_local_dof_couplings(dh::DofHandler, coupling::AbstractMatrix{Bool})
+    _check_coupling_dims(dh, coupling)
+    all(coupling) && return nothing
+    sdhs = dh.subdofhandlers
+    return Matrix{Bool}[
+        _coupling_to_local_dof_coupling(dh, coupling, sdh_row, sdh_col)
+            for sdh_row in sdhs, sdh_col in sdhs
     ]
 end
 
@@ -507,6 +743,8 @@ function _add_cell_entries!(
         sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
         keep_constrained::Bool, coupling::Union{Vector{<:AbstractMatrix{Bool}}, Nothing},
     )
+    # A DofHandler without spatial fields (no SubDofHandlers) has no cell entries
+    isempty(dh.subdofhandlers) && return sp
     # Add all connections between dofs for every cell while filtering based
     # on a) constraints, and b) field/dof coupling.
     cc = CellCache(dh)
@@ -534,6 +772,13 @@ function _add_cell_entries!(
     return sp
 end
 
+# Sorted, de-duplicating insert into a plain Vector (used for the constraint scratch below).
+@inline function insert_sorted!(v::Vector{Int}, item::Int)
+    k = searchsortedfirst(v, item)
+    (k == length(v) + 1 || @inbounds(v[k]) != item) && insert!(v, k, item)
+    return v
+end
+
 function _add_constraint_entries!(
         sp::AbstractSparsityPattern, dofcoefficients::Vector{Union{DofCoefficients{T, Ti}, Nothing}},
         dofmapping::Dict{Int, Int}, keep_constrained::Bool,
@@ -544,8 +789,7 @@ function _add_constraint_entries!(
 
     # New entries tracked separately and inserted after since it is not possible to modify
     # the datastructure while looping over it.
-    mempool = PoolAllocator.MemoryPool{Int}()
-    sp′ = Dict{Int, PoolAllocator.PoolVector{Int}}()
+    sp′ = Dict{Int, Vector{Int}}()
 
     for (row, colidxs) in zip(1:getnrows(sp), eachrow(sp)) # pairs(eachrow(sp))
         row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
@@ -560,11 +804,7 @@ function _add_constraint_entries!(
                 else
                     # ... this column _is_ constrained, distribute to columns.
                     for (col′, _) in col_coeffs
-                        r = get(sp′, row) do
-                            PoolAllocator.resize(PoolAllocator.malloc(mempool, 8), 0)
-                        end
-                        r = insert_sorted(r, col′)
-                        sp′[row] = r
+                        insert_sorted!(get!(() -> Int[], sp′, row), col′)
                     end
                 end
             end
@@ -576,11 +816,7 @@ function _add_constraint_entries!(
                     # ... this column is _not_ constrained, distribute to rows.
                     !keep_constrained && haskey(dofmapping, col) && continue
                     for (row′, _) in row_coeffs
-                        r = get(sp′, row′) do
-                            PoolAllocator.resize(PoolAllocator.malloc(mempool, 8), 0)
-                        end
-                        r = insert_sorted(r, col)
-                        sp′[row′] = r
+                        insert_sorted!(get!(() -> Int[], sp′, row′), col)
                     end
                 else
                     # ... this column _is_ constrained, double-distribute to columns/rows.
@@ -588,11 +824,7 @@ function _add_constraint_entries!(
                         !keep_constrained && haskey(dofmapping, row′) && continue
                         for (col′, _) in col_coeffs
                             !keep_constrained && haskey(dofmapping, col′) && continue
-                            r = get(sp′, row′) do
-                                PoolAllocator.resize(PoolAllocator.malloc(mempool, 8), 0)
-                            end
-                            r = insert_sorted(r, col′)
-                            sp′[row′] = r
+                            insert_sorted!(get!(() -> Int[], sp′, row′), col′)
                         end
                     end
                 end
@@ -635,7 +867,6 @@ function _add_interface_entries!(
         # TODO: This looks like it can be optimized for the common case where
         #       the cells are in the same subdofhandler
         sdhs_idx = dh.cell_to_subdofhandler[cellid.([ic.a, ic.b])]
-        sdhs = dh.subdofhandlers[sdhs_idx]
         # An interface integral is assembled over the stacked dof vector
         # [dofs(ic.a); dofs(ic.b)] and its local matrix can be dense within every field
         # block allowed by the mask (including the same-side blocks, since jump/average
@@ -648,8 +879,11 @@ function _add_interface_entries!(
         # produced by the cell pass, or by neighboring interfaces, are deduplicated by
         # `add_entry!`.
         for row_i in 1:2, col_i in 1:2
-            sdh = sdhs[row_i]
-            sdh2 = sdhs[col_i]
+            # A cell not covered by any subdofhandler has no dofs and contributes no
+            # pairs; the other side's same-side combination is still added.
+            (sdhs_idx[row_i] == 0 || sdhs_idx[col_i] == 0) && continue
+            sdh = dh.subdofhandlers[sdhs_idx[row_i]]
+            sdh2 = dh.subdofhandlers[sdhs_idx[col_i]]
             row_dofs = celldofs(row_i == 1 ? ic.a : ic.b)
             col_dofs = celldofs(col_i == 1 ? ic.a : ic.b)
             coupling_sdh = get!(couplings, (sdhs_idx[row_i], sdhs_idx[col_i])) do
@@ -676,11 +910,14 @@ function _add_interface_entries!(
 end
 
 # Internal matrix instantiation for SparseMatrixCSC and Symmetric{SparseMatrixCSC}
+# The counting transpose does not need sorted rows: per-column rowval order comes from the
+# ascending outer row loop, and the `sym` filter is a per-entry predicate. Rows are
+# therefore read through _eachrow_anyorder, which for SparsityPattern skips the lazy sort.
 function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityPattern, sym::Bool) where {Tv, Ti}
     # 1. Setup colptr
     colptr = zeros(Ti, getncols(sp) + 1)
     colptr[1] = 1
-    for (row, colidxs) in enumerate(eachrow(sp))
+    for (row, colidxs) in enumerate(_eachrow_anyorder(sp))
         for col in colidxs
             sym && row > col && continue
             colptr[col + 1] += 1
@@ -691,10 +928,10 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityP
     # 2. Allocate rowval and nzval now that nnz is known
     rowval = Vector{Ti}(undef, nnz)
     nzval = zeros(Tv, nnz)
-    # 3. Populate rowval. Since SparsityPattern is row-based we need to allocate an extra
+    # 3. Populate rowval. Since patterns are row-based we need to allocate an extra
     #    work buffer here to keep track of the next index into rowval
     nextinds = copy(colptr)
-    for (row, colidxs) in zip(1:getnrows(sp), eachrow(sp)) # pairs(eachrow(sp))
+    for (row, colidxs) in zip(1:getnrows(sp), _eachrow_anyorder(sp))
         for col in colidxs
             sym && row > col && continue
             k = nextinds[col]
@@ -707,75 +944,77 @@ function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::AbstractSparsityP
     return S
 end
 
-## ================= ##
-# FastSparsityPattern #
-## ================= ##
-
-"""
-    FastSparsityPattern([Ti = Int64], dh::DofHandler)
-
-This sparsity does not currently support the full `AbstractSparsityPattern` interface,
-but is used as an internal fast-path for `allocate_matrix(MatrixType, dh)` for some
-supported `MatrixType`s. It can be extended in the future or potentially be merged
-with `SparsityPattern`.
-See [#1302](https://github.com/Ferrite-FEM/Ferrite.jl/pull/1302) for details.
-
-!!! warning "Internal"
-    `FastSparsityPattern` is strictly internal and its interface and implementation
-    may change at any time.
-
-"""
-mutable struct FastSparsityPattern{Ti} <: AbstractSparsityPattern
-    const rowlen::Vector{Ti} # Number of stored entries in each row
-    const marker::Vector{Ti} # Marker if column has been "visited" by certain row
-    const rowptr::Vector{Ti} # Index of stored entries at the start of each row
-    const colidx::Vector{Ti} # colidx[i] gives the column number of the ith stored entry
-    is_colidx_sorted::Bool   # Is colidx sorted for each row
-end
-function FastSparsityPattern(::Type{Ti}, ncols, nrows) where {Ti <: Integer}
-    rowlen = zeros(Ti, nrows)
-    marker = zeros(Ti, ncols)
-    rowptr = Vector{Ti}(undef, nrows + 1)
-    colidx = Vector{Ti}(undef, 0) # To be resized later
-    return FastSparsityPattern(rowlen, marker, rowptr, colidx, false)
-end
-
-# _can_use_fastsp(MatrixType, args...; kwargs...) where args and kwargs are those passed to
-# `allocate_matrix`. See `add_sparsity_entries!` for a description of args/kwargs.
-function _can_use_fastsp(
-        ::Type{MatrixType},
-        ch = nothing;
-        topology = nothing,
-        keep_constrained = true,
-        coupling = nothing,
-        interface_coupling = nothing
-    ) where {MatrixType}
-    if ch === topology === coupling === interface_coupling === nothing
-        if MatrixType <: AbstractSparseMatrix # Symmetric/Block matrices not supported
-            return keep_constrained
+# SparsityPattern: the counting transpose parallelized by chunking the rows: each chunk
+# counts its rows' columns into a private histogram, and the serial combine converts the
+# histograms in place into per-(chunk, column) write cursors so that the chunks scatter
+# into disjoint slots in serial (ascending row) order, keeping each column sorted.
+function _allocate_matrix(::Type{SparseMatrixCSC{Tv, Ti}}, sp::SparsityPattern, sym::Bool) where {Tv, Ti}
+    nrows, ncols = getnrows(sp), getncols(sp)
+    # The serial cursor conversion costs O(nchunks * ncols) while the parallel phases gain
+    # ~ nstored / nchunks, so cap the chunk count at the optimum, ~ sqrt(average column
+    # length) -- more chunks than that make the transpose slower.
+    nstored = 0
+    @inbounds for row in 1:nrows
+        nstored += sp.buffer.indices[row].ncurrent
+    end
+    maxchunks = max(1, isqrt(cld(nstored, max(ncols, 1))))
+    chunks = collect(_task_chunks(nrows, max(1000, cld(nrows, maxchunks))))
+    # 1. Count the columns of each chunk's rows into a chunk-private histogram
+    hists = Vector{Vector{Ti}}(undef, length(chunks))
+    @sync for (ci, rowrange) in enumerate(chunks)
+        Threads.@spawn begin
+            hists[$ci] = _count_csc_columns_chunk(Ti, sp, $rowrange, sym)
         end
     end
-    return false
+    # 2. Setup colptr and convert each histogram in place into the chunk's write cursors
+    colptr = Vector{Ti}(undef, ncols + 1)
+    nzptr = one(Ti)
+    @inbounds for col in 1:ncols
+        colptr[col] = nzptr
+        for hist in hists
+            count = hist[col]
+            hist[col] = nzptr
+            nzptr += count
+        end
+    end
+    colptr[ncols + 1] = nzptr
+    nnz = Int(nzptr) - 1
+    # 3. Allocate rowval and nzval now that nnz is known and populate rowval
+    rowval = Vector{Ti}(undef, nnz)
+    nzval = zeros(Tv, nnz)
+    @sync for (ci, rowrange) in enumerate(chunks)
+        Threads.@spawn _fill_csc_rowval_chunk!(rowval, hists[ci], sp, rowrange, sym)
+    end
+    # The last chunk's cursors must have ended at the start of the next column
+    @assert isempty(hists) || all(col -> hists[end][col] == colptr[col + 1], 1:ncols)
+    return SparseMatrixCSC(nrows, ncols, colptr, rowval, nzval)
 end
 
-FastSparsityPattern(dh::DofHandler) = FastSparsityPattern(Int, dh)
-function FastSparsityPattern(::Type{Ti}, dh::DofHandler) where {Ti}
-    sp = FastSparsityPattern(Ti, ndofs(dh), ndofs(dh))
-    # Step 1: Create cell_dof_views::ArrayOfVectorViews (would be nice in `DofHandler` directly)
-    cell_dofs_views = create_celldofs(dh)
-    # Step 2: Define mapping rownr to cells
-    row_to_cells = create_row_to_cells(cell_dofs_views, sp)
-    # Step 3: Count how many cols stored for each row
-    count_row_sizes!(sp, row_to_cells, cell_dofs_views)
-    # Step 4: Build the rowptr (indices for s)
-    build_rowptr!(sp)
-    fill_colidx!(sp, row_to_cells, cell_dofs_views)
-    return sp
+function _count_csc_columns_chunk(::Type{Ti}, sp::SparsityPattern, rowrange::UnitRange{Int}, sym::Bool) where {Ti}
+    hist = zeros(Ti, getncols(sp))
+    @inbounds for row in rowrange
+        for col in _row_view(sp, row)
+            sym && row > col && continue
+            hist[col] += one(Ti)
+        end
+    end
+    return hist
 end
 
-getncols(sp::FastSparsityPattern) = length(sp.marker)
-getnrows(sp::FastSparsityPattern) = length(sp.rowlen)
+function _fill_csc_rowval_chunk!(rowval::Vector{Ti}, hist::Vector{Ti}, sp::SparsityPattern, rowrange::UnitRange{Int}, sym::Bool) where {Ti}
+    @inbounds for row in rowrange
+        for col in _row_view(sp, row)
+            sym && row > col && continue
+            k = hist[col]
+            rowval[k] = row
+            hist[col] = k + one(Ti)
+        end
+    end
+    return
+end
 
+# Build the cell -> global dofs map as an ArrayOfVectorViews (a compact copy of the
+# DofHandler's cell dof storage).
 function create_celldofs(dh::DofHandler)
     isclosed(dh) || throw(ArgumentError("DofHandler must be closed"))
     ncells = getncells(dh.grid)
@@ -786,18 +1025,50 @@ function create_celldofs(dh::DofHandler)
         indices[cell_idx] = n
         num = ndofs_per_cell(dh, cell_idx)
         num == 0 && continue
-        r = n:(n + num - 1)
-        #celldofs!(view(cell_dofs, r), dh, cell_idx), but faster without view:
+        # celldofs!(view(cell_dofs, r), dh, cell_idx), but ~4x faster without the view
+        # (Vector-to-Vector copyto! and no re-validation per cell)
         soffs = dh.cell_dofs_offset[cell_idx]
         copyto!(cell_dofs, n, dh.cell_dofs, soffs, num)
-        n = last(r) + 1
+        n += num
     end
     indices[end] = n
     return ArrayOfVectorViews(indices, cell_dofs, LinearIndices((ncells,)))
 end
 
-function create_row_to_cells(cell_dofs::ArrayOfVectorViews, sp)
-    nrows = getnrows(sp)
+# For each cell, the cells sharing a facet with it (used by the counting build to reserve row
+# space for interface entries).
+function create_cell_to_neighbors(grid::AbstractGrid, topology)
+    ncells = getncells(grid)
+    counts = zeros(Int, ncells)
+    for cell in 1:ncells
+        for facet in 1:nfacets(getcells(grid, cell))
+            counts[cell] += length(getneighborhood(topology, grid, FacetIndex(cell, facet)))
+        end
+    end
+    indices = Vector{Int}(undef, ncells + 1)
+    indices[1] = 1
+    for cell in 1:ncells
+        indices[cell + 1] = indices[cell] + counts[cell]
+    end
+    data = Vector{Int}(undef, indices[end] - 1)
+    fill!(counts, 0)
+    for cell in 1:ncells
+        for facet in 1:nfacets(getcells(grid, cell))
+            for nb in getneighborhood(topology, grid, FacetIndex(cell, facet))
+                data[indices[cell] + counts[cell]] = nb.idx[1]
+                counts[cell] += 1
+            end
+        end
+    end
+    return ArrayOfVectorViews(indices, data, LinearIndices((ncells,)))
+end
+
+# Inverse of cell_dofs: for each row (dof), the connected cells and, in parallel, the row's
+# local dof index within each such cell. The local index differs per incident cell (a dof
+# shared by two cells generally has different local numbers in them) and is only needed to
+# apply the (expanded, locally indexed) coupling masks. With full coupling the second map
+# is skipped (`nothing`).
+function create_row_to_cells(cell_dofs::ArrayOfVectorViews, nrows::Int, build_localidx::Bool)
     num_cells = zeros(Int, nrows)
     # 1: Figure out how many cells are connected to each dof
     n_connected = 0
@@ -807,97 +1078,172 @@ function create_row_to_cells(cell_dofs::ArrayOfVectorViews, sp)
             n_connected += 1
         end
     end
-
     # 2: Create the correct datastructure
-    data = Vector{Int}(undef, n_connected)
+    cells = Vector{Int}(undef, n_connected)
+    localidx = build_localidx ? Vector{Int}(undef, n_connected) : nothing
     indices = Vector{Int}(undef, nrows + 1)
     indices[1] = 1
     @inbounds for row in 1:nrows
         indices[row + 1] = indices[row] + num_cells[row]
     end
-    fill!(num_cells, 0) # Now we use this to count how many have been added
+    # Reset and reuse `num_cells` as a per-row write cursor: in the loop below
+    # `num_cells[row]` counts how many incident cells have been recorded for `row` so far,
+    # making `indices[row] + num_cells[row]` the next free slot in `row`'s block.
+    fill!(num_cells, 0)
     @inbounds for (cellnr, rows) in enumerate(cell_dofs)
-        for row in rows
-            data[indices[row] + num_cells[row]] = cellnr
+        for (li, row) in enumerate(rows)
+            k = indices[row] + num_cells[row]
+            cells[k] = cellnr
+            localidx === nothing || (localidx[k] = li)
             num_cells[row] += 1
         end
     end
-    return ArrayOfVectorViews(indices, data, LinearIndices((nrows,)))
+    lin = LinearIndices((nrows,))
+    row_to_cells = ArrayOfVectorViews(indices, cells, lin)
+    row_to_localidx = localidx === nothing ? nothing : ArrayOfVectorViews(indices, localidx, lin)
+    return row_to_cells, row_to_localidx
 end
 
-function count_row_sizes!(sp::FastSparsityPattern, row_to_cells::AbstractVector, cell_dofs::ArrayOfVectorViews)
-    @inbounds for row in 1:getnrows(sp)
-        for cnr in row_to_cells[row]
-            for col in cell_dofs[cnr]
-                if sp.marker[col] != row
-                    sp.marker[col] = row
-                    sp.rowlen[row] += 1
+# Chunk the rows of a count/fill pass over tasks. Each task gets its own column marker
+# (the only shared mutable state); per-row results are independent of the chunking since
+# the row stamps are globally unique.
+function _visit_row_candidates_chunked!(
+        rowlen::Vector{Int}, data::Union{Nothing, Vector{Int}}, indices::Union{Nothing, Vector{AdaptiveRange}},
+        ncols::Int, row_to_cells::ArrayOfVectorViews, row_to_localidx::Union{Nothing, ArrayOfVectorViews},
+        cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
+        couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
+        neighbor_cells::Union{Nothing, ArrayOfVectorViews}, interface_couplings::Union{Nothing, Matrix{Matrix{Bool}}},
+        oldbuffer::Union{Nothing, ConstructionBuffer{Int, 1}} = nothing,
+    )
+    @sync for rowrange in _task_chunks(length(rowlen))
+        Threads.@spawn begin
+            marker = zeros(Int, ncols) # per-task scratch
+            _visit_row_candidates!(
+                rowlen, data, indices, marker, $rowrange, row_to_cells, row_to_localidx,
+                cell_dofs, cell_to_sdh, couplings, isconstrained, neighbor_cells, interface_couplings,
+                oldbuffer
+            )
+        end
+    end
+    return
+end
+
+# Count (data === nothing) or fill (data/indices from the presized buffer) the per-row
+# candidate columns: the diagonal,
+# plus for every incident cell the cell's dofs, filtered by the (expanded) coupling mask and, for
+# keep_constrained = false, the constrained-dof filter. The count and fill passes MUST enumerate
+# identically; both go through this function to guarantee that.
+function _visit_row_candidates!(
+        rowlen::Vector{Int}, data::Union{Nothing, Vector{Int}}, indices::Union{Nothing, Vector{AdaptiveRange}},
+        marker::Vector{Int}, rowrange::UnitRange{Int}, row_to_cells::ArrayOfVectorViews, row_to_localidx::Union{Nothing, ArrayOfVectorViews},
+        cell_dofs::ArrayOfVectorViews, cell_to_sdh::Vector{Int},
+        couplings::Union{Nothing, Vector{Matrix{Bool}}}, isconstrained::Union{Nothing, Vector{Bool}},
+        neighbor_cells::Union{Nothing, ArrayOfVectorViews} = nothing,
+        interface_couplings::Union{Nothing, Matrix{Matrix{Bool}}} = nothing,
+        oldbuffer::Union{Nothing, ConstructionBuffer{Int, 1}} = nothing,
+    )
+    counting = data === nothing
+    ncols = length(marker) # marker has one slot per column
+    @inbounds for row in rowrange
+        start = counting ? 0 : indices[row].start
+        p = 0
+        # The diagonal is always stored when the column exists (the pattern may have more
+        # rows than columns)
+        if row <= ncols
+            marker[row] = row
+            counting || (data[start] = row)
+            p = 1
+        end
+        # Entries already stored in the pattern are always kept, deduplicated against the new
+        # candidates by the marker (cf. the retired generic per-entry path, which only ever
+        # added)
+        if oldbuffer !== nothing
+            r_old = oldbuffer.indices[row]
+            for q in 0:(r_old.ncurrent - 1)
+                col = oldbuffer.data[r_old.start + q]
+                if marker[col] != row
+                    marker[col] = row
+                    counting || (data[start + p] = col)
+                    p += 1
                 end
             end
         end
-    end
-    return sp
-end
-
-function build_rowptr!(sp)
-    sp.rowptr[1] = 1
-    @inbounds for row in 1:getnrows(sp)
-        sp.rowptr[row + 1] = sp.rowptr[row] + sp.rowlen[row]
-    end
-    return sp
-end
-
-function fill_colidx!(sp::FastSparsityPattern, row_to_cells::AbstractVector, cell_dofs::ArrayOfVectorViews)
-    resize!(sp.colidx, sp.rowptr[end] - 1) # nnz
-    fill!(sp.marker, 0)
-    @inbounds for row in 1:getnrows(sp)
-        pos = sp.rowptr[row]
-        for cnr in row_to_cells[row]
-            for col in cell_dofs[cnr]
-                if sp.marker[col] != row
-                    sp.marker[col] = row
-                    sp.colidx[pos] = col
-                    pos += 1
+        # For keep_constrained = false a constrained row stores only the diagonal (included
+        # in the pattern just above)
+        if !(isconstrained !== nothing && isconstrained[row])
+            cells = row_to_cells[row]
+            # `row_to_localidx` is `nothing` exactly when no mask restricts the candidates:
+            # no coupling/interface_coupling passed, or explicitly full masks (normalized to
+            # `nothing` in add_sparsity_entries!). Then `li` is never consulted and the
+            # placeholder below is dead code.
+            lidxs = row_to_localidx === nothing ? nothing : row_to_localidx[row]
+            for k in 1:length(cells)
+                cnr = cells[k]
+                dofs = cell_dofs[cnr]
+                mask = couplings === nothing ? nothing : couplings[cell_to_sdh[cnr]]
+                # Same-side interface blocks: for a cell that participates in an interface,
+                # interface_coupling also allows pairs within the cell itself, where
+                # `interface_couplings === nothing` means no restriction (nothing/full
+                # mask), i.e. every pair. The own cell pairs rows and columns in the same
+                # layout, so the diagonal (square) mask applies. A candidate therefore
+                # passes if either the cell coupling or the interface coupling allows it.
+                on_interface = neighbor_cells !== nothing && !isempty(neighbor_cells[cnr])
+                imask = on_interface && interface_couplings !== nothing ?
+                    interface_couplings[cell_to_sdh[cnr], cell_to_sdh[cnr]] : nothing
+                li = lidxs === nothing ? 0 : lidxs[k]
+                for j in 1:length(dofs)
+                    mask === nothing || mask[li, j] || (on_interface && (imask === nothing || imask[li, j])) || continue
+                    col = dofs[j]
+                    isconstrained !== nothing && isconstrained[col] && continue
+                    if marker[col] != row
+                        marker[col] = row
+                        counting || (data[start + p] = col)
+                        p += 1
+                    end
+                end
+            end
+            # Interface entries, cross blocks: visit the dofs of facet-neighbor cells,
+            # filtered by the expanded interface_coupling mask. The interface coupling
+            # allows (row, col) across an interface iff the mask couples them with the row
+            # cell as the test (first) index -- exactly `imask[li, j]` seen from this row,
+            # where the rectangular per-(sdh, sdh) expansion pairs the row cell's local
+            # layout with the neighbor's, so the lookup is well-defined for a neighbor in
+            # any subdofhandler; both orientations of every interface are covered here
+            # because every row visits all facet-neighbors of all its cells (the same-side
+            # blocks are covered by the own-cell loop above). This enumerates the interface
+            # entries exactly, so the count pass reserves and the fill pass inserts them
+            # here directly.
+            if neighbor_cells !== nothing
+                for k in 1:length(cells)
+                    cnr = cells[k]
+                    li = lidxs === nothing ? 0 : lidxs[k]
+                    for nbc in neighbor_cells[cnr]
+                        # A neighbor not covered by any subdofhandler has no dofs (and no
+                        # mask entry): nothing to add
+                        cell_to_sdh[nbc] == 0 && continue
+                        nbdofs = cell_dofs[nbc]
+                        imask = interface_couplings === nothing ? nothing :
+                            interface_couplings[cell_to_sdh[cnr], cell_to_sdh[nbc]]
+                        for j in 1:length(nbdofs)
+                            imask === nothing || imask[li, j] || continue
+                            col = nbdofs[j]
+                            isconstrained !== nothing && isconstrained[col] && continue
+                            if marker[col] != row
+                                marker[col] = row
+                                counting || (data[start + p] = col)
+                                p += 1
+                            end
+                        end
+                    end
                 end
             end
         end
-    end
-    return sp
-end
-
-allocate_matrix(sp::FastSparsityPattern) = allocate_matrix(SparseMatrixCSC, sp)
-allocate_matrix(::Type{SparseMatrixCSC}, sp::FastSparsityPattern{Int}) = allocate_matrix(SparseMatrixCSC{Float64, Int}, sp)
-function allocate_matrix(::Type{<:SparseMatrixCSC{Tv, Ti}}, sp::FastSparsityPattern{Ti}) where {Ti, Tv}
-    nnz = length(sp.colidx)
-    ncols = getncols(sp)
-    nrows = getnrows(sp)
-
-    # Number of stored entries per column
-    collen = zeros(Ti, ncols)
-    @inbounds for col in sp.colidx
-        collen[col] += 1
-    end
-
-    # Index of stored entries at the start of each column
-    colptr = Vector{Ti}(undef, ncols + 1)
-    colptr[1] = 1
-    @inbounds for col in 1:ncols
-        colptr[col + 1] = colptr[col] + collen[col]
-    end
-
-    # Build rowidx[i] giving the row number of the ith stored entry
-    rowidx = Vector{Ti}(undef, nnz)
-    next = copy(colptr)
-    @inbounds for row in 1:nrows
-        for p in sp.rowptr[row]:(sp.rowptr[row + 1] - 1)
-            col = sp.colidx[p]
-            q = next[col]
-            rowidx[q] = row
-            next[col] = q + 1
-            # For a given col, next[col] is increasing, and row is
-            # increasing in the outer loop -> rowidx sorted for each col
+        if counting
+            rowlen[row] = p
+        else
+            r = indices[row]
+            indices[row] = AdaptiveRange(r.start, p, r.nmax)
         end
     end
-    nzval = zeros(Tv, nnz)
-    return SparseMatrixCSC(nrows, ncols, colptr, rowidx, nzval)
+    return
 end

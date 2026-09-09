@@ -420,6 +420,25 @@ def scene_incompressible_elasticity():
     colorbar(d, view, ("CELLS", "sigma von Mises"), title="von Mises")
     finish(view, "incompressible_elasticity", twod=True, zoom=0.95)
 
+    # Figure 2 of the tutorial: pressure field of the unstable linear/linear
+    # element (left, checkerboard modes) next to the stable quadratic/linear
+    # element (right), on a shared color scale fitted to the stable solution.
+    view = new_view()
+    rlin = OpenDataFile(datadir + "/cook_linear_linear.vtu")
+    rquad = OpenDataFile(datadir + "/cook_quadratic_linear.vtu")
+    left = surface(warp(rlin, "u", 1.0), view, edges=False)
+    shifted = Transform(Input=warp(rquad, "u", 1.0))
+    shifted.Transform.Translate = [60.0, 0.0, 0.0]
+    right = surface(shifted, view, edges=False)
+    ColorBy(left, ("POINTS", "p"))
+    lut = colorbar(right, view, ("POINTS", "p"), title="$p$", horizontal=True, fmt="%.2f")
+    # Clip the shared scale to the stable solution's range: the checkerboard
+    # oscillations of the linear/linear pressure are ~30x larger and would
+    # otherwise wash out both fields.
+    pr = rquad.GetDataInformation().GetPointDataInformation().GetArrayInformation("p").GetComponentRange(0)
+    lut.RescaleTransferFunction(pr[0], pr[1])
+    finish(view, "incompressible_elasticity_pressure", twod=True, zoom=1.25, res=[1600, 950])
+
 
 # --- stokes-flow: velocity magnitude on the quarter disk
 @scene("stokes-flow")
@@ -456,6 +475,42 @@ def scene_computational_homogenization():
     lut_p.RescaleTransferFunction(0.0, hi)
     finish(view, "computational_homogenization", twod=True, zoom=1.25,
            res=[1600, 950], pan_y=-0.12)
+
+
+# --- stress_driven_homogenization: von Mises stress on the RVE deformed by
+# the total displacement (macroscopic + fluctuation) that results from the
+# prescribed macroscopic shear stress
+@scene("stress_driven_homogenization")
+def scene_stress_driven_homogenization():
+    view = new_view()
+    r = OpenDataFile(datadir + "/stress_driven_homogenization.vtu")
+    w = warp(r, "u_total", 4.0)  # ~3.6% average shear strain, exaggerated to be visible
+    calc = Calculator(Input=w)  # GPa: the raw Pa values need exponent labels
+    calc.AttributeType = "Cell Data"
+    calc.ResultArrayName = "vonMisesGPa"
+    calc.Function = "vonMises/1e9"
+    d = surface(calc, view, edges=False)
+    lut = colorbar(d, view, ("CELLS", "vonMisesGPa"), title="von Mises [GPa]",
+                   fmt="%.0f")
+    # clamp the colour range: a few stress-concentration cells between nearly
+    # touching inclusions would otherwise wash out the scale
+    lut.RescaleTransferFunction(0.0, 4.0)
+    # overlay the undeformed outline as the reference that makes the
+    # (exaggerated) macroscopic strain visible; the wiggles of the deformed
+    # boundary are the periodic fluctuation field
+    lift = Transform(Input=r)  # lift slightly towards the camera so the
+    lift.Transform.Translate = [0.0, 0.0, 0.001]  # outline is not z-fought
+    outline = FeatureEdges(Input=ExtractSurface(Input=lift))  # needs polydata
+    outline.BoundaryEdges = 1
+    outline.FeatureEdges = 0
+    outline.ManifoldEdges = 0
+    outline.NonManifoldEdges = 0
+    od = Show(outline, view)
+    od.Representation = "Surface"
+    od.ColorArrayName = [None, ""]
+    od.AmbientColor = od.DiffuseColor = [0.5, 0.5, 0.5]
+    od.LineWidth = 3.0
+    finish(view, "stress_driven_homogenization", twod=True, zoom=0.9)
 
 
 # --- linear_shell: deflected shell coloured by displacement magnitude

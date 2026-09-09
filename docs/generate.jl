@@ -163,6 +163,7 @@ write_overview(
         ("plasticity", "von Mises plasticity", ["plasticity-light.png", "plasticity-dark.png"]),
         ("transient_heat_equation", "Transient heat equation", ["transient_heat-light.webp", "transient_heat-dark.webp"]),
         ("computational_homogenization", "Computational homogenization", ["computational_homogenization-light.png", "computational_homogenization-dark.png"]),
+        ("stress_driven_homogenization", "Stress-driven computational homogenization", ["stress_driven_homogenization-light.png", "stress_driven_homogenization-dark.png"]),
         ("stokes-flow", "Stokes flow", ["stokes-flow-light.png", "stokes-flow-dark.png"]),
         ("porous_media", "Porous media", ["porous_media-light.webp", "porous_media-dark.webp"]),
         ("ns_vs_diffeq", "Navier–Stokes equations", ["ns_vs_diffeq-light.webp", "ns_vs_diffeq-dark.webp"]),

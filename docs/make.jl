@@ -38,12 +38,15 @@ bibtex_plugin = CitationBibliography(
     style = :numeric
 )
 
+codeblocks_plugin = CodeBlocks(
+    line_counter = :named,
+)
+
 # Build documentation.
 @timeit dto "makedocs" makedocs(
     format = Documenter.HTML(
         assets = [
             "assets/custom.css",
-            "assets/citations.css",
             "assets/favicon.ico",
         ],
         canonical = "https://ferrite-fem.github.io/Ferrite.jl/stable",
@@ -66,6 +69,7 @@ bibtex_plugin = CitationBibliography(
             "tutorials/plasticity.md",
             "tutorials/transient_heat_equation.md",
             "tutorials/computational_homogenization.md",
+            "tutorials/stress_driven_homogenization.md",
             "tutorials/stokes-flow.md",
             "tutorials/porous_media.md",
             "tutorials/ns_vs_diffeq.md",
@@ -81,6 +85,7 @@ bibtex_plugin = CitationBibliography(
             "topics/reference_shapes.md",
             "topics/FEValues.md",
             "topics/degrees_of_freedom.md",
+            "topics/algebraic_variables.md",
             "topics/sparse_matrix.md",
             "topics/assembly.md",
             "topics/boundary_conditions.md",
@@ -123,7 +128,7 @@ bibtex_plugin = CitationBibliography(
     ],
     plugins = [
         bibtex_plugin,
-        CodeBlocks(),
+        codeblocks_plugin,
     ]
 )
 

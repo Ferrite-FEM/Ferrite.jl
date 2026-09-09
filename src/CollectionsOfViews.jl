@@ -1,6 +1,6 @@
 module CollectionsOfViews
 
-export ArrayOfVectorViews, push_at_index!, ConstructionBuffer
+export ArrayOfVectorViews, push_at_index!, insert_sorted_at_index!, ConstructionBuffer
 
 # `AdaptiveRange` and `ConstructionBuffer` are used to efficiently build up an `ArrayOfVectorViews`
 # when the size of each view is unknown.
@@ -56,6 +56,58 @@ function push_at_index!(b::ConstructionBuffer, val, indices::Vararg{Int, N}) whe
     else # We have space in an already allocated section
         b.data[r.start + r.ncurrent] = val
         setindex!(b.indices, AdaptiveRange(r.start, r.ncurrent + 1, r.nmax), indices...)
+    end
+    return b
+end
+
+"""
+    insert_sorted_at_index!(b::ConstructionBuffer{<:Any, 1}, val, index::Int)
+
+Insert the value `val` into the `Vector` view at index `index` of the one-dimensional buffer
+`b`, keeping the view sorted and free of duplicates (`val` is dropped if already stored). The
+view must already be sorted, which holds when it is filled exclusively through this function.
+
+Unlike [`push_at_index!`](@ref), the reservation for a view grows *geometrically* when it
+overflows, so repeatedly growing the same view is amortized O(length) copies instead of
+O(length^2 / sizehint).
+"""
+function insert_sorted_at_index!(b::ConstructionBuffer{<:Any, 1}, val, index::Int)
+    r = b.indices[index]
+    n = length(b.data)
+    if r.start == 0
+        # `index` not previously added, allocate new space for it at the end of `b.data`
+        resize!(b.data, n + b.sizehint)
+        @inbounds b.data[n + 1] = val
+        b.indices[index] = AdaptiveRange(n + 1, 1, b.sizehint)
+        return b
+    end
+    lo = r.start
+    hi = r.start + r.ncurrent - 1
+    # Ranged searchsortedfirst to avoid the heap-allocating view(b.data, lo:hi)
+    k = searchsortedfirst(b.data, val, lo, hi, Base.Order.Forward)
+    (k <= hi && @inbounds(b.data[k]) == val) && return b # already stored
+    if r.ncurrent < r.nmax
+        # Space left in the reservation: shift the tail and insert in place
+        @inbounds for i in hi:-1:k
+            b.data[i + 1] = b.data[i]
+        end
+        @inbounds b.data[k] = val
+        b.indices[index] = AdaptiveRange(r.start, r.ncurrent + 1, r.nmax)
+    else
+        # Reservation full: move the view to the end of `b.data` with a geometrically grown
+        # reservation, inserting `val` at its sorted position during the copy
+        newstart = n + 1
+        newmax = r.nmax + max(r.nmax, b.sizehint)
+        resize!(b.data, n + newmax)
+        krel = k - r.start
+        @inbounds for i in 0:(krel - 1)
+            b.data[newstart + i] = b.data[r.start + i]
+        end
+        @inbounds b.data[newstart + krel] = val
+        @inbounds for i in krel:(r.ncurrent - 1)
+            b.data[newstart + i + 1] = b.data[r.start + i]
+        end
+        b.indices[index] = AdaptiveRange(newstart, r.ncurrent + 1, newmax)
     end
     return b
 end
@@ -141,14 +193,14 @@ Creates the `ArrayOfVectorViews` directly where the user is responsible for havi
 Checking of the argument dimensions can be elided by setting `checkargs = false`, but incorrect dimensions
 may lead to illegal out of bounds access later.
 
-`data` is indexed by `indices[i]:indices[i+1]`, where `i = lin_idx[idx...]` and `idx...` are the user-provided
+`data` is indexed by `indices[i]:(indices[i+1]-1)`, where `i = lin_idx[idx...]` and `idx...` are the user-provided
 indices to the `ArrayOfVectorViews`.
 """
 function ArrayOfVectorViews(indices::Vector{Int}, data::Vector{T}, lin_idx::LinearIndices{N}; checkargs = true) where {T, N}
     if checkargs
-        checkbounds(data, 1:(last(indices) - 1))
-        checkbounds(indices, last(lin_idx) + 1)
+        length(indices) == length(lin_idx) + 1 || throw(DimensionMismatch("indices must contain one offset per view and a terminal offset"))
         issorted(indices) || throw(ArgumentError("indices must be weakly increasing"))
+        1 <= first(indices) <= last(indices) <= length(data) + 1 || throw(ArgumentError("indices must lie between 1 and length(data) + 1"))
     end
     return ArrayOfVectorViews{T, N}(indices, data, lin_idx)
 end

@@ -33,7 +33,9 @@ fetch_assets(
         variants(
             [
                 "heat_equation", "linear_elasticity", "incompressible_elasticity",
+                "incompressible_elasticity_pressure",
                 "hyperelasticity", "plasticity", "computational_homogenization",
+                "stress_driven_homogenization",
                 "stokes-flow", "dg_heat_equation", "linear_shell",
                 "linear_elasticity_stress", "elastodynamics_modes", "darcy_flow",
             ], ".png"
@@ -55,4 +57,10 @@ fetch_assets(
         variants(["helmholtz", "landau_orig", "landau_opt", "topology_optimization_result"], ".png"),
         variants(["quasi_incompressible_hyperelasticity", "topology_optimization", "elasticity_adaptivity"], ".webp"),
     ),
+)
+
+# Reference shape figures
+fetch_assets(
+    joinpath(@__DIR__, "src", "assets"),
+    ["ref-" * n * ".svg" for n in ("line", "triangle", "quadrilateral", "tetrahedron", "hexahedron", "prism", "pyramid")],
 )

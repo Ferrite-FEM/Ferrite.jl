@@ -125,19 +125,33 @@ conditions are used.
 
 ---
 
-#### [Tutorial 9: Stokes flow](stokes-flow.md)
+#### [Tutorial 9: Stress-driven computational homogenization](stress_driven_homogenization.md)
+
+This tutorial solves the RVE problem from Tutorial 8 under a prescribed average *stress*
+instead of a prescribed average strain. The unknown macroscopic strain is added as an
+algebraic variable, acting as a Lagrange multiplier that enforces the stress control. The
+final section groups the dofs into blocks and solves the system with a Schur complement.
+
+**Keywords**: computational homogenization, algebraic variable, Lagrange multiplier,
+BlockArrays, Schur complement.
+
+---
+
+#### [Tutorial 10: Stokes flow](stokes-flow.md)
 
 In this tutorial Stokes flow with (vector) velocity and (scalar) pressure is solved on a
 quarter circle. Rotationally periodic boundary conditions is used for the inlet/outlet
 coupling. To obtain a unique solution, a mean value constraint is applied on the pressure
-using an affine constraint. The computational mesh is generated directly using the Gmsh API.
+using an affine constraint. A closing section solves the same problem with the Lagrange
+multiplier kept as an unknown, using an algebraic variable. The computational mesh is
+generated directly using the Gmsh API.
 
-**Keywords**: periodic boundary conditions, mean value constraint, mesh generation with
-Gmsh.
+**Keywords**: periodic boundary conditions, mean value constraint, Lagrange multiplier,
+algebraic variable, mesh generation with Gmsh.
 
 ---
 
-#### [Tutorial 10: Porous media (SubDofHandler)](porous_media.md)
+#### [Tutorial 11: Porous media (SubDofHandler)](porous_media.md)
 
 This tutorial introduces how to solve a complex linear problem, where there are different
 fields on different subdomains, and different cell types in the grid. This requires using
@@ -147,7 +161,7 @@ the `SubDofHandler` interface.
 
 ---
 
-#### [Tutorial 11: Incompressible Navier-Stokes equations](ns_vs_diffeq.md)
+#### [Tutorial 12: Incompressible Navier-Stokes equations](ns_vs_diffeq.md)
 
 In this tutorial the incompressible Navier-Stokes equations are solved. The domain is
 discretized in space with Ferrite as usual, and then formulated in a way to be compatible
@@ -158,7 +172,7 @@ for the time-integration.
 
 ---
 
-#### [Tutorial 12: Reactive surface](@ref tutorial-reactive-surface)
+#### [Tutorial 13: Reactive surface](@ref tutorial-reactive-surface)
 
 In this tutorial a reaction diffusion system on a sphere surface embedded in 3D is solved.
 Ferrite is used to assemble the diffusion operators and the mass matrices. The problem is
@@ -168,7 +182,7 @@ solved by using the usual first order reaction diffusion operator splitting.
 
 ---
 
-#### [Tutorial 13: Linear shell](@ref tutorial-linear-shell)
+#### [Tutorial 14: Linear shell](@ref tutorial-linear-shell)
 
 In this tutorial a linear shell element formulation is set up as a two-dimensional domain
 embedded in three-dimensional space. This will teach, and perhaps inspire, you on how
@@ -179,7 +193,7 @@ Ferrite.
 
 ---
 
-#### [Tutorial 14: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
+#### [Tutorial 15: Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation)
 
 This tutorial guides you through the process of solving the linear stationary heat equation
 (i.e. Poisson's equation) on a unit square with inhomogeneous Dirichlet and Neumann boundary
@@ -194,7 +208,7 @@ Ferrite.jl"](https://summerofcode.withgoogle.com/programs/2023/projects/SLGbRNI5
 
 ---
 
-#### [Tutorial 15: Heat equation with adaptive mesh refinement](@ref tutorial-heat-adaptivity)
+#### [Tutorial 16: Heat equation with adaptive mesh refinement](@ref tutorial-heat-adaptivity)
 
 In this tutorial the heat equation is solved on a cube with adaptive mesh refinement (AMR).
 A manufactured solution with a sharp spherical feature drives the refinement, using a
@@ -205,7 +219,7 @@ refinement are constrained to keep the approximation conforming.
 
 ---
 
-#### [Tutorial 16: Darcy flow with H(div) elements](@ref tutorial-darcy-flow)
+#### [Tutorial 17: Darcy flow with H(div) elements](@ref tutorial-darcy-flow)
 
 In this tutorial Darcy flow through a domain with an almost impermeable barrier is solved
 using the mixed form of the Poisson problem, with the flux as an explicit unknown

@@ -70,3 +70,9 @@ html:is(.theme--documenter-dark, .theme--catppuccin-frappe, .theme--catppuccin-m
         max-width: 18rem;
     }
 }
+html.theme--documenter-dark img.refcell,
+html.theme--catppuccin-frappe img.refcell,
+html.theme--catppuccin-macchiato img.refcell,
+html.theme--catppuccin-mocha img.refcell {
+    filter: invert(1) hue-rotate(180deg);
+}
