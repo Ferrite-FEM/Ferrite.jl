@@ -246,7 +246,7 @@ function _sparse_column_wise_solve(luA::SparseArrays.UMFPACK.UmfpackLU{T, Int}, 
     (m, n) = size(C)
     I = Int[]; J = Int[]; V = T[]
     sh = SparseArrays.nnz(C)
-    sizehint!(I, sh; shrink = false); sizehint!(J, sh; shrink = false); sizehint!(V, sh; shrink = false)
+    sizehint!(I, sh); sizehint!(J, sh); sizehint!(V, sh)
     sol = zeros(T, m)
     rhs = SparseArrays.SparseVector{T, Int}(undef, m) # zeros(T, n)
     for j in axes(C, 2)
