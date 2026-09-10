@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Fixes
+ - Untangle the tangled `AffineConstraints` in `close!` ([#1327])
+ - Atomic assembly support for BlockAssembler. ([#1452])
+ - `add_sparsity_entries!` (and thereby `allocate_matrix`) now guarantees that passing
+   `interface_coupling` adds the requested interface entries: the `topology` keyword
+   argument is now optional and, when not passed, constructed from the grid (previously
+   `interface_coupling` without `topology` was silently ignored). Passing an existing
+   topology is still recommended for performance reasons, in particular since one is
+   typically needed for `InterfaceIterator` in the assembly loop anyway. Calls that pass
+   both keyword arguments behave exactly as before. ([#1468])
 
  - Symmetric CSC assembly now rejects incompatible row/column dof lists and
    lower-triangle storage before modifying the system. Constraint application also
