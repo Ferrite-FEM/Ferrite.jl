@@ -10,8 +10,9 @@
 #
 # ![](stokes-flow-light.png)
 # ![](stokes-flow-dark.png)
-# *Figure 1*: Magnitude of the resulting velocity field on the quarter disk
-# domain ``\Omega`` (see *Figure 2*).
+# [[*Figure 1*](@ref tutorial-stokes-flow-figure-1)](@id tutorial-stokes-flow-figure-1):
+# Magnitude of the resulting velocity field on the quarter disk
+# domain ``\Omega`` (see [*Figure 2*](@ref tutorial-stokes-flow-figure-2)).
 
 # ## Introduction and problem formulation
 #
@@ -34,7 +35,8 @@
 # \end{align*}
 # ```
 # where the domain is defined as ``\Omega = \{\boldsymbol{x} \in (0, 1)^2:
-# \ ||\boldsymbol{x}|| \in (0.5, 1)\}``, see *Figure 2*. For the velocity we use periodic
+# \ ||\boldsymbol{x}|| \in (0.5, 1)\}``, see [*Figure 2*](@ref tutorial-stokes-flow-figure-2).
+# For the velocity we use periodic
 # boundary conditions on the inlet ``\Gamma_1`` and outlet ``\Gamma_3``:
 # ```math
 # \begin{align*}
@@ -51,7 +53,8 @@
 # ![](stokes-flow-geometry-light.png)
 # ![](stokes-flow-geometry-dark.png)
 #
-# *Figure 2*: Computational domain ``\Omega`` with boundaries ``\Gamma_1``,
+# [[*Figure 2*](@ref tutorial-stokes-flow-figure-2)](@id tutorial-stokes-flow-figure-2):
+# Computational domain ``\Omega`` with boundaries ``\Gamma_1``,
 # ``\Gamma_3`` (periodic boundary conditions) and ``\Gamma_2``, ``\Gamma_4``
 # (homogeneous Dirichlet boundary conditions).
 #
@@ -125,7 +128,7 @@
 # ```
 #
 # !!! note
-#     The constraint matrix ``\underline{\underline{C}}_p`` is the same matrix we would have
+#     [The constraint matrix](@id stokes-multiplier-note) ``\underline{\underline{C}}_p`` is the same matrix we would have
 #     obtained when assembling the system with the Lagrange multiplier. In that case the
 #     full system would be
 #     ```math
@@ -540,13 +543,15 @@ end
 
 main()
 
-# The resulting magnitude of the velocity field is visualized in *Figure 1*.
+# The resulting magnitude of the velocity field is visualized in
+# [*Figure 1*](@ref tutorial-stokes-flow-figure-1).
 
 # ## [Alternative: retaining the Lagrange multiplier](@id stokes-multiplier)
 #
 # As discussed in the introduction, the mean value constraint can also be enforced by
-# keeping the Lagrange multiplier ``\lambda`` as an unknown -- the note above shows the
-# resulting block system. We implement this variant too, since it is a good illustration
+# keeping the Lagrange multiplier ``\lambda`` as an unknown -- the
+# [note above](@ref stokes-multiplier-note) shows the resulting block system. We implement
+# this variant too, since it is a good illustration
 # of [algebraic variables](@ref topic-algebraic-variables): ``\lambda`` is a single
 # scalar unknown without spatial variation, which is exactly what an
 # [`AlgebraicVariable`](@ref) declares. In contrast to the `AffineConstraint`, this

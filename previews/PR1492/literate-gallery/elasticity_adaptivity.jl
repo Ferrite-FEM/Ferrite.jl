@@ -3,7 +3,8 @@
 # ![](elasticity_adaptivity-light.webp)
 # ![](elasticity_adaptivity-dark.webp)
 #
-# *Figure 1*: The adaptive refinement loop, colored by the von Mises stress:
+# [[*Figure 1*](@ref gallery-elasticity-adaptivity-figure-1)](@id gallery-elasticity-adaptivity-figure-1):
+# The adaptive refinement loop, colored by the von Mises stress:
 # the refinement concentrates at the stress singularity of the re-entrant
 # corner (displacements exaggerated).
 #

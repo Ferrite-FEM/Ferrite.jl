@@ -3,7 +3,8 @@
 # ![](transient_heat-light.webp)
 # ![](transient_heat-dark.webp)
 #
-# *Figure 1*: Visualization of the temperature time evolution on a unit
+# [[*Figure 1*](@ref tutorial-transient-heat-equation-figure-1)](@id tutorial-transient-heat-equation-figure-1):
+# Visualization of the temperature time evolution on a unit
 # square where the prescribed temperature on the upper and lower parts
 # of the boundary increase with time.
 #
