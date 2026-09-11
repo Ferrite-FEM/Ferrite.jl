@@ -29,3 +29,14 @@ end
 function adapt_structure(to, qr::QuadratureRule{shape}) where {shape}
     return QuadratureRule{shape}(adapt(to, qr.weights), adapt(to, qr.points))
 end
+
+# The `atomic` type parameter of the assemblers cannot be inferred from the fields, so this
+# cannot use `Adapt.@adapt_structure`. Only scratch-free assemblers can be adapted, since
+# the sorting scratch of a host assembler has no device counterpart.
+for AT in (:CSCAssembler, :CSRAssembler)
+    @eval function adapt_structure(to, a::Ferrite.$AT{Tv, Ti, <:Any, atomic, <:Any, Nothing}) where {Tv, Ti, atomic}
+        K = adapt(to, a.K)
+        f = adapt(to, a.f)
+        return Ferrite.$AT{Tv, Ti, typeof(K), atomic, typeof(f), Nothing}(K, f, nothing, nothing, nothing, nothing)
+    end
+end
