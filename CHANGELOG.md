@@ -5,7 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Next] - xxxx-xx-xx
+## Unreleased
+
+### Added
+
+ - Assembly into sparse matrices living on a device, via KernelAbstractions.jl:
+   `start_assemble` accepts any `GPUArrays`-based CSC or CSR sparse matrix (e.g.
+   `CUDA.CUSPARSE.CuSparseMatrixCSC` and `CuSparseMatrixCSR`) together with a device
+   vector, and supports `atomic = true`, which lets a kernel assemble all cells in a single
+   launch without a grid coloring.
+   Package extensions for AMDGPU.jl, oneAPI.jl, Metal.jl and GenericSparseArrays.jl make
+   this available on the other vendor backends: `allocate_matrix` also accepts
+   `ROCSparseMatrixCSC`/`ROCSparseMatrixCSR`, `oneSparseMatrixCSC`/`oneSparseMatrixCSR` and
+   the backend agnostic `GenericSparseMatrixCSC`/`GenericSparseMatrixCSR`, the latter being
+   the way to assemble a global matrix on Metal, which has no sparse matrix type of its own.
+   ([#1493])
+
+### Fixes
+
+ - Symmetric CSC assembly now rejects incompatible row/column dof lists and
+   lower-triangle storage before modifying the system. Constraint application also
+   rejects unsupported lower-triangle CSC storage.
+ - Constraint matrices correctly account for affine constraints with prescribed masters.
+ - CSC and CSR assembly correctly accumulate repeated interface dofs.
+ - Fixed the single-argument `InterfaceValues(facetvalues)` constructor.
+ - L2 projection supports complex scalar and tensor data.
+ - `ArrayOfVectorViews` validates offsets before constructing unchecked views.
+
+### Performance
+
+ - `InterfaceIterator` caches topology lookups, avoiding quadratic traversal for grids
+   with abstract cell storage. Recreate the iterator after changing the grid or topology.
+ - L2 right-hand-side assembly avoids temporary row-slice allocations.
+
+## [v1.7.0] - 2026-08-31
+
+### Added
+ - Added mesh-free [`AlgebraicVariable`s](https://ferrite-fem.github.io/Ferrite.jl/dev/topics/algebraic_variables/)
+   and coupling descriptors for small global unknowns such as Lagrange multipliers and
+   homogenized quantities. See the documentation for details. ([#1422])
+ - `ExclusiveTopology` now supports grids with mixed reference dimensions (e.g. a 3D grid
+   containing both `Hexahedron` and `Quadrilateral` cells). Mixed-dimensional connections
+   are stored in `vertex_vertex_neighbor`, `edge_edge_neighbor`, and `face_face_neighbor`
+   according to the shared entity, and can be queried with `VertexIndex`, `EdgeIndex`,
+   `FaceIndex`, and (per cell) `FacetIndex`. The bulk operations `facetskeleton` and
+   `get_facet_facet_neighborhood` remain unsupported for such grids, since they assume a
+   common facet dimension across the whole grid. ([#843])
+ - Experimental CUDA GPU support for assembly using type-stable, non-allocating element
+   routines. ([#1291])
+ - Atomic assembly (`start_assemble(K, f; atomic = true)`) now supports `Float16` and
+   `Complex` of `Float16`/`Float32`/`Float64` as value types, in addition to `Float32`
+   and `Float64`. ([#1474])
+ - `apply!` and `apply_zero!` now work for a `BlockMatrix`, including condensation of affine
+   constraints. Previously constraints could only be applied to a blocked system with
+   `apply_assemble!`. Blocks in either of the sparse formats Ferrite supports (`SparseMatrixCSC`
+   and `SparseMatrixCSR`) work, and so does any custom format implementing the internal
+   interface documented in the devdocs on assembly -- that interface is now phrased in terms of
+   explicit constraint data and index offsets, so the same methods serve a matrix on its own and
+   as a block of a blocked matrix, and the BlockArrays extension contains no format specific
+   code. As part of this, `apply!` and `apply_zero!` dispatch on `AbstractMatrix` rather than
+   `AbstractSparseMatrix`. ([#1489])
+ - `apply!` on a `SparseMatrixCSR` now supports affine constraints, which previously threw
+   `"condensation of ::SparseMatrixCSR{...} matrix not supported"`. ([#1489])
 
 ### Fixes
  - Atomic assembly support for BlockAssembler. ([#1452])
@@ -29,45 +90,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    typically needed for `InterfaceIterator` in the assembly loop anyway. Calls that pass
    both keyword arguments behave exactly as before. ([#1468])
 
-### Added
- - Added mesh-free [`AlgebraicVariable`s](https://ferrite-fem.github.io/Ferrite.jl/dev/topics/algebraic_variables/)
-   and coupling descriptors for small global unknowns such as Lagrange multipliers and
-   homogenized quantities. See the documentation for details. ([#1422])
- - `ExclusiveTopology` now supports grids with mixed reference dimensions (e.g. a 3D grid
-   containing both `Hexahedron` and `Quadrilateral` cells). Mixed-dimensional connections
-   are stored in `vertex_vertex_neighbor`, `edge_edge_neighbor`, and `face_face_neighbor`
-   according to the shared entity, and can be queried with `VertexIndex`, `EdgeIndex`,
-   `FaceIndex`, and (per cell) `FacetIndex`. The bulk operations `facetskeleton` and
-   `get_facet_facet_neighborhood` remain unsupported for such grids, since they assume a
-   common facet dimension across the whole grid. ([#843])
- - Experimental CUDA GPU support for assembly using type-stable, non-allocating element
-   routines. ([#1291])
- - Atomic assembly (`start_assemble(K, f; atomic = true)`) now supports `Float16` and
-   `Complex` of `Float16`/`Float32`/`Float64` as value types, in addition to `Float32`
-   and `Float64`. ([#1474])
- - Assembly into sparse matrices living on a device, via KernelAbstractions.jl:
-   `start_assemble` accepts any `GPUArrays`-based CSC or CSR sparse matrix (e.g.
-   `CUDA.CUSPARSE.CuSparseMatrixCSC` and `CuSparseMatrixCSR`) together with a device
-   vector, and supports `atomic = true`, which lets a kernel assemble all cells in a single
-   launch without a grid coloring.
-   Package extensions for AMDGPU.jl, oneAPI.jl, Metal.jl and GenericSparseArrays.jl make
-   this available on the other vendor backends: `allocate_matrix` also accepts
-   `ROCSparseMatrixCSC`/`ROCSparseMatrixCSR`, `oneSparseMatrixCSC`/`oneSparseMatrixCSR` and
-   the backend agnostic `GenericSparseMatrixCSC`/`GenericSparseMatrixCSR`, the latter being
-   the way to assemble a global matrix on Metal, which has no sparse matrix type of its own.
-   ([#1493])
- - `apply!` and `apply_zero!` now work for a `BlockMatrix`, including condensation of affine
-   constraints. Previously constraints could only be applied to a blocked system with
-   `apply_assemble!`. Blocks in either of the sparse formats Ferrite supports (`SparseMatrixCSC`
-   and `SparseMatrixCSR`) work, and so does any custom format implementing the internal
-   interface documented in the devdocs on assembly -- that interface is now phrased in terms of
-   explicit constraint data and index offsets, so the same methods serve a matrix on its own and
-   as a block of a blocked matrix, and the BlockArrays extension contains no format specific
-   code. As part of this, `apply!` and `apply_zero!` dispatch on `AbstractMatrix` rather than
-   `AbstractSparseMatrix`. ([#1489])
- - `apply!` on a `SparseMatrixCSR` now supports affine constraints, which previously threw
-   `"condensation of ::SparseMatrixCSR{...} matrix not supported"`. ([#1489])
-
 ### Performance
  - `create_coloring` is significantly faster: the incidence matrix construction and the
    zone coloring of the workstream algorithm are now multithreaded, and remaining serial
@@ -84,6 +106,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    matrices are unchanged. ([#1397], [#1490])
  - Building a `SparsityPattern` and instantiating a `SparseMatrixCSC` or `SparseMatrixCSR`
    from it is now multithreaded. ([#1481])
+ - Faster `ExclusiveTopology` construction (about 1.5x for hexahedral and 1.7x for
+   tetrahedral grids), `vertex_star_stencils` (roughly 30x), and `getneighborhood` with an
+   `EdgeIndex` (roughly 4x). ([#1466])
 
 ### Internal changes
  - `SparsityPattern` has been rewritten: all rows are now stored in a single contiguous
@@ -93,11 +118,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    been removed. ([#1397])
  - The documented contract of `Ferrite.eachrow(sp[, row])` for `AbstractSparsityPattern` now
    states that column indices are iterated in sorted order. ([#1397])
-
-### Performance
- - Faster `ExclusiveTopology` construction (about 1.5x for hexahedral and 1.7x for
-   tetrahedral grids), `vertex_star_stencils` (roughly 30x), and `getneighborhood` with an
-   `EdgeIndex` (roughly 4x). ([#1466])
 
 ### Documentation
  - New tutorial: Stress-driven computational homogenization, where the macroscopic
@@ -1187,6 +1207,7 @@ poking into Ferrite internals:
 [v1.4.1]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.4.1
 [v1.5.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.5.0
 [v1.6.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.6.0
+[v1.7.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.7.0
 [#352]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/352
 [#363]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/363
 [#378]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/378
@@ -1459,11 +1480,12 @@ poking into Ferrite internals:
 [#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
 [#1438]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1438
 [#1452]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1452
+[#1465]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1465
 [#1466]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1466
 [#1468]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1468
 [#1474]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1474
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
+[#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
 [#1493]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1493
-[#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489

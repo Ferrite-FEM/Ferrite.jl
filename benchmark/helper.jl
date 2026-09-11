@@ -10,6 +10,14 @@ module FerriteBenchmarkHelpers
 using Ferrite
 using LinearAlgebra: norm
 
+function interface_sweep(iterator)
+    checksum = 0
+    for ic in iterator
+        checksum += cellid(ic.a) + cellid(ic.b)
+    end
+    return checksum
+end
+
 # Coordinates for `n` cells, cycling through the grid if it has fewer.
 function cell_coordinate_batch(grid, n)
     return [getcoordinates(grid, mod1(i, getncells(grid))) for i in 1:n]

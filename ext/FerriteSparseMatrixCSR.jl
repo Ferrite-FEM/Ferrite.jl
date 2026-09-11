@@ -24,6 +24,9 @@ end
         coldofs::AbstractVector, sortedcoldofs::AbstractVector, colpermutation::AbstractVector,
         sym::Bool, atomic::Val = Val(false), rowoffset::Int = 0, coloffset::Int = 0
     )
+    if Ferrite._has_repeated_dofs(sortedcoldofs)
+        return Ferrite._assemble_repeated!(K, Ke, sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, sym, atomic, rowoffset, coloffset)
+    end
     return Ferrite._assemble_compressed!(
         Ferrite.MajorIsRow(), K.rowptr, K.colval, K.nzval, size(K, 2), transpose(Ke),
         sortedrowdofs, rowpermutation, sortedcoldofs, colpermutation, false, atomic, rowoffset, coloffset

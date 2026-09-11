@@ -2,6 +2,26 @@ using Ferrite
 import SparseMatricesCSR: SparseMatrixCSR, sparsecsr
 using SparseArrays, LinearAlgebra
 
+@testset "CSR assembly with repeated dofs" begin
+    for mode in (:dense, :merge, :binary), atomic in (false, true)
+        rdofs, cdofs = [3, 1, 3], [2, 4, 2, 1]
+        pattern = mode === :dense ? ones(40, 40) : zeros(40, 40)
+        if mode === :binary
+            pattern[:, 1:39] .= 1
+        else
+            pattern[rdofs, cdofs] .= 1
+        end
+        K = SparseMatrixCSR(sparse(pattern))
+        Ke = reshape(1.0:12.0, 3, 4)
+        expected = zeros(40, 40)
+        for (j, J) in pairs(cdofs), (i, I) in pairs(rdofs)
+            expected[I, J] += Ke[i, j]
+        end
+        assemble!(start_assemble(K; atomic), rdofs, cdofs, Ke)
+        @test K == expected
+    end
+end
+
 @testset "SparseMatricesCSR extension" begin
 
     @testset "apply!(::SparseMatrixCSR,...)" begin
@@ -24,6 +44,10 @@ using SparseArrays, LinearAlgebra
         f0 = K0 * sol
         f1 = K1 * sol
         f2 = K2 * sol
+        # CSR uses the generic symmetric RHS operation, which supports either triangle.
+        Klower = Symmetric(copy(K1), :L)
+        flower = copy(f0)
+        apply!(Klower, flower, ch)
         apply!(K0, f0, ch)
         apply!(K1, f1, ch)
         apply!(K2, f2, ch)
@@ -31,6 +55,8 @@ using SparseArrays, LinearAlgebra
         @test K1 == K2
         @test f0 ≈ f1
         @test f1 ≈ f2
+        @test Klower == K0
+        @test flower ≈ f0
         # Affine constraints are condensed just like for the CSC matrix. The sparsity pattern
         # has to hold the fill-in, so allocate it through the constraint handler.
         ch = ConstraintHandler(dh)

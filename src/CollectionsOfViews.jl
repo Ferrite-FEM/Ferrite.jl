@@ -193,14 +193,14 @@ Creates the `ArrayOfVectorViews` directly where the user is responsible for havi
 Checking of the argument dimensions can be elided by setting `checkargs = false`, but incorrect dimensions
 may lead to illegal out of bounds access later.
 
-`data` is indexed by `indices[i]:indices[i+1]`, where `i = lin_idx[idx...]` and `idx...` are the user-provided
+`data` is indexed by `indices[i]:(indices[i+1]-1)`, where `i = lin_idx[idx...]` and `idx...` are the user-provided
 indices to the `ArrayOfVectorViews`.
 """
 function ArrayOfVectorViews(indices::Vector{Int}, data::Vector{T}, lin_idx::LinearIndices{N}; checkargs = true) where {T, N}
     if checkargs
-        checkbounds(data, 1:(last(indices) - 1))
-        checkbounds(indices, last(lin_idx) + 1)
+        length(indices) == length(lin_idx) + 1 || throw(DimensionMismatch("indices must contain one offset per view and a terminal offset"))
         issorted(indices) || throw(ArgumentError("indices must be weakly increasing"))
+        1 <= first(indices) <= last(indices) <= length(data) + 1 || throw(ArgumentError("indices must lie between 1 and length(data) + 1"))
     end
     return ArrayOfVectorViews{T, N}(indices, data, lin_idx)
 end

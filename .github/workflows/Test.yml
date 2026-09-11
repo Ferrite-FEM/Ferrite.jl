@@ -13,10 +13,10 @@ jobs:
     name: Julia ${{ matrix.julia-version }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
-    continue-on-error: ${{ matrix.julia-version == 'pre' }}
+    continue-on-error: ${{ matrix.julia-version == 'pre' || matrix.julia-version == 'nightly' }}
     strategy:
       matrix:
-        julia-version: ['lts', '1', 'pre']
+        julia-version: ['lts', '1', 'pre', 'nightly']
         os: ['ubuntu-latest']
         include:
           - os: windows-latest
@@ -38,7 +38,7 @@ jobs:
           Pkg.add("JET")
           Pkg.develop(path = pwd())
           include(joinpath(pwd(), "test/jet.jl"))
-        if: ${{ matrix.os == 'ubuntu-latest' && matrix.julia-version != 'pre' }}
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.julia-version != 'pre' && matrix.julia-version != 'nightly' }}
       - uses: julia-actions/julia-processcoverage@v1
         with:
           directories: 'src,ext'
