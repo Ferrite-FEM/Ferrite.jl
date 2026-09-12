@@ -140,7 +140,7 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
     if cell === nothing && reinit_needs_cell(fv)
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
-
+    calculate_basis_transformation!(fun_values, geometric_interpolation(geo_mapping), x)
     @inbounds for (q_point, w) in pairs(getweights(fv.fqr, facet_nr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         J = getjacobian(mapping)

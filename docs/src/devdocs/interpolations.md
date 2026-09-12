@@ -73,6 +73,16 @@ Ferrite.dof_functionals
 Ferrite.matches_functional
 ```
 
+#### Hermitian type interpolations
+Interpolations with derivative type dofs must also implement the basis transformation matrix used when
+evaluating shape functions on a physical cell.
+
+```@docs
+Ferrite.requires_basis_transformation
+Ferrite.init_basis_transformation_matrix
+Ferrite.calculate_basis_transformation!
+```
+
 #### Interpolations that cannot be constructed from their type
 For interpolations, `ip`, for which `ip == typeof(ip)()` is false (or doesn't work), the following must be implemented manually
 ```@docs
