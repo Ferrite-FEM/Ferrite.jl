@@ -129,6 +129,16 @@ end
 Base.show(io::IO, f::PointDerivative) = print(io, "PointDerivative(", f.α, ")")
 
 """
+    NormalDerivative{dim}
+
+Dof functional for a point evaluation of a the derivative in a direction normal to a facet: 
+ℓ(f) = ∇f(xᵢ) ⋅ n_e at xᵢ on an facet e.
+"""
+struct NormalDerivative <: DofFunctional
+end
+Base.show(io::IO, ::NormalDerivative) = print(io, "NormalDerivative()")
+
+"""
     IntegralMoment
 
 Supertype for dof functionals defined as integral moments over the entity owning the dof:
@@ -2394,6 +2404,24 @@ edgedof_indices(::Argyris{RefTriangle, 5}) = (
 
 facedof_indices(ip::Argyris{RefTriangle, 5}) = (ntuple(i -> i, getnbasefunctions(ip)),)
 adjust_dofs_during_distribution(::Argyris{RefTriangle, 5}) = false
+function dof_functionals(::Argyris{RefTriangle, 5})
+    return (
+        #Vertex 1
+        PointValue(),
+        PointDerivative((1, 0)), PointDerivative((0, 1)),
+        PointDerivative((2, 0)), PointDerivative((0, 2)), PointDerivative((1, 1)),
+        #Vertex 2
+        PointValue(),
+        PointDerivative((1, 0)), PointDerivative((0, 1)),
+        PointDerivative((2, 0)), PointDerivative((0, 2)), PointDerivative((1, 1)),
+        #Vertex 3
+        PointValue(),
+        PointDerivative((1, 0)), PointDerivative((0, 1)),
+        PointDerivative((2, 0)), PointDerivative((0, 2)), PointDerivative((1, 1)),
+        #Edges
+        NormalDerivative(), NormalDerivative(), NormalDerivative(),
+    )
+end
 
 function reference_shape_value(ip::Argyris{RefTriangle, 5}, ξ::Vec{2, T}, i::Int) where {T}
     x, y = ξ
