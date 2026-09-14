@@ -338,7 +338,7 @@ function close!(ch::ConstraintHandler)
 
     if istangled(ch) # untangle affine constraints
         @debug @warn "untangling tangled and cyclic affine constraints"
-        untangle_constraints!(ch)
+        _untangle_affine_constraints!(ch)
     end
 
     ch.closed = true
