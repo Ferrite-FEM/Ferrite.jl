@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    with abstract cell storage. Recreate the iterator after changing the grid or topology.
  - L2 right-hand-side assembly avoids temporary row-slice allocations.
 
+### Internal changes
+ - Introduce `AbstractCellCache` which `CellCache` and friends are now subtype of.
+
 ## [v1.7.0] - 2026-08-31
 
 ### Added
