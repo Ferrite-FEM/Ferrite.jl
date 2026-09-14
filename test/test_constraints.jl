@@ -1539,9 +1539,9 @@ end # testset
         add!(ch, AffineConstraint(1, [1 => 1.0], 0.0))
 
         @test_throws ArgumentError(
-            "the affine constraints are tangled and untangling them results in " *
-                "ill defined constraints. A possibility to avoid this is to guarantee that " *
-                "the constraints are not tangled before calling close!"
+                    "the affine constraints are tangled and untangling them fails. " *
+                        "This can be due to e.g. redudant constraints. A possibility to avoid this is to guarantee that " *
+                        "the constraints are not tangled before calling close!"
         ) close!(ch)
     end # subtestset
 
