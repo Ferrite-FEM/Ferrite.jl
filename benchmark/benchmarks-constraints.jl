@@ -107,7 +107,7 @@ let g = SUITE["constraints"]
     g["close! ProjectedDirichlet H(div)"] = @benchmarkable $close_projected($dh, $set) evals = 1
 end
 
-# Untangle affine constraints that are tangled. This happens in close!. 
+# Untangle affine constraints that are tangled. This happens in close!.
 let g = SUITE["constraints"]
     N = 10
     g["close! untangle AffineConstraint(s)"] = @benchmarkable(

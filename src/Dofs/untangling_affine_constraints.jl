@@ -102,14 +102,14 @@ function _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, Tv, Ti})
         coeffs === nothing && continue # this constraint corresponds to a Dirichlet constraint
         dof_position_counter = 0
         for (d, c) in coeffs
-            
+
             tangled_eq = get(ch.dofmapping, d, 0)
             dof_position_counter += 1
             tangled_eq == 0 && continue # skip as d is not in the prescribed dofs and therefore not tangled
 
             tangled_coeffs = ch.dofcoefficients[tangled_eq]
             if !(tangled_coeffs === nothing || isempty(tangled_coeffs)) # nothing means Dirichlet, empty means Dirichlet but through AffineConstraint
-                
+
                 # add the dof to the affine_cdof_ordering
                 _assign_new_index!(affine_cdof_ordering, d)
                 # add the equation to affine_equation_ordering
@@ -209,7 +209,7 @@ end
 Update the dof coefficients `dc` using the constraint matrix `A⁻¹C` and the mappings `affine_equation_ordering` and `affine_fdof_ordering`.
 """
 function _update_dof_coefficients!(dc::Vector{Union{Nothing, DofCoefficients{Tv, Ti}}}, A⁻¹C::SparseMatrixCSC, affine_equation_ordering::Dict{Int, Int}, affine_fdof_ordering::Dict{Int, Int}) where {Tv, Ti}
-    
+
     affine_fdof_mapping⁻¹ = Dict(v => k for (k, v) in affine_fdof_ordering) # Bijections.jl could avoid this but probably not worth it
     affine_equation_ordering⁻¹ = Dict(v => k for (k, v) in affine_equation_ordering)
 
