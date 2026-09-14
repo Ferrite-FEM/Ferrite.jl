@@ -365,6 +365,11 @@ function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandle
     return
 end
 
+"""
+    evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector)
+
+Return a vector of length `getnnodes(grid)` where the `i`th entry is the projected value evaluated at node `i`. `vals` should be the output from `project` using `proj`.
+"""
 evaluate_at_grid_nodes(proj::L2Projector, vals::AbstractVector) =
     _evaluate_at_grid_nodes(proj, vals, Val(false))
 
