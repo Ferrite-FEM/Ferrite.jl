@@ -404,4 +404,56 @@ function assemble_interfaces!(K, dh, iv, topology)
     return K
 end
 
+#----------------------------------------------------------------------#
+# Constraints
+#----------------------------------------------------------------------#
+
+function setup_random_affine_constraint(dofs::Vector{Int}, inhomogeneity::Real=0.0)
+        V = rand(length(dofs))
+        constrained_dof_val, constrained_dof_index = findmax(V)
+        V ./= constrained_dof_val
+        constrained_dof = dofs[constrained_dof_index]
+        ac = AffineConstraint(
+            constrained_dof,
+            Pair{Int, Float64}[i => -v for (i, v) in zip(dofs, V) if i != constrained_dof],
+            inhomogeneity,
+        )
+        return ac
+    end
+
+function setup_tangled_ch(N::Int)
+    dim = 3
+    grid = generate_grid(Hexahedron, ntuple(i -> N, dim))
+    ip = Lagrange{RefHexahedron, 1}()^dim
+    dh = DofHandler(grid)
+    add!(dh, :u, ip)
+    close!(dh)
+
+    ch = ConstraintHandler(dh)
+    Γper = collect_periodic_facets(grid,
+            union(getfacetset(grid, "left"),  getfacetset(grid, "front"), getfacetset(grid, "top")),
+            union(getfacetset(grid, "right"), getfacetset(grid, "back"),  getfacetset(grid, "bottom"))
+    )
+    n_dofs = ndofs(dh)
+    # Randomly chosen lengths which are used to select a (sub)set of the
+    # dofs to then apply an AffineConstraint to.
+    ac_lengths = [n_dofs, 200, 50, 60, 70, 1000, 5000] 
+    acs = Vector{AffineConstraint}(undef, length(ac_lengths))
+    # generate AffineConstraint(s).
+    for (i, l) in pairs(ac_lengths)
+        acs[i] = setup_random_affine_constraint(rand(1:n_dofs, l))
+    end
+
+    # Include PeriodicDirichlet because they are a common cause of 
+    # tangled constraints
+    pdbc = PeriodicDirichlet(:u, Γper)
+    add!(ch, pdbc)
+
+    for ac in acs
+        add!(ch, ac)
+    end
+    return ch
+end
+
+
 end # module FerriteBenchmarkHelpers
