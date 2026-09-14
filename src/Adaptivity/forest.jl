@@ -10,14 +10,19 @@
 #   materialization                `creategrid` (Lnodes numbering) and `facetskeleton`
 
 """
-    ForestBWG{dim, C <: OctreeBWG, T <: Real} <: Ferrite.AbstractGrid{dim}
-`p4est` adaptive grid implementation based on [BWG2011](@citet)
-and [IBWG2015](@citet).
+    ForestBWG{dim, C <: AbstractTree, T <: Real} <: Ferrite.AbstractGrid{dim}
+Forest-of-trees adaptive grid: every cell of a conforming coarse grid is the root of a
+refinement tree. Quadrilateral and hexahedral grids become forests of octrees following
+`p4est` ([BWG2011](@citet), [IBWG2015](@citet)); triangular and tetrahedral grids become
+forests of simplex trees following the tetrahedral space-filling curve of [BH2016](@citet),
+with Bey's red refinement into `2^dim` children. Both kinds share the refinement,
+coarsening, balancing and materialization API; mixed grids are not supported.
 
 ## Constructor
     ForestBWG(grid::AbstractGrid{dim}, b) where dim
-Builds an adaptive grid based on a non-adaptive one `grid` and a given max refinement level `b`,
-i.e. no leaf may be refined beyond level `b`.
+Builds an adaptive grid based on a non-adaptive one `grid` (of `Quadrilateral`, `Hexahedron`,
+`Triangle` or `Tetrahedron` cells) and a given max refinement level `b`, i.e. no leaf may be
+refined beyond level `b`.
 
 `b` must satisfy `0 ≤ b ≤ 30` in 2D and `0 ≤ b ≤ 19` in 3D, and defaults to those upper bounds
 (p4est's `P4EST_MAXLEVEL`/`P8EST_MAXLEVEL`). They are hard limits, not just defaults: a larger
@@ -26,7 +31,7 @@ that [`creategrid`](@ref Ferrite.AMR.creategrid) uses to identify nodes across t
 An out-of-range `b` therefore throws a `DomainError` rather than silently producing a grid with
 wrongly merged nodes.
 """
-struct ForestBWG{dim, C <: OctreeBWG, T <: Real} <: Ferrite.AbstractGrid{dim}
+struct ForestBWG{dim, C <: AbstractTree, T <: Real} <: Ferrite.AbstractGrid{dim}
     cells::Vector{C}
     nodes::Vector{Node{dim, T}}
     # Sets
@@ -41,10 +46,11 @@ end
 function ForestBWG(grid::Ferrite.AbstractGrid{dim}, b = DEFAULT_MAXLEVEL[dim]) where {dim}
     cells = getcells(grid)
     C = eltype(cells)
-    @assert isconcretetype(C)
-    @assert (C == Quadrilateral && dim == 2) || (C == Hexahedron && dim == 3)
+    isconcretetype(C) || throw(ArgumentError("ForestBWG requires a grid with a single concrete cell type, got $C"))
+    (C <: Union{Quadrilateral, Hexahedron, Triangle, Tetrahedron} && Ferrite.getrefdim(C) == dim) ||
+        throw(ArgumentError("ForestBWG supports Quadrilateral/Triangle grids in 2D and Hexahedron/Tetrahedron grids in 3D, got a $(dim)D grid of $C"))
     topology = ExclusiveTopology(grid)
-    cells = OctreeBWG.(grid.cells, b)
+    cells = _tree.(grid.cells, b)
     nodes = getnodes(grid)
     cellsets = Ferrite.getcellsets(grid)
     nodesets = Ferrite.getnodesets(grid)
@@ -52,6 +58,10 @@ function ForestBWG(grid::Ferrite.AbstractGrid{dim}, b = DEFAULT_MAXLEVEL[dim]) w
     vertexsets = Ferrite.getvertexsets(grid)
     return ForestBWG(cells, nodes, cellsets, nodesets, facetsets, vertexsets, topology)
 end
+
+# The tree kind of a macro cell: octrees for hypercubes, Burstedde–Holke trees for simplices.
+_tree(cell::Union{Quadrilateral, Hexahedron}, b) = OctreeBWG(cell, b)
+_tree(cell::Union{Triangle, Tetrahedron}, b) = SimplexTreeBH(cell, b)
 
 function Ferrite.get_facet_facet_neighborhood(g::ForestBWG{dim}) where {dim}
     return Ferrite._get_facet_facet_neighborhood(g.topology, Val(dim))
@@ -82,7 +92,8 @@ uniform refinement; adaptive refinement of marked cells goes through the
 `refine!(forest, cellids)` vector method.
 
 Runs in `O(n)`: each tree's leaf list is rebuilt in a single pass (children spliced in
-z-order in place of their parent, preserving Morton order) rather than via `n`
+curve order in place of their parent, preserving the tree's space-filling-curve order —
+Morton order for octrees, tetrahedral-Morton order for simplex trees) rather than via `n`
 in-place `insert!`s, which would be `O(n^2)`.
 """
 function refine_all!(forest::ForestBWG, l)
@@ -138,19 +149,19 @@ end
 
 Refine all leaves addressed by the global `cellids` — the production refinement entry
 point, e.g. for the cells flagged by an error estimator in an adaptive FE loop. `cellids`
-are global cell ids in the grid's flat numbering (tree-major, Morton-within-tree);
+are global cell ids in the grid's flat numbering (tree-major, curve order within a tree);
 duplicates are ignored and ids at the maximum level `tree.b` are skipped.
 
 Runs in `O(n + k)` for `n` leaves and `k = length(cellids)`: the sorted ids are mapped to
 per-tree local indices in one merge pass and each tree's leaf list is rebuilt once
-(children spliced in z-order in place of their parent, preserving Morton order). This
+(children spliced in curve order in place of their parent, preserving the sorted order). This
 avoids the `O(n^2)` of refining cells one at a time, where every in-place `insert!`
 memmoves the leaf-array tail. The caller's `cellids` vector is not modified (a sorted
 copy is taken when needed).
 
 Combine with [`balanceforest!`](@ref Ferrite.AMR.balanceforest!) to restore 2:1 balance and
-[`coarsen!`](@ref Ferrite.AMR.coarsen!) for derefinement; both preserve the Morton-sorted
-leaf invariant this method relies on.
+[`coarsen!`](@ref Ferrite.AMR.coarsen!) for derefinement; both preserve the sorted-leaf
+invariant this method relies on.
 """
 function refine!(forest::ForestBWG, cellids::AbstractVector{<:Integer})
     isempty(cellids) && return
@@ -161,6 +172,7 @@ function refine!(forest::ForestBWG, cellids::AbstractVector{<:Integer})
     # in place of their parent so the result stays Morton-sorted. `sort` (not `sort!`)
     # leaves the caller's marking vector untouched.
     marked = issorted(cellids) ? cellids : sort(cellids)
+    _check_cellids(forest, marked)
     cursor = 1                # cursor into `marked`
     offset = 0                # number of leaves in already-processed trees
     for tree in forest.cells
@@ -207,8 +219,8 @@ end
 
 Coarsen the `2^dim`-sibling families addressed by the global `cellids` — the batch, derefinement
 counterpart of [`refine!`](@ref Ferrite.AMR.refine!). `cellids` are global cell ids in the grid's
-flat numbering (tree-major, Morton-within-tree); each replaces the family it belongs to with the
-common parent (one level up).
+flat numbering (tree-major, curve order within a tree); each replaces the family it belongs to
+with the common parent (one level up).
 
 `require_all_siblings` selects the trigger policy:
 - `true` (default): a family is coarsened only if **all** `2^dim` of its children are in `cellids`
@@ -223,7 +235,7 @@ duplicates are ignored.
 
 Runs in `O(n + k)` like the vector [`refine!`](@ref Ferrite.AMR.refine!): the sorted ids are mapped
 to per-tree local indices in one merge pass and each tree's leaf list is rebuilt once (families
-collapsed to their parent in place, preserving Morton order). The caller's `cellids` vector is not
+collapsed to their parent in place, preserving the sorted order). The caller's `cellids` vector is not
 modified (a sorted copy is taken when needed). Combine with [`balanceforest!`](@ref
 Ferrite.AMR.balanceforest!) to restore 2:1 balance before [`creategrid`](@ref
 Ferrite.AMR.creategrid).
@@ -241,7 +253,7 @@ end
 Coarsen the families addressed by `coarsen_ids` and refine the leaves addressed by `refine_ids` in a
 single pass, then (if `balance`, the default) restore 2:1 balance via
 [`balanceforest!`](@ref Ferrite.AMR.balanceforest!). Both id vectors use the same global, flat cell
-numbering (tree-major, Morton-within-tree) as [`refine!`](@ref Ferrite.AMR.refine!) and
+numbering (tree-major, curve order within a tree) as [`refine!`](@ref Ferrite.AMR.refine!) and
 [`coarsen!`](@ref Ferrite.AMR.coarsen!).
 
 Doing both at once is the point: a global cell id encodes a leaf's position in the current leaf
@@ -269,10 +281,22 @@ function refine_and_coarsen!(
     return
 end
 
+# Sorted global cell ids must address existing cells; out-of-range ids would otherwise be
+# silently ignored by the merge passes below.
+function _check_cellids(forest::ForestBWG, marked::AbstractVector{<:Integer})
+    isempty(marked) && return
+    n = getncells(forest)
+    (first(marked) >= 1 && last(marked) <= n) ||
+        throw(ArgumentError("cell ids must lie in 1:$n, got ids $(first(marked)) and $(last(marked))"))
+    return
+end
+
 # Shared driver for `coarsen!(forest, ids)` and `refine_and_coarsen!`: `cmarked`/`rmarked` are the
 # (sorted) global coarsen/refine ids. Locate each tree's id range in one merge pass and rebuild the
 # tree's leaves once. Either id vector may be empty.
 function _apply_refine_coarsen!(forest::ForestBWG, cmarked::AbstractVector{<:Integer}, rmarked::AbstractVector{<:Integer}, require_all_siblings::Bool)
+    _check_cellids(forest, cmarked)
+    _check_cellids(forest, rmarked)
     ccursor = 1               # cursor into `cmarked`
     rcursor = 1               # cursor into `rmarked`
     offset = 0                # number of leaves in already-processed trees
@@ -300,7 +324,7 @@ end
 # preserve Morton order, so the rebuilt leaf list stays sorted. Coarsening is only ever triggered at
 # a family's first sibling, so the whole family is consumed contiguously.
 function _refine_coarsen_tree!(
-        tree::OctreeBWG, cmarked, cfirst, clast, rmarked, rfirst, rlast, offset, require_all_siblings::Bool
+        tree::AbstractTree, cmarked, cfirst, clast, rmarked, rfirst, rlast, offset, require_all_siblings::Bool
     )
     leaves = tree.leaves
     n = length(leaves)
@@ -313,22 +337,9 @@ function _refine_coarsen_tree!(
     localidx = 1
     while localidx <= n
         leaf = leaves[localidx]
-        # --- refine branch -------------------------------------------------------------
-        if rc < rlast && rmarked[rc] - offset == localidx
-            while rc < rlast && rmarked[rc] - offset == localidx   # skip duplicate ids
-                rc += 1
-            end
-            if leaf.l + 1 <= b
-                for child in children(leaf, b)
-                    push!(buf, child)
-                end
-            else
-                push!(buf, leaf)   # already at max level: keep verbatim
-            end
-            localidx += 1
-            continue
-        end
         # --- coarsen branch (only at a complete family's first sibling) -----------------
+        # Decided before the refine branch so that a refine mark on the *first* sibling of a
+        # family marked for coarsening is caught as a conflict like one on any other sibling.
         winend = localidx + nchild - 1
         if leaf.l > 0 && child_id(leaf, b) == 1 && winend <= n && _is_complete_family(leaves, localidx, leaf, b, nchild)
             # distinct coarsen marks landing in the family window [localidx, winend]
@@ -353,6 +364,21 @@ function _refine_coarsen_tree!(
                 continue
             end
         end
+        # --- refine branch -------------------------------------------------------------
+        if rc < rlast && rmarked[rc] - offset == localidx
+            while rc < rlast && rmarked[rc] - offset == localidx   # skip duplicate ids
+                rc += 1
+            end
+            if leaf.l + 1 <= b
+                for child in children(leaf, b)
+                    push!(buf, child)
+                end
+            else
+                push!(buf, leaf)   # already at max level: keep verbatim
+            end
+            localidx += 1
+            continue
+        end
         # --- keep branch ---------------------------------------------------------------
         while cc < clast && cmarked[cc] - offset == localidx   # drop marks that cannot coarsen
             cc += 1
@@ -365,10 +391,10 @@ function _refine_coarsen_tree!(
     return
 end
 
-# `leaves[i:i+nchild-1]` are exactly the `2^dim` children of `firstchild`'s parent, in z-order.
+# `leaves[i:i+nchild-1]` are exactly the `2^dim` children of `firstchild`'s parent, in curve order.
 # `firstchild` must be a first sibling (`child_id == 1`), so `children(parent(firstchild))` starts
-# with it and equals the leaf slice (both Morton/z-order) exactly when the family is intact.
-function _is_complete_family(leaves, i, firstchild::OctantBWG, b, nchild)
+# with it and equals the leaf slice (both in curve order) exactly when the family is intact.
+function _is_complete_family(leaves, i, firstchild::AbstractElement, b, nchild)
     fam = children(parent(firstchild, b), b)
     @inbounds for j in 1:nchild
         leaves[i + j - 1] == fam[j] || return false
@@ -415,10 +441,10 @@ function Ferrite.getncells(grid::ForestBWG)
 end
 
 """
-    getcells(forest::ForestBWG) -> Vector{OctantBWG}
+    getcells(forest::ForestBWG) -> Vector{<:AbstractElement}
 
-Collect the leaf octants of all trees of `forest` into a single vector, in ascending cell id
-order (tree by tree, Morton order within each tree) — i.e. the octant `getcells(forest)[i]`
+Collect the leaf elements of all trees of `forest` into a single vector, in ascending cell id
+order (tree by tree, curve order within each tree) — i.e. the element `getcells(forest)[i]`
 materializes into cell `i` of [`creategrid`](@ref Ferrite.AMR.creategrid)`(forest)`.
 
 !!! warning "Allocates on every call"
@@ -433,8 +459,7 @@ The returned octants live in the coordinate system of their respective tree, so 
 """
 function Ferrite.getcells(forest::ForestBWG{dim, C}) where {dim, C}
     ncells = getncells(forest)
-    nnodes = 2^dim
-    cellvector = Vector{OctantBWG{dim, nnodes, eltype(C)}}(undef, ncells)
+    cellvector = Vector{_leaftype(C)}(undef, ncells)
     o = one(eltype(C))
     cellid = o
     for tree in forest.cells
@@ -539,7 +564,7 @@ map — and the walk itself visits only boundary leaves. The canonicalization is
 provisional id that `p` is merged onto, so the per-node canonical lookup in `creategrid` is an
 array index.
 """
-function _merge_intertree_nodes!(forest::ForestBWG{dim}, bnd::Vector{Vector{Tuple{UInt64, Int}}}, alias::Vector{Int}) where {dim}
+function _merge_intertree_nodes!(forest::ForestBWG{dim, <:OctreeBWG}, bnd::Vector{Vector{Tuple{UInt64, Int}}}, alias::Vector{Int}) where {dim}
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     node_map = dim < 3 ? node_map₂ : node_map₃
@@ -690,7 +715,7 @@ high face), and the contributing local face index is exactly the root face index
 `O(#leaves)` plane test, replacing a former `O(#leaves · 2dim)` [`contains_facet`](@ref) scan over
 each leaf's `faces`.
 """
-function reconstruct_facetsets(forest::ForestBWG{dim}) where {dim}
+function reconstruct_facetsets(forest::ForestBWG{dim, <:OctreeBWG}) where {dim}
     _perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     _perm_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     new_facesets = typeof(forest.facetsets)()
@@ -764,9 +789,9 @@ function balance_corner(forest, k′, c′, o, s)
     s′ = transform_corner(forest, k′, c′, s, true)
     neighbor_tree = forest.cells[k′]
     leaves = neighbor_tree.leaves
-    return if !_in_leaves(leaves, s′) && !_in_leaves(leaves, parent(s′, neighbor_tree.b))
+    return if !_in_leaves(leaves, s′, neighbor_tree.b) && !_in_leaves(leaves, parent(s′, neighbor_tree.b), neighbor_tree.b)
         gp = parent(parent(s′, neighbor_tree.b), neighbor_tree.b)
-        if _in_leaves(leaves, gp)
+        if _in_leaves(leaves, gp, neighbor_tree.b)
             refine_octant!(neighbor_tree, gp)
         end
     end
@@ -777,9 +802,9 @@ function balance_face(forest, k′, f′, o, s)
     s′ = transform_facet(forest, k′, f′, s)
     neighbor_tree = forest.cells[k′]
     leaves = neighbor_tree.leaves
-    return if !_in_leaves(leaves, s′) && !_in_leaves(leaves, parent(s′, neighbor_tree.b))
+    return if !_in_leaves(leaves, s′, neighbor_tree.b) && !_in_leaves(leaves, parent(s′, neighbor_tree.b), neighbor_tree.b)
         gp = parent(parent(s′, neighbor_tree.b), neighbor_tree.b)
-        if _in_leaves(leaves, gp)
+        if _in_leaves(leaves, gp, neighbor_tree.b)
             refine_octant!(neighbor_tree, gp)
         end
     end
@@ -790,9 +815,9 @@ function balance_edge(forest, k, e, k′, e′, o, s)
     s′ = transform_edge(forest, k, e, k′, e′, s, true)
     neighbor_tree = forest.cells[k′]
     leaves = neighbor_tree.leaves
-    return if !_in_leaves(leaves, s′) && !_in_leaves(leaves, parent(s′, neighbor_tree.b))
+    return if !_in_leaves(leaves, s′, neighbor_tree.b) && !_in_leaves(leaves, parent(s′, neighbor_tree.b), neighbor_tree.b)
         gp = parent(parent(s′, neighbor_tree.b), neighbor_tree.b)
-        if _in_leaves(leaves, gp)
+        if _in_leaves(leaves, gp, neighbor_tree.b)
             refine_octant!(neighbor_tree, gp)
         end
     end
@@ -823,7 +848,7 @@ through a corner/face/edge connection to another tree), decodes the neighbour ty
 permutation tables, and calls `balance_face`/`balance_corner`/`balance_edge` to refine the
 neighbour tree where the balance condition requires it.
 """
-function _balance_leaf!(forest::ForestBWG{dim}, k, tree, o, perm_face, perm_face_inv, perm_corner, perm_corner_inv, rootfaces, rootedges, rootvertices, facet_neighborhood) where {dim}
+function _balance_leaf!(forest::ForestBWG{dim, <:OctreeBWG}, k, tree, o, perm_face, perm_face_inv, perm_corner, perm_corner_inv, rootfaces, rootedges, rootvertices, facet_neighborhood) where {dim}
     ss = possibleneighbors(o, o.l, tree.b)
     # s_i indexes possibleneighbors (encodes the neighbourhood type); skip in-tree neighbours inline.
     for (s_i, s) in enumerate(ss)
@@ -954,8 +979,8 @@ struct BalanceBuffers{OT, K}
     inds::Vector{Int}
 end
 
-function BalanceBuffers(s0::OT) where {OT <: OctantBWG}
-    K = Tuple{typeof(morton(s0, s0.l, s0.l)), typeof(s0.l)}
+function BalanceBuffers(s0::OT, b::Integer) where {OT <: AbstractElement}
+    K = typeof(_sortkey(s0, b))
     return BalanceBuffers{OT, K}(K[], Int[], OT[], OT[], OT[], OT[], OT[], OT[], Set{OT}(), Set{OT}(), Int[])
 end
 
@@ -966,7 +991,7 @@ Enforce the 2:1 balance condition across the whole forest: no two leaves sharing
 corner may differ by more than one refinement level. Each tree is balanced internally
 (`balancetree`); boundary leaves ([`_touches_tree_boundary`](@ref)) are additionally balanced
 against their out-of-tree neighbours via [`_balance_leaf!`](@ref). Iterated to a fixed point, then
-duplicate/over-refined leaves are pruned and re-sorted into Morton order.
+duplicate/over-refined leaves are pruned and re-sorted into curve order.
 
 A balance refinement can itself create new 2:1 violations (also in trees processed earlier in the
 same pass), which is why the outer loop reruns until a whole pass adds no cells. This ripple can
@@ -978,45 +1003,59 @@ max-refined forest. On return the invariant holds globally — the non-conformit
 Algorithm 17 of [BWG2011](@citet).
 """
 function balanceforest!(forest::ForestBWG{dim}) where {dim}
-    perm_face = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
-    perm_face_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
-    perm_corner = dim == 2 ? node_map₂ : node_map₃
-    perm_corner_inv = dim == 2 ? node_map₂_inv : node_map₃_inv
-    root_ = root(dim)
+    ctx = _balance_context(forest)
     nrefcells = 0
-    facet_neighborhood = Ferrite.get_facet_facet_neighborhood(forest)
     # `balancetree` scratch, allocated once and reused across every tree and pass.
-    bb = BalanceBuffers(forest.cells[1].leaves[1])
+    bb = BalanceBuffers(forest.cells[1].leaves[1], forest.cells[1].b)
     while nrefcells - getncells(forest) != 0
         nrefcells = getncells(forest)
         for k in 1:length(forest.cells)
-            tree = forest.cells[k]
-            rootfaces = faces(root_, tree.b)
-            rootedges = dim == 3 ? edges(root_, tree.b) : nothing
-            rootvertices = vertices(root_, tree.b)
-            balanced = balancetree(tree, bb)
+            balanced = balancetree(forest.cells[k], bb)
             forest.cells[k] = balanced
-            for o in forest.cells[k].leaves
-                # Only leaves touching the tree boundary can have out-of-tree neighbours;
-                # skip the interior (the majority) → no possibleneighbors/findall there.
-                _touches_tree_boundary(o, tree.b) || continue
-                _balance_leaf!(forest, k, tree, o, perm_face, perm_face_inv, perm_corner, perm_corner_inv, rootfaces, rootedges, rootvertices, facet_neighborhood)
-            end
+            _balance_tree_boundary!(forest, k, balanced, ctx)
         end
     end
     return
 end
 
-# Sort octants in place by (Morton-anchor key, level) — the same total order as
-# `isless`, but computing each Morton key once instead of letting `sort!` call
-# `morton` twice per comparison (`morton` is a ~b·dim-bit interleave).
-function _sort_by_morton!(v::Vector{OT}, keybuf::Vector, permbuf::Vector{Int}, scratch::Vector{OT}) where {OT <: OctantBWG}
+# The inter-tree half of `balanceforest!`, per tree kind: `_balance_context` gathers what is
+# constant over the whole forest, `_balance_tree_boundary!` balances the leaves of tree `k`
+# against the neighbouring trees. Hypercubes push the pivot's out-of-tree `possibleneighbors`
+# through the face/edge/corner transforms (`_balance_leaf!`); simplices cannot transform
+# elements across trees and work on points instead (`simplex_forest.jl`).
+function _balance_context(forest::ForestBWG{dim, <:OctreeBWG}) where {dim}
+    return (
+        perm_face = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm,
+        perm_face_inv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv,
+        perm_corner = dim == 2 ? node_map₂ : node_map₃,
+        perm_corner_inv = dim == 2 ? node_map₂_inv : node_map₃_inv,
+        facet_neighborhood = Ferrite.get_facet_facet_neighborhood(forest),
+    )
+end
+
+function _balance_tree_boundary!(forest::ForestBWG{dim, <:OctreeBWG}, k, tree, ctx) where {dim}
+    root_ = root(dim)
+    rootfaces = faces(root_, tree.b)
+    rootedges = dim == 3 ? edges(root_, tree.b) : nothing
+    rootvertices = vertices(root_, tree.b)
+    for o in tree.leaves
+        # Only leaves touching the tree boundary can have out-of-tree neighbours;
+        # skip the interior (the majority) → no possibleneighbors/findall there.
+        _touches_tree_boundary(o, tree.b) || continue
+        _balance_leaf!(forest, k, tree, o, ctx.perm_face, ctx.perm_face_inv, ctx.perm_corner, ctx.perm_corner_inv, rootfaces, rootedges, rootvertices, ctx.facet_neighborhood)
+    end
+    return
+end
+
+# Sort elements in place by their `_sortkey` — the space-filling-curve order — computing each
+# key once instead of letting `sort!` recompute it twice per comparison (the octant key is a
+# ~b·dim-bit interleave, the simplex key an O(l) ancestor walk).
+function _sort_by_key!(v::Vector{OT}, b::Integer, keybuf::Vector, permbuf::Vector{Int}, scratch::Vector{OT}) where {OT <: AbstractElement}
     n = length(v)
     n < 2 && return v
     resize!(keybuf, n)
     @inbounds for i in 1:n
-        o = v[i]
-        keybuf[i] = (morton(o, o.l, o.l), o.l)
+        keybuf[i] = _sortkey(v[i], b)
     end
     resize!(permbuf, n)
     sortperm!(permbuf, keybuf; alg = QuickSort)
@@ -1059,12 +1098,12 @@ end
 """
 Algorithm 7 of [SSB2008](@citet)
 """
-function balancetree(tree::OctreeBWG)
+function balancetree(tree::AbstractTree)
     length(tree.leaves) == 1 && return tree
-    return balancetree(tree, BalanceBuffers(tree.leaves[1]))
+    return balancetree(tree, BalanceBuffers(tree.leaves[1], tree.b))
 end
 
-function balancetree(tree::OctreeBWG, bb::BalanceBuffers)
+function balancetree(tree::AbstractTree, bb::BalanceBuffers)
     length(tree.leaves) == 1 && return tree
     W, P, R, Q, T = bb.W, bb.P, bb.R, bb.Q, bb.T
     empty!(W)
@@ -1077,7 +1116,7 @@ function balancetree(tree::OctreeBWG, bb::BalanceBuffers)
         for o in W
             o.l == l && push!(Q, o)
         end
-        _sort_by_morton!(Q, bb.keybuf, bb.permbuf, bb.scratch)
+        _sort_by_key!(Q, tree.b, bb.keybuf, bb.permbuf, bb.scratch)
         # T: one representative per distinct parent (first in Q order)
         empty!(T); empty!(bb.Tparents)
         for x in Q
@@ -1089,9 +1128,7 @@ function balancetree(tree::OctreeBWG, bb::BalanceBuffers)
         end
         for t in T
             append!(R, children(parent(t, tree.b), tree.b)) # == t and its siblings
-            for nb in possibleneighbors(parent(t, tree.b), l - 1, tree.b)
-                inside(nb, tree.b) && push!(P, nb)
-            end
+            _push_same_level_neighbors!(P, parent(t, tree.b), tree.b) # the in-tree same-level neighbours
         end
         append!(P, x for x in W if x.l == l - 1)
         _drop_level!(W, l - 1) # capacity-preserving in-place filter (see note above)
@@ -1099,9 +1136,9 @@ function balancetree(tree::OctreeBWG, bb::BalanceBuffers)
         append!(W, P)
         empty!(P)
     end
-    _sort_by_morton!(R, bb.keybuf, bb.permbuf, bb.scratch) # (morton-anchor, level) key disambiguates at max depth
+    _sort_by_key!(R, tree.b, bb.keybuf, bb.permbuf, bb.scratch) # (curve position, level) key disambiguates at max depth
     linearise!(R, tree.b, bb.inds)
-    return OctreeBWG(copy(R), tree.b, tree.nodes) # copy: R is the reused buffer; the tree owns its leaves
+    return typeof(tree)(copy(R), tree.b, tree.nodes) # copy: R is the reused buffer; the tree owns its leaves
 end
 
 """
@@ -1109,7 +1146,7 @@ Algorithm 8 of [SSB2008](@citet)
 
 Inverted the algorithm to delete! instead of add incrementally to a new array
 """
-function linearise!(leaves::Vector{T}, b, inds) where {T <: OctantBWG}
+function linearise!(leaves::Vector{T}, b, inds) where {T <: AbstractElement}
     empty!(inds)
     @inbounds for i in 1:(length(leaves) - 1)
         isancestor(leaves[i], leaves[i + 1], b) && push!(inds, i)
@@ -2350,7 +2387,7 @@ Requires a 2:1-balanced forest (see [`balanceforest!`](@ref)) — balance is wha
 hanging vertices are simple feature midpoints with non-hanging masters, and it is checked (an
 unbalanced forest leaves element vertices without node ids, which raises an error).
 """
-function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C, T}
+function creategrid(forest::ForestBWG{dim, C, T}) where {dim, C <: OctreeBWG, T}
     node_map = dim == 2 ? node_map₂ : node_map₃
     celltype = dim == 2 ? Quadrilateral : Hexahedron
     NV = 2^dim
@@ -2562,7 +2599,7 @@ hanging-constraint detection.
 
 Requires a 2:1-balanced forest (see [`balanceforest!`](@ref)), like `creategrid`.
 """
-function Ferrite.facetskeleton(forest::ForestBWG{dim}) where {dim}
+function Ferrite.facetskeleton(forest::ForestBWG{dim, <:OctreeBWG}) where {dim}
     perm = dim == 2 ? 𝒱₂_perm : 𝒱₃_perm
     perminv = dim == 2 ? 𝒱₂_perm_inv : 𝒱₃_perm_inv
     offsets = _element_offsets(forest)
