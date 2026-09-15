@@ -114,7 +114,7 @@ adjust_dofs_during_distribution(::Interpolation)
     interior_facedofs_on_lattice(::Interpolation)
 
 Return `true` if the interior face dofs are placed on a regular lattice, enumerated in the
-order assumed by [`permute_and_push!`](@ref). This is required to distribute an
+order assumed by [`permute_and_set!`](@ref). This is required to distribute an
 interpolation with more than one dof on a face shared between 3D cells, and interpolations
 must opt in (the default is `false`).
 """
@@ -128,21 +128,39 @@ this cache is of the same type no matter the interpolation: the purpose is to ma
 dof-distribution type-stable.
 """
 struct InterpolationInfo
-    nvertexdofs::Vector{Int}
-    nedgedofs::Vector{Int}
-    nfacedofs::Vector{Int}
-    nvolumedofs::Int
+    lvertexdofs::Vector{Int}
+    lvertexdofoffsets::Vector{Int}
+    ledgedofs::Vector{Int}
+    ledgedofoffsets::Vector{Int}
+    lfacedofs::Vector{Int}
+    lfacedofoffsets::Vector{Int}
+    lvolumedofs::Vector{Int}
     reference_dim::Int
     adjust_during_distribution::Bool
     interior_facedofs_on_lattice::Bool
     n_copies::Int
 end
 function InterpolationInfo(interpolation::Interpolation{shape}, n_copies) where {rdim, shape <: AbstractRefShape{rdim}}
+    lvertexdofs = Int[]
+    for ii in vertexdof_indices(interpolation)
+        append!(lvertexdofs, ii)
+    end
+    ledgedofs = Int[]
+    for ii in edgedof_interior_indices(interpolation)
+        append!(ledgedofs, ii)
+    end
+    lfacedofs = Int[]
+    for ii in facedof_interior_indices(interpolation)
+        append!(lfacedofs, ii)
+    end
     info = InterpolationInfo(
-        [length(i) for i in vertexdof_indices(interpolation)],
-        [length(i) for i in edgedof_interior_indices(interpolation)],
-        [length(i) for i in facedof_interior_indices(interpolation)],
-        length(volumedof_interior_indices(interpolation)),
+        lvertexdofs,
+        cumsum([1; [length(i) for i in vertexdof_indices(interpolation)]]),
+        ledgedofs,
+        cumsum([1; [length(i) for i in edgedof_interior_indices(interpolation)]]),
+        lfacedofs,
+        cumsum([1; [length(i) for i in facedof_interior_indices(interpolation)]]),
+        [volumedof_interior_indices(interpolation)...],
         rdim,
         adjust_dofs_during_distribution(interpolation),
         interior_facedofs_on_lattice(interpolation),
@@ -319,8 +337,9 @@ enumeration on a cell defined by [`vertices(::Cell)`](@ref). The vertex enumerat
 match the vertex enumeration of the corresponding geometrical cell.
 
 !!! note
-    The dofs appearing in the tuple must be continuous and increasing! The first dof must be
-    the 1, as vertex dofs are enumerated first.
+    The dof indices must be disjoint from those of the other entities and, together with
+    them, cover `1:getnbasefunctions(ip)`. Their values are otherwise free, see the
+    [devdocs on interpolations](@ref devdocs-interpolations).
 """
 vertexdof_indices(ip::Interpolation) = ntuple(_ -> (), nvertices(ip))
 
@@ -331,10 +350,6 @@ A tuple containing tuples of local dof indices for the respective vertex in loca
 enumeration on a cell defined by [`vertices(::Cell)`](@ref). The vertex enumeration must
 match the vertex enumeration of the corresponding geometrical cell.
 Used internally in [`ConstraintHandler`](@ref) and defaults to [`vertexdof_indices(ip::Interpolation)`](@ref) for continuous interpolation.
-
-!!! note
-    The dofs appearing in the tuple must be continuous and increasing! The first dof must be
-    the 1, as vertex dofs are enumerated first.
 """
 dirichlet_vertexdof_indices(ip::Interpolation) = vertexdof_indices(ip)
 
@@ -388,8 +403,10 @@ match the edge enumeration of the corresponding geometrical cell. Note that the 
 are included here.
 
 !!! note
-    The dofs appearing in the tuple must be continuous and increasing! The first dof must be
-    computed via "last vertex dof index + 1", if edge dofs exist.
+    Within an edge the dofs must be listed along the local edge direction, so that
+    [`permute_and_set!`](@ref) can reverse them for a cell that traverses the edge the other
+    way. Their values are otherwise free, see the
+    [devdocs on interpolations](@ref devdocs-interpolations).
 """
 edgedof_interior_indices(::Interpolation)
 
@@ -440,8 +457,10 @@ match the face enumeration of the corresponding geometrical cell. Note that the 
 edge dofs are included here.
 
 !!! note
-    The dofs appearing in the tuple must be continuous and increasing! The first dof must be
-    the computed via "last edge interior dof index + 1", if face dofs exist.
+    Within a face the dofs must be listed in the lattice enumeration order documented for
+    [`permute_and_set!`](@ref) whenever [`interior_facedofs_on_lattice`](@ref) holds. Their
+    values are otherwise free, see the
+    [devdocs on interpolations](@ref devdocs-interpolations).
 """
 facedof_interior_indices(::Interpolation)
 
@@ -451,8 +470,9 @@ facedof_interior_indices(::Interpolation)
 Tuple containing the dof indices associated with the interior of a volume.
 
 !!! note
-    The dofs appearing in the tuple must be continuous and increasing, volumedofs are
-    enumerated last.
+    The dof indices must be disjoint from those of the other entities and, together with
+    them, cover `1:getnbasefunctions(ip)`. Their values are otherwise free, see the
+    [devdocs on interpolations](@ref devdocs-interpolations).
 """
 volumedof_interior_indices(::Interpolation) = ()
 
@@ -817,41 +837,59 @@ function getnbasefunctions(ip::Lagrange2Tri345)
     return (order + 1) * (order + 2) ÷ 2
 end
 
-# Permutation to switch numbering to Ferrite ordering
-const permdof2DLagrange2Tri345 = Dict{Int, Vector{Int}}(
-    1 => [1, 2, 3],
-    2 => [3, 6, 1, 5, 4, 2],
-    3 => [4, 10, 1, 7, 9, 8, 5, 2, 3, 6],
-    4 => [5, 15, 1, 9, 12, 14, 13, 10, 6, 2, 3, 4, 7, 8, 11],
-    5 => [6, 21, 1, 11, 15, 18, 20, 19, 16, 12, 7, 2, 3, 4, 5, 8, 9, 10, 13, 14, 17],
-)
+# The local dofs are numbered in the natural lattice order of the basis, i.e. the order in
+# which `reference_coordinates` below emits the nodes: row by row with increasing barycentric
+# v2-weight `k`, each row with increasing barycentric v1-weight `l`. The node at lattice
+# point `(l, k)` sits at `(l, k) ./ order` and is dof number
+#
+#     1 + k * (order + 1) - k * (k - 1) ÷ 2 + l,
+#
+# which for order 3 gives (v1, v2 and v3 are the reference vertices)
+#
+#     k=3 | 10 = v2
+#     k=2 |  8  9
+#     k=1 |  5  6  7
+#     k=0 |  1  2  3  4
+#           v3          v1
+#           l=0 1  2  3
+#
+# The entity tuples below index into that numbering directly, so `reference_shape_value` can
+# evaluate the basis function for dof `i` without permuting anything.
+function vertexdof_indices(ip::Lagrange2Tri345)
+    order = getorder(ip)
+    # v1 = (l = order, k = 0), v2 = (l = 0, k = order), v3 = (l = 0, k = 0)
+    order == 3 && return ((4,), (10,), (1,))
+    order == 4 && return ((5,), (15,), (1,))
+    order == 5 && return ((6,), (21,), (1,))
+    throw(ArgumentError("Unsupported order $order for Lagrange on triangles."))
+end
 
 function edgedof_interior_indices(ip::Lagrange2Tri345)
     order = getorder(ip)
-    order == 1 && return ((), (), ())
-    order == 2 && return ((4,), (5,), (6,))
-    order == 3 && return ((4, 5), (6, 7), (8, 9))
-    order == 4 && return ((4, 5, 6), (7, 8, 9), (10, 11, 12))
-    order == 5 && return ((4, 5, 6, 7), (8, 9, 10, 11), (12, 13, 14, 15))
+    # Listed along the local edge direction, i.e. e1: v1 -> v2, e2: v2 -> v3, e3: v3 -> v1
+    order == 3 && return ((7, 9), (8, 5), (2, 3))
+    order == 4 && return ((9, 12, 14), (13, 10, 6), (2, 3, 4))
+    order == 5 && return ((11, 15, 18, 20), (19, 16, 12, 7), (2, 3, 4, 5))
     throw(ArgumentError("Unsupported order $order for Lagrange on triangles."))
 end
 
 function facedof_interior_indices(ip::Lagrange2Tri345)
     order = getorder(ip)
-    ncellintdofs = (order + 1) * (order + 2) ÷ 2 - 3 * order
-    totaldofs = getnbasefunctions(ip)
-    return (ntuple(i -> totaldofs - ncellintdofs + i, ncellintdofs),)
+    # The interior nodes form a smaller triangular lattice, listed in the same row-by-row
+    # order, as promised by `interior_facedofs_on_lattice` (see `permute_and_set!`).
+    order == 3 && return ((6,),)
+    order == 4 && return ((7, 8, 11),)
+    order == 5 && return ((8, 9, 10, 13, 14, 17),)
+    throw(ArgumentError("Unsupported order $order for Lagrange on triangles."))
 end
 
 function reference_coordinates(ip::Lagrange2Tri345)
     order = getorder(ip)
     coordpts = Vector{Vec{2, Float64}}()
-    for k in 0:order
-        for l in 0:(order - k)
-            push!(coordpts, Vec{2, Float64}((l / order, k / order)))
-        end
+    for k in 0:order, l in 0:(order - k)
+        push!(coordpts, Vec{2, Float64}((l / order, k / order)))
     end
-    return permute!(coordpts, permdof2DLagrange2Tri345[order])
+    return coordpts
 end
 
 function reference_shape_value(ip::Lagrange2Tri345, ξ::Vec{2}, i::Int)
@@ -859,7 +897,6 @@ function reference_shape_value(ip::Lagrange2Tri345, ξ::Vec{2}, i::Int)
         throw(ArgumentError("no shape function $i for interpolation $ip"))
     end
     order = getorder(ip)
-    i = permdof2DLagrange2Tri345[order][i]
     ξ_x = ξ[1]
     ξ_y = ξ[2]
     i1, i2, i3 = _numlin_basis2D(i, order)
@@ -965,49 +1002,66 @@ function getnbasefunctions(ip::Lagrange3DTet34)
     return (order + 1) * (order + 2) * (order + 3) ÷ 6
 end
 
-edgedof_interior_indices(::Lagrange{RefTetrahedron, 3}) = ((5, 6), (7, 8), (9, 10), (11, 12), (13, 14), (15, 16))
-facedof_interior_indices(::Lagrange{RefTetrahedron, 3}) = ((17,), (18,), (19,), (20,))
-
-edgedof_interior_indices(::Lagrange{RefTetrahedron, 4}) = ((5, 6, 7), (8, 9, 10), (11, 12, 13), (14, 15, 16), (17, 18, 19), (20, 21, 22))
-facedof_interior_indices(::Lagrange{RefTetrahedron, 4}) = ((23, 24, 25), (26, 27, 28), (29, 30, 31), (32, 33, 34))
-volumedof_interior_indices(::Lagrange{RefTetrahedron, 4}) = (35,)
-
-# Barycentric multi-indices α (with |α| = order) for the nodes of the interpolation, in
-# local dof order: vertex dofs, then edge interior dofs (following the local edge
-# direction), then face interior dofs (in the lattice enumeration assumed by
-# `permute_and_push!`), and finally volume interior dofs. The node corresponding to α is
-# located at ∑ₜ αₜ xₜ / order, with xₜ the reference vertex coordinates.
+# Barycentric multi-indices α (with |α| = order) for the nodes of the interpolation, in the
+# natural lattice order of the basis: the node at lattice point (k1, k2, k3) sits at
+# (k1, k2, k3) ./ order and has α = (order - k1 - k2 - k3, k1, k2, k3), enumerated with k1
+# (the ξ₁ direction) fastest and k3 (ξ₃) slowest. This is the local dof numbering, and the
+# entity tuples below index into it.
 function _lagrange_tet_lattice_multiindices(order::Int)
+    return [
+        (order - k1 - k2 - k3, k1, k2, k3)
+            for k3 in 0:order for k2 in 0:(order - k3) for k1 in 0:(order - k3 - k2)
+    ]
+end
+
+# The entity dof tuples in that numbering, generated from the reference topology so that
+# the orderings the dof distribution relies on hold by construction: edge interior dofs
+# follow the local edge direction, and face interior dofs follow the lattice enumeration
+# assumed by `permute_and_set!`.
+function _lagrange_tet_entity_dofs(order::Int)
     # Topology of RefTetrahedron. This must match reference_edges/reference_faces in
     # Grid/grid.jl, which are not yet defined when this file is included.
     tet_edges = ((1, 2), (2, 3), (3, 1), (1, 4), (2, 4), (3, 4))
     tet_faces = ((1, 3, 2), (1, 2, 4), (2, 3, 4), (1, 4, 3))
-    αs = NTuple{4, Int}[]
-    for v in 1:4 # vertex nodes
-        push!(αs, ntuple(t -> t == v ? order : 0, 4))
-    end
-    for (a, b) in tet_edges # edge interior nodes, from vertex a towards vertex b
-        for k in 1:(order - 1)
-            push!(αs, ntuple(t -> t == a ? order - k : (t == b ? k : 0), 4))
-        end
+    αs = _lagrange_tet_lattice_multiindices(order)
+    dof(α) = findfirst(==(α), αs)::Int
+    vertices = ntuple(v -> (dof(ntuple(t -> t == v ? order : 0, 4)),), 4)
+    edges = ntuple(length(tet_edges)) do e # from vertex a towards vertex b
+        a, b = tet_edges[e]
+        return ntuple(k -> dof(ntuple(t -> t == a ? order - k : (t == b ? k : 0), 4)), order - 1)
     end
     q = order - 3 # order of the face interior lattices
-    for (a, b, c) in tet_faces # face interior nodes
-        for t2 in 0:q, t1 in 0:(q - t2)
-            t3 = q - t1 - t2
-            push!(αs, ntuple(t -> t == a ? t1 + 1 : (t == b ? t2 + 1 : (t == c ? t3 + 1 : 0)), 4))
-        end
+    faces = ntuple(length(tet_faces)) do f
+        a, b, c = tet_faces[f]
+        return Tuple(
+            dof(ntuple(t -> t == a ? t1 + 1 : (t == b ? t2 + 1 : (t == c ? q - t1 - t2 + 1 : 0)), 4))
+                for t2 in 0:q for t1 in 0:(q - t2)
+        )
     end
-    for s3 in 0:(order - 4), s2 in 0:(order - 4 - s3), s1 in 0:(order - 4 - s3 - s2) # volume interior nodes
-        push!(αs, (s1 + 1, s2 + 1, s3 + 1, order - 3 - s1 - s2 - s3))
-    end
-    return αs
+    volume = Tuple(
+        dof((s1 + 1, s2 + 1, s3 + 1, order - 3 - s1 - s2 - s3))
+            for s3 in 0:(order - 4) for s2 in 0:(order - 4 - s3) for s1 in 0:(order - 4 - s3 - s2)
+    )
+    return (; vertices, edges, faces, volume)
 end
 
 const _lagrange_tet3_multiindices = _lagrange_tet_lattice_multiindices(3)
 const _lagrange_tet4_multiindices = _lagrange_tet_lattice_multiindices(4)
 _lattice_multiindices(::Lagrange{RefTetrahedron, 3}) = _lagrange_tet3_multiindices
 _lattice_multiindices(::Lagrange{RefTetrahedron, 4}) = _lagrange_tet4_multiindices
+
+const _lagrange_tet3_entity_dofs = _lagrange_tet_entity_dofs(3)
+const _lagrange_tet4_entity_dofs = _lagrange_tet_entity_dofs(4)
+
+vertexdof_indices(::Lagrange{RefTetrahedron, 3}) = _lagrange_tet3_entity_dofs.vertices
+edgedof_interior_indices(::Lagrange{RefTetrahedron, 3}) = _lagrange_tet3_entity_dofs.edges
+facedof_interior_indices(::Lagrange{RefTetrahedron, 3}) = _lagrange_tet3_entity_dofs.faces
+# Order 3 has no volume interior dofs, so the generic empty default applies.
+
+vertexdof_indices(::Lagrange{RefTetrahedron, 4}) = _lagrange_tet4_entity_dofs.vertices
+edgedof_interior_indices(::Lagrange{RefTetrahedron, 4}) = _lagrange_tet4_entity_dofs.edges
+facedof_interior_indices(::Lagrange{RefTetrahedron, 4}) = _lagrange_tet4_entity_dofs.faces
+volumedof_interior_indices(::Lagrange{RefTetrahedron, 4}) = _lagrange_tet4_entity_dofs.volume
 
 function reference_coordinates(ip::Lagrange3DTet34)
     order = getorder(ip)
@@ -1163,29 +1217,22 @@ end
 ##################################
 # Tricubic tensor-product interpolation. The 64 nodes sit on the regular 4×4×4 lattice of
 # the reference hexahedron, each node being a tensor product of the equispaced 1D order-3
-# nodes. The interior face dofs follow the lattice enumeration assumed by
-# `permute_and_push!` (matching `Lagrange{RefQuadrilateral, 3}`).
+# nodes. Local dofs are numbered in the natural lattice order, with the ξ₁ direction fastest
+# and ξ₃ slowest, so the node with tensor-product index (a, b, c) ∈ (1:4)³ is dof
+# `_lagrange_hex3_dof(a, b, c)`.
 getnbasefunctions(::Lagrange{RefHexahedron, 3}) = 64
-
-edgedof_interior_indices(::Lagrange{RefHexahedron, 3}) = (
-    (9, 10), (11, 12), (13, 14), (15, 16), (17, 18), (19, 20),
-    (21, 22), (23, 24), (25, 26), (27, 28), (29, 30), (31, 32),
-)
-facedof_interior_indices(::Lagrange{RefHexahedron, 3}) = (
-    (33, 34, 35, 36), (37, 38, 39, 40), (41, 42, 43, 44),
-    (45, 46, 47, 48), (49, 50, 51, 52), (53, 54, 55, 56),
-)
-volumedof_interior_indices(::Lagrange{RefHexahedron, 3}) = (57, 58, 59, 60, 61, 62, 63, 64)
 
 # The equispaced 1D order-3 Lagrange nodes on [-1, 1], scaled by 3 to keep them integer
 # (the actual nodes are these divided by 3: -1, -1/3, 1/3, 1).
 const _lagrange_hex3_nodes_1d_x3 = (-3, -1, 1, 3)
 
-# Tensor-product multi-indices (a, b, c) ∈ (1:4)³ for the 64 nodes, in local dof order:
-# vertices, edge interior dofs (following the local edge direction), face interior dofs (in
-# the lattice enumeration assumed by `permute_and_push!`), and volume interior dofs. The
-# node for (a, b, c) is located at (x_a, x_b, x_c) with x the 1D nodes above.
-function _build_lagrange_hex3_multiindices()
+_lagrange_hex3_dof(a::Int, b::Int, c::Int) = a + 4 * (b - 1) + 16 * (c - 1)
+
+# The entity dof tuples in that numbering, generated from the reference topology so that
+# the orderings the dof distribution relies on hold by construction: edge interior dofs
+# follow the local edge direction, and face interior dofs follow the lattice enumeration
+# assumed by `permute_and_set!` (matching `Lagrange{RefQuadrilateral, 3}`).
+function _build_lagrange_hex3_entity_dofs()
     # Topology of RefHexahedron, given as the tensor-product index of each vertex. Must
     # match reference_edges/reference_faces in Grid/grid.jl, which are not yet defined when
     # this file is included.
@@ -1201,33 +1248,34 @@ function _build_lagrange_hex3_multiindices()
         (1, 4, 3, 2), (1, 2, 6, 5), (2, 3, 7, 6),
         (3, 4, 8, 7), (1, 5, 8, 4), (5, 6, 7, 8),
     )
-    αs = NTuple{3, Int}[]
-    for v in 1:8 # vertex nodes
-        push!(αs, vertex_idx[v])
-    end
-    for (a, b) in hex_edges # edge interior nodes, from vertex a towards vertex b
+    vertices = ntuple(v -> (_lagrange_hex3_dof(vertex_idx[v]...),), 8)
+    edges = ntuple(length(hex_edges)) do e # from vertex a towards vertex b
+        a, b = hex_edges[e]
         ia, ib = vertex_idx[a], vertex_idx[b]
-        for k in 1:2
-            push!(αs, ntuple(t -> ia[t] + (k * (ib[t] - ia[t])) ÷ 3, 3))
-        end
+        return ntuple(k -> _lagrange_hex3_dof(ntuple(t -> ia[t] + (k * (ib[t] - ia[t])) ÷ 3, 3)...), 2)
     end
-    for (a, b, _, d) in hex_faces # face interior nodes, i (a→b) fastest, j (a→d) slowest
+    faces = ntuple(length(hex_faces)) do f # i (a→b) fastest, j (a→d) slowest
+        a, b, _, d = hex_faces[f]
         ia, ib, id = vertex_idx[a], vertex_idx[b], vertex_idx[d]
-        for j in 0:1, i in 0:1
-            push!(αs, ntuple(t -> ia[t] + ((i + 1) * (ib[t] - ia[t]) + (j + 1) * (id[t] - ia[t])) ÷ 3, 3))
-        end
+        return Tuple(
+            _lagrange_hex3_dof(ntuple(t -> ia[t] + ((i + 1) * (ib[t] - ia[t]) + (j + 1) * (id[t] - ia[t])) ÷ 3, 3)...)
+                for j in 0:1 for i in 0:1
+        )
     end
-    for c in (2, 3), b in (2, 3), a in (2, 3) # volume interior nodes
-        push!(αs, (a, b, c))
-    end
-    return αs
+    volume = Tuple(_lagrange_hex3_dof(a, b, c) for c in (2, 3) for b in (2, 3) for a in (2, 3))
+    return (; vertices, edges, faces, volume)
 end
 
-const _lagrange_hex3_multiindices = _build_lagrange_hex3_multiindices()
+const _lagrange_hex3_entity_dofs = _build_lagrange_hex3_entity_dofs()
+
+vertexdof_indices(::Lagrange{RefHexahedron, 3}) = _lagrange_hex3_entity_dofs.vertices
+edgedof_interior_indices(::Lagrange{RefHexahedron, 3}) = _lagrange_hex3_entity_dofs.edges
+facedof_interior_indices(::Lagrange{RefHexahedron, 3}) = _lagrange_hex3_entity_dofs.faces
+volumedof_interior_indices(::Lagrange{RefHexahedron, 3}) = _lagrange_hex3_entity_dofs.volume
 
 function reference_coordinates(::Lagrange{RefHexahedron, 3})
     m = _lagrange_hex3_nodes_1d_x3
-    return [Vec{3, Float64}((m[α[1]] / 3, m[α[2]] / 3, m[α[3]] / 3)) for α in _lagrange_hex3_multiindices]
+    return [Vec{3, Float64}((m[a] / 3, m[b] / 3, m[c] / 3)) for c in 1:4 for b in 1:4 for a in 1:4]
 end
 
 function reference_shape_value(ip::Lagrange{RefHexahedron, 3}, ξ::Vec{3}, i::Int)
@@ -1235,7 +1283,8 @@ function reference_shape_value(ip::Lagrange{RefHexahedron, 3}, ξ::Vec{3}, i::In
         throw(ArgumentError("no shape function $i for interpolation $ip"))
     end
     m = _lagrange_hex3_nodes_1d_x3
-    α = _lagrange_hex3_multiindices[i]
+    # Decode the tensor-product index of dof `i` (ξ₁ fastest, ξ₃ slowest)
+    α = ((i - 1) % 4 + 1, (i - 1) ÷ 4 % 4 + 1, (i - 1) ÷ 16 + 1)
     # Product of the 1D Lagrange basis L_a(t) = ∏_{b≠a} (t - x_b) / (x_a - x_b) per axis,
     # evaluated with the nodes scaled by 3 (s = 3t) to preserve the element type of ξ.
     val = one(ξ[1])
