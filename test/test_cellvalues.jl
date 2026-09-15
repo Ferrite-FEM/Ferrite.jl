@@ -164,7 +164,7 @@ end
                 cvc = copy(cv)
                 @test typeof(cv) == typeof(cvc)
 
-                test_equal_but_unaliased(cv.fun_values, cvc.fun_values)
+                test_equal_but_unaliased(cv.fun_values[1], cvc.fun_values[1])
                 test_equal_but_unaliased(cv.geo_mapping, cvc.geo_mapping)
                 # qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
                 @test cvc.qr === cv.qr
@@ -295,6 +295,14 @@ end
         cmv_u = MultiFieldCellValues(qr, (u = ipu,)) # Case with a single interpolation
         cmv_rt = MultiFieldCellValues(qr, (u = ipu, r = iprt))
         cmv3 = MultiFieldCellValues(qr, (u = ipu, T = Lagrange{RefQuadrilateral, 2}(), p = ipp)) # Case with 3 unique IPs
+
+        # MultiFieldCellValues is an alias for CellValues constructed with a NamedTuple
+        @test cmv isa CellValues
+        @test cmv isa MultiFieldCellValues
+        @test !(cvu isa MultiFieldCellValues)
+        @test typeof(CellValues(qr, (u = ipu, p = ipp, T = ipT))) === typeof(cmv)
+        @test typeof(CellValues(Float64, qr, (u = ipu,))) === typeof(cmv_u)
+        @test propertynames(cmv) == (:u, :p, :T)
 
         @test cmv.p === cmv.T # Correct aliasing for identical interpolations
         # Correctly inferred geometric interpolation:
@@ -651,7 +659,7 @@ end
 
         cmv = MultiFieldCellValues(QuadratureRule{RefPrism}(2), (u = Lagrange{RefPrism, 2}(), v = Lagrange{RefPrism, 1}()^3))
         showstring = sprint(show, MIME"text/plain"(), cmv)
-        @test startswith(showstring, "MultiFieldCellValues with 5 quadrature points")
+        @test startswith(showstring, "CellValues with 5 quadrature points")
         @test contains(showstring, "Geometric interpolation: Lagrange{RefPrism, 1}()")
         @test contains(showstring, "u: Lagrange{RefPrism, 2}()")
         @test contains(showstring, "v: Lagrange{RefPrism, 1}()^3")
