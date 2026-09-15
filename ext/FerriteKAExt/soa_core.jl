@@ -42,14 +42,26 @@ function as_structure_of_arrays(d, N, fv::Ferrite.GeometryMapping)
     )
 end
 
-# We do not need a soa container for the CPU variant.
-function Ferrite.distribute_to_workers(backend::KA.CPU, a::AT, num_workers) where {AT <: Ferrite.AbstractAssembler}
-    return [
-        a; [start_assemble(a.K, a.f; fillzero = false)::AT for _ in 2:num_workers]
-    ]
+# Assemblers without sorting scratch (created by `start_assemble` on device arrays) hold no
+# per-worker state, so all workers share a single instance.
+const ScratchFreeAssembler = Union{
+    Ferrite.CSCAssembler{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
+    Ferrite.CSRAssembler{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
+}
+
+function Ferrite.distribute_to_workers(backend::KA.Backend, a::ScratchFreeAssembler, num_workers)
+    return Ferrite.SoAContainer(a, num_workers)
 end
 
-# Only supported for thread safe assemblers
-function Ferrite.distribute_to_workers(backend::KA.GPU, a::Ferrite.AbstractThreadSafeAssembler, num_workers)
-    return Ferrite.SoAContainer(a, num_workers)
+get_substruct(a::ScratchFreeAssembler, i) = a
+
+# Assemblers with sorting scratch need one instance per worker, which we can only allocate
+# on the host.
+function Ferrite.distribute_to_workers(backend::KA.Backend, a::AT, num_workers) where {AT <: Ferrite.AbstractAssembler}
+    if !(backend isa KA.CPU)
+        throw(ArgumentError("$AT cannot be used on $backend, create the assembler with `start_assemble` on device arrays instead"))
+    end
+    return [
+        a; [start_assemble(a.K, a.f; fillzero = false, atomic = Ferrite._is_atomic(a))::AT for _ in 2:num_workers]
+    ]
 end

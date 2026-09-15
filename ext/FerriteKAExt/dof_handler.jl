@@ -47,7 +47,7 @@ function Ferrite.celldofs!(global_dofs::AbstractVector{<:Integer}, sdh::DeviceSu
 end
 
 # Host-only container — not sent to the device!
-struct HostDofHandler{sdim, G <: Grid{sdim}, DH <: AbstractDofHandler} <: AbstractDofHandler
+struct HostDofHandler{sdim, G <: AbstractGrid{sdim}, DH <: AbstractDofHandler} <: AbstractDofHandler
     subdofhandlers::Vector
     grid::G
     original_dh::DH
