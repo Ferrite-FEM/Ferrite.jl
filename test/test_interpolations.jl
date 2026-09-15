@@ -244,6 +244,31 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         end
     end
 
+    @testset "Tensor product structure of hypercube Lagrange" begin
+        for ip in (
+                Lagrange{RefLine, 1}(), Lagrange{RefLine, 2}(),
+                Lagrange{RefQuadrilateral, 1}(), Lagrange{RefQuadrilateral, 2}(),
+                Lagrange{RefHexahedron, 1}(), Lagrange{RefHexahedron, 2}(),
+            )
+            ip1d = Ferrite.tensor_product_interpolation(ip)
+            @test ip1d isa Lagrange{RefLine, Ferrite.getorder(ip)}
+            ind = Ferrite.tensor_product_indices(ip)
+            rdim = Ferrite.getrefdim(ip)
+            ## Every shape function factors into the indexed 1D shape functions
+            for _ in 1:5
+                ξ = rand(Vec{rdim, Float64}) * 2 - ones(Vec{rdim})
+                for i in 1:getnbasefunctions(ip)
+                    N = Ferrite.reference_shape_value(ip, ξ, i)
+                    N1d = prod(
+                        Ferrite.reference_shape_value(ip1d, Vec(ξ[d]), ind[i][d])
+                            for d in 1:rdim
+                    )
+                    @test N ≈ N1d atol = 1.0e-14
+                end
+            end
+        end
+    end
+
     @testset "Errors for entitydof_indices on VectorizedInterpolations" begin
         ip = Lagrange{RefQuadrilateral, 2}()^2
         @test_throws ArgumentError Ferrite.vertexdof_indices(ip)

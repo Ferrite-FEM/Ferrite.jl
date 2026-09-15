@@ -1450,6 +1450,55 @@ function reference_shape_value(ip::Lagrange{RefPyramid, 2}, ξ::Vec{3, T}, i::In
     throw(ArgumentError("no shape function $i for interpolation $ip"))
 end
 
+#########################################################
+# Tensor product structure of hypercube interpolations  #
+#########################################################
+
+"""
+    tensor_product_interpolation(ip::Lagrange{RefHypercube{dim}, order})
+
+Return the 1D interpolation `Lagrange{RefLine, order}()` whose `dim`-fold tensor product
+spans the same function space as `ip`. Every shape function of `ip` is a product of `dim`
+shape functions of the returned interpolation, with the factors given by
+[`tensor_product_indices`](@ref Ferrite.tensor_product_indices):
+
+```
+N[i](ξ) = N¹ᴰ[a](ξ₁) * N¹ᴰ[b](ξ₂) * ...   where (a, b, ...) = tensor_product_indices(ip)[i]
+```
+
+This structure enables sum-factorized evaluation, where the interpolation is applied as
+`dim` successive 1D contractions instead of one dense `nbasefunctions × nquadpoints`
+contraction. Only defined for interpolations where the corresponding 1D interpolation
+exists.
+"""
+tensor_product_interpolation(::Lagrange{RefHypercube{dim}, order}) where {dim, order} = Lagrange{RefLine, order}()
+
+"""
+    tensor_product_indices(ip::Lagrange{RefHypercube{dim}, order})
+
+Return a vector `ind` of `NTuple{dim, Int}` such that shape function `i` of `ip` factors
+into 1D shape functions of `tensor_product_interpolation(ip)` as
+
+```
+N[i](ξ) = N¹ᴰ[ind[i][1]](ξ₁) * N¹ᴰ[ind[i][2]](ξ₂) * ...
+```
+
+The indices refer to the local (1D) shape function numbering of the 1D interpolation, i.e.
+vertices first, then interior nodes. See also
+[`tensor_product_interpolation`](@ref Ferrite.tensor_product_interpolation).
+"""
+function tensor_product_indices(ip::Lagrange{RefHypercube{rdim}, order}) where {rdim, order}
+    ip1d = tensor_product_interpolation(ip)
+    nodes1d = reference_coordinates(ip1d)
+    return map(reference_coordinates(ip)) do x
+        ntuple(rdim) do d
+            a = findfirst(n -> abs(n[1] - x[d]) < sqrt(eps(Float64)), nodes1d)
+            a === nothing && error("no matching 1D node for coordinate $(x[d])")
+            return a
+        end
+    end
+end
+
 ###################
 # Bubble elements #
 ###################
