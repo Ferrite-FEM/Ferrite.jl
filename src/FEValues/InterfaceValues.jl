@@ -162,7 +162,7 @@ function reinit!(
     @assert length(quad_points_a) <= length(quad_points_b)
 
     # Re-evaluate shape functions in the transformed quadrature points
-    precompute_values!(get_fun_values(iv.there), quad_points_b)
+    foreach(fun_values -> precompute_values!(fun_values, quad_points_b), get_fun_values(iv.there))
     precompute_values!(get_geo_mapping(iv.there), quad_points_b)
 
     # reinit! the "there" side
