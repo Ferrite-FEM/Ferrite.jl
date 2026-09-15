@@ -28,6 +28,7 @@ jobs:
           - {user: 'Ferrite-FEM', repo: 'FerriteMeshParser.jl'}
           - {user: 'Ferrite-FEM', repo: 'FerriteInterfaceElements.jl'}
           - {user: 'Ferrite-FEM', repo: 'FerriteViz.jl'}
+          - {user: 'Ferrite-FEM', repo: 'FerriteIGA.jl'}
     steps:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
