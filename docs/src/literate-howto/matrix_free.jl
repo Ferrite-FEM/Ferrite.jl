@@ -80,7 +80,7 @@
 # !!! note "Why not `CellValues`?"
 #     `CellValues` precomputes and stores the value and gradient of every shape function in
 #     every quadrature point -- exactly the `nbasefunctions × nquadpoints` tables that sum
-#     factorization avoids materializing. The operator below therefore does not use
+#     factorization avoids materializing. The evaluator below therefore does not use
 #     `CellValues` in the matrix-vector product; it consumes the 1D building blocks
 #     directly. (We do use standard assembly to *verify* the operator at the end.)
 #
@@ -90,175 +90,41 @@
 #     (e.g. applying the constraint condensation on the fly around the operator
 #     application) and is left as an exercise for the reader.
 #
-# ## Commented program
+# ## Prologue: a generic tensor-product evaluator
 #
-# We start by loading the packages and setting up the problem: a quadratic Lagrange
-# interpolation on a hexahedral grid, and a smoothly varying conductivity `κ`.
+# Almost all of the machinery needed for sum-factorized operator evaluation is independent
+# of the PDE being solved: it depends only on the interpolation and the quadrature rule.
+# This prologue implements that machinery as a `TensorProductEvaluator`, closely modeled
+# after deal.II's `FEEvaluation` class (see e.g.
+# [deal.II step-37](https://dealii.org/current/doxygen/deal.II/step_37.html); MFEM's
+# `QuadratureInterpolator` plays the same role). The problem-specific part of the how-to --
+# what happens *at* each quadrature point -- reduces to a couple of lines sandwiched
+# between calls to this evaluator.
+#
+# !!! note "A future Ferrite API?"
+#     Everything in this section is problem-independent and could eventually be included in
+#     Ferrite as a complement to `CellValues` for matrix-free methods. For now it lives in
+#     this how-to while the design settles. Only *gradient* evaluation is implemented here
+#     (sufficient for the Laplace operator); evaluation of *values* (needed for e.g. mass
+#     matrices) follows the exact same pattern with contractions using only `B`, and an
+#     implementation evaluating both can share intermediate contraction passes.
 
 using Ferrite, LinearAlgebra, SparseArrays
 using Test #src
 
-grid = generate_grid(Hexahedron, (16, 16, 16));
-
-ip = Lagrange{RefHexahedron, 2}()
-qr = QuadratureRule{RefHexahedron}(3)
-
-dh = DofHandler(grid)
-add!(dh, :u, ip)
-close!(dh);
-
-κ(x::Vec{3}) = 2.0 + sinpi(x[1]) * cospi(2 * x[2]) * sinpi(x[3] / 2)
-
-# ### The 1D building blocks
-#
-# The 1D interpolation and quadrature rule from which the 3D versions are constructed:
-
-ip1d = Ferrite.tensor_product_interpolation(ip)
-qr1d = QuadratureRule{RefLine}(3)
-
-n1d = getnbasefunctions(ip1d)
-nq1d = getnquadpoints(qr1d);
-
-# From these we build the two matrices that the matrix-vector product contracts with: `B`
-# interpolates 1D nodal values to the 1D quadrature points, and `D` evaluates the 1D
-# derivative in the quadrature points. (The operator below also stores their transposes
-# since the "integration" step contracts with the transposed operators.)
-
-B = [Ferrite.reference_shape_value(ip1d, ξ, a) for ξ in Ferrite.getpoints(qr1d), a in 1:n1d]
-D = [Ferrite.reference_shape_gradient(ip1d, ξ, a)[1] for ξ in Ferrite.getpoints(qr1d), a in 1:n1d]
-
-# The three-dimensional rule `qr` is the tensor product of `qr1d` with itself, flattened
-# such that the first coordinate varies fastest. Since the implementation below relies on
-# this layout, let us verify it:
-
-let p1d = Ferrite.getpoints(qr1d), p3d = Ferrite.getpoints(qr)
-    for (q, ξ) in pairs(p3d)
-        q1 = (q - 1) % nq1d + 1
-        q2 = ((q - 1) ÷ nq1d) % nq1d + 1
-        q3 = (q - 1) ÷ (nq1d * nq1d) + 1
-        @assert ξ ≈ Vec(p1d[q1][1], p1d[q2][1], p1d[q3][1])
-    end
-end
-
-# Similarly, `Ferrite.tensor_product_indices` tells us which 1D shape functions each 3D
-# shape function is a product of. From it we compute, for every (Ferrite-ordered) shape
-# function, its linear index in the *lexicographic* ordering that the tensor contractions
-# use:
-
-tpind = Ferrite.tensor_product_indices(ip)
-lex = [LinearIndices((n1d, n1d, n1d))[abc...] for abc in tpind]
-
-# For example, shape function 9 (the first edge dof, located at `ξ = (0, -1, -1)`) is the
-# product of 1D function 3 (the midpoint function) in `ξ₁` and 1D function 1 (the left
-# vertex function) in `ξ₂` and `ξ₃`:
-
-tpind[9]
-
-# ### The operator
-#
-# The operator stores three things per cell: the (lexicographically permuted) global dof
-# indices, and the tensor `D_q` for every quadrature point. The 1D matrices and a set of
-# scratch buffers for the contractions are shared between all cells.
-#
-# The number of 1D quadrature points and 1D basis functions are lifted into the *type* as
-# `NQ` and `N`. The contraction loops below run over these sizes, and baking them into the
-# type lets the compiler unroll the (very short) innermost loops completely. This mirrors
-# what the established matrix-free implementations do -- deal.II and MFEM template their
-# kernels on the polynomial degree for the same reason.
-
-struct PartialAssemblyOperator{NQ, N}
-    ndofs::Int
-    dofmap::Matrix{Int}                              # nbasefunctions × ncells
-    Dq::Matrix{SymmetricTensor{2, 3, Float64, 6}}    # nquadpoints × ncells
-    ## 1D operators
-    B::Matrix{Float64}
-    D::Matrix{Float64}
-    Bᵀ::Matrix{Float64}
-    Dᵀ::Matrix{Float64}
-    ## Scratch buffers for one cell
-    ue::Array{Float64, 3}                            # (n, n, n) local values
-    ye::Array{Float64, 3}                            # (n, n, n) local result
-    tmp::Array{Float64, 3}                           # (n, n, n)
-    t1::Array{Float64, 3}                            # (nq, n, n)
-    t2::Array{Float64, 3}                            # (nq, n, n)
-    s1::Array{Float64, 3}                            # (nq, nq, n)
-    s2::Array{Float64, 3}                            # (nq, nq, n)
-    s3::Array{Float64, 3}                            # (nq, nq, n)
-    gx::Array{Float64, 3}                            # (nq, nq, nq)
-    gy::Array{Float64, 3}                            # (nq, nq, nq)
-    gz::Array{Float64, 3}                            # (nq, nq, nq)
-end
-
-Base.size(A::PartialAssemblyOperator) = (A.ndofs, A.ndofs)
-Base.size(A::PartialAssemblyOperator, d::Int) = size(A)[d]
-Base.eltype(::PartialAssemblyOperator) = Float64
-
-# The setup loop computes `D_q = det(J) w κ(x) J⁻¹ J⁻ᵀ` for every quadrature point of every
-# cell. This is the "partial" assembly: it visits every cell like regular assembly, but the
-# result is 6 floats per quadrature point instead of an element matrix. Note how the dof
-# permutation is folded into the stored `dofmap` such that the matrix-vector product can
-# gather straight into lexicographic ordering.
-#
-# The geometry mapping is evaluated with the geometric (trilinear) interpolation of the
-# grid: `J = Σₐ xₐ ⊗ ∇̂Nₐ(ξ_q)`.
-
-function partial_assembly(
-        dh::DofHandler, ip, qr::QuadratureRule, κ::Function,
-        B::Matrix, D::Matrix, lex::Vector{Int},
-    )
-    grid = dh.grid
-    n = size(B, 2)  # 1D basis functions
-    nq = size(B, 1) # 1D quadrature points
-    ncells = getncells(grid)
-    nqp = getnquadpoints(qr)
-    @assert nq^3 == nqp && n^3 == getnbasefunctions(ip)
-    w = Ferrite.getweights(qr)
-    ## Evaluate the geometric interpolation in the quadrature points
-    ip_geo = geometric_interpolation(getcelltype(grid))
-    ngeo = getnbasefunctions(ip_geo)
-    N_geo = [Ferrite.reference_shape_value(ip_geo, ξ, a) for a in 1:ngeo, ξ in Ferrite.getpoints(qr)]
-    dNdξ_geo = [Ferrite.reference_shape_gradient(ip_geo, ξ, a) for a in 1:ngeo, ξ in Ferrite.getpoints(qr)]
-    ## Allocate the per-cell data
-    dofmap = Matrix{Int}(undef, getnbasefunctions(ip), ncells)
-    Dq = Matrix{SymmetricTensor{2, 3, Float64, 6}}(undef, nqp, ncells)
-    for cell in CellIterator(dh)
-        e = cellid(cell)
-        x = getcoordinates(cell)
-        for (i, dof) in pairs(celldofs(cell))
-            dofmap[lex[i], e] = dof
-        end
-        for q in 1:nqp
-            J = zero(Tensor{2, 3})
-            x_q = zero(Vec{3})
-            for a in 1:ngeo
-                J += x[a] ⊗ dNdξ_geo[a, q]
-                x_q += N_geo[a, q] * x[a]
-            end
-            Jinv = inv(J)
-            Dq[q, e] = det(J) * w[q] * κ(x_q) * dott(Jinv)
-        end
-    end
-    return PartialAssemblyOperator{nq, n}(
-        ndofs(dh), dofmap, Dq, B, D, collect(transpose(B)), collect(transpose(D)),
-        zeros(n, n, n), zeros(n, n, n), zeros(n, n, n),
-        zeros(nq, n, n), zeros(nq, n, n),
-        zeros(nq, nq, n), zeros(nq, nq, n), zeros(nq, nq, n),
-        zeros(nq, nq, nq), zeros(nq, nq, nq), zeros(nq, nq, nq),
-    )
-end
-
-A = partial_assembly(dh, ip, qr, κ, B, D, lex);
-
-# ### The 1D contraction kernels
+# ### 1D contraction kernels
 #
 # The workhorses of sum factorization: contract a small 1D matrix `M` with one of the three
 # dimensions of a rank-3 tensor. Note that the output dimension (the row index of `M`) can
 # differ from the input dimension, so the same three functions implement both interpolation
-# (`n1d → nq1d`, using `B`/`D`) and integration (`nq1d → n1d`, using `Bᵀ`/`Dᵀ`). The two
-# involved sizes are therefore passed as `Val`s: `P` is the length of the contracted
-# dimension and `Q` the length of the corresponding output dimension. Since both are known
-# at compile time the reduction loop is fully unrolled, with the sum accumulated in a
-# register instead of read-modified-written through memory.
+# (`n1d → nq1d`, using the 1D matrices `B`/`D` defined below) and integration
+# (`nq1d → n1d`, using their transposes). The two involved sizes are therefore passed as
+# `Val`s: `P` is the length of the contracted dimension and `Q` the length of the
+# corresponding output dimension. Since both are known at compile time the reduction loop
+# is fully unrolled, with the sum accumulated in a register instead of read-modified-written
+# through memory. Baking the (very short) loop lengths into the type like this mirrors what
+# the established matrix-free implementations do -- deal.II and MFEM template their kernels
+# on the polynomial degree for the same reason.
 
 function contract_1!(out::Array{T, 3}, M::Matrix{T}, A::Array{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
     ## out[q, j, k] = Σᵢ M[q, i] A[i, j, k]
@@ -296,22 +162,102 @@ function contract_3!(out::Array{T, 3}, M::Matrix{T}, A::Array{T, 3}, ::Val{P}, :
     return out
 end
 
-# ### The element kernel
+# ### The evaluator
 #
-# With the contractions in place the local operator application follows the classical
-# five-step structure (`gather -> interpolate -> pointwise -> integrate -> scatter`), where
-# this function implements the middle three steps:
+# The evaluator bundles the 1D operator matrices with the scratch buffers for one cell:
+# `B` interpolates 1D nodal values to the 1D quadrature points and `D` evaluates the 1D
+# derivative there (their transposes are stored explicitly since the integration step
+# contracts with the transposed operators). `ue` holds the gathered local dof values (in
+# lexicographic ordering), `ye` the local result, and `gx`/`gy`/`gz` the three components
+# of the evaluated quantity in the quadrature points. As for the contraction kernels, the
+# number of 1D quadrature points `NQ` and 1D basis functions `N` are lifted into the type.
 #
-# 1. Interpolate: compute the reference gradient `∇̂u` in all quadrature points, one
-#    component at a time. The `x`-component, for example, differentiates along the first
-#    dimension and interpolates along the other two: `gx = (B ⊗ B ⊗ D) ue`.
-# 2. Pointwise: apply the stored `D_q` tensor, `h_q = D_q ⋅ ∇̂u_q`.
-# 3. Integrate: apply the transpose of step 1 and accumulate the three components.
+# Since the evaluator owns scratch data it plays the same role as `CellValues` does for
+# regular assembly: it is *not* thread-safe, and parallelizing the cell loop requires one
+# evaluator per task (compare with the scratch data in the
+# [multithreaded assembly how-to](@ref howto-threaded-assembly)).
 
-function element_apply!(A::PartialAssemblyOperator{NQ, N}, e::Int) where {NQ, N}
-    (; B, D, Bᵀ, Dᵀ, ue, ye, tmp, t1, t2, s1, s2, s3, gx, gy, gz, Dq) = A
+struct TensorProductEvaluator{NQ, N, T}
+    ## 1D operators
+    B::Matrix{T}
+    D::Matrix{T}
+    Bᵀ::Matrix{T}
+    Dᵀ::Matrix{T}
+    ## Scratch buffers for one cell
+    ue::Array{T, 3}                                  # (n, n, n) local values
+    ye::Array{T, 3}                                  # (n, n, n) local result
+    tmp::Array{T, 3}                                 # (n, n, n)
+    t1::Array{T, 3}                                  # (nq, n, n)
+    t2::Array{T, 3}                                  # (nq, n, n)
+    s1::Array{T, 3}                                  # (nq, nq, n)
+    s2::Array{T, 3}                                  # (nq, nq, n)
+    s3::Array{T, 3}                                  # (nq, nq, n)
+    gx::Array{T, 3}                                  # (nq, nq, nq)
+    gy::Array{T, 3}                                  # (nq, nq, nq)
+    gz::Array{T, 3}                                  # (nq, nq, nq)
+end
+
+function TensorProductEvaluator(ip::Lagrange{RefHexahedron}, qr1d::QuadratureRule{RefLine})
+    ip1d = Ferrite.tensor_product_interpolation(ip)
+    n = getnbasefunctions(ip1d)
+    nq = getnquadpoints(qr1d)
+    B = [Ferrite.reference_shape_value(ip1d, ξ, a) for ξ in Ferrite.getpoints(qr1d), a in 1:n]
+    D = [Ferrite.reference_shape_gradient(ip1d, ξ, a)[1] for ξ in Ferrite.getpoints(qr1d), a in 1:n]
+    return TensorProductEvaluator{nq, n, Float64}(
+        B, D, collect(transpose(B)), collect(transpose(D)),
+        zeros(n, n, n), zeros(n, n, n), zeros(n, n, n),
+        zeros(nq, n, n), zeros(nq, n, n),
+        zeros(nq, nq, n), zeros(nq, nq, n), zeros(nq, nq, n),
+        zeros(nq, nq, nq), zeros(nq, nq, nq), zeros(nq, nq, nq),
+    )
+end
+
+Ferrite.getnquadpoints(::TensorProductEvaluator{NQ}) where {NQ} = NQ^3
+Ferrite.getnbasefunctions(::TensorProductEvaluator{<:Any, N}) where {N} = N^3
+
+# The evaluator consumes and produces local dof values in *lexicographic* ordering (the
+# ordering of the rank-3 scratch tensors), whereas Ferrite numbers the dofs by entity
+# (vertices, then edges, faces, and the interior). The permutation between the two follows
+# directly from `Ferrite.tensor_product_indices` (deal.II stores the equivalent permutation
+# as `ShapeInfo::lexicographic_numbering`):
+
+function lexicographic_numbering(ip::Lagrange{RefHexahedron})
+    n = getnbasefunctions(Ferrite.tensor_product_interpolation(ip))
+    return [LinearIndices((n, n, n))[abc...] for abc in Ferrite.tensor_product_indices(ip)]
+end
+
+# ### The evaluator interface
+#
+# Six functions make up the interface, corresponding to the five steps of a matrix-free
+# operator application (`gather -> interpolate -> pointwise -> integrate -> scatter`),
+# where the pointwise step is split into a getter and a setter (this is where the user's
+# problem-specific code goes). The naming follows deal.II's `FEEvaluation`.
+#
+# First the gather and scatter steps, where `dofs` are the global dof indices of the cell
+# *already permuted to lexicographic ordering* (see `partial_assembly` below, which stores
+# the permuted dof map):
+
+function read_dof_values!(ev::TensorProductEvaluator, x::AbstractVector, dofs::AbstractVector{Int})
+    @inbounds for l in eachindex(ev.ue)
+        ev.ue[l] = x[dofs[l]]
+    end
+    return ev
+end
+
+function distribute_local_to_global!(y::AbstractVector, ev::TensorProductEvaluator, dofs::AbstractVector{Int})
+    @inbounds for l in eachindex(ev.ye)
+        y[dofs[l]] += ev.ye[l]
+    end
+    return y
+end
+
+# The interpolation step computes the reference gradient `∇̂u` in all quadrature points,
+# one component at a time. The `x`-component, for example, differentiates along the first
+# dimension and interpolates along the other two: `gx = (B ⊗ B ⊗ D) ue`.
+
+function evaluate_gradients!(ev::TensorProductEvaluator{NQ, N}) where {NQ, N}
+    (; B, D, ue, t1, t2, s1, s2, s3, gx, gy, gz) = ev
     n, nq = Val(N), Val(NQ)
-    ## Interpolate: reference gradients in the quadrature points
     contract_1!(t1, B, ue, n, nq)
     contract_1!(t2, D, ue, n, nq)
     contract_2!(s1, B, t1, n, nq)
@@ -320,14 +266,31 @@ function element_apply!(A::PartialAssemblyOperator{NQ, N}, e::Int) where {NQ, N}
     contract_3!(gx, B, s3, n, nq) # gx = (B ⊗ B ⊗ D) ue
     contract_3!(gy, B, s2, n, nq) # gy = (B ⊗ D ⊗ B) ue
     contract_3!(gz, D, s1, n, nq) # gz = (D ⊗ B ⊗ B) ue
-    ## Pointwise application of D_q
-    @inbounds for q in eachindex(gx)
-        h = Dq[q, e] ⋅ Vec(gx[q], gy[q], gz[q])
-        gx[q] = h[1]
-        gy[q] = h[2]
-        gz[q] = h[3]
+    return ev
+end
+
+# The pointwise accessors, indexed by the (linear) quadrature point number:
+
+@inline function get_gradient(ev::TensorProductEvaluator, q::Int)
+    return @inbounds Vec(ev.gx[q], ev.gy[q], ev.gz[q])
+end
+
+@inline function submit_gradient!(ev::TensorProductEvaluator, h::Vec{3}, q::Int)
+    @inbounds begin
+        ev.gx[q] = h[1]
+        ev.gy[q] = h[2]
+        ev.gz[q] = h[3]
     end
-    ## Integrate: transposed contractions, accumulated into ye
+    return ev
+end
+
+# Finally the integration step: the transpose of `evaluate_gradients!`, contracting the
+# submitted quadrature point data with the transposed 1D operators and accumulating the
+# three components into the local result `ye`.
+
+function integrate_gradients!(ev::TensorProductEvaluator{NQ, N}) where {NQ, N}
+    (; Bᵀ, Dᵀ, ye, tmp, t1, s1, gx, gy, gz) = ev
+    n, nq = Val(N), Val(NQ)
     contract_3!(s1, Bᵀ, gx, nq, n)
     contract_2!(t1, Bᵀ, s1, nq, n)
     contract_1!(ye, Dᵀ, t1, nq, n)  # ye  = (Bᵀ ⊗ Bᵀ ⊗ Dᵀ) gx
@@ -339,36 +302,150 @@ function element_apply!(A::PartialAssemblyOperator{NQ, N}, e::Int) where {NQ, N}
     contract_2!(t1, Bᵀ, s1, nq, n)
     contract_1!(tmp, Bᵀ, t1, nq, n) # ye += (Dᵀ ⊗ Bᵀ ⊗ Bᵀ) gz
     ye .+= tmp
-    return
+    return ev
 end
+
+# This concludes the generic part -- note that the heat equation has not been mentioned
+# once. Everything below this point is the problem-specific part.
+#
+# ## Commented program
+#
+# We start by setting up the problem: a quadratic Lagrange interpolation on a hexahedral
+# grid, and a smoothly varying conductivity `κ`.
+
+grid = generate_grid(Hexahedron, (16, 16, 16));
+
+ip = Lagrange{RefHexahedron, 2}()
+
+dh = DofHandler(grid)
+add!(dh, :u, ip)
+close!(dh);
+
+κ(x::Vec{3}) = 2.0 + sinpi(x[1]) * cospi(2 * x[2]) * sinpi(x[3] / 2)
+
+# The quadrature rule is where the tensor product structure of the *integration* comes
+# from, so instead of relying on the memory layout of `QuadratureRule{RefHexahedron}(3)` we
+# construct the 3D rule explicitly as the tensor product of a 1D rule with itself, with the
+# first coordinate varying fastest to match the lexicographic ordering of the evaluator:
+
+qr1d = QuadratureRule{RefLine}(3)
+p1d = Ferrite.getpoints(qr1d)
+w1d = Ferrite.getweights(qr1d)
+qr = QuadratureRule{RefHexahedron}(
+    vec([wx * wy * wz for wx in w1d, wy in w1d, wz in w1d]),
+    vec([Vec(px[1], py[1], pz[1]) for px in p1d, py in p1d, pz in p1d]),
+);
+
+# With the interpolation and 1D quadrature rule we can construct the evaluator:
+
+ev = TensorProductEvaluator(ip, qr1d)
+
+# To see what the underlying trait provides, consider shape function 9 (the first edge dof,
+# located at `ξ = (0, -1, -1)`): it is the product of 1D function 3 (the midpoint function)
+# in `ξ₁` and 1D function 1 (the left vertex function) in `ξ₂` and `ξ₃`:
+
+Ferrite.tensor_product_indices(ip)[9]
+
+# ### Partial assembly
+#
+# The operator stores two things per cell: the lexicographically permuted global dof
+# indices, and the tensor `D_q` for every quadrature point. The evaluator (with its
+# scratch buffers) is shared between all cells.
+
+struct PartialAssemblyOperator{E <: TensorProductEvaluator}
+    ndofs::Int
+    dofmap::Matrix{Int}                              # nbasefunctions × ncells
+    Dq::Matrix{SymmetricTensor{2, 3, Float64, 6}}    # nquadpoints × ncells
+    ev::E
+end
+
+Base.size(A::PartialAssemblyOperator) = (A.ndofs, A.ndofs)
+Base.size(A::PartialAssemblyOperator, d::Int) = size(A)[d]
+Base.eltype(::PartialAssemblyOperator) = Float64
+
+# The setup loop computes `D_q = det(J) w κ(x) J⁻¹ J⁻ᵀ` for every quadrature point of every
+# cell. This is the "partial" assembly: it visits every cell like regular assembly, but the
+# result is 6 floats per quadrature point instead of an element matrix. Note how the dof
+# permutation is folded into the stored `dofmap` such that the matrix-vector product can
+# gather straight into lexicographic ordering.
+#
+# The geometry mapping is evaluated with the geometric (trilinear) interpolation of the
+# grid: `J = Σₐ xₐ ⊗ ∇̂Nₐ(ξ_q)`.
+
+function partial_assembly(
+        dh::DofHandler, ip, qr::QuadratureRule, κ::Function, ev::TensorProductEvaluator,
+    )
+    grid = dh.grid
+    ncells = getncells(grid)
+    nqp = getnquadpoints(qr)
+    @assert nqp == getnquadpoints(ev) && getnbasefunctions(ip) == getnbasefunctions(ev)
+    w = Ferrite.getweights(qr)
+    lex = lexicographic_numbering(ip)
+    ## Evaluate the geometric interpolation in the quadrature points
+    ip_geo = geometric_interpolation(getcelltype(grid))
+    ngeo = getnbasefunctions(ip_geo)
+    N_geo = [Ferrite.reference_shape_value(ip_geo, ξ, a) for a in 1:ngeo, ξ in Ferrite.getpoints(qr)]
+    dNdξ_geo = [Ferrite.reference_shape_gradient(ip_geo, ξ, a) for a in 1:ngeo, ξ in Ferrite.getpoints(qr)]
+    ## Allocate the per-cell data
+    dofmap = Matrix{Int}(undef, getnbasefunctions(ip), ncells)
+    Dq = Matrix{SymmetricTensor{2, 3, Float64, 6}}(undef, nqp, ncells)
+    for cell in CellIterator(dh)
+        e = cellid(cell)
+        x = getcoordinates(cell)
+        for (i, dof) in pairs(celldofs(cell))
+            dofmap[lex[i], e] = dof
+        end
+        for q in 1:nqp
+            J = zero(Tensor{2, 3})
+            x_q = zero(Vec{3})
+            for a in 1:ngeo
+                J += x[a] ⊗ dNdξ_geo[a, q]
+                x_q += N_geo[a, q] * x[a]
+            end
+            Jinv = inv(J)
+            Dq[q, e] = det(J) * w[q] * κ(x_q) * dott(Jinv)
+        end
+    end
+    return PartialAssemblyOperator(ndofs(dh), dofmap, Dq, ev)
+end
+
+A = partial_assembly(dh, ip, qr, κ, ev);
 
 # ### The matrix-vector product
 #
-# Finally the global product loops over the cells and adds the gather and scatter steps
-# around the element kernel. By overloading `LinearAlgebra.mul!` the operator can be
-# dropped into any iterative solver that accepts a general linear operator (e.g. the
-# packages Krylov.jl, IterativeSolvers.jl, or KrylovKit.jl).
+# With the evaluator doing the heavy lifting, the operator application reduces to the
+# problem-specific pointwise operation `h_q = D_q ⋅ ∇̂u_q` sandwiched between the generic
+# evaluator calls. By overloading `LinearAlgebra.mul!` the operator can be dropped into any
+# iterative solver that accepts a general linear operator (e.g. the packages Krylov.jl,
+# IterativeSolvers.jl, or KrylovKit.jl).
 
 function LinearAlgebra.mul!(y::AbstractVector, A::PartialAssemblyOperator, x::AbstractVector)
-    (; dofmap, ue, ye) = A
+    (; dofmap, Dq, ev) = A
     fill!(y, 0)
     for e in axes(dofmap, 2)
-        @inbounds for l in eachindex(ue)
-            ue[l] = x[dofmap[l, e]]
+        dofs = view(dofmap, :, e)
+        read_dof_values!(ev, x, dofs)
+        evaluate_gradients!(ev)
+        @inbounds for q in 1:getnquadpoints(ev)
+            submit_gradient!(ev, Dq[q, e] ⋅ get_gradient(ev, q), q)
         end
-        element_apply!(A, e)
-        @inbounds for l in eachindex(ye)
-            y[dofmap[l, e]] += ye[l]
-        end
+        integrate_gradients!(ev)
+        distribute_local_to_global!(y, ev, dofs)
     end
     return y
 end
 
 Base.:*(A::PartialAssemblyOperator, x::AbstractVector) = mul!(similar(x, size(A, 1)), A, x)
 
+# For comparison: a mass matrix would store the scalar `det(J) w ρ(x)` per quadrature
+# point and its product loop would be `submit_value!(ev, m_q * get_value(ev, q), q)`
+# between `evaluate_values!` and `integrate_values!` -- the cell loop, gather/scatter, and
+# contraction machinery are untouched. This separation is what makes the evaluator a
+# candidate for a library abstraction.
+#
 # Note that the loop over the cells can be parallelized without further ado on the CPU
-# (given one set of scratch buffers per task) *except* for the scatter step, which requires
-# the same treatment as parallel assembly: grid coloring or atomic additions, see the
+# (given one evaluator per task) *except* for the scatter step, which requires the same
+# treatment as parallel assembly: grid coloring or atomic additions, see the
 # [multithreaded assembly how-to](@ref howto-threaded-assembly).
 #
 # ## Verification
