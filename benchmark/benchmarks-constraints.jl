@@ -106,3 +106,13 @@ let g = SUITE["constraints"]
     end
     g["close! ProjectedDirichlet H(div)"] = @benchmarkable $close_projected($dh, $set) evals = 1
 end
+
+# Untangle affine constraints that are tangled. This happens in close!.
+let g = SUITE["constraints"]
+    N = 10
+    g["close! untangle AffineConstraint(s)"] = @benchmarkable(
+        Ferrite._untangle_affine_constraints!(ch),
+        setup = (ch = FerriteBenchmarkHelpers.setup_tangled_ch($N)),
+        evals = 1, seconds = 1.0,
+    )
+end
