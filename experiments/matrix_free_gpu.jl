@@ -462,17 +462,20 @@ t_csr_e = best_time(() -> mul!(ye_ref, K_e, Float64.(xe_h)))
 
 # ## Findings and next steps
 #
-# Measured (2026-09-16, heat p2 on the 16³ grid, 35937 dofs):
+# Measured (2026-09-16, p2 on the 16³ grid; heat: 35937 dofs, elasticity: 107811 dofs):
 #
-# | run | matvec |
-# |---|---|
-# | Metal, Apple M3, Float32, thread-per-cell | 0.36 ms |
-# | CPU backend, 1 thread, Float64, same kernel | 0.70 ms |
-# | host `SparseMatrixCSC` SpMV, 1 thread, Float64 | 0.89 ms |
+# | run | heat | elasticity |
+# |---|---|---|
+# | Metal, Apple M3, Float32, thread-per-cell | 0.36-0.53 ms | 0.76 ms |
+# | CPU backend, 1 thread, Float64, same kernels | 0.70-0.80 ms | 2.8 ms |
+# | host `SparseMatrixCSC` SpMV, 1 thread, Float64 | 0.89 ms | 7.3-7.6 ms |
 #
-# I.e. the *naive* device kernel already beats the serial host SpMV by ~2.5x (note the
-# Float32-vs-Float64 and 1-thread caveats), before any of the performance work listed
-# below.
+# I.e. the *naive* device kernel beats the serial host SpMV by ~2x for heat and by ~10x
+# for elasticity (note the Float32-vs-Float64 and 1-thread caveats), before any of the
+# performance work listed below. Elasticity is the decisive case -- more arithmetic per
+# byte and a ~40x smaller operator (~12 MiB of quadrature point data + dofmap against
+# ~0.5 GB of assembled matrix) -- and the sum-factorized kernel wins there even serially
+# on the CPU (2.8 ms vs 7.6 ms).
 #
 # What this script establishes:
 #
