@@ -37,11 +37,12 @@ this shows how to use grid coloring and the structure-of-arrays types in Ferrite
 
 #### [Matrix-free operator evaluation](matrix_free.md)
 
-This guide implements the operator of [Tutorial 1: Heat equation](../tutorials/heat_equation.md)
-*matrix-free*: instead of assembling a sparse matrix, only a small tensor per quadrature
-point is stored ("partial assembly") and the matrix-vector product is evaluated cell by
-cell with sum factorization, exploiting the tensor product structure of the hexahedral
-basis and quadrature. This uses much less memory than the assembled sparse matrix, in
-particular for higher order interpolations.
+This guide implements the operators of [Tutorial 1: Heat equation](../tutorials/heat_equation.md)
+and [Tutorial 2: Linear elasticity](../tutorials/linear_elasticity.md) *matrix-free*:
+instead of assembling a sparse matrix, only a small tensor per quadrature point is stored
+("partial assembly") and the matrix-vector product is evaluated cell by cell with sum
+factorization, exploiting the tensor product structure of the hexahedral basis and
+quadrature. This uses much less memory than the assembled sparse matrix, in particular for
+higher order interpolations and vector valued problems.
 
 ---
