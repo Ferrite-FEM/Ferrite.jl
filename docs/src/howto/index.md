@@ -43,6 +43,8 @@ instead of assembling a sparse matrix, only a small tensor per quadrature point 
 ("partial assembly") and the matrix-vector product is evaluated cell by cell with sum
 factorization, exploiting the tensor product structure of the hexahedral basis and
 quadrature. This uses much less memory than the assembled sparse matrix, in particular for
-higher order interpolations and vector valued problems.
+higher order interpolations and vector valued problems. The guide also shows how to handle
+Dirichlet boundary conditions without a matrix and how to solve the resulting system with
+the conjugate gradient method.
 
 ---

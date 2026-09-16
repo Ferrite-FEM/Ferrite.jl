@@ -99,10 +99,11 @@
 #     below.)
 #
 # !!! note "Boundary conditions"
-#     For simplicity this how-to only considers the raw operators without constraints.
-#     Dirichlet boundary conditions require special treatment for matrix-free operators
-#     (e.g. applying the constraint condensation on the fly around the operator
-#     application) and is left as an exercise for the reader.
+#     Without a matrix there is nothing for `apply!(K, f, ch)` to modify, so Dirichlet
+#     conditions require some (mild) special treatment for matrix-free operators. The
+#     [section on boundary conditions](@ref howto-matrix-free-dirichlet) below shows how to
+#     reproduce the standard workflow with vector operations and a wrapper around the
+#     operator.
 #
 # ## A generic operator
 #
@@ -275,6 +276,140 @@ t_csr = best_time(() -> mul!(y_csr, K, x))
 #    bound and scales like assembly does.
 #  - **Polynomial order**: the arithmetic advantage of sum factorization grows with `p` as
 #    well -- `O(p⁴)` against `O(p⁶)` per cell in 3D.
+#
+# ## [Dirichlet boundary conditions and solving](@id howto-matrix-free-dirichlet)
+#
+# With an assembled matrix, Dirichlet conditions are enforced by modifying the matrix:
+# `apply!(K, f, ch)` zeroes the constrained rows and columns, puts a one on the diagonal,
+# and moves the column contribution of the inhomogeneity to the right hand side. Without a
+# matrix the same three effects are produced with vector operations only:
+#
+#  1. **Lifting**: put the prescribed values in a vector, `apply!(u, ch)` -- this is the
+#     inhomogeneity `g`.
+#  2. **Right hand side**: the column elimination `f - K_fc g` is one application of the
+#     unconstrained operator, `b = f - A * u`, followed by `apply_zero!(b, ch)`.
+#  3. **The operator**: the Krylov solver must see the matrix `[[A_ff, 0], [0, I]]` -- the
+#     same matrix `apply!(K, ch)` produces. This is a thin wrapper around the operator that
+#     overwrites the constrained entries of the output with the corresponding entries of
+#     the input.
+#
+# The wrapper relies on the input having *zeros* in the constrained entries such that the
+# constrained dofs do not pollute the free equations through `A_fc`. This invariant holds
+# automatically inside the Krylov solve: the initial residual `b` is zeroed there (step 2),
+# every iterate is a linear combination of `b` and operator outputs, and the identity block
+# maps zeros to zeros.
+
+struct ConstrainedOperator{A, CH <: ConstraintHandler}
+    A::A
+    ch::CH
+end
+
+Base.size(C::ConstrainedOperator) = size(C.A)
+Base.size(C::ConstrainedOperator, d::Int) = size(C.A, d)
+Base.eltype(C::ConstrainedOperator) = eltype(C.A)
+
+function LinearAlgebra.mul!(y::AbstractVector, C::ConstrainedOperator, x::AbstractVector)
+    mul!(y, C.A, x)
+    @inbounds for d in Ferrite.prescribed_dofs(C.ch)
+        y[d] = x[d] # identity block for the constrained dofs
+    end
+    return y
+end
+
+Base.:*(C::ConstrainedOperator, x::AbstractVector) = mul!(similar(x, size(C, 1)), C, x)
+
+# We solve the heat equation with a unit source term and an inhomogeneous Dirichlet
+# condition on the whole boundary. The constraint handler and the load vector are set up
+# exactly as they would be with an assembled matrix:
+
+ch = ConstraintHandler(dh)
+∂Ω = union((getfacetset(grid, name) for name in ("left", "right", "top", "bottom", "front", "back"))...)
+add!(ch, Dirichlet(:u, ∂Ω, x -> sinpi(x[1]) * x[2]))
+close!(ch);
+
+function assemble_load(dh::DofHandler, ip, qr::QuadratureRule)
+    cv = CellValues(qr, ip)
+    f = zeros(ndofs(dh))
+    fe = zeros(getnbasefunctions(cv))
+    for cell in CellIterator(dh)
+        reinit!(cv, cell)
+        fill!(fe, 0)
+        for q in 1:getnquadpoints(cv)
+            dΩ = getdetJdV(cv, q)
+            for i in 1:getnbasefunctions(cv)
+                fe[i] += shape_value(cv, q, i) * dΩ
+            end
+        end
+        assemble!(f, celldofs(cell), fe)
+    end
+    return f
+end
+
+f = assemble_load(dh, ip, qr);
+
+# Since the operator only exposes `mul!` we solve with the conjugate gradient method. Any
+# Krylov package works here (Krylov.jl, IterativeSolvers.jl, KrylovKit.jl, ...); to keep
+# this how-to dependency free we roll our own textbook implementation:
+
+function conjugate_gradient!(x::AbstractVector, A, b::AbstractVector; tol = 1.0e-12, maxiter = 10_000)
+    r = b - A * x
+    p = copy(r)
+    Ap = similar(b)
+    rr = dot(r, r)
+    rr0 = rr
+    iter = 0
+    while sqrt(rr) > tol * sqrt(rr0) && iter < maxiter
+        mul!(Ap, A, p)
+        α = rr / dot(p, Ap)
+        x .+= α .* p
+        r .-= α .* Ap
+        rr_new = dot(r, r)
+        p .= r .+ (rr_new / rr) .* p
+        rr = rr_new
+        iter += 1
+    end
+    return x, iter
+end
+
+# The solve now follows the same `apply!`/`apply_zero!` rhythm as the assembled workflow:
+
+u_mf = zeros(ndofs(dh))
+apply!(u_mf, ch)                        # lifting: u = g on the constrained dofs
+b = f - A * u_mf                        # column elimination: one unconstrained matvec
+apply_zero!(b, ch)                      # zero the constrained entries
+Δu, iters = conjugate_gradient!(zeros(ndofs(dh)), ConstrainedOperator(A, ch), b)
+u_mf .+= Δu
+apply!(u_mf, ch)                        # (only needed for affine constraints)
+iters
+
+# Compare with the standard assembled workflow (recall that `apply!` modifies `K` and `f`
+# in place):
+
+apply!(K, f, ch)
+u_ref = K \ f
+u_mf ≈ u_ref
+@test u_mf ≈ u_ref #src
+
+# For nonlinear problems inside a Newton loop this simplifies: the increment has
+# homogeneous constraints, so the lifting and the extra matvec disappear and only
+# `apply_zero!` and the wrapped operator remain.
+#
+# Two remarks for more general constraints:
+#
+#  - **Affine constraints** (periodic boundary conditions, hanging nodes from adaptive
+#    refinement) couple dofs, so the projector trick above is not enough: the operator
+#    application needs `C x` before and `Cᵀ y` after, with `C` the affine constraint
+#    matrix. The natural place to implement this is the gather/scatter step -- resolving a
+#    constrained dof to its master combination during `read_dof_values!` and scattering
+#    transposed in `distribute_local_to_global!` -- which is how deal.II handles it.
+#  - The approach here (index lists and masked vector updates) ports directly to the GPU,
+#    where matrix modification would be even more awkward than on the CPU.
+#
+# Unpreconditioned CG is used above to keep the focus on the operator, but note that
+# preconditioning is *the* open question for matrix-free methods: without an assembled
+# matrix there is no ILU or algebraic multigrid, and the practical options are diagonal
+# preconditioning (the diagonal can be computed matrix-free), polynomial/Chebyshev
+# smoothing, and (geometric or `p`-) multigrid with matrix-free level operators.
 #
 # ## Linear elasticity
 #
