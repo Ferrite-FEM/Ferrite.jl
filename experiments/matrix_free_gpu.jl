@@ -136,6 +136,64 @@ end
     end
 end
 
+# A variant with a plain (racy!) scatter, selected with the `noatomics` flag. The result is
+# wrong at shared dofs, but if this kernel runs where the atomic one traps, the problem is
+# the atomics support of the backend and not the kernel body.
+
+@kernel function heat_pa_kernel_noatomics!(
+        y, @Const(x), @Const(dofmap), @Const(Dq),
+        B::SMatrix{NQ, N, T}, D::SMatrix{NQ, N, T},
+    ) where {NQ, N, T}
+    e = @index(Global, Linear)
+    ue = MArray{Tuple{N, N, N}, T}(undef)
+    t1 = MArray{Tuple{NQ, N, N}, T}(undef)
+    t2 = MArray{Tuple{NQ, N, N}, T}(undef)
+    s1 = MArray{Tuple{NQ, NQ, N}, T}(undef)
+    s2 = MArray{Tuple{NQ, NQ, N}, T}(undef)
+    s3 = MArray{Tuple{NQ, NQ, N}, T}(undef)
+    gx = MArray{Tuple{NQ, NQ, NQ}, T}(undef)
+    gy = MArray{Tuple{NQ, NQ, NQ}, T}(undef)
+    gz = MArray{Tuple{NQ, NQ, NQ}, T}(undef)
+    ye = MArray{Tuple{N, N, N}, T}(undef)
+    tmp = MArray{Tuple{N, N, N}, T}(undef)
+    n, nq = Val(N), Val(NQ)
+    Bᵀ = transpose(B)
+    Dᵀ = transpose(D)
+    @inbounds for l in 1:(N * N * N)
+        ue[l] = x[dofmap[l, e]]
+    end
+    Ferrite.contract_1!(t1, B, ue, n, nq)
+    Ferrite.contract_1!(t2, D, ue, n, nq)
+    Ferrite.contract_2!(s1, B, t1, n, nq)
+    Ferrite.contract_2!(s2, D, t1, n, nq)
+    Ferrite.contract_2!(s3, B, t2, n, nq)
+    Ferrite.contract_3!(gx, B, s3, n, nq)
+    Ferrite.contract_3!(gy, B, s2, n, nq)
+    Ferrite.contract_3!(gz, D, s1, n, nq)
+    @inbounds for q in 1:(NQ * NQ * NQ)
+        h = Dq[q, e] ⋅ Vec(gx[q], gy[q], gz[q])
+        gx[q] = h[1]
+        gy[q] = h[2]
+        gz[q] = h[3]
+    end
+    Ferrite.contract_3!(s1, Bᵀ, gx, nq, n)
+    Ferrite.contract_2!(t1, Bᵀ, s1, nq, n)
+    Ferrite.contract_1!(ye, Dᵀ, t1, nq, n)
+    Ferrite.contract_3!(s1, Bᵀ, gy, nq, n)
+    Ferrite.contract_2!(t1, Dᵀ, s1, nq, n)
+    Ferrite.contract_1!(tmp, Bᵀ, t1, nq, n)
+    @inbounds for l in 1:(N * N * N)
+        ye[l] += tmp[l]
+    end
+    Ferrite.contract_3!(s1, Dᵀ, gz, nq, n)
+    Ferrite.contract_2!(t1, Bᵀ, s1, nq, n)
+    Ferrite.contract_1!(tmp, Bᵀ, t1, nq, n)
+    @inbounds for l in 1:(N * N * N)
+        ye[l] += tmp[l]
+        y[dofmap[l, e]] += ye[l] # NOTE: racy, for isolating backend atomics issues only
+    end
+end
+
 # Host-side operator: the same data as the CPU `MatrixFreeOperator` (permuted dofmap and
 # per-quadrature-point data) but with the storage adapted to the backend, plus the 1D
 # matrices as `SMatrix`.
@@ -149,9 +207,11 @@ struct GPUHeatOperator{TB, TD <: AbstractMatrix, TQ <: AbstractMatrix, SB, SD}
     ndofs::Int
 end
 
+const use_atomics = !("noatomics" in ARGS)
+
 function LinearAlgebra.mul!(y::AbstractVector, A::GPUHeatOperator, x::AbstractVector)
     fill!(y, 0)
-    kernel! = heat_pa_kernel!(A.backend)
+    kernel! = use_atomics ? heat_pa_kernel!(A.backend) : heat_pa_kernel_noatomics!(A.backend)
     kernel!(y, x, A.dofmap, A.Dq, A.B, A.D; ndrange = size(A.dofmap, 2))
     KernelAbstractions.synchronize(A.backend)
     return y
@@ -238,7 +298,11 @@ y_ref = K * Float64.(x_h)
 rel_err = norm(y_h - y_ref) / norm(y_ref)
 @printf "relative error vs assembled matrix (T = %s): %.3e\n" T rel_err
 ## Float32 accumulation over 27 dofs and atomics: expect ~sqrt(eps(T)) at worst
-@test rel_err < (T === Float32 ? 5.0f-5 : 1.0e-13)
+if use_atomics
+    @test rel_err < (T === Float32 ? 5.0f-5 : 1.0e-13)
+else
+    @warn "noatomics: racy scatter, skipping the correctness check" rel_err
+end
 
 # ## Timing
 

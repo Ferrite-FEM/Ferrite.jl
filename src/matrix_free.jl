@@ -21,7 +21,7 @@
 # output dimension. Both are known at compile time such that the reduction loop is fully
 # unrolled, with the sum accumulated in a register.
 
-function contract_1!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
+@inline function contract_1!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
     # out[q, j, k] = Σᵢ M[q, i] A[i, j, k]
     @inbounds for k in axes(A, 3), j in axes(A, 2), q in 1:Q
         s = zero(T)
@@ -33,7 +33,7 @@ function contract_1!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::Abstract
     return out
 end
 
-function contract_2!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
+@inline function contract_2!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
     # out[i, q, k] = Σⱼ M[q, j] A[i, j, k]
     @inbounds for k in axes(A, 3), q in 1:Q, i in axes(A, 1)
         s = zero(T)
@@ -45,7 +45,7 @@ function contract_2!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::Abstract
     return out
 end
 
-function contract_3!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
+@inline function contract_3!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
     # out[i, j, q] = Σₖ M[q, k] A[i, j, k]
     @inbounds for q in 1:Q, j in axes(A, 2), i in axes(A, 1)
         s = zero(T)
