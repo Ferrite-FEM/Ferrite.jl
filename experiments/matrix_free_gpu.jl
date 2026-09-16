@@ -865,15 +865,20 @@ t_csr_e = best_time(() -> mul!(ye_ref, K_e, Float64.(xe_h)))
 #
 #     julia --project=experiments experiments/matrix_free_gpu.jl cuda f32 n=40
 #
-# Measured at `n=40` on the H100 NVL (Float32): thread-per-cell 0.256 ms,
-# workgroup-per-cell 0.418 ms, host serial SpMV 22.8 ms. Three take-aways:
+# Measured at `n=40` on the H100 NVL (Float32): thread-per-cell 0.253-0.256 ms,
+# workgroup-per-cell 0.418 ms, multi-cell workgroup 0.351 ms (C=4) / 0.214 ms (C=8) /
+# 0.213 ms (C=16), host serial SpMV 22.8 ms. The batch sweep confirms the occupancy
+# diagnosis: C=8 (216 threads/block) saturates the card and becomes the fastest kernel
+# overall, 1.7x from the cuSPARSE baseline; C=16 gains nothing more, so the remaining gap
+# is not occupancy but the atomic scatter, the Int64 index traffic, and the inherently
+# scattered x[dof] reads. Take-aways from the n=40 runs:
 #
 # - Against the baselines measured in the notes on the same hardware and mesh, partial
-#   assembly already **beats the element-assembly kernel** (0.256 vs 0.390 ms) with far
-#   less storage, and sits 2.1x above vendor-tuned cuSPARSE (0.123 ms). The data volume of
+#   assembly **beats the element-assembly kernel** (0.213 vs 0.390 ms) with far less
+#   storage, and sits 1.7x above vendor-tuned cuSPARSE (0.123 ms). The data volume of
 #   the PA matvec (~80 MB of D_q + dofmap + vectors) corresponds to ~0.03 ms at H100
-#   bandwidth, so the kernel is latency/index-bound with ample headroom -- unlike CSR,
-#   which *is* bandwidth-bound at 254 MiB and has none.
+#   bandwidth, so the kernel is still index/atomics-bound with headroom left -- unlike
+#   CSR, which *is* bandwidth-bound at 254 MiB and has none.
 # - The layouts **flip at scale**: workgroup-per-cell scaled ~linearly from 16³ (it was
 #   already saturated), while thread-per-cell barely moved (0.18 -> 0.256 ms) because at
 #   16³ its 4096 threads left the card mostly idle, and at 40³ its spill traffic gets
