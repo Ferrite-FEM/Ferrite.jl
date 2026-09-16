@@ -57,6 +57,9 @@ backend, default_T = if "metal" in ARGS
 elseif "cuda" in ARGS
     using CUDA
     CUDABackend(), Float64
+elseif "amdgpu" in ARGS
+    using AMDGPU
+    ROCBackend(), Float64
 else
     CPU(), Float64
 end
@@ -185,6 +188,158 @@ end
     end
 end
 
+# ## The workgroup-per-cell kernel
+#
+# The layout deal.II and MFEM use: one *workgroup* (CUDA thread block / Metal threadgroup /
+# AMDGPU wavefront group) per cell, with the scratch in `@localmem` -- the workgroup-shared
+# on-chip memory (CUDA "shared memory", AMDGPU "LDS", Metal "threadgroup memory";
+# KernelAbstractions abstracts all of them) -- and the contractions parallelized over the
+# threads of the workgroup, with `@synchronize` barriers between the phases.
+#
+# For `p = 2` with a 3-point 1D rule every scratch tensor is 3×3×3 (`NQ == N == M`), so a
+# workgroup of `M³ = 27` threads is a perfect fit: thread `(α, β, γ)` owns entry
+# `(α, β, γ)` of every buffer and computes exactly one entry per contraction phase (a
+# 3-term fma loop reading its neighbors' entries from local memory). Compared to the
+# thread-per-cell kernel this removes the ~300 floats of register spill per thread (each
+# thread now holds a couple of accumulators), and the gather is cooperative. The general
+# `NQ != N` case needs a per-stage thread map; here we simply require square 1D matrices.
+#
+# Note for the CPU backend: thread-local variables do not survive `@synchronize` there, so
+# each phase re-derives its indices from `@index` (which is always valid) instead of
+# computing them once.
+
+@inline function _thread_ijk(l, ::Val{M}) where {M}
+    return ((l - 1) % M + 1, ((l - 1) ÷ M) % M + 1, (l - 1) ÷ (M * M) + 1)
+end
+
+@kernel function heat_pa_kernel_wgpc!(
+        y, @Const(x), @Const(dofmap), @Const(Dq),
+        B::SMatrix{M, M, T}, D::SMatrix{M, M, T},
+    ) where {M, T}
+    ue = @localmem T (M, M, M)
+    t1 = @localmem T (M, M, M)
+    t2 = @localmem T (M, M, M)
+    s1 = @localmem T (M, M, M)
+    s2 = @localmem T (M, M, M)
+    s3 = @localmem T (M, M, M)
+    gx = @localmem T (M, M, M)
+    gy = @localmem T (M, M, M)
+    gz = @localmem T (M, M, M)
+    ## NOTE: on the CPU backend thread-local variables do not survive `@synchronize`, and
+    ## `@index` calls must sit at the top level of each phase (not nested in other macro
+    ## blocks) -- hence every phase re-derives its indices.
+    ## Gather: one dof per thread (cooperative)
+    l = @index(Local, Linear)
+    gl = @index(Global, Linear)
+    e = (gl - l) ÷ (M * M * M) + 1
+    @inbounds ue[l] = x[dofmap[l, e]]
+    @synchronize
+    ## Contract dimension 1: t1 = C1(B, ue), t2 = C1(D, ue)
+    l = @index(Local, Linear)
+    α, β, γ = _thread_ijk(l, Val(M))
+    @inbounds begin
+        a1 = zero(T)
+        a2 = zero(T)
+        for i in 1:M
+            v = ue[i, β, γ]
+            a1 = muladd(B[α, i], v, a1)
+            a2 = muladd(D[α, i], v, a2)
+        end
+        t1[l] = a1
+        t2[l] = a2
+    end
+    @synchronize
+    ## Contract dimension 2: s1 = C2(B, t1), s2 = C2(D, t1), s3 = C2(B, t2)
+    l = @index(Local, Linear)
+    α, β, γ = _thread_ijk(l, Val(M))
+    @inbounds begin
+        a1 = zero(T)
+        a2 = zero(T)
+        a3 = zero(T)
+        for j in 1:M
+            v1 = t1[α, j, γ]
+            v2 = t2[α, j, γ]
+            a1 = muladd(B[β, j], v1, a1)
+            a2 = muladd(D[β, j], v1, a2)
+            a3 = muladd(B[β, j], v2, a3)
+        end
+        s1[l] = a1
+        s2[l] = a2
+        s3[l] = a3
+    end
+    @synchronize
+    ## Contract dimension 3 (gx = C3(B, s3) etc.), fused with the pointwise application of
+    ## D_q: the thread that computes the gradient at quadrature point l = (α, β, γ) also
+    ## owns that point's slot of gx/gy/gz, so no barrier is needed in between.
+    l = @index(Local, Linear)
+    gl = @index(Global, Linear)
+    e = (gl - l) ÷ (M * M * M) + 1
+    α, β, γ = _thread_ijk(l, Val(M))
+    @inbounds begin
+        a1 = zero(T)
+        a2 = zero(T)
+        a3 = zero(T)
+        for k in 1:M
+            a1 = muladd(B[γ, k], s3[α, β, k], a1)
+            a2 = muladd(B[γ, k], s2[α, β, k], a2)
+            a3 = muladd(D[γ, k], s1[α, β, k], a3)
+        end
+        h = Dq[l, e] ⋅ Vec(a1, a2, a3)
+        gx[l] = h[1]
+        gy[l] = h[2]
+        gz[l] = h[3]
+    end
+    @synchronize
+    ## Integrate, transposed contractions: contract dimension 3 with Bᵀ/Dᵀ
+    l = @index(Local, Linear)
+    α, β, γ = _thread_ijk(l, Val(M))
+    @inbounds begin
+        a1 = zero(T)
+        a2 = zero(T)
+        a3 = zero(T)
+        for k in 1:M
+            a1 = muladd(B[k, γ], gx[α, β, k], a1) # Bᵀ[γ, k] == B[k, γ]
+            a2 = muladd(B[k, γ], gy[α, β, k], a2)
+            a3 = muladd(D[k, γ], gz[α, β, k], a3)
+        end
+        s1[l] = a1
+        s2[l] = a2
+        s3[l] = a3
+    end
+    @synchronize
+    ## Contract dimension 2 with Bᵀ/Dᵀ (t3 reuses the gx buffer)
+    l = @index(Local, Linear)
+    α, β, γ = _thread_ijk(l, Val(M))
+    @inbounds begin
+        a1 = zero(T)
+        a2 = zero(T)
+        a3 = zero(T)
+        for j in 1:M
+            a1 = muladd(B[j, β], s1[α, j, γ], a1)
+            a2 = muladd(D[j, β], s2[α, j, γ], a2)
+            a3 = muladd(B[j, β], s3[α, j, γ], a3)
+        end
+        t1[l] = a1
+        t2[l] = a2
+        gx[l] = a3
+    end
+    @synchronize
+    ## Contract dimension 1 with Dᵀ/Bᵀ, sum the three components, and scatter. The result
+    ## entry is owned by this thread, so it goes straight from registers to the atomic add.
+    l = @index(Local, Linear)
+    gl = @index(Global, Linear)
+    e = (gl - l) ÷ (M * M * M) + 1
+    α, β, γ = _thread_ijk(l, Val(M))
+    @inbounds begin
+        a = zero(T)
+        for i in 1:M
+            a = muladd(D[i, α], t1[i, β, γ], a)
+            a = muladd(B[i, α], t2[i, β, γ] + gx[i, β, γ], a)
+        end
+        Atomix.@atomic y[dofmap[l, e]] += a
+    end
+end
+
 # Host-side operator: the same data as the CPU `MatrixFreeOperator` (permuted dofmap and
 # per-quadrature-point data) but with the storage adapted to the backend, plus the 1D
 # matrices as `SMatrix`.
@@ -305,6 +460,47 @@ end
 t_dev = best_time(() -> mul!(y_d, A, x_d))
 t_csr = best_time(() -> mul!(y_ref, K, Float64.(x_h)))
 @printf "matvec: device (thread-per-cell) %.3f ms | host cuSPARSE-analog (SparseMatrixCSC) %.3f ms\n" 1000t_dev 1000t_csr
+
+# ## The workgroup-per-cell variant, verified and timed
+#
+# Same data, different kernel and launch geometry: `M³` threads per workgroup, one
+# workgroup per cell (`ndrange = M³ * ncells` with workgroup size `M³`).
+
+struct GPUHeatOperatorWGPC{TB, TD <: AbstractMatrix, TQ <: AbstractMatrix, SB, SD}
+    backend::TB
+    dofmap::TD
+    Dq::TQ
+    B::SB
+    D::SD
+    ndofs::Int
+end
+
+function LinearAlgebra.mul!(y::AbstractVector, A::GPUHeatOperatorWGPC, x::AbstractVector)
+    M = size(A.B, 1)
+    @assert M == size(A.B, 2) # the cooperative kernel assumes NQ == N
+    fill!(y, 0)
+    kernel! = heat_pa_kernel_wgpc!(A.backend, M^3)
+    kernel!(y, x, A.dofmap, A.Dq, A.B, A.D; ndrange = M^3 * size(A.dofmap, 2))
+    KernelAbstractions.synchronize(A.backend)
+    return y
+end
+
+A_wg = GPUHeatOperatorWGPC(backend, A.dofmap, A.Dq, B, D, ndofs(dh))
+
+mul!(y_d, A_wg, x_d)
+rel_err_wg = norm(Array(y_d) - y_ref) / norm(y_ref)
+@printf "workgroup-per-cell: relative error vs assembled matrix: %.3e\n" rel_err_wg
+@test rel_err_wg < (T === Float32 ? 5.0f-5 : 1.0e-13)
+
+t_wg = best_time(() -> mul!(y_d, A_wg, x_d))
+@printf "matvec: device (workgroup-per-cell) %.3f ms | (thread-per-cell) %.3f ms\n" 1000t_wg 1000t_dev
+
+# Note that on the *CPU* backend the workgroup-per-cell kernel is expected to be *slower*
+# than thread-per-cell: the CPU emulates workgroups and barriers by splitting the kernel
+# into one loop per phase, which costs overhead and buys nothing (a CPU thread has no
+# register pressure problem at this size and nobody to cooperate with). The comparison
+# only becomes meaningful on an actual GPU, where the localmem layout eliminates the
+# per-thread register spill.
 
 # ## Linear elasticity on the device
 #
