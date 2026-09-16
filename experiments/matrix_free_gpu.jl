@@ -317,6 +317,18 @@ t_csr = best_time(() -> mul!(y_ref, K, Float64.(x_h)))
 
 # ## Findings and next steps
 #
+# Measured (2026-09-16, heat p2 on the 16³ grid, 35937 dofs):
+#
+# | run | matvec |
+# |---|---|
+# | Metal, Apple M3, Float32, thread-per-cell | 0.36 ms |
+# | CPU backend, 1 thread, Float64, same kernel | 0.70 ms |
+# | host `SparseMatrixCSC` SpMV, 1 thread, Float64 | 0.89 ms |
+#
+# I.e. the *naive* device kernel already beats the serial host SpMV by ~2.5x (note the
+# Float32-vs-Float64 and 1-thread caveats), before any of the performance work listed
+# below.
+#
 # What this script establishes:
 #
 # 1. The sum factorization kernels in Ferrite are **device-portable as-is** (after the
