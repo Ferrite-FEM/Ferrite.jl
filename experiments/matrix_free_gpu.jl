@@ -635,11 +635,14 @@ t_csr_e = best_time(() -> mul!(ye_ref, K_e, Float64.(xe_h)))
 #
 # | run | heat | elasticity |
 # |---|---|---|
-# | Metal, Apple M3, Float32, thread-per-cell | 0.36-0.54 ms | 0.63-0.76 ms |
-# | Metal, Apple M3, Float32, workgroup-per-cell | 0.46 ms | -- |
-# | CPU backend, 1 thread, Float64, thread-per-cell | 0.70-0.81 ms | 2.8 ms |
-# | CPU backend, 1 thread, Float64, workgroup-per-cell | 1.27 ms | -- |
+# | Metal, Apple M3, Float32, thread-per-cell | 0.36-0.54 ms | 0.63-0.86 ms |
+# | Metal, Apple M3, Float32, workgroup-per-cell | 0.45-0.46 ms | -- |
+# | CPU backend, 1 thread, Float64, thread-per-cell | 0.70-0.85 ms | 2.8 ms |
+# | CPU backend, 1 thread, Float64, workgroup-per-cell | 1.3-1.7 ms | -- |
 # | host `SparseMatrixCSC` SpMV, 1 thread, Float64 | 0.89 ms | 7.3-7.6 ms |
+#
+# (Ranges are run-to-run variance on identical code -- the M3 numbers wander by ~20-30%
+# between invocations, so treat single-run comparisons below that margin as noise.)
 #
 # I.e. the *naive* device kernel beats the serial host SpMV by ~2x for heat and by ~11x
 # for elasticity (note the Float32-vs-Float64 and 1-thread caveats), before most of the
