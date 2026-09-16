@@ -16,19 +16,48 @@
 # Contraction of the 1D operator matrix `M` with one of the three dimensions of the rank-3
 # tensor `A`. The output dimension (the row index of `M`) can differ from the input
 # dimension, so the same functions implement both interpolation (`n1d -> nq1d`) and, with
-# the transposed operator, integration (`nq1d -> n1d`). The two sizes are passed as `Val`s:
-# `P` is the length of the contracted dimension and `Q` the length of the corresponding
-# output dimension. Both are known at compile time such that the reduction loop is fully
-# unrolled, with the sum accumulated in a register.
+# the transposed operator, integration (`nq1d -> n1d`). The length `P` of the contracted
+# dimension is passed as a `Val` such that the reduction loop is fully unrolled, with the
+# sum accumulated in a register.
+#
+# The computation is split in two layers. `contract_<d>_entry` computes a *single entry*
+# of the output -- the innermost reduction -- and is the shared core: a serial caller that
+# owns a whole cell (the `TensorProductEvaluator`, or one GPU thread in a
+# thread-per-cell kernel) uses the `contract_<d>!` wrappers that loop over all output
+# entries, whereas a cooperative GPU kernel (one workgroup per cell, one output entry per
+# thread) calls the entry functions directly with its thread's output index.
+
+@inline function contract_1_entry(M::AbstractMatrix, A::AbstractArray{<:Any, 3}, q::Int, j::Int, k::Int, ::Val{P}) where {P}
+    # Σᵢ M[q, i] A[i, j, k]
+    s = zero(eltype(A))
+    @inbounds for i in 1:P
+        s = muladd(M[q, i], A[i, j, k], s)
+    end
+    return s
+end
+
+@inline function contract_2_entry(M::AbstractMatrix, A::AbstractArray{<:Any, 3}, i::Int, q::Int, k::Int, ::Val{P}) where {P}
+    # Σⱼ M[q, j] A[i, j, k]
+    s = zero(eltype(A))
+    @inbounds for j in 1:P
+        s = muladd(M[q, j], A[i, j, k], s)
+    end
+    return s
+end
+
+@inline function contract_3_entry(M::AbstractMatrix, A::AbstractArray{<:Any, 3}, i::Int, j::Int, q::Int, ::Val{P}) where {P}
+    # Σₖ M[q, k] A[i, j, k]
+    s = zero(eltype(A))
+    @inbounds for k in 1:P
+        s = muladd(M[q, k], A[i, j, k], s)
+    end
+    return s
+end
 
 @inline function contract_1!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
     # out[q, j, k] = Σᵢ M[q, i] A[i, j, k]
     @inbounds for k in axes(A, 3), j in axes(A, 2), q in 1:Q
-        s = zero(T)
-        for i in 1:P
-            s = muladd(M[q, i], A[i, j, k], s)
-        end
-        out[q, j, k] = s
+        out[q, j, k] = contract_1_entry(M, A, q, j, k, Val(P))
     end
     return out
 end
@@ -36,11 +65,7 @@ end
 @inline function contract_2!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
     # out[i, q, k] = Σⱼ M[q, j] A[i, j, k]
     @inbounds for k in axes(A, 3), q in 1:Q, i in axes(A, 1)
-        s = zero(T)
-        for j in 1:P
-            s = muladd(M[q, j], A[i, j, k], s)
-        end
-        out[i, q, k] = s
+        out[i, q, k] = contract_2_entry(M, A, i, q, k, Val(P))
     end
     return out
 end
@@ -48,11 +73,7 @@ end
 @inline function contract_3!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
     # out[i, j, q] = Σₖ M[q, k] A[i, j, k]
     @inbounds for q in 1:Q, j in axes(A, 2), i in axes(A, 1)
-        s = zero(T)
-        for k in 1:P
-            s = muladd(M[q, k], A[i, j, k], s)
-        end
-        out[i, j, q] = s
+        out[i, j, q] = contract_3_entry(M, A, i, j, q, Val(P))
     end
     return out
 end

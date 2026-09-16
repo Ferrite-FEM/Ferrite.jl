@@ -13,11 +13,15 @@
 #
 # Taking stock of what `src/matrix_free.jl` defines and how each piece relates to a GPU:
 #
-# - The **contraction kernels** (`contract_1!/2!/3!`) are plain loops with compile-time
-#   trip counts over `AbstractArray`s -- they compile for the GPU *unchanged* and are
-#   called from inside the device kernel below, operating on stack-allocated `MArray`s
-#   with the 1D matrices passed by value as `SMatrix`. (The only change this required in
-#   Ferrite was relaxing their signature from `Matrix` to `AbstractMatrix`.)
+# - The **contraction kernels** are plain loops with compile-time trip counts over
+#   `AbstractArray`s -- they compile for the GPU *unchanged*. They are layered in Ferrite
+#   as single-entry reductions (`contract_<d>_entry`, the shared core) wrapped by loops
+#   over all output entries (`contract_<d>!`): the thread-per-cell kernels below call the
+#   `!` wrappers on stack-allocated `MArray`s (one thread owns the whole cell), while the
+#   workgroup-per-cell kernel calls the entry functions directly (one thread owns one
+#   output entry), so both layouts and the CPU evaluator share the same innermost math.
+#   The 1D matrices are passed by value as `SMatrix`. (The only signature change this
+#   required in Ferrite was `Matrix` -> `AbstractMatrix`.)
 # - The **`ConstrainedDofMap` / dofmap / `Dq` data** is plain, isbits-element arrays. This
 #   is what `Adapt.jl` is for: `adapt(backend, x)` converts the storage to the backend's
 #   array type (KernelAbstractions implements the adaptor for every backend). For the
@@ -225,6 +229,9 @@ end
     gx = @localmem T (M, M, M)
     gy = @localmem T (M, M, M)
     gz = @localmem T (M, M, M)
+    ## Each phase computes one output entry per thread, calling the same
+    ## `Ferrite.contract_<d>_entry` reductions that the serial `contract_<d>!` wrappers
+    ## (and thereby the CPU evaluator and the thread-per-cell kernels) are built from.
     ## NOTE: on the CPU backend thread-local variables do not survive `@synchronize`, and
     ## `@index` calls must sit at the top level of each phase (not nested in other macro
     ## blocks) -- hence every phase re-derives its indices.
@@ -238,34 +245,17 @@ end
     l = @index(Local, Linear)
     α, β, γ = _thread_ijk(l, Val(M))
     @inbounds begin
-        a1 = zero(T)
-        a2 = zero(T)
-        for i in 1:M
-            v = ue[i, β, γ]
-            a1 = muladd(B[α, i], v, a1)
-            a2 = muladd(D[α, i], v, a2)
-        end
-        t1[l] = a1
-        t2[l] = a2
+        t1[l] = Ferrite.contract_1_entry(B, ue, α, β, γ, Val(M))
+        t2[l] = Ferrite.contract_1_entry(D, ue, α, β, γ, Val(M))
     end
     @synchronize
     ## Contract dimension 2: s1 = C2(B, t1), s2 = C2(D, t1), s3 = C2(B, t2)
     l = @index(Local, Linear)
     α, β, γ = _thread_ijk(l, Val(M))
     @inbounds begin
-        a1 = zero(T)
-        a2 = zero(T)
-        a3 = zero(T)
-        for j in 1:M
-            v1 = t1[α, j, γ]
-            v2 = t2[α, j, γ]
-            a1 = muladd(B[β, j], v1, a1)
-            a2 = muladd(D[β, j], v1, a2)
-            a3 = muladd(B[β, j], v2, a3)
-        end
-        s1[l] = a1
-        s2[l] = a2
-        s3[l] = a3
+        s1[l] = Ferrite.contract_2_entry(B, t1, α, β, γ, Val(M))
+        s2[l] = Ferrite.contract_2_entry(D, t1, α, β, γ, Val(M))
+        s3[l] = Ferrite.contract_2_entry(B, t2, α, β, γ, Val(M))
     end
     @synchronize
     ## Contract dimension 3 (gx = C3(B, s3) etc.), fused with the pointwise application of
@@ -276,14 +266,9 @@ end
     e = (gl - l) ÷ (M * M * M) + 1
     α, β, γ = _thread_ijk(l, Val(M))
     @inbounds begin
-        a1 = zero(T)
-        a2 = zero(T)
-        a3 = zero(T)
-        for k in 1:M
-            a1 = muladd(B[γ, k], s3[α, β, k], a1)
-            a2 = muladd(B[γ, k], s2[α, β, k], a2)
-            a3 = muladd(D[γ, k], s1[α, β, k], a3)
-        end
+        a1 = Ferrite.contract_3_entry(B, s3, α, β, γ, Val(M))
+        a2 = Ferrite.contract_3_entry(B, s2, α, β, γ, Val(M))
+        a3 = Ferrite.contract_3_entry(D, s1, α, β, γ, Val(M))
         h = Dq[l, e] ⋅ Vec(a1, a2, a3)
         gx[l] = h[1]
         gy[l] = h[2]
@@ -293,35 +278,23 @@ end
     ## Integrate, transposed contractions: contract dimension 3 with Bᵀ/Dᵀ
     l = @index(Local, Linear)
     α, β, γ = _thread_ijk(l, Val(M))
+    Bᵀ = transpose(B)
+    Dᵀ = transpose(D)
     @inbounds begin
-        a1 = zero(T)
-        a2 = zero(T)
-        a3 = zero(T)
-        for k in 1:M
-            a1 = muladd(B[k, γ], gx[α, β, k], a1) # Bᵀ[γ, k] == B[k, γ]
-            a2 = muladd(B[k, γ], gy[α, β, k], a2)
-            a3 = muladd(D[k, γ], gz[α, β, k], a3)
-        end
-        s1[l] = a1
-        s2[l] = a2
-        s3[l] = a3
+        s1[l] = Ferrite.contract_3_entry(Bᵀ, gx, α, β, γ, Val(M))
+        s2[l] = Ferrite.contract_3_entry(Bᵀ, gy, α, β, γ, Val(M))
+        s3[l] = Ferrite.contract_3_entry(Dᵀ, gz, α, β, γ, Val(M))
     end
     @synchronize
     ## Contract dimension 2 with Bᵀ/Dᵀ (t3 reuses the gx buffer)
     l = @index(Local, Linear)
     α, β, γ = _thread_ijk(l, Val(M))
+    Bᵀ = transpose(B)
+    Dᵀ = transpose(D)
     @inbounds begin
-        a1 = zero(T)
-        a2 = zero(T)
-        a3 = zero(T)
-        for j in 1:M
-            a1 = muladd(B[j, β], s1[α, j, γ], a1)
-            a2 = muladd(D[j, β], s2[α, j, γ], a2)
-            a3 = muladd(B[j, β], s3[α, j, γ], a3)
-        end
-        t1[l] = a1
-        t2[l] = a2
-        gx[l] = a3
+        t1[l] = Ferrite.contract_2_entry(Bᵀ, s1, α, β, γ, Val(M))
+        t2[l] = Ferrite.contract_2_entry(Dᵀ, s2, α, β, γ, Val(M))
+        gx[l] = Ferrite.contract_2_entry(Bᵀ, s3, α, β, γ, Val(M))
     end
     @synchronize
     ## Contract dimension 1 with Dᵀ/Bᵀ, sum the three components, and scatter. The result
@@ -330,12 +303,12 @@ end
     gl = @index(Global, Linear)
     e = (gl - l) ÷ (M * M * M) + 1
     α, β, γ = _thread_ijk(l, Val(M))
+    Bᵀ = transpose(B)
+    Dᵀ = transpose(D)
     @inbounds begin
-        a = zero(T)
-        for i in 1:M
-            a = muladd(D[i, α], t1[i, β, γ], a)
-            a = muladd(B[i, α], t2[i, β, γ] + gx[i, β, γ], a)
-        end
+        a = Ferrite.contract_1_entry(Dᵀ, t1, α, β, γ, Val(M)) +
+            Ferrite.contract_1_entry(Bᵀ, t2, α, β, γ, Val(M)) +
+            Ferrite.contract_1_entry(Bᵀ, gx, α, β, γ, Val(M))
         Atomix.@atomic y[dofmap[l, e]] += a
     end
 end
