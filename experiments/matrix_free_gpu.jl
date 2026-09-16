@@ -9,7 +9,9 @@
 #
 # and analogously with `cuda` (CUDA.jl) or `amdgpu` (AMDGPU.jl). Additional flags: `f32`
 # forces Float32 on any backend (Metal always uses Float32; pass it on CUDA to compare
-# against Metal numbers), `noatomics` selects the racy-scatter debug kernel.
+# against Metal numbers), `noatomics` selects the racy-scatter debug kernel, `n=NN` sets
+# the heat grid size (default 16), and `c=NN` the cells-per-workgroup batch of the
+# multi-cell kernel (default 4).
 #
 # To run on a remote CUDA host, copy this directory (note that `.git` is a worktree
 # pointer file and useless remotely) and instantiate the environment there -- the
@@ -328,6 +330,138 @@ end
     end
 end
 
+# ## The multi-cell workgroup kernel
+#
+# The n=40 H100 runs showed the weakness of 27-thread workgroups: one warp with 5 idle
+# lanes, and so few threads per block that the blocks-per-SM cap limits occupancy to
+# ~40%. The remedy (what deal.II and MFEM do) is to process a *batch* of `C` cells per
+# workgroup: `C * M³` threads (C = 4 gives 108 threads, i.e. full-ish warps and a ~95%
+# occupancy ceiling), with the localmem buffers gaining a cell dimension and the barriers
+# amortized over the batch. Thread `lt` handles slot `s` of batch-cell `c`.
+#
+# A batch may straddle the end of the cell range; to keep the barriers non-divergent every
+# thread executes all phases with the cell index clamped into range, and only the final
+# scatter is guarded by the true cell index.
+
+@kernel function heat_pa_kernel_wgmc!(
+        y, @Const(x), @Const(dofmap), @Const(Dq),
+        B::SMatrix{M, M, T}, D::SMatrix{M, M, T}, ncells::Int, ::Val{C},
+    ) where {M, T, C}
+    ue = @localmem T (M, M, M, C)
+    t1 = @localmem T (M, M, M, C)
+    t2 = @localmem T (M, M, M, C)
+    s1 = @localmem T (M, M, M, C)
+    s2 = @localmem T (M, M, M, C)
+    s3 = @localmem T (M, M, M, C)
+    gx = @localmem T (M, M, M, C)
+    gy = @localmem T (M, M, M, C)
+    gz = @localmem T (M, M, M, C)
+    ## Gather
+    lt = @index(Local, Linear)
+    gl = @index(Global, Linear)
+    s = (lt - 1) % (M * M * M) + 1
+    c = (lt - 1) ÷ (M * M * M) + 1
+    e = min((gl - lt) ÷ (C * M * M * M) * C + c, ncells)
+    @inbounds ue[s + (c - 1) * M * M * M] = x[dofmap[s, e]]
+    @synchronize
+    ## Contract dimension 1
+    lt = @index(Local, Linear)
+    s = (lt - 1) % (M * M * M) + 1
+    c = (lt - 1) ÷ (M * M * M) + 1
+    α, β, γ = _thread_ijk(s, Val(M))
+    @inbounds begin
+        uec = @view ue[:, :, :, c]
+        t1[lt] = Ferrite.contract_1_entry(B, uec, α, β, γ, Val(M))
+        t2[lt] = Ferrite.contract_1_entry(D, uec, α, β, γ, Val(M))
+    end
+    @synchronize
+    ## Contract dimension 2
+    lt = @index(Local, Linear)
+    s = (lt - 1) % (M * M * M) + 1
+    c = (lt - 1) ÷ (M * M * M) + 1
+    α, β, γ = _thread_ijk(s, Val(M))
+    @inbounds begin
+        t1c = @view t1[:, :, :, c]
+        t2c = @view t2[:, :, :, c]
+        s1[lt] = Ferrite.contract_2_entry(B, t1c, α, β, γ, Val(M))
+        s2[lt] = Ferrite.contract_2_entry(D, t1c, α, β, γ, Val(M))
+        s3[lt] = Ferrite.contract_2_entry(B, t2c, α, β, γ, Val(M))
+    end
+    @synchronize
+    ## Contract dimension 3, fused with the pointwise application of D_q
+    lt = @index(Local, Linear)
+    gl = @index(Global, Linear)
+    s = (lt - 1) % (M * M * M) + 1
+    c = (lt - 1) ÷ (M * M * M) + 1
+    e = min((gl - lt) ÷ (C * M * M * M) * C + c, ncells)
+    α, β, γ = _thread_ijk(s, Val(M))
+    @inbounds begin
+        s1c = @view s1[:, :, :, c]
+        s2c = @view s2[:, :, :, c]
+        s3c = @view s3[:, :, :, c]
+        a1 = Ferrite.contract_3_entry(B, s3c, α, β, γ, Val(M))
+        a2 = Ferrite.contract_3_entry(B, s2c, α, β, γ, Val(M))
+        a3 = Ferrite.contract_3_entry(D, s1c, α, β, γ, Val(M))
+        h = Dq[s, e] ⋅ Vec(a1, a2, a3)
+        gx[lt] = h[1]
+        gy[lt] = h[2]
+        gz[lt] = h[3]
+    end
+    @synchronize
+    ## Integrate: contract dimension 3 with Bᵀ/Dᵀ
+    lt = @index(Local, Linear)
+    s = (lt - 1) % (M * M * M) + 1
+    c = (lt - 1) ÷ (M * M * M) + 1
+    α, β, γ = _thread_ijk(s, Val(M))
+    Bᵀ = transpose(B)
+    Dᵀ = transpose(D)
+    @inbounds begin
+        gxc = @view gx[:, :, :, c]
+        gyc = @view gy[:, :, :, c]
+        gzc = @view gz[:, :, :, c]
+        s1[lt] = Ferrite.contract_3_entry(Bᵀ, gxc, α, β, γ, Val(M))
+        s2[lt] = Ferrite.contract_3_entry(Bᵀ, gyc, α, β, γ, Val(M))
+        s3[lt] = Ferrite.contract_3_entry(Dᵀ, gzc, α, β, γ, Val(M))
+    end
+    @synchronize
+    ## Contract dimension 2 with Bᵀ/Dᵀ (t3 reuses the gx buffer)
+    lt = @index(Local, Linear)
+    s = (lt - 1) % (M * M * M) + 1
+    c = (lt - 1) ÷ (M * M * M) + 1
+    α, β, γ = _thread_ijk(s, Val(M))
+    Bᵀ = transpose(B)
+    Dᵀ = transpose(D)
+    @inbounds begin
+        s1c = @view s1[:, :, :, c]
+        s2c = @view s2[:, :, :, c]
+        s3c = @view s3[:, :, :, c]
+        t1[lt] = Ferrite.contract_2_entry(Bᵀ, s1c, α, β, γ, Val(M))
+        t2[lt] = Ferrite.contract_2_entry(Dᵀ, s2c, α, β, γ, Val(M))
+        gx[lt] = Ferrite.contract_2_entry(Bᵀ, s3c, α, β, γ, Val(M))
+    end
+    @synchronize
+    ## Contract dimension 1 with Dᵀ/Bᵀ, sum the components, and scatter (guarded by the
+    ## true cell index -- padded threads computed garbage on the clamped cell but write
+    ## nothing).
+    lt = @index(Local, Linear)
+    gl = @index(Global, Linear)
+    s = (lt - 1) % (M * M * M) + 1
+    c = (lt - 1) ÷ (M * M * M) + 1
+    etrue = (gl - lt) ÷ (C * M * M * M) * C + c
+    α, β, γ = _thread_ijk(s, Val(M))
+    Bᵀ = transpose(B)
+    Dᵀ = transpose(D)
+    @inbounds if etrue <= ncells
+        t1c = @view t1[:, :, :, c]
+        t2c = @view t2[:, :, :, c]
+        gxc = @view gx[:, :, :, c]
+        a = Ferrite.contract_1_entry(Dᵀ, t1c, α, β, γ, Val(M)) +
+            Ferrite.contract_1_entry(Bᵀ, t2c, α, β, γ, Val(M)) +
+            Ferrite.contract_1_entry(Bᵀ, gxc, α, β, γ, Val(M))
+        Atomix.@atomic y[dofmap[s, etrue]] += a
+    end
+end
+
 # Host-side operator: the same data as the CPU `MatrixFreeOperator` (permuted dofmap and
 # per-quadrature-point data) but with the storage adapted to the backend, plus the 1D
 # matrices as `SMatrix`.
@@ -502,6 +636,48 @@ t_wg = best_time(() -> mul!(y_d, A_wg, x_d))
 # register pressure problem at this size and nobody to cooperate with). The comparison
 # only becomes meaningful on an actual GPU, where the localmem layout eliminates the
 # per-thread register spill.
+#
+# ## The multi-cell workgroup variant, verified and timed
+#
+# The batch size is set with a `c=NN` argument (default 4, i.e. 108-thread workgroups).
+
+cbatch = 4
+for a in ARGS
+    m = match(r"^c=(\d+)$", a)
+    m === nothing || global cbatch = parse(Int, m[1])
+end
+
+struct GPUHeatOperatorWGMC{TB, TD <: AbstractMatrix, TQ <: AbstractMatrix, SB, SD}
+    backend::TB
+    dofmap::TD
+    Dq::TQ
+    B::SB
+    D::SD
+    ndofs::Int
+    cbatch::Int
+end
+
+function LinearAlgebra.mul!(y::AbstractVector, A::GPUHeatOperatorWGMC, x::AbstractVector)
+    M = size(A.B, 1)
+    @assert M == size(A.B, 2)
+    C = A.cbatch
+    ncells = size(A.dofmap, 2)
+    fill!(y, 0)
+    kernel! = heat_pa_kernel_wgmc!(A.backend, C * M^3)
+    kernel!(y, x, A.dofmap, A.Dq, A.B, A.D, ncells, Val(C); ndrange = cld(ncells, C) * C * M^3)
+    KernelAbstractions.synchronize(A.backend)
+    return y
+end
+
+A_wgmc = GPUHeatOperatorWGMC(backend, A.dofmap, A.Dq, B, D, ndofs(dh), cbatch)
+
+mul!(y_d, A_wgmc, x_d)
+rel_err_wgmc = norm(Array(y_d) - y_ref) / norm(y_ref)
+@printf "multi-cell workgroup (C = %d): relative error vs assembled matrix: %.3e\n" cbatch rel_err_wgmc
+@test rel_err_wgmc < (T === Float32 ? 5.0f-5 : 1.0e-13)
+
+t_wgmc = best_time(() -> mul!(y_d, A_wgmc, x_d))
+@printf "matvec: device (multi-cell workgroup, C = %d) %.3f ms | (workgroup-per-cell) %.3f ms | (thread-per-cell) %.3f ms\n" cbatch 1000t_wgmc 1000t_wg 1000t_dev
 
 # ## Linear elasticity on the device
 #
