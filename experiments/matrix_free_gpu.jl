@@ -7,7 +7,21 @@
 #     julia --project=experiments -e 'import Pkg; Pkg.add("Metal")'
 #     julia --project=experiments experiments/matrix_free_gpu.jl metal
 #
-# (and analogously with CUDA.jl / `CUDABackend()` etc.)
+# and analogously with `cuda` (CUDA.jl) or `amdgpu` (AMDGPU.jl). Additional flags: `f32`
+# forces Float32 on any backend (Metal always uses Float32; pass it on CUDA to compare
+# against Metal numbers), `noatomics` selects the racy-scatter debug kernel.
+#
+# To run on a remote CUDA host, copy this directory (note that `.git` is a worktree
+# pointer file and useless remotely) and instantiate the environment there -- the
+# `experiments` Manifest tracks Ferrite by the relative path `..`, so the copied source is
+# used as is:
+#
+#     rsync -av --exclude='.git' ./ user@host:ferrite-matrix-free/
+#     ssh user@host
+#     cd ferrite-matrix-free
+#     julia --project=experiments -e 'import Pkg; Pkg.instantiate(); Pkg.add("CUDA")'
+#     julia --project=experiments experiments/matrix_free_gpu.jl cuda
+#     julia --project=experiments experiments/matrix_free_gpu.jl cuda f32
 #
 # ## Portability of the pieces
 #
@@ -60,6 +74,7 @@ backend, default_T = if "metal" in ARGS
     MetalBackend(), Float32
 elseif "cuda" in ARGS
     using CUDA
+    @info "CUDA device" name = CUDA.name(CUDA.device())
     CUDABackend(), Float64
 elseif "amdgpu" in ARGS
     using AMDGPU
