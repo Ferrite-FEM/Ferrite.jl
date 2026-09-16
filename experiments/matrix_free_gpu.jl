@@ -689,6 +689,26 @@ t_csr_e = best_time(() -> mul!(ye_ref, K_e, Float64.(xe_h)))
 #
 #     julia --project=experiments experiments/matrix_free_gpu.jl cuda f32 n=40
 #
+# Measured at `n=40` on the H100 NVL (Float32): thread-per-cell 0.256 ms,
+# workgroup-per-cell 0.418 ms, host serial SpMV 22.8 ms. Three take-aways:
+#
+# - Against the baselines measured in the notes on the same hardware and mesh, partial
+#   assembly already **beats the element-assembly kernel** (0.256 vs 0.390 ms) with far
+#   less storage, and sits 2.1x above vendor-tuned cuSPARSE (0.123 ms). The data volume of
+#   the PA matvec (~80 MB of D_q + dofmap + vectors) corresponds to ~0.03 ms at H100
+#   bandwidth, so the kernel is latency/index-bound with ample headroom -- unlike CSR,
+#   which *is* bandwidth-bound at 254 MiB and has none.
+# - The layouts **flip at scale**: workgroup-per-cell scaled ~linearly from 16³ (it was
+#   already saturated), while thread-per-cell barely moved (0.18 -> 0.256 ms) because at
+#   16³ its 4096 threads left the card mostly idle, and at 40³ its spill traffic gets
+#   latency-hidden by 64k threads. The 27-thread workgroups are structurally weak on
+#   NVIDIA hardware: one warp with 5 idle lanes, tiny blocks (the blocks-per-SM cap limits
+#   occupancy to ~40%), and 6 barriers per cell.
+# - The established remedy, and the clear next experiment, is **multiple cells per
+#   workgroup** (e.g. 4 x 27 = 108 threads: full warps, deeper occupancy, barriers
+#   amortized over 4 cells -- what deal.II and MFEM do), combined with an Int32, transposed
+#   dofmap for coalesced gathers and coloring instead of atomics.
+#
 # I.e. the *naive* device kernel beats the serial host SpMV by ~2x for heat and by ~11x
 # for elasticity (note the Float32-vs-Float64 and 1-thread caveats), before most of the
 # performance work listed below. Elasticity is the decisive case -- more arithmetic per
