@@ -29,5 +29,6 @@ Ferrite.distribute_local_to_global!
 ```@docs
 Ferrite.lexicographic_numbering
 Ferrite.lexicographic_dofmap
+Ferrite.ConstrainedDofMap
 Ferrite.quadrature_point_data
 ```

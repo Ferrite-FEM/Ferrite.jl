@@ -99,25 +99,31 @@
 #     below.)
 #
 # !!! note "Boundary conditions"
-#     Without a matrix there is nothing for `apply!(K, f, ch)` to modify, so Dirichlet
-#     conditions require some (mild) special treatment for matrix-free operators. The
-#     [section on boundary conditions](@ref howto-matrix-free-dirichlet) below shows how to
-#     reproduce the standard workflow with vector operations and a wrapper around the
-#     operator.
+#     Without a matrix there is nothing for `apply!(K, f, ch)` to modify, so constraints
+#     require some (mild) special treatment for matrix-free operators. The
+#     [section on boundary conditions](@ref howto-matrix-free-dirichlet) below shows how
+#     Dirichlet and affine constraints (e.g. periodic boundary conditions) are handled:
+#     the gather and scatter steps resolve the constraints on the fly, and vector
+#     operations replace the matrix modification.
 #
 # ## A generic operator
 #
 # Both operators in this how-to -- and cell-integral bilinear forms in general -- share
 # everything except (i) the data stored per quadrature point and (ii) the pointwise
 # operation contracting that data with the evaluated gradient. We therefore define one
-# operator type, parameterized by the quadrature point data and the pointwise function:
+# operator type, parameterized by the quadrature point data and the pointwise function.
+# The dof map is either a plain matrix of lexicographically permuted dof indices
+# ([`Ferrite.lexicographic_dofmap(dh, ip)`](@ref Ferrite.lexicographic_dofmap)) or, as used
+# in the [boundary condition section](@ref howto-matrix-free-dirichlet) below, its
+# constraint-aware counterpart (`Ferrite.lexicographic_dofmap(dh, ip, ch)`) for which the
+# gather and scatter steps resolve affine constraints on the fly:
 
 using Ferrite, LinearAlgebra, SparseArrays
 using Test #src
 
-struct MatrixFreeOperator{D, F <: Function, E <: Ferrite.TensorProductEvaluator}
+struct MatrixFreeOperator{M, D, F <: Function, E <: Ferrite.TensorProductEvaluator}
     ndofs::Int
-    dofmap::Matrix{Int}   # nbasefunctions × ncells, lexicographically permuted
+    dofmap::M             # lexicographically permuted dof indices, see below
     qpdata::Matrix{D}     # nquadpoints × ncells
     pointwise::F          # (qpdata, ĝ) -> ĥ
     ev::E
@@ -135,16 +141,15 @@ Base.eltype(::MatrixFreeOperator) = Float64
 function LinearAlgebra.mul!(y::AbstractVector, A::MatrixFreeOperator, x::AbstractVector)
     (; dofmap, qpdata, pointwise, ev) = A
     fill!(y, 0)
-    for e in axes(dofmap, 2)
-        dofs = view(dofmap, :, e)
-        Ferrite.read_dof_values!(ev, x, dofs)
+    for e in axes(qpdata, 2)
+        Ferrite.read_dof_values!(ev, x, dofmap, e)
         Ferrite.evaluate_gradients!(ev)
         @inbounds for q in 1:Ferrite.getnquadpoints(ev)
             ĝ = Ferrite.get_gradient(ev, q)
             Ferrite.submit_gradient!(ev, pointwise(qpdata[q, e], ĝ), q)
         end
         Ferrite.integrate_gradients!(ev)
-        Ferrite.distribute_local_to_global!(y, ev, dofs)
+        Ferrite.distribute_local_to_global!(y, ev, dofmap, e)
     end
     return y
 end
@@ -204,9 +209,9 @@ A = MatrixFreeOperator(ndofs(dh), dofmap, Dq, (D, ĝ) -> D ⋅ ĝ, ev);
 # standard assembly (compare with the [heat equation tutorial](@ref tutorial-heat-equation))
 # and compare the matrix-vector products for a random input vector.
 
-function assemble_sparse_heat(dh::DofHandler, ip, qr::QuadratureRule, κ::Function)
+function assemble_sparse_heat(dh::DofHandler, ip, qr::QuadratureRule, κ::Function, ch = nothing)
     cv = CellValues(qr, ip)
-    K = allocate_matrix(dh)
+    K = ch === nothing ? allocate_matrix(dh) : allocate_matrix(dh, ch)
     assembler = start_assemble(K)
     nbf = getnbasefunctions(cv)
     Ke = zeros(nbf, nbf)
@@ -277,27 +282,30 @@ t_csr = best_time(() -> mul!(y_csr, K, x))
 #  - **Polynomial order**: the arithmetic advantage of sum factorization grows with `p` as
 #    well -- `O(p⁴)` against `O(p⁶)` per cell in 3D.
 #
-# ## [Dirichlet boundary conditions and solving](@id howto-matrix-free-dirichlet)
+# ## [Boundary conditions and solving](@id howto-matrix-free-dirichlet)
 #
-# With an assembled matrix, Dirichlet conditions are enforced by modifying the matrix:
-# `apply!(K, f, ch)` zeroes the constrained rows and columns, puts a one on the diagonal,
-# and moves the column contribution of the inhomogeneity to the right hand side. Without a
-# matrix the same three effects are produced with vector operations only:
+# With an assembled matrix, constraints are enforced by modifying the matrix:
+# `apply!(K, f, ch)` condenses the system, i.e. it computes `Cᵀ K C` (with `C` the
+# constraint matrix relating the constrained and free dofs, `u = C u_f + g`), puts a
+# diagonal entry on the rows of the constrained dofs, and moves the contribution of the
+# inhomogeneity `g` to the right hand side. Without a matrix the same three effects are
+# produced differently:
 #
-#  1. **Lifting**: put the prescribed values in a vector, `apply!(u, ch)` -- this is the
-#     inhomogeneity `g`.
-#  2. **Right hand side**: the column elimination `f - K_fc g` is one application of the
-#     unconstrained operator, `b = f - A * u`, followed by `apply_zero!(b, ch)`.
-#  3. **The operator**: the Krylov solver must see the matrix `[[A_ff, 0], [0, I]]` -- the
-#     same matrix `apply!(K, ch)` produces. This is a thin wrapper around the operator that
-#     overwrites the constrained entries of the output with the corresponding entries of
-#     the input.
-#
-# The wrapper relies on the input having *zeros* in the constrained entries such that the
-# constrained dofs do not pollute the free equations through `A_fc`. This invariant holds
-# automatically inside the Krylov solve: the initial residual `b` is zeroed there (step 2),
-# every iterate is a linear combination of `b` and operator outputs, and the identity block
-# maps zeros to zeros.
+#  1. **The condensed operator `Cᵀ A C`** is realized in the gather and scatter steps: when
+#     the operator is given the constraint-aware dof map,
+#     `Ferrite.lexicographic_dofmap(dh, ip, ch)`, `read_dof_values!` resolves a constrained
+#     dof to (the homogeneous part of) its master combination -- zero for a plain Dirichlet
+#     dof, `Σₘ aₘ x[m]` for an affine constraint -- and `distribute_local_to_global!`
+#     scatters transposed, distributing the contribution of a constrained dof to its
+#     masters. The resulting operator never reads or writes the constrained entries.
+#  2. **Lifting**: the inhomogeneity `g` is one `apply!(u, ch)` on a vector, and the right
+#     hand side of the condensed system, `Cᵀ (f - A g)`, costs one application of the
+#     *unconstrained* operator.
+#  3. **Identity block**: `Cᵀ A C` has zero rows and columns for the constrained dofs. To
+#     make the operator invertible (and keep it symmetric positive definite for CG) we put
+#     an identity block there, mirroring the diagonal entry that `apply!` writes. This is a
+#     thin wrapper that overwrites the constrained entries of the output with the
+#     corresponding entries of the input:
 
 struct ConstrainedOperator{A, CH <: ConstraintHandler}
     A::A
@@ -318,14 +326,25 @@ end
 
 Base.:*(C::ConstrainedOperator, x::AbstractVector) = mul!(similar(x, size(C, 1)), C, x)
 
-# We solve the heat equation with a unit source term and an inhomogeneous Dirichlet
-# condition on the whole boundary. The constraint handler and the load vector are set up
-# exactly as they would be with an assembled matrix:
+# We solve the heat equation with a unit source term, periodic (affine!) constraints
+# coupling the left and right faces, and an inhomogeneous Dirichlet condition on the rest
+# of the boundary. The constraint handler is set up exactly as it would be with an
+# assembled matrix (the periodic constraint is added first such that the Dirichlet
+# condition takes precedence on the shared edges):
 
 ch = ConstraintHandler(dh)
-∂Ω = union((getfacetset(grid, name) for name in ("left", "right", "top", "bottom", "front", "back"))...)
+add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid, "left", "right")))
+∂Ω = union((getfacetset(grid, name) for name in ("top", "bottom", "front", "back"))...)
 add!(ch, Dirichlet(:u, ∂Ω, x -> sinpi(x[1]) * x[2]))
 close!(ch);
+
+# The condensed operator `Cᵀ A C` is the same heat operator as before, just with the
+# constraint-aware dof map:
+
+cmap = Ferrite.lexicographic_dofmap(dh, ip, ch)
+A_c = MatrixFreeOperator(ndofs(dh), cmap, Dq, (D, ĝ) -> D ⋅ ĝ, ev);
+
+# The load vector is assembled as usual:
 
 function assemble_load(dh::DofHandler, ip, qr::QuadratureRule)
     cv = CellValues(qr, ip)
@@ -371,39 +390,44 @@ function conjugate_gradient!(x::AbstractVector, A, b::AbstractVector; tol = 1.0e
     return x, iter
 end
 
-# The solve now follows the same `apply!`/`apply_zero!` rhythm as the assembled workflow:
+# The solve now follows the same rhythm as the assembled workflow: lifting, right hand
+# side, solve, and finally `apply!` to distribute the constrained values (for the periodic
+# slave dofs the master values). For the right hand side, `Cᵀ (f - A g)`, note that
+# `apply_zero!` is not enough with affine constraints -- the residual entries of the
+# constrained dofs must be distributed to their masters (the `Cᵀ`). This is what
+# `Ferrite._condense_rhs!` does (for plain Dirichlet dofs it degenerates to zeroing the
+# entry, like `apply_zero!`):
 
 u_mf = zeros(ndofs(dh))
-apply!(u_mf, ch)                        # lifting: u = g on the constrained dofs
-b = f - A * u_mf                        # column elimination: one unconstrained matvec
-apply_zero!(b, ch)                      # zero the constrained entries
-Δu, iters = conjugate_gradient!(zeros(ndofs(dh)), ConstrainedOperator(A, ch), b)
+apply!(u_mf, ch)                        # lifting: the inhomogeneity g
+b = f - A * u_mf                        # one *unconstrained* matvec ...
+Ferrite._condense_rhs!(b, ch)           # ... and b = Cᵀ b
+Δu, iters = conjugate_gradient!(zeros(ndofs(dh)), ConstrainedOperator(A_c, ch), b)
 u_mf .+= Δu
-apply!(u_mf, ch)                        # (only needed for affine constraints)
+apply!(u_mf, ch)                        # distribute the affine constraint values
 iters
 
-# Compare with the standard assembled workflow (recall that `apply!` modifies `K` and `f`
-# in place):
+# Compare with the standard assembled workflow. One detail highlights a hidden cost of the
+# assembled path: condensing affine constraints into the matrix requires entries *outside*
+# the sparsity pattern of the bilinear form, so the matrix must be allocated with
+# `allocate_matrix(dh, ch)` -- we therefore reassemble `K` here. The matrix-free operator
+# has no such coupling between constraints and storage.
 
+K = assemble_sparse_heat(dh, ip, qr, κ, ch)
 apply!(K, f, ch)
 u_ref = K \ f
+apply!(u_ref, ch)
 u_mf ≈ u_ref
 @test u_mf ≈ u_ref #src
 
 # For nonlinear problems inside a Newton loop this simplifies: the increment has
 # homogeneous constraints, so the lifting and the extra matvec disappear and only
-# `apply_zero!` and the wrapped operator remain.
+# `_condense_rhs!` of the residual and the wrapped operator remain.
 #
-# Two remarks for more general constraints:
-#
-#  - **Affine constraints** (periodic boundary conditions, hanging nodes from adaptive
-#    refinement) couple dofs, so the projector trick above is not enough: the operator
-#    application needs `C x` before and `Cᵀ y` after, with `C` the affine constraint
-#    matrix. The natural place to implement this is the gather/scatter step -- resolving a
-#    constrained dof to its master combination during `read_dof_values!` and scattering
-#    transposed in `distribute_local_to_global!` -- which is how deal.II handles it.
-#  - The approach here (index lists and masked vector updates) ports directly to the GPU,
-#    where matrix modification would be even more awkward than on the CPU.
+# Note that this treatment of constraints -- index lists resolved during the gather and
+# scatter -- ports directly to the GPU, where matrix modification would be even more
+# awkward than on the CPU. Hanging node constraints from adaptive refinement are affine
+# constraints as well and are handled by the same mechanism.
 #
 # Unpreconditioned CG is used above to keep the focus on the operator, but note that
 # preconditioning is *the* open question for matrix-free methods: without an assembled

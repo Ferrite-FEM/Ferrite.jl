@@ -83,6 +83,64 @@ using Ferrite:
         @test y ≈ K * x
     end
 
+    @testset "constrained gather/scatter vs CᵀKC (Dirichlet + periodic)" begin
+        ## Regular grid such that the periodic facets match geometrically
+        grid = generate_grid(Hexahedron, (3, 3, 3))
+        ip = Lagrange{RefHexahedron, 2}()
+        qr1d = QuadratureRule{RefLine}(3)
+        qr = QuadratureRule{RefHexahedron}(3)
+        dh = close!(add!(DofHandler(grid), :u, ip))
+        ## Periodic (affine) constraints in x, plain Dirichlet on two other faces. Add the
+        ## periodic constraint first such that Dirichlet overrides it on the shared edges.
+        ch = ConstraintHandler(dh)
+        add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid, "left", "right")))
+        add!(ch, Dirichlet(:u, union(getfacetset(grid, "top"), getfacetset(grid, "bottom")), x -> 0.0))
+        close!(ch)
+        κ(x) = 1.3 + 0.9 * sinpi(x[1]) * x[2]
+        ## Matrix-free operator with the constraint-aware dof map
+        ev = TensorProductEvaluator(ip, qr1d)
+        cmap = lexicographic_dofmap(dh, ip, ch)
+        Dq = quadrature_point_data(grid, qr) do x, J, w
+            Jinv = inv(J)
+            return det(J) * w * κ(x) * dott(Jinv)
+        end
+        ## Assembled (unconstrained) reference and the explicit constraint matrix
+        cv = CellValues(qr, ip)
+        K = allocate_matrix(dh)
+        assembler = start_assemble(K)
+        Ke = zeros(getnbasefunctions(cv), getnbasefunctions(cv))
+        for cell in CellIterator(dh)
+            reinit!(cv, cell)
+            fill!(Ke, 0)
+            for q in 1:getnquadpoints(cv)
+                dΩ = getdetJdV(cv, q) * κ(spatial_coordinate(cv, q, getcoordinates(cell)))
+                for i in 1:size(Ke, 1), j in 1:size(Ke, 2)
+                    Ke[i, j] += (shape_gradient(cv, q, i) ⋅ shape_gradient(cv, q, j)) * dΩ
+                end
+            end
+            assemble!(assembler, celldofs(cell), Ke)
+        end
+        C, _ = Ferrite.create_constraint_matrix(ch)
+        ## The constrained matrix-free operator must match CᵀKC
+        x_f = rand(length(ch.free_dofs))
+        x = C * x_f # constraint-consistent full-size input (homogeneous part)
+        y = zeros(ndofs(dh))
+        for e in 1:getncells(grid)
+            read_dof_values!(ev, x, cmap, e)
+            evaluate_gradients!(ev)
+            for q in 1:Ferrite.getnquadpoints(ev)
+                submit_gradient!(ev, Dq[q, e] ⋅ get_gradient(ev, q), q)
+            end
+            integrate_gradients!(ev)
+            distribute_local_to_global!(y, ev, cmap, e)
+        end
+        y_expect = zeros(ndofs(dh))
+        y_expect[ch.free_dofs] .= C' * (K * x)
+        @test y ≈ y_expect
+        ## In particular the constrained rows are exactly zero
+        @test all(iszero, y[ch.prescribed_dofs])
+    end
+
     @testset "elasticity operator vs assembled matrix" begin
         grid = distorted_grid(2)
         ipv = Lagrange{RefHexahedron, 2}()^3

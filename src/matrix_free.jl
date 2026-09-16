@@ -197,15 +197,78 @@ function lexicographic_dofmap(dh::DofHandler, ip::Interpolation)
     return dofmap
 end
 
+"""
+    ConstrainedDofMap
+
+Constraint-aware version of the dof map returned by [`lexicographic_dofmap`](@ref
+Ferrite.lexicographic_dofmap): positive entries are regular global dof indices, and a
+negative entry `-k` marks a constrained dof, where `k` indexes into a compressed table of
+`(master dof, coefficient)` pairs describing the (homogeneous part of the) constraint. A
+plain Dirichlet dof has an empty master list. Constructed with
+`lexicographic_dofmap(dh, ip, ch)`.
+"""
+struct ConstrainedDofMap{Tv}
+    dofmap::Matrix{Int}       # > 0: global dof index, -k: constraint number k
+    offsets::Vector{Int}      # masters/coefficients of constraint k: offsets[k]:(offsets[k + 1] - 1)
+    masters::Vector{Int}
+    coefficients::Vector{Tv}
+end
+
+"""
+    lexicographic_dofmap(dh::DofHandler, ip, ch::ConstraintHandler)
+
+Constraint-aware version returning a [`ConstrainedDofMap`](@ref Ferrite.ConstrainedDofMap):
+[`read_dof_values!`](@ref Ferrite.read_dof_values!) and
+[`distribute_local_to_global!`](@ref Ferrite.distribute_local_to_global!) then apply the
+*homogeneous* part of the constraints in `ch` during the gather and (transposed) during the
+scatter, i.e. the resulting operator is `Cᵀ A C` in terms of the constraint matrix `C`
+(see [`create_constraint_matrix`](@ref)). Constraint inhomogeneities are not applied --
+handle them by lifting, see the matrix-free how-to in the documentation.
+"""
+function lexicographic_dofmap(dh::DofHandler, ip::Interpolation, ch::ConstraintHandler)
+    @assert isclosed(ch)
+    dofmap = lexicographic_dofmap(dh, ip)
+    np = length(ch.prescribed_dofs)
+    offsets = Vector{Int}(undef, np + 1)
+    offsets[1] = 1
+    masters = Int[]
+    coefficients = eltype(ch.inhomogeneities)[]
+    for k in 1:np
+        dofcoef = ch.dofcoefficients[k]
+        if dofcoef !== nothing
+            for (d, v) in dofcoef
+                # Prescribed masters are part of the effective inhomogeneity (see
+                # `create_constraint_matrix`), not of the homogeneous application.
+                ch.isconstrained[d] && continue
+                push!(masters, d)
+                push!(coefficients, v)
+            end
+        end
+        offsets[k + 1] = length(masters) + 1
+    end
+    for l in eachindex(dofmap)
+        k = get(ch.dofmapping, dofmap[l], 0)
+        k != 0 && (dofmap[l] = -k)
+    end
+    return ConstrainedDofMap(dofmap, offsets, masters, coefficients)
+end
+
 ###########################
 # Gather / scatter        #
 ###########################
 
 """
     read_dof_values!(ev::TensorProductEvaluator, x::AbstractVector, dofs::AbstractVector{Int})
+    read_dof_values!(ev::TensorProductEvaluator, x::AbstractVector, dofmap, e::Int)
 
-Gather the local dof values `x[dofs]` into the evaluator. `dofs` must be permuted to
-lexicographic ordering, see [`lexicographic_dofmap`](@ref Ferrite.lexicographic_dofmap).
+Gather the local dof values `x[dofs]` of cell `e` into the evaluator, where `dofs` are
+permuted to lexicographic ordering (column `e` of the `dofmap` from
+[`lexicographic_dofmap`](@ref Ferrite.lexicographic_dofmap)).
+
+When `dofmap` is a [`ConstrainedDofMap`](@ref Ferrite.ConstrainedDofMap) the homogeneous
+part of the constraints is applied during the gather: a constrained dof takes the value
+`Σₘ aₘ x[m]` of its masters (zero for a plain Dirichlet dof) and the entry `x[d]` of a
+constrained dof `d` is never read.
 """
 function read_dof_values!(ev::TensorProductEvaluator, x::AbstractVector, dofs::AbstractVector{Int})
     @inbounds for l in eachindex(ev.ue)
@@ -213,17 +276,62 @@ function read_dof_values!(ev::TensorProductEvaluator, x::AbstractVector, dofs::A
     end
     return ev
 end
+function read_dof_values!(ev::TensorProductEvaluator, x::AbstractVector, dofmap::Matrix{Int}, e::Int)
+    return read_dof_values!(ev, x, view(dofmap, :, e))
+end
+function read_dof_values!(ev::TensorProductEvaluator, x::AbstractVector, m::ConstrainedDofMap, e::Int)
+    (; dofmap, offsets, masters, coefficients) = m
+    ue = ev.ue
+    @inbounds for l in eachindex(ue)
+        d = dofmap[l, e]
+        if d > 0
+            ue[l] = x[d]
+        else
+            v = zero(eltype(ue))
+            for j in offsets[-d]:(offsets[-d + 1] - 1)
+                v += coefficients[j] * x[masters[j]]
+            end
+            ue[l] = v
+        end
+    end
+    return ev
+end
 
 """
     distribute_local_to_global!(y::AbstractVector, ev::TensorProductEvaluator, dofs::AbstractVector{Int})
+    distribute_local_to_global!(y::AbstractVector, ev::TensorProductEvaluator, dofmap, e::Int)
 
 Scatter-add the local result of [`integrate_gradients!`](@ref Ferrite.integrate_gradients!)
-into `y[dofs]`. `dofs` must be permuted to lexicographic ordering, see
-[`lexicographic_dofmap`](@ref Ferrite.lexicographic_dofmap).
+into `y[dofs]` for cell `e`, where `dofs` are permuted to lexicographic ordering (column
+`e` of the `dofmap` from [`lexicographic_dofmap`](@ref Ferrite.lexicographic_dofmap)).
+
+When `dofmap` is a [`ConstrainedDofMap`](@ref Ferrite.ConstrainedDofMap) the transposed
+homogeneous constraints are applied during the scatter: the contribution of a constrained
+dof is distributed to its masters (scaled by the constraint coefficients) and `y[d]` of a
+constrained dof `d` is never written -- combined with the constrained gather this realizes
+the operator `Cᵀ A C`, which has zero rows and columns for all constrained dofs.
 """
 function distribute_local_to_global!(y::AbstractVector, ev::TensorProductEvaluator, dofs::AbstractVector{Int})
     @inbounds for l in eachindex(ev.ye)
         y[dofs[l]] += ev.ye[l]
+    end
+    return y
+end
+function distribute_local_to_global!(y::AbstractVector, ev::TensorProductEvaluator, dofmap::Matrix{Int}, e::Int)
+    return distribute_local_to_global!(y, ev, view(dofmap, :, e))
+end
+function distribute_local_to_global!(y::AbstractVector, ev::TensorProductEvaluator, m::ConstrainedDofMap, e::Int)
+    (; dofmap, offsets, masters, coefficients) = m
+    ye = ev.ye
+    @inbounds for l in eachindex(ye)
+        d = dofmap[l, e]
+        if d > 0
+            y[d] += ye[l]
+        else
+            for j in offsets[-d]:(offsets[-d + 1] - 1)
+                y[masters[j]] += coefficients[j] * ye[l]
+            end
+        end
     end
     return y
 end
