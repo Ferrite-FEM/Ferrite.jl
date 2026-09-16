@@ -662,16 +662,25 @@ t_csr_e = best_time(() -> mul!(ye_ref, K_e, Float64.(xe_h)))
 #
 # | run | heat | elasticity |
 # |---|---|---|
-# | Metal, Apple M3, Float32, thread-per-cell | 0.36-0.53 ms | 0.76 ms |
-# | CPU backend, 1 thread, Float64, same kernels | 0.70-0.80 ms | 2.8 ms |
+# | Metal, Apple M3, Float32, thread-per-cell | 0.36-0.54 ms | 0.63-0.76 ms |
+# | Metal, Apple M3, Float32, workgroup-per-cell | 0.46 ms | -- |
+# | CPU backend, 1 thread, Float64, thread-per-cell | 0.70-0.81 ms | 2.8 ms |
+# | CPU backend, 1 thread, Float64, workgroup-per-cell | 1.27 ms | -- |
 # | host `SparseMatrixCSC` SpMV, 1 thread, Float64 | 0.89 ms | 7.3-7.6 ms |
 #
-# I.e. the *naive* device kernel beats the serial host SpMV by ~2x for heat and by ~10x
-# for elasticity (note the Float32-vs-Float64 and 1-thread caveats), before any of the
+# I.e. the *naive* device kernel beats the serial host SpMV by ~2x for heat and by ~11x
+# for elasticity (note the Float32-vs-Float64 and 1-thread caveats), before most of the
 # performance work listed below. Elasticity is the decisive case -- more arithmetic per
 # byte and a ~40x smaller operator (~12 MiB of quadrature point data + dofmap against
 # ~0.5 GB of assembled matrix) -- and the sum-factorized kernel wins there even serially
 # on the CPU (2.8 ms vs 7.6 ms).
+#
+# The workgroup-per-cell layout beats thread-per-cell on the device (0.46 vs 0.54 ms) and
+# loses on the CPU backend (barrier emulation, nothing to cooperate on) -- as expected in
+# both directions. That the device gain is modest (~1.2x) says the kernel is no longer
+# limited by the register spill: the remaining costs are the Int64 dofmap indirection,
+# streaming D_q, and the atomic scatter, i.e. exactly the coalescing/Int32/coloring items
+# below.
 #
 # What this script establishes:
 #
