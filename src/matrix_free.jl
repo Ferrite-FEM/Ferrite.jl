@@ -21,7 +21,7 @@
 # output dimension. Both are known at compile time such that the reduction loop is fully
 # unrolled, with the sum accumulated in a register.
 
-function contract_1!(out::AbstractArray{T, 3}, M::Matrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
+function contract_1!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
     # out[q, j, k] = Σᵢ M[q, i] A[i, j, k]
     @inbounds for k in axes(A, 3), j in axes(A, 2), q in 1:Q
         s = zero(T)
@@ -33,7 +33,7 @@ function contract_1!(out::AbstractArray{T, 3}, M::Matrix{T}, A::AbstractArray{T,
     return out
 end
 
-function contract_2!(out::AbstractArray{T, 3}, M::Matrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
+function contract_2!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
     # out[i, q, k] = Σⱼ M[q, j] A[i, j, k]
     @inbounds for k in axes(A, 3), q in 1:Q, i in axes(A, 1)
         s = zero(T)
@@ -45,7 +45,7 @@ function contract_2!(out::AbstractArray{T, 3}, M::Matrix{T}, A::AbstractArray{T,
     return out
 end
 
-function contract_3!(out::AbstractArray{T, 3}, M::Matrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
+function contract_3!(out::AbstractArray{T, 3}, M::AbstractMatrix{T}, A::AbstractArray{T, 3}, ::Val{P}, ::Val{Q}) where {T, P, Q}
     # out[i, j, q] = Σₖ M[q, k] A[i, j, k]
     @inbounds for q in 1:Q, j in axes(A, 2), i in axes(A, 1)
         s = zero(T)
@@ -117,27 +117,30 @@ struct TensorProductEvaluator{NQ, N, NC, T}
     gz::Array{T, 4}                                  # (nq, nq, nq, nc)
 end
 
-function TensorProductEvaluator(ip::Lagrange{RefHexahedron}, qr1d::QuadratureRule{RefLine})
-    return _tensor_product_evaluator(ip, qr1d, 1)
+function TensorProductEvaluator(ip::Lagrange{RefHexahedron}, qr1d::QuadratureRule{RefLine}; T::Type = Float64)
+    return _tensor_product_evaluator(ip, qr1d, 1, T)
 end
 function TensorProductEvaluator(
-        ipv::VectorizedInterpolation{3, RefHexahedron, <:Any, <:Lagrange}, qr1d::QuadratureRule{RefLine}
+        ipv::VectorizedInterpolation{3, RefHexahedron, <:Any, <:Lagrange}, qr1d::QuadratureRule{RefLine};
+        T::Type = Float64,
     )
-    return _tensor_product_evaluator(ipv.ip, qr1d, 3)
+    return _tensor_product_evaluator(ipv.ip, qr1d, 3, T)
 end
 
-function _tensor_product_evaluator(ip::Lagrange{RefHexahedron}, qr1d::QuadratureRule{RefLine}, nc::Int)
+function _tensor_product_evaluator(
+        ip::Lagrange{RefHexahedron}, qr1d::QuadratureRule{RefLine}, nc::Int, ::Type{T}
+    ) where {T}
     ip1d = tensor_product_interpolation(ip)
     n = getnbasefunctions(ip1d)
     nq = getnquadpoints(qr1d)
-    B = [reference_shape_value(ip1d, ξ, a) for ξ in getpoints(qr1d), a in 1:n]
-    D = [reference_shape_gradient(ip1d, ξ, a)[1] for ξ in getpoints(qr1d), a in 1:n]
-    return TensorProductEvaluator{nq, n, nc, Float64}(
+    B = T[reference_shape_value(ip1d, ξ, a) for ξ in getpoints(qr1d), a in 1:n]
+    D = T[reference_shape_gradient(ip1d, ξ, a)[1] for ξ in getpoints(qr1d), a in 1:n]
+    return TensorProductEvaluator{nq, n, nc, T}(
         B, D, collect(transpose(B)), collect(transpose(D)),
-        zeros(n, n, n, nc), zeros(n, n, n, nc), zeros(n, n, n),
-        zeros(nq, n, n), zeros(nq, n, n),
-        zeros(nq, nq, n), zeros(nq, nq, n), zeros(nq, nq, n),
-        zeros(nq, nq, nq, nc), zeros(nq, nq, nq, nc), zeros(nq, nq, nq, nc),
+        zeros(T, n, n, n, nc), zeros(T, n, n, n, nc), zeros(T, n, n, n),
+        zeros(T, nq, n, n), zeros(T, nq, n, n),
+        zeros(T, nq, nq, n), zeros(T, nq, nq, n), zeros(T, nq, nq, n),
+        zeros(T, nq, nq, nq, nc), zeros(T, nq, nq, nq, nc), zeros(T, nq, nq, nq, nc),
     )
 end
 
