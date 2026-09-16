@@ -380,8 +380,21 @@ function setup(n, ::Type{T}) where {T}
     return grid, ip, dh, qr, κ, dofmap, DqT, B, D
 end
 
+# The heat grid size can be set with an `n=NN` argument (default 16, i.e. 4096 cells and
+# 35937 dofs). At 16³ a large GPU is latency-bound rather than saturated -- pass `n=40` to
+# reproduce the mesh of the H100 benchmark notes (64000 cells, 531441 dofs) for a direct
+# comparison against the cuSPARSE numbers measured there. The elasticity section below
+# always uses a 16³ grid, since its assembled reference matrix grows out of hand.
+
+nheat = 16
+for a in ARGS
+    m = match(r"^n=(\d+)$", a)
+    m === nothing || global nheat = parse(Int, m[1])
+end
+@info "heat grid" nheat ncells = nheat^3 ndofs = (2 * nheat + 1)^3
+
 T = default_T
-grid, ip, dh, qr, κ, dofmap, Dq, B, D = setup(16, T)
+grid, ip, dh, qr, κ, dofmap, Dq, B, D = setup(nheat, T)
 
 # ## Moving the data to the device
 #
@@ -581,17 +594,20 @@ function LinearAlgebra.mul!(y::AbstractVector, A::GPUElasticityOperator, x::Abst
     return y
 end
 
-# Host setup: same grid and rules; heterogeneous Lamé parameters folded into the per-point
-# data as in the CPU how-to (J⁻¹ + premultiplied λ, μ: 11 floats per point).
+# Host setup: fixed 16³ grid (independent of the `n=NN` heat grid, since the assembled
+# reference matrix below grows out of hand), same rules; heterogeneous Lamé parameters
+# folded into the per-point data as in the CPU how-to (J⁻¹ + premultiplied λ, μ: 11 floats
+# per point).
 
+grid_e = nheat == 16 ? grid : generate_grid(Hexahedron, (16, 16, 16))
 ipv = ip^3
-dh_e = close!(add!(DofHandler(grid), :u, ipv))
+dh_e = close!(add!(DofHandler(grid_e), :u, ipv))
 λ(x) = 2.0 + x[1]
 μ(x) = 1.0 + 0.5 * sinpi(x[3])
 dofmap_e = Ferrite.lexicographic_dofmap(dh_e, ipv)
 qp_e = map(
     d -> (Jinv = convert(Tensor{2, 3, T}, d.Jinv), λw = T(d.λw), μw = T(d.μw)),
-    Ferrite.quadrature_point_data(grid, qr) do x, J, w
+    Ferrite.quadrature_point_data(grid_e, qr) do x, J, w
         (Jinv = inv(J), λw = det(J) * w * λ(x), μw = det(J) * w * μ(x))
     end,
 )
@@ -650,14 +666,28 @@ t_csr_e = best_time(() -> mul!(ye_ref, K_e, Float64.(xe_h)))
 #
 # | run | heat | elasticity |
 # |---|---|---|
+# | NVIDIA H100 NVL, Float64, workgroup-per-cell | 0.096 ms | -- |
+# | NVIDIA H100 NVL, Float64, thread-per-cell | 0.31 ms | 0.68 ms |
+# | NVIDIA H100 NVL, Float32, workgroup-per-cell | 0.036 ms | -- |
+# | NVIDIA H100 NVL, Float32, thread-per-cell | 0.18 ms | 0.40 ms |
 # | Metal, Apple M3, Float32, thread-per-cell | 0.36-0.54 ms | 0.63-0.86 ms |
 # | Metal, Apple M3, Float32, workgroup-per-cell | 0.45-0.46 ms | -- |
 # | CPU backend, 1 thread, Float64, thread-per-cell | 0.70-0.85 ms | 2.8 ms |
 # | CPU backend, 1 thread, Float64, workgroup-per-cell | 1.3-1.7 ms | -- |
-# | host `SparseMatrixCSC` SpMV, 1 thread, Float64 | 0.89 ms | 7.3-7.6 ms |
+# | host `SparseMatrixCSC` SpMV, 1 thread, Float64 | 0.89 ms (13.8 ms on the H100 host) | 7.3-7.6 ms |
 #
-# (Ranges are run-to-run variance on identical code -- the M3 numbers wander by ~20-30%
+# (M3 ranges are run-to-run variance on identical code -- those numbers wander by ~20-30%
 # between invocations, so treat single-run comparisons below that margin as noise.)
+#
+# The H100 runs sharpen two conclusions. First, workgroup-per-cell beats thread-per-cell
+# by 3.2x (Float64) to 5x (Float32) there, versus only ~1.2x on the M3: discrete GPUs
+# punish the register spilling of the thread-per-cell layout much harder. Second, at 16³
+# the H100 is latency-bound, not saturated (110k threads on a card that keeps ~270k
+# resident) -- for absolute numbers comparable to the H100 benchmark notes this experiment
+# grew out of (heat p2, 64000 cells, 531441 dofs, Float32, where cuSPARSE CSR measured
+# 0.123 ms and element assembly 0.390 ms), run with `n=40`:
+#
+#     julia --project=experiments experiments/matrix_free_gpu.jl cuda f32 n=40
 #
 # I.e. the *naive* device kernel beats the serial host SpMV by ~2x for heat and by ~11x
 # for elasticity (note the Float32-vs-Float64 and 1-thread caveats), before most of the
