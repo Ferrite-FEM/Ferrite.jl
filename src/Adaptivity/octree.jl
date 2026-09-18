@@ -18,7 +18,7 @@ const ncorners_edge = ncorners_face2D
 const DEFAULT_MAXLEVEL = (0, 30, 19)
 
 @noinline function _throw_maxlevel(dim, b)
-    msg = "maximum refinement level b = $b is out of range for a $(dim)D forest, it must satisfy 0 ≤ b ≤ $(DEFAULT_MAXLEVEL[dim]) (p4est's $(dim == 2 ? "P4EST_MAXLEVEL" : "P8EST_MAXLEVEL")). Beyond it an octree coordinate no longer fits the UInt64 keys of the cross-tree boundary node tables, whose collisions would silently merge unrelated nodes."
+    msg = "maximum refinement level b = $b is out of range for a $(dim)D forest, it must satisfy 0 ≤ b ≤ $(DEFAULT_MAXLEVEL[dim]) (p4est's $(dim == 2 ? "P4EST_MAXLEVEL" : "P8EST_MAXLEVEL")). Beyond it a tree coordinate no longer fits the UInt64 keys of the cross-tree boundary node tables, whose collisions would silently merge unrelated nodes."
     return throw(DomainError(b, msg))
 end
 
@@ -31,7 +31,15 @@ end
     return b
 end
 
-struct OctantBWG{dim, N, T <: Integer} <: Ferrite.AbstractCell{Ferrite.RefHypercube{dim}}
+# The two element kinds of a forest share their tree-level algorithms (`refine!`, `coarsen!`,
+# `balancetree`, ...): `OctantBWG`/`OctreeBWG` here for hypercubes ([BWG2011](@cite)) and
+# `SimplexBH`/`SimplexTreeBH` in `simplex.jl` for simplices ([BH2016](@cite)). The shared code
+# only relies on `children`, `parent`, `child_id`, `_nchildren`, `_sortkey`, `isancestor`,
+# `inside` and `_push_same_level_neighbors!`.
+abstract type AbstractElement{RS <: Ferrite.AbstractRefShape} <: Ferrite.AbstractCell{RS} end
+abstract type AbstractTree{RS <: Ferrite.AbstractRefShape} <: Ferrite.AbstractCell{RS} end
+
+struct OctantBWG{dim, N, T <: Integer} <: AbstractElement{Ferrite.RefHypercube{dim}}
     #Refinement level
     l::T
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)
@@ -123,6 +131,11 @@ function Base.isless(o1::OctantBWG, o2::OctantBWG)
     end
 end
 
+# The `(space-filling-curve position, level)` key of the `isless` order above, as a function
+# so the tree code shared with the simplex elements (whose key needs `b`, see
+# `_sortkey(::SimplexBH, b)`) can sort and search both kinds alike.
+_sortkey(o::OctantBWG, b::Integer) = (morton(o, o.l, o.l), o.l)
+
 """
     children(octant::OctantBWG{dim, N, T}, b::Integer) -> NTuple{N, OctantBWG}
 Compute the `N = 2^dim` children of `octant`, returned in z-order (x before y before z).
@@ -211,7 +224,7 @@ Further, each edge consists of two three-dimensional integer coordinates.
 """
 edges(octant::OctantBWG{3}, b::Integer) = ntuple(i -> edge(octant, i, b), Val(12))
 
-struct OctreeBWG{dim, N, T <: Integer} <: Ferrite.AbstractCell{Ferrite.RefHypercube{dim}}
+struct OctreeBWG{dim, N, T <: Integer} <: AbstractTree{Ferrite.RefHypercube{dim}}
     leaves::Vector{OctantBWG{dim, N, T}}
     #maximum refinement level
     b::T
@@ -221,6 +234,14 @@ end
 # Number of children an octant of this tree splits into (== 2^dim == N, the corner count),
 # straight from the type so it works regardless of the leaves' levels.
 _nchildren(::OctreeBWG{dim, N}) where {dim, N} = N
+_leaftype(::Type{OctreeBWG{dim, N, T}}) where {dim, N, T} = OctantBWG{dim, N, T}
+
+# Position of `o` in the sorted `leaves` (the first index whose key is not smaller), and
+# whether it is a leaf. `_sortkey` orders both element kinds.
+@inline function _leaf_position(leaves::Vector, o, b::Integer)
+    idx = searchsortedfirst(leaves, o; by = x -> _sortkey(x, b))
+    return idx, (idx <= length(leaves) && leaves[idx] == o)
+end
 
 """
     refine_octant!(octree::OctreeBWG, pivot_octant::OctantBWG)
@@ -240,14 +261,13 @@ to refine many leaves at once prefer [`refine_all!`](@ref Ferrite.AMR.refine_all
 `refine!(forest, cellids)` vector method, which rebuild the leaf list in one linear pass
 instead of `n` shifts.
 """
-function refine_octant!(octree::OctreeBWG{dim, N, T}, pivot_octant::OctantBWG{dim, N, T}) where {dim, N, T <: Integer}
+function refine_octant!(octree::AbstractTree, pivot_octant::AbstractElement)
     if !(pivot_octant.l + 1 <= octree.b)
         return
     end
-    o = one(T)
-    # leaves are Morton-sorted (the `Base.isless` total order), so locate the
+    # leaves are sorted along the space-filling curve (`_sortkey`), so locate the
     # pivot with a binary search instead of an O(N) linear scan.
-    leave_idx = searchsortedfirst(octree.leaves, pivot_octant)
+    leave_idx, = _leaf_position(octree.leaves, pivot_octant, octree.b)
     old_octant = popat!(octree.leaves, leave_idx)
     _children = children(pivot_octant, octree.b)
     for child in _children
@@ -414,14 +434,14 @@ p4est_opposite_edge_index(e) = ((e - 1) ⊻ 0b11) + 1
 # compute the *target* key once and compare against each probed leaf's key, rather than going
 # through `searchsortedfirst`/`isless` which recomputes `morton` for both sides every step
 # (`morton` is a ~b·dim-bit interleave — the dominant per-comparison cost on small per-tree arrays).
-@inline function _in_leaves(leaves::Vector{<:OctantBWG}, o::OctantBWG)
-    okey = (morton(o, o.l, o.l), o.l)
+@inline function _in_leaves(leaves::Vector{<:AbstractElement}, o::AbstractElement, b::Integer)
+    okey = _sortkey(o, b)
     lo = 1
     hi = length(leaves)
     @inbounds while lo <= hi
         mid = (lo + hi) >>> 1
         lf = leaves[mid]
-        lkey = (morton(lf, lf.l, lf.l), lf.l)
+        lkey = _sortkey(lf, b)
         if lkey < okey
             lo = mid + 1
         elseif lkey > okey
@@ -468,6 +488,16 @@ function possibleneighbors(o::OctantBWG{3}, l, b)
             corner_neighbor(o, i, b)
         end
     end
+end
+
+# Append the in-tree same-level neighbours of `o` (the corner/face/edge neighbours that lie
+# inside the root); the hypercube case of the `balancetree` neighbour query. Duplicates are
+# fine, callers deduplicate.
+function _push_same_level_neighbors!(P, o::OctantBWG, b::Integer)
+    for nb in possibleneighbors(o, o.l, b)
+        inside(nb, b) && push!(P, nb)
+    end
+    return P
 end
 
 """
