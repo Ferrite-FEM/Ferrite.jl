@@ -33,12 +33,14 @@ Furthermore, the following functions are applicable to
 ```@docs
 shape_value(::Ferrite.AbstractValues, ::Int, ::Int)
 shape_gradient(::Ferrite.AbstractValues, ::Int, ::Int)
+shape_directional_derivative
 shape_symmetric_gradient
 shape_divergence
 shape_curl
 getnbasefunctions(::Ferrite.AbstractValues)
 function_value
 function_gradient
+function_directional_derivative
 function_symmetric_gradient
 function_divergence
 function_curl
