@@ -36,7 +36,7 @@ Custom FEValues, `fe_v::AbstractValues`, should normally implement the [`reinit!
   * [`shape_value`](@ref)
   * [`getnquadpoints`](@ref)
   * [`getnbasefunctions`](@ref)
-* [`function_gradient`](@ref), [`function_divergence`](@ref), [`function_symmetric_gradient`](@ref), and [`function_curl`](@ref) requires
+* [`function_gradient`](@ref), [`function_directional_derivative`](@ref), [`function_divergence`](@ref), [`function_symmetric_gradient`](@ref), and [`function_curl`](@ref) requires
   * [`shape_gradient`](@ref)
   * [`getnquadpoints`](@ref)
   * [`getnbasefunctions`](@ref)

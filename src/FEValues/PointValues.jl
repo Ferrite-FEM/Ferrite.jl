@@ -59,6 +59,8 @@ function_value(pv::PointValues, u::AbstractVector, args...) =
     function_value(pv, 1, u, args...)
 function_gradient(pv::PointValues, u::AbstractVector, args...) =
     function_gradient(pv, 1, u, args...)
+function_directional_derivative(pv::PointValues, u::AbstractVector, direction::Vec, args...) =
+    function_directional_derivative(pv, 1, u, direction, args...)
 function_symmetric_gradient(pv::PointValues, u::AbstractVector, args...) =
     function_symmetric_gradient(pv, 1, u, args...)
 

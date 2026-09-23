@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+ - `shape_directional_derivative` and `function_directional_derivative` evaluate
+   derivatives along a supplied direction without forming the full function gradient.
+
 ### Fixes
  - Untangle the tangled `AffineConstraints` in `close!` ([#1327])
  - Atomic assembly support for BlockAssembler. ([#1452])

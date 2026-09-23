@@ -50,6 +50,7 @@ ANIM_RES = [1000, 750]  # animations are rendered directly at their final size
 EDGE = [0.15, 0.15, 0.15]  # mesh edge color (reads on both light and dark surfaces)
 BARS = []  # scalar bars whose text flips between the variants
 ANNOTS = []  # displays drawn in the annotation color, which also flips
+TEXTS = []  # 2d text overlays, drawn in the annotation color
 # (suffix, annotation color, background color): the two theme variants each
 # scene is saved as. The saved images are transparent, but edge antialiasing
 # blends against the render background, so match it to the docs theme to
@@ -190,7 +191,7 @@ def colorbar(display, view, array, title=None, preset="Cool to Warm",
 
 
 def _set_camera(view, azimuth, elevation, zoom, twod, pan_y=0.0, bounds=None,
-                parallel=False):
+                parallel=False, pan_x=0.0):
     # bounds: frame these explicit bounds instead of the currently shown data
     # (see bounds_over_time), e.g. so an oscillating geometry stays in view.
     # parallel: orthographic projection for the 3d camera, e.g. so copies of a
@@ -209,7 +210,8 @@ def _set_camera(view, azimuth, elevation, zoom, twod, pan_y=0.0, bounds=None,
     cam.Zoom(zoom)
     # pan_y < 0 shifts the scene up in the frame, freeing space for a
     # horizontal colour bar below the mesh
-    cam.SetWindowCenter(0.0, pan_y)
+    # pan_x > 0 shifts it left, freeing space for a vertical colour bar
+    cam.SetWindowCenter(pan_x, pan_y)
 
 
 def _apply_variant(view, text, bg):
@@ -220,16 +222,18 @@ def _apply_variant(view, text, bg):
     for d in ANNOTS:
         d.AmbientColor = text
         d.DiffuseColor = text
+    for d in TEXTS:
+        d.Color = text
 
 
 def finish(view, name, azimuth=30, elevation=25, zoom=1.0, twod=False, res=None,
-           pan_y=0.0, parallel=False):
+           pan_y=0.0, parallel=False, pan_x=0.0):
     # res overrides the frame size (default RES); use a matching aspect ratio for
     # non-square domains so the scene fills the frame instead of leaving margins.
     res = render_resolution(res, RES)
     view.ViewSize = res
     Render()  # settle the render window / scalar-bar layout at the new size first
-    _set_camera(view, azimuth, elevation, zoom, twod, pan_y, parallel=parallel)
+    _set_camera(view, azimuth, elevation, zoom, twod, pan_y, parallel=parallel, pan_x=pan_x)
     for variant, text, bg in VARIANTS:
         _apply_variant(view, text, bg)
         Render()
@@ -239,6 +243,7 @@ def finish(view, name, azimuth=30, elevation=25, zoom=1.0, twod=False, res=None,
         )
     BARS.clear()
     ANNOTS.clear()
+    TEXTS.clear()
     Delete(view)
 
 
@@ -327,6 +332,7 @@ def finish_anim(view, source, name, azimuth=30, elevation=25, zoom=1.0,
             )
     BARS.clear()
     ANNOTS.clear()
+    TEXTS.clear()
     Delete(view)
 
 
@@ -841,6 +847,64 @@ def scene_elasticity_adaptivity():
     lut.RescaleTransferFunction(0.0, 1800.0)
     finish_anim(view, r, "elasticity_adaptivity", twod=True, zoom=0.95,
                 res=[1000, 920], delay=60)
+
+
+# --- gradient_crystal_plasticity: shear stress on the deformed SVE for the four
+# combinations of boundary conditions, laid out in a 2x2 grid like Figure 5 of the paper
+@scene("gradient_crystal_plasticity")
+def scene_gradient_crystal_plasticity():
+    view = new_view()
+    # Arrange the panels in the camera plane, so a tilted view of the cubes does
+    # not also tilt the rows of the comparison figure.
+    cam = GetActiveCamera()
+    cam.Azimuth(-15)
+    cam.Elevation(30)
+    cam.OrthogonalizeViewUp()
+    up = cam.GetViewUp()
+    forward = cam.GetDirectionOfProjection()
+    right = [forward[1] * up[2] - forward[2] * up[1],
+             forward[2] * up[0] - forward[0] * up[2],
+             forward[0] * up[1] - forward[1] * up[0]]
+    panels = [("uD-ξN", 0, 1), ("uD-ξD", 1, 1), ("uN-ξN", 0, 0), ("uN-ξD", 1, 0)]
+    lo, hi = float("inf"), float("-inf")
+    displays = []
+    L = None
+    for name, col, row in panels:
+        # the outer surface only: the grains have duplicated nodes, so on the volume mesh
+        # every grain boundary facet would be an exterior face and z-fight with its twin
+        path = datadir + "/gradient_crystal_plasticity_" + name + "_surface.vtkhdf"
+        if not os.path.isfile(path):
+            path = path.removesuffix(".vtkhdf") + ".vtu"  # reuse older full-run output
+        r = OpenDataFile(path)
+        times = list(getattr(r, "TimestepValues", []))
+        t_last = times[-1] if times else 0.0  # show the end of the loading
+        r.UpdatePipeline(t_last)  # bounds and ranges are only valid after the reader has executed
+        view.ViewTime = t_last
+        if L is None:
+            b = r.GetDataInformation().GetBounds()
+            L = b[1] - b[0]
+            assert L > 0, "invalid bounds %s" % (b,)
+        rng = r.PointData["σ12"].GetRange()
+        lo, hi = min(lo, rng[0]), max(hi, rng[1])
+        w = warp(r, "u", 10.0)  # same exaggeration as the paper
+        t = Transform(Input=w)
+        t.Transform.Translate = [L * (2.6 * col * right[i] + 1.95 * row * up[i]) for i in range(3)]
+        displays.append(surface(t, view, edges=False))
+    lut = colorbar(displays[0], view, ("POINTS", "σ12"), title="$\\sigma_{12}$ [MPa]",
+                   fmt="%.0f", pos=[0.86, 0.32])
+    for d in displays[1:]:
+        ColorBy(d, ("POINTS", "σ12"))
+    lut.RescaleTransferFunction(lo, min(hi, 6000.0))  # clamp: a few hot spots would wash out the field
+    for (name, col, row), pos in zip(panels, ([0.17, 0.91], [0.595, 0.91], [0.17, 0.50], [0.595, 0.50])):
+        td = Show(Text(Text=name.replace("ξ", "$\\xi$")), view)  # mathtext: the UI font lacks ξ
+        td.WindowLocation = "Any Location"
+        td.Position = pos
+        td.FontSize = 10 if check else 40
+        td.Bold = 1
+        TEXTS.append(td)
+    # parallel projection keeps the four copies the same size
+    finish(view, "gradient_crystal_plasticity", azimuth=0, elevation=0, zoom=1.32,
+           parallel=True, pan_x=0.16)
 
 
 names = selected or list(SCENES)
