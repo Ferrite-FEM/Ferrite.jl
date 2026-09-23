@@ -130,6 +130,17 @@ quadrature point `q_point`.
 shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
 
 """
+    shape_directional_derivative(fe_v::AbstractValues, q_point::Int, base_function::Int, direction::Vec)
+
+Return `shape_gradient(fe_v, q_point, base_function) ⋅ direction`.
+The result is a scalar for scalar shape functions and a vector for vector shape
+functions. `direction` is expressed in spatial coordinates and is not normalized.
+"""
+@propagate_inbounds function shape_directional_derivative(fe_v::AbstractValues, q_point::Int, base_function::Int, direction::Vec)
+    return shape_gradient(fe_v, q_point, base_function) ⋅ direction
+end
+
+"""
     shape_symmetric_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
 
 Return the symmetric gradient of shape function `base_function` evaluated in
@@ -254,6 +265,31 @@ function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {
 end
 function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {T <: AbstractVector}
     return zero(T) ⊗ zero(shape_gradient_type(cv))
+end
+
+"""
+    function_directional_derivative(fe_v::AbstractValues, q_point::Int, u::AbstractVector, direction::Vec, [dof_range])
+
+Compute the directional derivative of the function in a quadrature point,
+equivalent to `function_gradient(fe_v, q_point, u, dof_range) ⋅ direction`.
+The result is a scalar for scalar fields and a vector for vector fields.
+`direction` is expressed in spatial coordinates and is not normalized.
+
+`u` contains the degrees of freedom, optionally selected by `dof_range`, as in
+[`function_gradient`](@ref). Each shape gradient is contracted with `direction`
+before multiplying by the corresponding degree of freedom, avoiding computation
+of the full function gradient.
+"""
+function function_directional_derivative(fe_v::AbstractValues, q_point::Int, u::AbstractVector, direction::Vec, dof_range = eachindex(u))
+    n_base_funcs = getnbasefunctions(fe_v)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
+    @boundscheck checkquadpoint(fe_v, q_point)
+    deriv = (zero(shape_gradient_type(fe_v)) ⋅ zero(direction)) * zero(eltype(u))
+    @inbounds for (i, j) in enumerate(dof_range)
+        deriv += shape_directional_derivative(fe_v, q_point, i, direction) * u[j]
+    end
+    return deriv
 end
 
 """

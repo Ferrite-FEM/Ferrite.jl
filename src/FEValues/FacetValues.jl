@@ -25,11 +25,13 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 
 * [`shape_value`](@ref)
 * [`shape_gradient`](@ref)
+* [`shape_directional_derivative`](@ref)
 * [`shape_symmetric_gradient`](@ref)
 * [`shape_divergence`](@ref)
 
 * [`function_value`](@ref)
 * [`function_gradient`](@ref)
+* [`function_directional_derivative`](@ref)
 * [`function_symmetric_gradient`](@ref)
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)

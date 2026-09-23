@@ -35,11 +35,13 @@ The first element of the interface is denoted "here" and the second element "the
 
 * [`shape_value`](@ref)
 * [`shape_gradient`](@ref)
+* [`shape_directional_derivative`](@ref)
 * [`shape_divergence`](@ref)
 * [`shape_curl`](@ref)
 
 * [`function_value`](@ref)
 * [`function_gradient`](@ref)
+* [`function_directional_derivative`](@ref)
 * [`function_symmetric_gradient`](@ref)
 * [`function_divergence`](@ref)
 * [`function_curl`](@ref)
@@ -342,6 +344,44 @@ This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\
 multiply by minus the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function function_gradient_jump end
+
+"""
+    shape_directional_derivative(iv::InterfaceValues, q_point::Int, base_function::Int, direction::Vec; here::Bool)
+
+Evaluate the shape directional derivative on the selected side of the interface.
+Shape functions belonging to the other side contribute zero.
+"""
+@propagate_inbounds function shape_directional_derivative(iv::InterfaceValues, q_point::Int, base_function::Int, direction::Vec; here::Bool)
+    return shape_gradient(iv, q_point, base_function; here = here) ⋅ direction
+end
+
+"""
+    function_directional_derivative(iv::InterfaceValues, q_point::Int, u::AbstractVector, direction::Vec; here::Bool)
+    function_directional_derivative(iv::InterfaceValues, q_point::Int, u::AbstractVector, direction::Vec, dof_range_here, dof_range_there; here::Bool)
+
+Evaluate the function directional derivative on the selected side of the interface.
+By default, `u` contains the degrees of freedom on the `here` side followed by
+those on the `there` side. Explicit ranges can instead select each side's degrees
+of freedom from `u`.
+"""
+function function_directional_derivative(iv::InterfaceValues, q_point::Int, u::AbstractVector, direction::Vec; here::Bool)
+    dof_range_here = 1:getnbasefunctions(iv.here)
+    dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
+    return function_directional_derivative(iv, q_point, u, direction, dof_range_here, dof_range_there; here = here)
+end
+
+function function_directional_derivative(
+        iv::InterfaceValues, q_point::Int, u::AbstractVector, direction::Vec,
+        dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int}; here::Bool
+    )
+    @boundscheck checkbounds(u, dof_range_here)
+    @boundscheck checkbounds(u, dof_range_there)
+    if here
+        return function_directional_derivative(iv.here, q_point, u, direction, dof_range_here)
+    else
+        return function_directional_derivative(iv.there, q_point, u, direction, dof_range_there)
+    end
+end
 
 for func in (:function_value, :function_gradient, :function_symmetric_gradient)
     @eval begin
