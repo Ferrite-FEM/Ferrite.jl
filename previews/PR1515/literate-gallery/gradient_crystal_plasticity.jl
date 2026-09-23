@@ -177,8 +177,45 @@
 # ```
 # with the constant macroscopic stress ``\bar{\boldsymbol{\sigma}}`` as the (symmetric)
 # Lagrange multiplier. The multiplier is a global unknown without a spatial domain, which is
-# precisely what an [`AlgebraicVariable`](@ref) is. The weak constraint does not see rigid
-# body motions, so these are removed by fixing displacement components at three corners of
+# precisely what an [`AlgebraicVariable`](@ref) is.
+#
+# For the Neumann case, we add the following term to the incremental potential of either
+# format:
+# ```math
+# -\bar{\boldsymbol{\sigma}} : \int_\Omega
+# \left[\boldsymbol{\epsilon}[\boldsymbol{u}] - \bar{\boldsymbol{\epsilon}}\right] \,\mathrm{d}V.
+# ```
+# Taking variations with respect to the displacement and the multiplier gives the two
+# coupled weak equations
+# ```math
+# \begin{aligned}
+# R_u[\delta\boldsymbol{u}] &:= \int_\Omega
+# (\boldsymbol{\sigma} - \bar{\boldsymbol{\sigma}}) :
+# \boldsymbol{\epsilon}[\delta\boldsymbol{u}] \,\mathrm{d}V = 0
+# \quad \forall\,\delta\boldsymbol{u}, \\
+# R_{\bar\sigma}[\delta\bar{\boldsymbol{\sigma}}] &:= -\int_\Omega
+# \delta\bar{\boldsymbol{\sigma}} :
+# (\boldsymbol{\epsilon}[\boldsymbol{u}] - \bar{\boldsymbol{\epsilon}}) \,\mathrm{d}V = 0
+# \quad \forall\,\delta\bar{\boldsymbol{\sigma}}.
+# \end{aligned}
+# ```
+# Here the multiplier variations are spatially constant symmetric tensors. The first
+# equation replaces the displacement equation above and gives the uniform boundary
+# traction ``\boldsymbol{t} = \bar{\boldsymbol{\sigma}} \cdot \boldsymbol{n}``; the second
+# enforces the prescribed average strain. The slip or microstress equations are unchanged.
+#
+# In `element_residual!`, the displacement test function is the vector basis function
+# ``\boldsymbol{N}_i``, so `ru[i]` accumulates the first equation using
+# `δε = shape_symmetric_gradient(cv.u, qp, i)`. For the second equation we choose each constant
+# symmetric tensor basis function ``\boldsymbol{B}_k`` of the multiplier in turn:
+# `δσ̄ = algebraic_basis_value(prob.σ̄vals, k)` returns ``\boldsymbol{B}_k``, and
+# `re[layout.σ̄[k]]` accumulates
+# ``-\boldsymbol{B}_k : (\boldsymbol{\epsilon} - \bar{\boldsymbol{\epsilon}})\,\mathrm{d}V``.
+# Assembly sums these contributions over all bulk elements into the same global multiplier
+# equations. The minus signs follow from the potential term above.
+#
+# The weak constraint does not see rigid body motions, so these are removed by fixing
+# displacement components at three corners of
 # the cube (the standard 3-2-1 rule); since the constraint only involves the strain, these
 # point constraints are free of reaction forces and do not affect the homogenized response.
 # Combined with microhard (``\xi``N) or microfree
@@ -616,15 +653,15 @@ function element_residual!(re, ae, ae_n, states, states_n, mat::CrystalMaterial{
             φ = ψe - ψg
             π = ψe + ψg - stn.φ + Δtϕ
         end
+        σu = prob.σ̄vals === nothing ? σ : σ - σ̄
         for i in 1:nu
-            ru[i] += (shape_symmetric_gradient(cv.u, qp, i) ⊡ σ) * dΩ
+            δε = shape_symmetric_gradient(cv.u, qp, i)
+            ru[i] += (δε ⊡ σu) * dΩ
         end
-        if prob.σ̄vals !== nothing # Neumann: multiplier terms
-            for i in 1:nu
-                ru[i] -= (σ̄ ⊡ shape_symmetric_gradient(cv.u, qp, i)) * dΩ
-            end
+        if prob.σ̄vals !== nothing # Neumann: average-strain constraint
             for (k, I) in pairs(layout.σ̄)
-                re[I] -= (algebraic_basis_value(prob.σ̄vals, k) ⊡ (ε - ε̄)) * dΩ
+                δσ̄ = algebraic_basis_value(prob.σ̄vals, k)
+                re[I] -= (δσ̄ ⊡ (ε - ε̄)) * dΩ
             end
         end
         st.σ = value(σ)
