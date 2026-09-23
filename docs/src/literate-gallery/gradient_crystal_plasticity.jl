@@ -653,15 +653,12 @@ function element_residual!(re, ae, ae_n, states, states_n, mat::CrystalMaterial{
             φ = ψe - ψg
             π = ψe + ψg - stn.φ + Δtϕ
         end
+        σu = prob.σ̄vals === nothing ? σ : σ - σ̄
         for i in 1:nu
             δε = shape_symmetric_gradient(cv.u, qp, i)
-            ru[i] += (δε ⊡ σ) * dΩ
+            ru[i] += (δε ⊡ σu) * dΩ
         end
-        if prob.σ̄vals !== nothing # Neumann: multiplier terms
-            for i in 1:nu
-                δε = shape_symmetric_gradient(cv.u, qp, i)
-                ru[i] -= (δε ⊡ σ̄) * dΩ
-            end
+        if prob.σ̄vals !== nothing # Neumann: average-strain constraint
             for (k, I) in pairs(layout.σ̄)
                 δσ̄ = algebraic_basis_value(prob.σ̄vals, k)
                 re[I] -= (δσ̄ ⊡ (ε - ε̄)) * dΩ
