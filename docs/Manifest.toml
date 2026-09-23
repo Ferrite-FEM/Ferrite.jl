@@ -2,7 +2,7 @@
 
 julia_version = "1.12.7"
 manifest_format = "2.0"
-project_hash = "3b50a0c0c38617d51d70cb7b4bec554c05b22c41"
+project_hash = "f9fac957a34a7cb1dd15fc06788376ef6095f791"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "ec6be48a85c93d995563b84bff8a86bc98df45ce"
@@ -669,6 +669,14 @@ deps = ["Ferrite", "Gmsh"]
 git-tree-sha1 = "e1a87020d81c2095380499582eee11c9d413a36d"
 uuid = "4f95f4f8-b27c-4ae5-9a39-ea55e634e36b"
 version = "1.3.0"
+
+[[deps.FerriteInterfaceElements]]
+deps = ["Ferrite", "OrderedCollections", "VTKBase"]
+git-tree-sha1 = "3131a3a246ff0c9b8974050b3f98ec3c6bdcb6e8"
+repo-rev = "6e2a63b259c104c5b22b0b2bdaccd1f90c38f37e"
+repo-url = "https://github.com/Ferrite-FEM/FerriteInterfaceElements.jl"
+uuid = "76cf2c14-24ca-44b2-b86c-6046d3cfcf82"
+version = "1.0.0"
 
 [[deps.FerriteMeshParser]]
 deps = ["Ferrite"]
