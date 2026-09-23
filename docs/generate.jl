@@ -184,5 +184,6 @@ write_overview(
         ("landau", "Ginzburg–Landau minimization", ["landau_opt-light.png", "landau_opt-dark.png"]),
         ("topology_optimization", "Topology optimization", ["topology_optimization-light.webp", "topology_optimization-dark.webp"]),
         ("elasticity_adaptivity", "Linear elasticity with adaptive mesh refinement", ["elasticity_adaptivity-light.webp", "elasticity_adaptivity-dark.webp"]),
+        ("gradient_crystal_plasticity", "Gradient crystal plasticity on a polycrystal SVE", ["gradient_crystal_plasticity-light.png", "gradient_crystal_plasticity-dark.png"]),
     ],
 )

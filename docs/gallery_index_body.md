@@ -61,3 +61,17 @@ approximation conforming. The mesh is read from an Abaqus input file using
 [FerriteMeshParser](https://github.com/Ferrite-FEM/FerriteMeshParser.jl).
 
 *Contributed by*: Maximilian Köhler ([@koehlerson](https://github.com/koehlerson)).
+
+---
+
+#### [Gradient crystal plasticity on a polycrystal SVE](gradient_crystal_plasticity.md)
+
+Gradient-extended crystal viscoplasticity on a Neper-generated polycrystal, in the
+semi-dual format where the microstresses are the global unknowns and the slips are solved
+for locally. The grains are separated with
+[FerriteInterfaceElements](https://github.com/Ferrite-FEM/FerriteInterfaceElements.jl)
+and tied with affine constraints, the Neumann loading uses an algebraic variable as
+Lagrange multiplier, and all tangents come from ForwardDiff. Reproduces the boundary
+condition study (upper and lower energy bounds) of Carlsson, Larsson and Runesson (2019).
+
+*Contributed by*: Kristoffer Carlsson ([@KristofferC](https://github.com/KristofferC)).

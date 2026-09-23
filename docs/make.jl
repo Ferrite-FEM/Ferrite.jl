@@ -121,6 +121,7 @@ codeblocks_plugin = CodeBlocks(
             "gallery/landau.md",
             "gallery/topology_optimization.md",
             "gallery/elasticity_adaptivity.md",
+            "gallery/gradient_crystal_plasticity.md",
         ],
         "devdocs/index.md",
         "cited-literature.md",

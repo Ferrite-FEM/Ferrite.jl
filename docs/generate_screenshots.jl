@@ -57,6 +57,7 @@ const EXAMPLES = Dict(
     "landau" => "literate-gallery/landau.jl",
     "topology_optimization" => "literate-gallery/topology_optimization.jl",
     "elasticity_adaptivity" => "literate-gallery/elasticity_adaptivity.jl",
+    "gradient_crystal_plasticity" => "literate-gallery/gradient_crystal_plasticity.jl",
 )
 
 # Extra code evaluated in the example's module after running it, e.g. to
@@ -70,6 +71,15 @@ const POSTRUN = Dict(
     # The example only runs the larger regularization radius; the figure comparing the
     # two needs the smaller one as well.
     "topology_optimization" => :(topopt(0.02, 0.5, 60, "small_radius"; output = false)),
+    # The example defaults to a coarse 10-grain SVE; the figures use the 50-grain SVE with
+    # the time stepping of the paper (~1 h). The stress-strain plot is a Plots figure, so it
+    # is saved directly to the assets folder instead of being rendered by ParaView.
+    "gradient_crystal_plasticity" => :(
+        let results = run_cases("gradient_crystal_plasticity_n50.inp"; nsteps = 30)
+            print_summary(results)
+            save_stress_plots(results, $(joinpath(@__DIR__, "screenshot-assets")))
+        end
+    ),
 )
 
 # Output file basenames (before the -light/-dark suffix) each scene renders;
@@ -83,6 +93,7 @@ const OUTPUTS = Dict(
     "postprocessing" => ["postprocessing", "postprocessing_cutline"],
     "threaded_assembly" => ["coloring"],
     "topology_optimization" => ["topology_optimization", "topology_optimization_result"],
+    "gradient_crystal_plasticity" => ["gradient_crystal_plasticity", "gradient_crystal_plasticity_stress"],
 )
 
 const DOCS = @__DIR__
