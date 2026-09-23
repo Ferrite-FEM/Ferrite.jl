@@ -191,7 +191,7 @@ def colorbar(display, view, array, title=None, preset="Cool to Warm",
 
 
 def _set_camera(view, azimuth, elevation, zoom, twod, pan_y=0.0, bounds=None,
-                parallel=False):
+                parallel=False, pan_x=0.0):
     # bounds: frame these explicit bounds instead of the currently shown data
     # (see bounds_over_time), e.g. so an oscillating geometry stays in view.
     # parallel: orthographic projection for the 3d camera, e.g. so copies of a
@@ -210,7 +210,8 @@ def _set_camera(view, azimuth, elevation, zoom, twod, pan_y=0.0, bounds=None,
     cam.Zoom(zoom)
     # pan_y < 0 shifts the scene up in the frame, freeing space for a
     # horizontal colour bar below the mesh
-    cam.SetWindowCenter(0.0, pan_y)
+    # pan_x > 0 shifts it left, freeing space for a vertical colour bar
+    cam.SetWindowCenter(pan_x, pan_y)
 
 
 def _apply_variant(view, text, bg):
@@ -226,13 +227,13 @@ def _apply_variant(view, text, bg):
 
 
 def finish(view, name, azimuth=30, elevation=25, zoom=1.0, twod=False, res=None,
-           pan_y=0.0, parallel=False):
+           pan_y=0.0, parallel=False, pan_x=0.0):
     # res overrides the frame size (default RES); use a matching aspect ratio for
     # non-square domains so the scene fills the frame instead of leaving margins.
     res = render_resolution(res, RES)
     view.ViewSize = res
     Render()  # settle the render window / scalar-bar layout at the new size first
-    _set_camera(view, azimuth, elevation, zoom, twod, pan_y, parallel=parallel)
+    _set_camera(view, azimuth, elevation, zoom, twod, pan_y, parallel=parallel, pan_x=pan_x)
     for variant, text, bg in VARIANTS:
         _apply_variant(view, text, bg)
         Render()
@@ -856,7 +857,7 @@ def scene_gradient_crystal_plasticity():
     # Arrange the panels in the camera plane, so a tilted view of the cubes does
     # not also tilt the rows of the comparison figure.
     cam = GetActiveCamera()
-    cam.Azimuth(35)
+    cam.Azimuth(-15)
     cam.Elevation(30)
     cam.OrthogonalizeViewUp()
     up = cam.GetViewUp()
@@ -887,14 +888,14 @@ def scene_gradient_crystal_plasticity():
         lo, hi = min(lo, rng[0]), max(hi, rng[1])
         w = warp(r, "u", 10.0)  # same exaggeration as the paper
         t = Transform(Input=w)
-        t.Transform.Translate = [L * (3.0 * col * right[i] + 2.7 * row * up[i]) for i in range(3)]
+        t.Transform.Translate = [L * (2.6 * col * right[i] + 1.95 * row * up[i]) for i in range(3)]
         displays.append(surface(t, view, edges=False))
     lut = colorbar(displays[0], view, ("POINTS", "σ12"), title="$\\sigma_{12}$ [MPa]",
                    fmt="%.0f", pos=[0.86, 0.32])
     for d in displays[1:]:
         ColorBy(d, ("POINTS", "σ12"))
     lut.RescaleTransferFunction(lo, min(hi, 6000.0))  # clamp: a few hot spots would wash out the field
-    for (name, col, row), pos in zip(panels, ([0.275, 0.84], [0.625, 0.84], [0.275, 0.43], [0.625, 0.43])):
+    for (name, col, row), pos in zip(panels, ([0.17, 0.91], [0.595, 0.91], [0.17, 0.50], [0.595, 0.50])):
         td = Show(Text(Text=name.replace("ξ", "$\\xi$")), view)  # mathtext: the UI font lacks ξ
         td.WindowLocation = "Any Location"
         td.Position = pos
@@ -902,7 +903,8 @@ def scene_gradient_crystal_plasticity():
         td.Bold = 1
         TEXTS.append(td)
     # parallel projection keeps the four copies the same size
-    finish(view, "gradient_crystal_plasticity", azimuth=0, elevation=0, zoom=1.15, parallel=True)
+    finish(view, "gradient_crystal_plasticity", azimuth=0, elevation=0, zoom=1.32,
+           parallel=True, pan_x=0.16)
 
 
 names = selected or list(SCENES)
