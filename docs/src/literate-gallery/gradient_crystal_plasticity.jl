@@ -206,9 +206,9 @@
 #
 # In `element_residual!`, the displacement test function is the vector basis function
 # ``\boldsymbol{N}_i``, so `ru[i]` accumulates the first equation using
-# `shape_symmetric_gradient(cv.u, qp, i)`. For the second equation we choose each constant
+# `δε = shape_symmetric_gradient(cv.u, qp, i)`. For the second equation we choose each constant
 # symmetric tensor basis function ``\boldsymbol{B}_k`` of the multiplier in turn:
-# `algebraic_basis_value(prob.σ̄vals, k)` returns ``\boldsymbol{B}_k``, and
+# `δσ̄ = algebraic_basis_value(prob.σ̄vals, k)` returns ``\boldsymbol{B}_k``, and
 # `re[layout.σ̄[k]]` accumulates
 # ``-\boldsymbol{B}_k : (\boldsymbol{\epsilon} - \bar{\boldsymbol{\epsilon}})\,\mathrm{d}V``.
 # Assembly sums these contributions over all bulk elements into the same global multiplier
@@ -654,14 +654,17 @@ function element_residual!(re, ae, ae_n, states, states_n, mat::CrystalMaterial{
             π = ψe + ψg - stn.φ + Δtϕ
         end
         for i in 1:nu
-            ru[i] += (shape_symmetric_gradient(cv.u, qp, i) ⊡ σ) * dΩ
+            δε = shape_symmetric_gradient(cv.u, qp, i)
+            ru[i] += (δε ⊡ σ) * dΩ
         end
         if prob.σ̄vals !== nothing # Neumann: multiplier terms
             for i in 1:nu
-                ru[i] -= (σ̄ ⊡ shape_symmetric_gradient(cv.u, qp, i)) * dΩ
+                δε = shape_symmetric_gradient(cv.u, qp, i)
+                ru[i] -= (δε ⊡ σ̄) * dΩ
             end
             for (k, I) in pairs(layout.σ̄)
-                re[I] -= (algebraic_basis_value(prob.σ̄vals, k) ⊡ (ε - ε̄)) * dΩ
+                δσ̄ = algebraic_basis_value(prob.σ̄vals, k)
+                re[I] -= (δσ̄ ⊡ (ε - ε̄)) * dΩ
             end
         end
         st.σ = value(σ)
