@@ -471,8 +471,9 @@ end
 # ### Dissipation of the primal format
 #
 # With backward Euler, the dissipative stress of the primal format is a function of the
-# slip increment. The regularized absolute value ``|\Delta\gamma|_\delta = \sqrt{\Delta\gamma^2
-# + \delta^2}`` removes the infinite slope at ``\Delta\gamma = 0``, and the corresponding
+# slip increment. The regularized absolute value
+# ``|\Delta\gamma|_\delta = \sqrt{\Delta\gamma^2 + \delta^2}`` removes the infinite slope
+# at ``\Delta\gamma = 0``, and the corresponding
 # (regularized) dissipation ``\Delta t\, \phi`` enters the incremental potential.
 function dissipative_stress(Δγ, mat::CrystalMaterial, Δt, δ)
     A = mat.C * (mat.tstar / Δt)^(1 / mat.m)
