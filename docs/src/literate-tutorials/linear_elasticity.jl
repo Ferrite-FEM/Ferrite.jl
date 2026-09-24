@@ -405,6 +405,110 @@ end
 # Vertical normal stresses (MPa) exported using the `L2Projector` (left)
 # and constant stress in each cell (right).
 
+#md # !!! details "Advanced: exploiting the structure of vectorized interpolations"
+#md #     The element routine above treats each vector valued shape function $\boldsymbol{N}_I$ as
+#md #     a black box. However, since `ip` was constructed by vectorizing a scalar interpolation,
+#md #     `Lagrange{RefTriangle, order}()^dim`, the vector valued shape functions have a lot of
+#md #     structure: shape function $I = \mathrm{dim}\,(i - 1) + c$ is the scalar shape function
+#md #     $N_i$ acting in direction $c$,
+#md #     ```math
+#md #     \boldsymbol{N}_I = N_i \boldsymbol{e}_c, \qquad
+#md #     \mathrm{grad}(\boldsymbol{N}_I) = \boldsymbol{e}_c \otimes \mathrm{grad}(N_i),
+#md #     ```
+#md #     so all rows but one of $\mathrm{grad}(\boldsymbol{N}_I)$ are zero. The double contractions
+#md #     in `assemble_cell!` multiply all these zeros anyway. Inserting the structure into the
+#md #     expression for $K_{IJ}$, with $J = \mathrm{dim}\,(j - 1) + d$, gives
+#md #     ```math
+#md #     K_{IJ}
+#md #     = \left[\boldsymbol{e}_c \otimes \mathrm{grad}(N_i)\right] : \mathsf{C} : \left[\boldsymbol{e}_d \otimes \mathrm{grad}(N_j)\right]^\mathrm{sym}
+#md #     = \boldsymbol{e}_c \cdot \underbrace{\left(\mathsf{C} : \left[\boldsymbol{e}_d \otimes \mathrm{grad}(N_j)\right]^\mathrm{sym}\right)}_{\boldsymbol{\sigma}_j^d} \cdot \mathrm{grad}(N_i)
+#md #     ```
+#md #     where $\boldsymbol{\sigma}_j^d$ is the stress caused by a unit value of the trial dof $J$.
+#md #     It only depends on $j$ and $d$, so it can be computed once per trial function and reused
+#md #     for all test functions. For given $(i, j, d)$, the vector
+#md #     $\boldsymbol{\sigma}_j^d \cdot \mathrm{grad}(N_i)$ then contains the entries $K_{IJ}$
+#md #     for all test components $c$ at once.
+#md #
+#md #     Only the *scalar* shape functions are needed for this, so we create `CellValues` for the
+#md #     scalar interpolation. The vectorized interpolation is still used for the `DofHandler`,
+#md #     and the local numbering `I = dim * (i - 1) + c` above is the ordering Ferrite uses for
+#md #     the shape functions of a vectorized interpolation.
+#md #     ````@example linear_elasticity
+#md #     cellvalues_scalar = CellValues(qr, Lagrange{RefTriangle, order}());
+#md #     nothing # hide
+#md #     ````
+#md #     The element routine loops over the scalar shape functions and fills the
+#md #     `dim × dim` block of `ke` for each pair. The innermost loops are very short, so the
+#md #     bounds checks would otherwise dominate the cost (about 2.5x slower without `@inbounds`).
+#md #     The size check on `ke` makes this safe.
+#md #     ````@example linear_elasticity
+#md #     function assemble_cell_blocked!(ke, cellvalues, C::SymmetricTensor{4, dim}) where {dim}
+#md #         n = getnbasefunctions(cellvalues) # number of scalar shape functions
+#md #         size(ke) == (dim * n, dim * n) || error("ke has the wrong size")
+#md #         @inbounds for q_point in 1:getnquadpoints(cellvalues)
+#md #             dΩ = getdetJdV(cellvalues, q_point)
+#md #             for j in 1:n
+#md #                 ∇Nⱼ = shape_gradient(cellvalues, q_point, j)
+#md #                 # Stress from a unit trial dof in each direction d
+#md #                 σⱼ = ntuple(d -> C ⊡ symmetric(basevec(∇Nⱼ, d) ⊗ ∇Nⱼ), Val(dim))
+#md #                 for i in 1:n
+#md #                     ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
+#md #                     for d in 1:dim
+#md #                         # Entries K_IJ for all test components c
+#md #                         kᵢⱼ = (σⱼ[d] ⋅ ∇Nᵢ) * dΩ
+#md #                         for c in 1:dim
+#md #                             ke[dim * (i - 1) + c, dim * (j - 1) + d] += kᵢⱼ[c]
+#md #                         end
+#md #                     end
+#md #                 end
+#md #             end
+#md #         end
+#md #         return ke
+#md #     end
+#md #     nothing # hide
+#md #     ````
+#md #     The global assembly is the same as before, apart from the element routine, and
+#md #     the result is identical to the one from `assemble_global!`.
+#md #     ````@example linear_elasticity
+#md #     function assemble_global_blocked!(K, dh, cellvalues, C)
+#md #         ke = zeros(ndofs_per_cell(dh), ndofs_per_cell(dh))
+#md #         assembler = start_assemble(K)
+#md #         for cell in CellIterator(dh)
+#md #             reinit!(cellvalues, cell)
+#md #             fill!(ke, 0.0)
+#md #             assemble_cell_blocked!(ke, cellvalues, C)
+#md #             assemble!(assembler, celldofs(cell), ke)
+#md #         end
+#md #         return K
+#md #     end
+#md #     K_blocked = assemble_global_blocked!(allocate_matrix(dh), dh, cellvalues_scalar, C)
+#md #     K_blocked ≈ assemble_global!(allocate_matrix(dh), dh, cellvalues, C)
+#md #     ````
+#md #     ````@example linear_elasticity
+#md #     using Test # hide
+#md #     @test K_blocked ≈ assemble_global!(allocate_matrix(dh), dh, cellvalues, C) # hide
+#md #     nothing # hide
+#md #     ````
+#md #     How much this saves depends on the share of the element routine in the total assembly
+#md #     time. For the linear triangles with a single quadrature point used in this tutorial, the
+#md #     element routine is so cheap that the total assembly time hardly changes. For higher order
+#md #     elements and in 3D, the element routine dominates, and the whole assembly becomes several
+#md #     times faster. The table shows timings of the element routine (`assemble_cell!` vs.
+#md #     `assemble_cell_blocked!`) and the resulting speedup of the complete global assembly
+#md #     (including `reinit!` and `assemble!`) on an Apple M4 Pro, using grids from
+#md #     `generate_grid` (i.e. with linear geometry).
+#md #
+#md #     | Interpolation         | Quadrature points | `assemble_cell!` | `assemble_cell_blocked!` | Element speedup | Global assembly speedup |
+#md #     |:----------------------|------------------:|-----------------:|-------------------------:|----------------:|------------------------:|
+#md #     | Linear triangle       |                 1 |            28 ns |                    19 ns |            1.5x |                    1.1x |
+#md #     | Quadratic triangle    |                 3 |           318 ns |                   128 ns |            2.5x |                    1.5x |
+#md #     | Linear hexahedron     |                 8 |           6.0 μs |                   1.7 μs |            3.6x |                    2.7x |
+#md #     | Quadratic tetrahedron |                 4 |           4.6 μs |                   1.2 μs |            3.9x |                    2.1x |
+#md #     | Quadratic hexahedron  |                27 |           216 μs |                    43 μs |            5.1x |                    4.2x |
+#md #
+#md #     The same idea applies to any element routine for a vectorized interpolation, e.g. the
+#md #     tangent in the [hyperelasticity tutorial](@ref tutorial-hyperelasticity).
+
 # The mesh produced by gmsh is not stable between different OS        #src
 # For linux, we therefore test carefully, and for other OS we provide #src
 # a coarse test to indicate introduced errors before running CI.      #src
