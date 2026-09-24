@@ -408,11 +408,13 @@ end
 # Constraints
 #----------------------------------------------------------------------#
 
-function setup_random_affine_constraint(dofs::Vector{Int}, inhomogeneity::Real = 0.0)
-    V = rand(length(dofs))
-    constrained_dof_val, constrained_dof_index = findmax(V)
+function setup_affine_constraint(dofs::Vector{Int}, inhomogeneity::Real = 0.0)
+    V = ones(length(dofs))
+    # Pick a random dof for master dof
+    constrained_dof = rand(dofs)
+    constrained_dof_index = findfirst(x -> x == constrained_dof, dofs)
+    constrained_dof_val = V[constrained_dof_index]
     V ./= constrained_dof_val
-    constrained_dof = dofs[constrained_dof_index]
     ac = AffineConstraint(
         constrained_dof,
         Pair{Int, Float64}[i => -v for (i, v) in zip(dofs, V) if i != constrained_dof],
@@ -435,18 +437,11 @@ function setup_tangled_ch(N::Int)
         union(getfacetset(grid, "left"), getfacetset(grid, "front"), getfacetset(grid, "top")),
         union(getfacetset(grid, "right"), getfacetset(grid, "back"), getfacetset(grid, "bottom"))
     )
-    n_dofs = ndofs(dh)
-    # Randomly chosen lengths which are used to select a (sub)set of the
-    # dofs to then apply an AffineConstraint to.
-    ac_lengths = [n_dofs, 200, 50, 60, 70, 1000, 5000]
-    acs = Vector{AffineConstraint}(undef, length(ac_lengths))
-    # generate AffineConstraint(s).
-    for (i, l) in pairs(ac_lengths)
-        acs[i] = setup_random_affine_constraint(rand(1:n_dofs, l))
+    acs = Vector{AffineConstraint}(undef, dim)
+    # Generate `dim` AffineConstraints. These mimic mean value constraints.
+    for i in eachindex(acs)
+        acs[i] = setup_affine_constraint(rand(i:dim:ndofs(dh)-dim+i))
     end
-
-    # Include PeriodicDirichlet because they are a common cause of
-    # tangled constraints
     pdbc = PeriodicDirichlet(:u, Γper)
     add!(ch, pdbc)
 
