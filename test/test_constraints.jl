@@ -1540,7 +1540,7 @@ end # testset
 
         @test_throws ArgumentError(
             "the affine constraints are tangled and untangling them fails. " *
-                "This can be due to e.g. redudant constraints. A possibility to avoid this is to guarantee that " *
+                "This can be due to e.g. redundant constraints. A possibility to avoid this is to guarantee that " *
                 "the constraints are not tangled before calling close!"
         ) close!(ch)
     end # subtestset

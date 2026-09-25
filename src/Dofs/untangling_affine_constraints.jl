@@ -2,7 +2,7 @@
     _untangle_affine_constraints!(ch::ConstraintHandler)
 
 Untangle the affine constraints in `ch`. This is best illustrated using an example. The following system has
-tangled constraints as `u2` appears as a master and a slave dof. 
+tangled constraints as `u2` appears as a master and a slave dof.
 
     u1 = u2 + u5
     u2 = u3 + 4 * u10 + 4.0
@@ -50,7 +50,7 @@ function _untangle_affine_constraints!(ch::ConstraintHandler)
             throw(
                 ArgumentError(
                     "the affine constraints are tangled and untangling them fails. " *
-                        "This can be due to e.g. redudant constraints. A possibility to avoid this is to guarantee that " *
+                        "This can be due to e.g. redundant constraints. A possibility to avoid this is to guarantee that " *
                         "the constraints are not tangled before calling close!"
                 )
             )
@@ -80,7 +80,7 @@ end
 """
     _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, T}) where {DH, T}
 
-Create and returns the left-hand side constraint matrix `A` from the system `A * a_c = C * a_f + g`. As `A` only contains the 
+Create and returns the left-hand side constraint matrix `A` from the system `A * a_c = C * a_f + g`. As `A` only contains the
 tangled affine constraints its structure is built from the ground up. This means there is a mapping required to associate
 each row in `A` to its original position. To do this `affine_equation_ordering` returned. Finally, `new_dofcoefficients` are returned
 which have the entries that are now in `A` removed.
