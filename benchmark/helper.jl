@@ -408,19 +408,27 @@ end
 # Constraints
 #----------------------------------------------------------------------#
 
-function setup_affine_constraint(dofs::Vector{Int}, inhomogeneity::Real = 0.0)
+function setup_affine_constraint!(acs::Vector{AffineConstraint}, dofs::Vector{Int}, dofmapping::Dict{Int, Int}, inhomogeneity::Real = 0.0)
     V = ones(length(dofs))
-    # Pick a random dof for master dof
-    constrained_dof = rand(dofs)
-    constrained_dof_index = findfirst(x -> x == constrained_dof, dofs)
-    constrained_dof_val = V[constrained_dof_index]
-    V ./= constrained_dof_val
+    # Pick a dof for master dof and ensure it is not already prescribed
+    # by PBC, otherwise the PBC will be overwritten.
+    constrained_dof = nothing
+    ac_constrained_dofs = [a.constrained_dof for a in acs]
+    periodic_master_dofs = keys(dofmapping)
+    for mdof in dofs
+        if mdof ∉ ac_constrained_dofs && mdof ∉ periodic_master_dofs
+            constrained_dof = mdof
+            break
+        end
+    end
+    @assert !isnothing(constrained_dof)
     ac = AffineConstraint(
         constrained_dof,
-        Pair{Int, Float64}[i => -v for (i, v) in zip(dofs, V) if i != constrained_dof],
+        Pair{Int, Float64}[d => -c for (d, c) in zip(dofs, V) if d != constrained_dof],
         inhomogeneity,
     )
-    return ac
+    push!(acs, ac)
+    return acs
 end
 
 function setup_tangled_ch(N::Int)
@@ -437,19 +445,18 @@ function setup_tangled_ch(N::Int)
         union(getfacetset(grid, "left"), getfacetset(grid, "front"), getfacetset(grid, "top")),
         union(getfacetset(grid, "right"), getfacetset(grid, "back"), getfacetset(grid, "bottom"))
     )
-    acs = Vector{AffineConstraint}(undef, dim)
-    # Generate `dim` AffineConstraints. These mimic mean value constraints.
-    for i in eachindex(acs)
-        acs[i] = setup_affine_constraint(rand(i:dim:ndofs(dh)-dim+i))
-    end
     pdbc = PeriodicDirichlet(:u, Γper)
     add!(ch, pdbc)
-
+    # Generate `dim` AffineConstraints. These mimic mean value constraints.
+    acs = AffineConstraint[]
+    sizehint!(acs, dim)
+    for i in 1:dim
+        setup_affine_constraint!(acs, collect(i:dim:ndofs(dh)-dim+i), ch.dofmapping)
+    end
     for ac in acs
         add!(ch, ac)
     end
     return ch
 end
-
 
 end # module FerriteBenchmarkHelpers
