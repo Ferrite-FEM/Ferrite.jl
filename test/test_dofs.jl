@@ -799,37 +799,31 @@ end
         ic = [false true; false false]
         K = allocate_matrix(dh; coupling = cc, topology = topology, interface_coupling = ic)
         iv = InterfaceValues(FacetQuadratureRule{RefQuadrilateral}(2), ip)
-        sdh = dh.subdofhandlers[1]
-        drng_u = dof_range(sdh, :u)
-        drng_p = dof_range(sdh, :p)
-        ncdofs = ndofs_per_cell(dh)
+        drng_u = dof_range(dh.subdofhandlers[1], :u)
+        drng_p = dof_range(dh.subdofhandlers[1], :p)
         assembler = start_assemble(K)
+        buf = InterfaceAssemblyBuffer{Float64}(max_nstacked_interface_dofs(dh))
         for interface in InterfaceIterator(dh, topology)
             reinit!(iv, interface)
-            Ke = zeros(2 * ncdofs, 2 * ncdofs)
-            # Map interface shape function index (here-side 1:4, there-side 5:8) to the
-            # index in the stacked dof vector [celldofs(a); celldofs(b)]
-            stackedindex(i, drng) = i <= length(drng) ? drng[i] : ncdofs + drng[i - length(drng)]
+            n = nstacked_interface_dofs(interface)
+            Ke = zeros(n, n)
+            # dof_range maps interface shape function index (here-side 1:4, there-side
+            # 5:8) to the index in the stacked dof vector [celldofs(a); celldofs(b)]
+            ru = dof_range(interface, :u)
+            rp = dof_range(interface, :p)
             for qp in 1:getnquadpoints(iv)
                 dΓ = getdetJdV(iv, qp)
-                for i in 1:getnbasefunctions(iv)
+                for (i, I) in pairs(ru)
                     δu = shape_value_average(iv, qp, i)
-                    for j in 1:getnbasefunctions(iv)
+                    for (j, J) in pairs(rp)
                         p = shape_value_average(iv, qp, j)
-                        Ke[stackedindex(i, drng_u), stackedindex(j, drng_p)] += δu * p * dΓ
+                        Ke[I, J] += δu * p * dΓ
                     end
                 end
             end
             # The stacked dof vector contains the shared (continuous) dofs twice, which
-            # the assembler does not support: accumulate the duplicated rows/columns onto
-            # the unique dofs before assembling
-            idofs = interfacedofs(interface)
-            udofs = unique(idofs)
-            uindex = [findfirst(==(d), udofs) for d in idofs]
-            Kc = zeros(length(udofs), length(udofs))
-            for i in axes(Ke, 1), j in axes(Ke, 2)
-                Kc[uindex[i], uindex[j]] += Ke[i, j]
-            end
+            # the assembler does not support: condense onto the unique dofs first
+            udofs, Kc = condense_interface!(buf, interface, Ke)
             # This throws a missing sparsity entry error if the pattern misses the
             # shared-dof strips or the same-side blocks
             assemble!(assembler, udofs, Kc)

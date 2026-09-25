@@ -185,11 +185,18 @@ export
     UpdateFlags,
     cellid,
     interfacedofs,
+    unique_interfacedofs,
+    nstacked_interface_dofs,
+    nunique_interface_dofs,
+    max_nstacked_interface_dofs,
+    is_shared,
 
     # assembly
     start_assemble,
     assemble!,
     finish_assemble,
+    InterfaceAssemblyBuffer,
+    condense_interface!,
 
     # exporting data
     VTKGridFile,

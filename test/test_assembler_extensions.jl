@@ -3,8 +3,11 @@ import SparseMatricesCSR: SparseMatrixCSR, sparsecsr
 using SparseArrays, LinearAlgebra
 
 @testset "CSR assembly with repeated dofs" begin
+    # For CSR storage the breaking direction is repeated *columns* (the row traversals
+    # mirror CSC's column traversals): detected deterministically and rejected. Repeated
+    # rows are simply processed once per occurrence and accumulate correctly.
     for mode in (:dense, :merge, :binary), atomic in (false, true)
-        rdofs, cdofs = [3, 1, 3], [2, 4, 2, 1]
+        rdofs, cdofs = [3, 1, 3], [2, 4, 1]
         pattern = mode === :dense ? ones(40, 40) : zeros(40, 40)
         if mode === :binary
             pattern[:, 1:39] .= 1
@@ -12,13 +15,23 @@ using SparseArrays, LinearAlgebra
             pattern[rdofs, cdofs] .= 1
         end
         K = SparseMatrixCSR(sparse(pattern))
-        Ke = reshape(1.0:12.0, 3, 4)
+        Ke = reshape(1.0:9.0, 3, 3)
         expected = zeros(40, 40)
         for (j, J) in pairs(cdofs), (i, I) in pairs(rdofs)
             expected[I, J] += Ke[i, j]
         end
         assemble!(start_assemble(K; atomic), rdofs, cdofs, Ke)
         @test K == expected
+        # ... while repeated columns error
+        err = try
+            assemble!(start_assemble(K; atomic), rdofs, [2, 4, 2, 1], reshape(1.0:12.0, 3, 4))
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("repeated entries", err.msg)
+        @test occursin("condense_interface!", err.msg)
     end
 end
 
