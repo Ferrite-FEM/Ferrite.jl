@@ -3,10 +3,12 @@
 # ![](stress_driven_homogenization-light.png)
 # ![](stress_driven_homogenization-dark.png)
 #
-# *Figure 1*: von Mises stress in the RVE from the strain-driven homogenization
+# [[*Figure 1*](@ref tutorial-stress-driven-homogenization-figure-1)](@id tutorial-stress-driven-homogenization-figure-1):
+# von Mises stress in the RVE from the strain-driven homogenization
 # tutorial, deformed by the total displacement (macroscopic plus fluctuation part) that
 # results from the prescribed macroscopic shear stress ``\bar{\sigma}_{12}`` -- compare
-# with the strain-driven (periodic) shear load case in that tutorial's Figure 1. The
+# with the strain-driven (periodic) shear load case in that tutorial's
+# [Figure 1](@ref tutorial-computational-homogenization-figure-1). The
 # gray outline is the undeformed RVE (displacements exaggerated by a factor of 4; the
 # wiggles of the boundary are the periodic fluctuation field, matching on opposite
 # edges).
@@ -489,7 +491,7 @@ end
 # Since the exported `:u` is only the *fluctuation* (which does not show the
 # macroscopic deformation), we also export the total displacement ``\boldsymbol{u} =
 # \bar{\boldsymbol{\varepsilon}} \cdot \boldsymbol{x} + \boldsymbol{u}^\mu``, which is
-# what deforms the RVE (see Figure 1).
+# what deforms the RVE (see [Figure 1](@ref tutorial-stress-driven-homogenization-figure-1)).
 uμ_nodes = evaluate_at_grid_nodes(dh, a, :u)
 u_total = [ε̄ ⋅ get_node_coordinate(grid, n) + uμ_nodes[n] for n in 1:getnnodes(grid)]
 

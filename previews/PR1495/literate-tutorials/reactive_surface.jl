@@ -11,7 +11,8 @@ nothing                    #hide
 # ![](reactive_surface-light.webp)
 # ![](reactive_surface-dark.webp)
 #
-# *Figure 1*: Reactant concentration field of the Gray-Scott model on the unit sphere.
+# [[*Figure 1*](@ref tutorial-reactive-surface-figure-1)](@id tutorial-reactive-surface-figure-1):
+# Reactant concentration field of the Gray-Scott model on the unit sphere.
 #
 #-
 #md # !!! tip

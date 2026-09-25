@@ -3,7 +3,8 @@
 # ![](incompressible_elasticity-light.png)
 # ![](incompressible_elasticity-dark.png)
 #
-# *Figure 1*: von Mises stress on the deformed Cook's membrane.
+# [[*Figure 1*](@ref tutorial-incompressible-elasticity-figure-1)](@id tutorial-incompressible-elasticity-figure-1):
+# von Mises stress on the deformed Cook's membrane.
 #
 #-
 #md # !!! tip
@@ -447,13 +448,15 @@ u2 = solve(0.5, quadratic_u, linear_p);
 
 # ## Results
 #
-# The two solutions are compared in Figure 2, where the computed pressure field is
+# The two solutions are compared in
+# [Figure 2](@ref tutorial-incompressible-elasticity-figure-2), where the computed pressure field is
 # plotted on the deformed geometry.
 #
 # ![](incompressible_elasticity_pressure-light.png)
 # ![](incompressible_elasticity_pressure-dark.png)
 #
-# *Figure 2*: Pressure field for the linear/linear element (left) and the
+# [[*Figure 2*](@ref tutorial-incompressible-elasticity-figure-2)](@id tutorial-incompressible-elasticity-figure-2):
+# Pressure field for the linear/linear element (left) and the
 # quadratic/linear element (right). The color scale is fitted to the range of the
 # quadratic/linear solution.
 #
@@ -468,8 +471,9 @@ u2 = solve(0.5, quadratic_u, linear_p);
 # the displacement field, and therefore the deformed shape, looks reasonable also for the
 # linear/linear element, but since the stress depends on the pressure (recall
 # ``\boldsymbol{\sigma} = 2G\, \boldsymbol{\varepsilon}^\mathrm{dev} - p\,
-# \boldsymbol{I}``) the stress output from the unstable element is useless. Figure 1 at
-# the top of this page shows the von Mises stress from the stable quadratic/linear
+# \boldsymbol{I}``) the stress output from the unstable element is useless.
+# [Figure 1](@ref tutorial-incompressible-elasticity-figure-1) at the top of this page
+# shows the von Mises stress from the stable quadratic/linear
 # solution.
 
 ## test the result                 #src

@@ -3,7 +3,8 @@
 # ![](postprocessing-light.png)
 # ![](postprocessing-dark.png)
 #
-# *Figure 1*: Heat flux computed from the solution to the heat equation on the unit square,
+# [[*Figure 1*](@ref howto-postprocessing-figure-1)](@id howto-postprocessing-figure-1):
+# Heat flux computed from the solution to the heat equation on the unit square,
 # coloured by magnitude with arrows for the direction. See the previous example:
 # [Heat equation](@ref tutorial-heat-equation).
 #
@@ -103,7 +104,7 @@ q_projected = project(projector, q_gp, qr);
 # ## Exporting to VTK
 # To visualize the heat flux, we export the projected field `q_projected`
 # to a VTK-file, which can be viewed in e.g. [ParaView](https://www.paraview.org/).
-# The result is also visualized in *Figure 1*.
+# The result is also visualized in [*Figure 1*](@ref howto-postprocessing-figure-1).
 VTKGridFile("heat_equation_flux", grid) do vtk
     write_projection(vtk, projector, q_projected, "q")
 end;
@@ -112,10 +113,12 @@ end;
 # ![](postprocessing_cutline-light.png)
 # ![](postprocessing_cutline-dark.png)
 #
-# *Figure 2*: The temperature field, with the cut line along which we want to compute
+# [[*Figure 2*](@ref howto-postprocessing-figure-2)](@id howto-postprocessing-figure-2):
+# The temperature field, with the cut line along which we want to compute
 # the temperature and heat flux drawn on top.
 
-# Consider a cut-line through the domain like the one in *Figure 2* above.
+# Consider a cut-line through the domain like the one in
+# [*Figure 2*](@ref howto-postprocessing-figure-2) above.
 # We will evaluate the temperature and the heat flux distribution along a horizontal line.
 points = [Vec((x, 0.75)) for x in range(-1.0, 1.0, length = 101)];
 
@@ -140,11 +143,15 @@ import Plots
 
 # Firstly, we are going to plot the temperature values along the given line.
 Plots.plot(getindex.(points, 1), u_points, xlabel = "x (coordinate)", ylabel = "u (temperature)", label = nothing)
-# *Figure 3*: Temperature along the cut line from *Figure 2*.
+# [[*Figure 3*](@ref howto-postprocessing-figure-3)](@id howto-postprocessing-figure-3):
+# Temperature along the cut line from
+# [*Figure 2*](@ref howto-postprocessing-figure-2).
 
 # Secondly, the horizontal heat flux (i.e. the first component of the heat flux vector) is plotted.
 Plots.plot(getindex.(points, 1), getindex.(q_points, 1), xlabel = "x (coordinate)", ylabel = "q_x (flux in x-direction)", label = nothing)
-# *Figure 4*: ``x``-component of the flux along the cut line from *Figure 2*.
+# [[*Figure 4*](@ref howto-postprocessing-figure-4)](@id howto-postprocessing-figure-4):
+# ``x``-component of the flux along the cut
+# line from [*Figure 2*](@ref howto-postprocessing-figure-2).
 
 #md # ## [Plain program](@id postprocessing-plain-program)
 #md #

@@ -5,7 +5,8 @@
 # ![](topology_optimization-light.webp)
 # ![](topology_optimization-dark.webp)
 #
-# *Figure 1*: Evolution of the material density during topology optimization of the
+# [[*Figure 1*](@ref tutorial-topology-optimization-figure-1)](@id tutorial-topology-optimization-figure-1):
+# Evolution of the material density during topology optimization of the
 # bending beam for a fixed total mass.
 #
 #-
@@ -542,12 +543,13 @@ end
 topopt(0.03, 0.5, 60, "topopt_frames"; output = true); #src iteration series for the docs animation (docs/screenshots.py)
 
 # We observe, that the stiffness for the lower value of $ra$ is higher,
-# but also requires more iterations until convergence and finer structures to be manufactured, as can be seen in Figure 2:
+# but also requires more iterations until convergence and finer structures to be manufactured, as can be seen in [Figure 2](@ref tutorial-topology-optimization-figure-2):
 #
 # ![](topology_optimization_result-light.png)
 # ![](topology_optimization_result-dark.png)
 #
-# *Figure 2*: Optimization results of the bending beam for smaller (left) and larger (right) value of the regularization parameter $\beta$.
+# [[*Figure 2*](@ref tutorial-topology-optimization-figure-2)](@id tutorial-topology-optimization-figure-2):
+# Optimization results of the bending beam for smaller (left) and larger (right) value of the regularization parameter $\beta$.
 #
 # To prove mesh independence, the user could vary the mesh resolution and compare the results.
 

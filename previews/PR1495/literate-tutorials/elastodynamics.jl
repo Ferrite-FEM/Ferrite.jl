@@ -3,7 +3,8 @@
 # ![](elastodynamics-light.webp)
 # ![](elastodynamics-dark.webp)
 #
-# *Figure 1*: Free vibration of the cantilever beam after the static tip load is released
+# [[*Figure 1*](@ref tutorial-elastodynamics-figure-1)](@id tutorial-elastodynamics-figure-1):
+# Free vibration of the cantilever beam after the static tip load is released
 # at $t = 0$, colored by the deflection magnitude (displacements exaggerated by a factor
 # of 75). The animation covers three periods of the first bending mode.
 #
@@ -324,7 +325,8 @@ end
 # ![](elastodynamics_modes-light.png)
 # ![](elastodynamics_modes-dark.png)
 #
-# *Figure 2*: The four lowest vibration modes, from top to bottom. Modes 1, 3 and 4 are
+# [[*Figure 2*](@ref tutorial-elastodynamics-figure-2)](@id tutorial-elastodynamics-figure-2):
+# The four lowest vibration modes, from top to bottom. Modes 1, 3 and 4 are
 # the first three bending modes about the weak axis, deflecting in the thickness direction
 # $z$; mode 2 (second from the top, recognizable by its wide face) is the first bending
 # mode about the strong axis, deflecting sideways in $y$. For easy comparison all modes
@@ -518,7 +520,8 @@ plt = plot_tip_deflection(:black)
 # ![](elastodynamics_tip-light.svg)
 # ![](elastodynamics_tip-dark.svg)
 #
-# *Figure 3*: Tip deflection history from the finite element simulation compared with the
+# [[*Figure 3*](@ref tutorial-elastodynamics-figure-3)](@id tutorial-elastodynamics-figure-3):
+# Tip deflection history from the finite element simulation compared with the
 # analytical single mode solution.
 #
 # The finite element solution follows the envelope and frequency of the single mode

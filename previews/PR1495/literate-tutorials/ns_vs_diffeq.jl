@@ -10,6 +10,10 @@ nothing                    #hide
 # ![nsdiffeq](ns_vs_diffeq-light.webp)
 # ![nsdiffeq](ns_vs_diffeq-dark.webp)
 #
+# [[*Figure 1*](@ref tutorial-ins-ordinarydiffeq-figure-1)](@id tutorial-ins-ordinarydiffeq-figure-1):
+# Velocity magnitude of the flow around a
+# circular obstacle in a channel, showing the von Kármán vortex street that develops
+# behind the obstacle.
 #
 # In this example we focus on a simple but visually appealing problem from
 # fluid dynamics, namely vortex shedding. This problem is also known as

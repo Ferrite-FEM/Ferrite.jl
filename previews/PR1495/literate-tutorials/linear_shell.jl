@@ -4,7 +4,8 @@
 # ![](linear_shell-light.png)
 # ![](linear_shell-dark.png)
 #
-# *Figure 1*: Magnitude of the deflection of the shell (deformation magnified).
+# [[*Figure 1*](@ref tutorial-linear-shell-figure-1)](@id tutorial-linear-shell-figure-1):
+# Magnitude of the deflection of the shell (deformation magnified).
 #-
 # ## Introduction
 #

@@ -3,7 +3,8 @@
 # ![](linear_elasticity-light.png)
 # ![](linear_elasticity-dark.png)
 #
-# *Figure 1*: Vertical normal stress $\sigma_{22}$ (MPa) on the deformed geometry. The
+# [[*Figure 1*](@ref tutorial-linear-elasticity-figure-1)](@id tutorial-linear-elasticity-figure-1):
+# Vertical normal stress $\sigma_{22}$ (MPa) on the deformed geometry. The
 # computational mesh is generated from the 1mm $\times$ 1mm Ferrite logo.
 #
 #md # !!! tip
@@ -392,14 +393,16 @@ VTKGridFile("linear_elasticity", dh) do vtk
     write_cell_data(vtk, color_data, "colors") #hide
 end
 
-# We used the displacement field to visualize the deformed logo in *Figure 1*,
-# and in *Figure 2*, we demonstrate the difference between the interpolated stress
+# We used the displacement field to visualize the deformed logo in
+# [*Figure 1*](@ref tutorial-linear-elasticity-figure-1), and in
+# [*Figure 2*](@ref tutorial-linear-elasticity-figure-2), we demonstrate the difference between the interpolated stress
 # field and the constant stress in each cell.
 
 # ![](linear_elasticity_stress-light.png)
 # ![](linear_elasticity_stress-dark.png)
 #
-# *Figure 2*: Vertical normal stresses (MPa) exported using the `L2Projector` (left)
+# [[*Figure 2*](@ref tutorial-linear-elasticity-figure-2)](@id tutorial-linear-elasticity-figure-2):
+# Vertical normal stresses (MPa) exported using the `L2Projector` (left)
 # and constant stress in each cell (right).
 
 # The mesh produced by gmsh is not stable between different OS        #src

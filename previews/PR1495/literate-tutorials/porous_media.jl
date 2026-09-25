@@ -1,4 +1,4 @@
-# # Porous media
+# # [Porous media](@id tutorial-porous-media)
 
 # Porous media is a two-phase material, consisting of solid parts and a liquid occupying
 # the pores in between.
@@ -10,10 +10,16 @@
 # In the porous media, denoted the matrix, we have both the displacement field,
 # `:u`, as well as the liquid pressure, `:p`, as unknown. The simulation results,
 # the vertical strain (defined on the whole domain) and the liquid pressure (only
-# defined in the porous matrix), are shown below
+# defined in the porous matrix), are shown in [Figure 1](@ref tutorial-porous-media-figure-1).
 #
 # ![Vertical strain (left) and pressure (right) evolution.](porous_media-light.webp)
 # ![Vertical strain (left) and pressure (right) evolution.](porous_media-dark.webp)
+#
+# [[*Figure 1*](@ref tutorial-porous-media-figure-1)](@id tutorial-porous-media-figure-1):
+# Vertical strain ``\epsilon_{22}`` (left) and
+# liquid pressure ``p`` (right) over time as the top surface is compressed. The strain is
+# defined on the whole domain, whereas the pressure only exists in the porous matrix; the
+# impermeable solid aggregates are shown in gray.
 #
 # ## Theory of porous media
 # The strong forms are given as

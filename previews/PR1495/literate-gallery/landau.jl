@@ -2,13 +2,18 @@
 
 # ![landau_orig.png](landau_orig-light.png)
 # ![landau_orig.png](landau_orig-dark.png)
-
-# Original
+#
+# [[*Figure 1*](@ref tutorial-ginzburg-landau-minimizer-figure-1)](@id tutorial-ginzburg-landau-minimizer-figure-1):
+# Magnitude of the
+# polarization ``|\boldsymbol{P}|`` for the prescribed initial guess.
 
 # ![landau_opt.png](landau_opt-light.png)
 # ![landau_opt.png](landau_opt-dark.png)
-
-# Optimized
+#
+# [[*Figure 2*](@ref tutorial-ginzburg-landau-minimizer-figure-2)](@id tutorial-ginzburg-landau-minimizer-figure-2):
+# Magnitude of the
+# polarization ``|\boldsymbol{P}|`` after minimizing the Ginzburg-Landau free energy with
+# Newton's method.
 
 # In this example a basic Ginzburg-Landau model is solved.
 # This example gives an idea of how the API together with automatic differentiation can be
