@@ -109,8 +109,8 @@ end
 
 # Untangle affine constraints that are tangled. This happens in close!.
 let g = SUITE["constraints"]
-    N = 20
-    g["close! untangle AffineConstraint(s)"] = @benchmarkable(
+    N = 8
+    g["close! untangle AffineConstraint"] = @benchmarkable(
         Ferrite._untangle_affine_constraints!(ch),
         setup = (ch = FerriteBenchmarkHelpers.setup_tangled_ch($N)),
         evals = 1, seconds = 1.0,
