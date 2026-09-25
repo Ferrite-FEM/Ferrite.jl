@@ -5,8 +5,8 @@ Untangle the affine constraints in `ch`. This is best illustrated using an examp
 tangled constraints as `u2` appears as a master and a slave dof. 
 
     u1 = u2 + u5
-    u2 = u3 + 4*u10 + 4.0
-    u9 = 3*u2 - 2.0
+    u2 = u3 + 4 * u10 + 4.0
+    u9 = 3 * u2 - 2.0
 
 To untangle this the following linear system is assembled, here `a_c` and `a_f` are the vectors of the individual dofs `u_i`.
 
@@ -39,7 +39,7 @@ which are then used to update the `ConstraintHandler` accordingly. A couple of t
 
 """
 function _untangle_affine_constraints!(ch::ConstraintHandler)
-
+    @assert istangled(ch) "ConstraintHandler is not tangled"
     A, affine_equation_ordering, new_dofcoefficients = _create_lhs_affine_constraint_matrix(ch)
     C, g, affine_fdof_ordering = _create_rhs_affine_constraint_matrices(ch, new_dofcoefficients, affine_equation_ordering)
 
@@ -234,7 +234,7 @@ end
 Check if the constraint handler has any tangled dofs. An example of a tangled dof is
 
     u1 = u2 + u5
-    u2 = u3 + 4*u10 + 4.0.
+    u2 = u3 + 4 * u10 + 4.0.
 
 Here, `u2` is a tangled dof as it appears on the left- and right-hand side of the constraints.
 """

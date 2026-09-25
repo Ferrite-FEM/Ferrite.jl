@@ -451,7 +451,7 @@ function setup_tangled_ch(N::Int)
     acs = AffineConstraint[]
     sizehint!(acs, dim)
     for i in 1:dim
-        setup_affine_constraint!(acs, collect(i:dim:ndofs(dh)-dim+i), ch.dofmapping)
+        setup_affine_constraint!(acs, collect(i:dim:(ndofs(dh) - dim + i)), ch.dofmapping)
     end
     for ac in acs
         add!(ch, ac)
