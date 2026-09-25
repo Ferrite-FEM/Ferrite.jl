@@ -103,7 +103,7 @@ end;
 # The function to create corresponding cellvalues for the displacement field `u` and pressure `p`
 # follows in a similar fashion from the `incompressible_elasticity` example. Since both fields
 # share the same quadrature rule and geometric interpolation, we collect them in a single
-# [`MultiFieldCellValues`](@ref). The values for each field are then accessed as `cellvalues.u`
+# multi-field [`CellValues`](@ref). The values for each field are then accessed as `cellvalues.u`
 # and `cellvalues.p`, while geometric quantities (e.g. `getdetJdV`) are queried on `cellvalues`
 # directly.
 function create_values(interpolation_u, interpolation_p)
@@ -112,7 +112,7 @@ function create_values(interpolation_u, interpolation_p)
     facet_qr = FacetQuadratureRule{RefTetrahedron}(4)
 
     ## cellvalues for both the displacement, u, and pressure, p, fields
-    cellvalues = MultiFieldCellValues(qr, (u = interpolation_u, p = interpolation_p))
+    cellvalues = CellValues(qr, (u = interpolation_u, p = interpolation_p))
 
     ## facetvalues for u
     facetvalues_u = FacetValues(facet_qr, interpolation_u)
@@ -255,7 +255,7 @@ end;
 # The only thing that changes in the assembly of the global stiffness matrix is slicing the corresponding element
 # dofs for the displacement (see `global_dofsu`) and pressure (`global_dofsp`).
 function assemble_global!(
-        K::SparseMatrixCSC, f, cellvalues::MultiFieldCellValues,
+        K::SparseMatrixCSC, f, cellvalues::CellValues,
         dh::DofHandler, mp::NeoHooke, w
     )
     nu = getnbasefunctions(cellvalues.u)
