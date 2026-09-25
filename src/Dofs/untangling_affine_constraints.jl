@@ -17,7 +17,7 @@ Concretely, for the above example we get
     | 1  -1  ⋅ | |u1|   |1  ⋅||u5|   | 1.0|
     | ⋅   1  ⋅ | |u2| = |⋅  1||u3| + | 4.0|
     | ⋅  -3  1 | |u9|   |⋅  ⋅|       |-2.0|.
-    
+
 Solving this system we find the new master/slave dofs and their coefficients
 
     |u1|   |1  1||u5|   | 5.0|
