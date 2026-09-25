@@ -126,7 +126,6 @@ include("Grid/grid.jl")
 include("Grid/topology.jl")
 include("Grid/utils.jl")
 include("Grid/grid_generators.jl")
-include("Grid/coloring.jl")
 
 # Dofs
 include("Dofs/algebraic_variables.jl")
@@ -139,6 +138,10 @@ include("Dofs/DofRenumbering.jl")
 
 include("iterators.jl")
 include("Dofs/algebraic_coupling.jl")
+
+# Grid coloring (after Dofs since the DofHandler/ConstraintHandler based methods are
+# defined here too)
+include("coloring.jl")
 
 # Assembly
 include("assembler.jl")

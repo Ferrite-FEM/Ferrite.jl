@@ -759,6 +759,364 @@ end
     end
 end
 
+@testset "grid coloring with extended conflicts" begin
+    cell_color(colors, c) = findfirst(cv -> c in cv, colors)
+    both_algs = (ColoringAlgorithm.Greedy, ColoringAlgorithm.WorkStream)
+
+    # Facet neighbors within the cellset, computed independently via ExclusiveTopology
+    function facet_neighbors_ref(grid, cellset)
+        topology = ExclusiveTopology(grid)
+        nbh = Ferrite.get_facet_facet_neighborhood(topology, grid)
+        Nf = Dict{Int, Vector{Int}}()
+        for cellid in cellset
+            nbs = Int[]
+            for f in 1:Ferrite.nfacets(getcells(grid, cellid))
+                for fidx in nbh[cellid, f]
+                    other = fidx[1]
+                    other in cellset && push!(nbs, other)
+                end
+            end
+            Nf[cellid] = nbs
+        end
+        return Nf
+    end
+
+    # Reference conflict predicates from dof-level write-set reasoning:
+    #  - facet: pure DG, items write dofs of their facet closure, cell dofs disjoint
+    #  - sharp: only discontinuous fields cross interfaces, but continuous fields exist
+    #  - product: a continuous field crosses interfaces
+    function conflict_predicates(grid, cellset)
+        An = Ferrite.create_incidence_matrix(grid, cellset)
+        Nf = facet_neighbors_ref(grid, cellset)
+        closure(c) = vcat([c], Nf[c])
+        facet_conflict(c1, c2) = !isempty(intersect(closure(c1), closure(c2)))
+        sharp_conflict(c1, c2) = An[c1, c2] || facet_conflict(c1, c2)
+        product_conflict(c1, c2) = any(x == y || An[x, y] for x in closure(c1), y in closure(c2))
+        return facet_conflict, sharp_conflict, product_conflict
+    end
+
+    function check_partition(colors, cellset)
+        @test sum(length, colors, init = 0) == length(cellset)
+        @test union!(Set{Int}(), colors...) == Set(cellset)
+        return
+    end
+
+    function check_safe(colors, conflict)
+        for color in colors, c1 in color, c2 in color
+            c1 == c2 && continue
+            @test !conflict(c1, c2)
+        end
+        return
+    end
+
+    function test_conflict_coloring(grid, cellset = 1:getncells(grid))
+        cellvec = sort!(unique!(collect(Int, cellset)))
+        facet_conflict, sharp_conflict, product_conflict = conflict_predicates(grid, cellvec)
+        refshape = Ferrite.getrefshape(getcelltype(grid))
+        dh_dg = DofHandler(grid)
+        add!(dh_dg, :u, DiscontinuousLagrange{refshape, 1}())
+        close!(dh_dg)
+        dh_mix = DofHandler(grid)
+        add!(dh_mix, :u, DiscontinuousLagrange{refshape, 1}())
+        add!(dh_mix, :p, Lagrange{refshape, 1}())
+        close!(dh_mix)
+        ic_dg_only = [true false; false false] # only :u couples across interfaces
+        for alg in both_algs
+            # Grid method: no field information -> conservative product graph
+            colors = create_coloring(grid, cellvec; alg, interface_coupling = true)
+            check_partition(colors, cellvec)
+            check_safe(colors, product_conflict)
+            # Pure DG discretization -> facet graph
+            colors = create_coloring(dh_dg; cellset = cellvec, alg, interface_coupling = true)
+            check_partition(colors, cellvec)
+            check_safe(colors, facet_conflict)
+            # Mixed discretization, only the DG field crosses -> sharp graph
+            colors = create_coloring(dh_mix; cellset = cellvec, alg, interface_coupling = ic_dg_only)
+            check_partition(colors, cellvec)
+            check_safe(colors, sharp_conflict)
+            # Mixed discretization, all fields cross -> product graph
+            colors = create_coloring(dh_mix; cellset = cellvec, alg, interface_coupling = true)
+            check_partition(colors, cellvec)
+            check_safe(colors, product_conflict)
+        end
+        return
+    end
+    test_conflict_coloring(generate_grid(Line, (6,)))
+    test_conflict_coloring(generate_grid(Triangle, (4, 4)))
+    test_conflict_coloring(generate_grid(Quadrilateral, (4, 4)))
+    test_conflict_coloring(generate_grid(Tetrahedron, (3, 3, 3)))
+    test_conflict_coloring(generate_grid(Hexahedron, (3, 3, 3)))
+    test_conflict_coloring(generate_grid(Quadrilateral, (5, 5)), 1:12) # subset
+    test_conflict_coloring(generate_grid(Quadrilateral, (6, 6)), union(Set(1:8), Set(25:36))) # unconnected subset
+
+    # Exactness of the conflict graphs against brute force references. The quadratic
+    # cells catch node-count-vs-vertex-count misclassification of facet neighbors (e.g.
+    # a QuadraticTetrahedron edge neighbor shares 3 nodes but only 2 vertices).
+    function brute_force_matrix(grid, cellset, conflict)
+        n = getncells(grid)
+        A = zeros(Bool, n, n)
+        for c1 in cellset, c2 in cellset
+            c1 == c2 && continue
+            A[c1, c2] = conflict(c1, c2)
+        end
+        return A
+    end
+    # There is no generate_grid for QuadraticTetrahedron: upgrade a linear tetrahedral
+    # grid by inserting edge midside nodes (only the connectivity matters here)
+    function quadratic_tet_grid(dims)
+        lin = generate_grid(Tetrahedron, dims)
+        nodes = copy(Ferrite.getnodes(lin))
+        midnode = Dict{NTuple{2, Int}, Int}()
+        cells = QuadraticTetrahedron[]
+        for cell in getcells(lin)
+            mids = Int[]
+            for (a, b) in Ferrite.edges(cell)
+                id = get!(midnode, minmax(a, b)) do
+                    xm = (Ferrite.get_node_coordinate(lin, a) + Ferrite.get_node_coordinate(lin, b)) / 2
+                    push!(nodes, Node(xm))
+                    length(nodes)
+                end
+                push!(mids, id)
+            end
+            push!(cells, QuadraticTetrahedron((cell.nodes..., mids...)))
+        end
+        return Grid(cells, nodes)
+    end
+    for (grid, cellset) in (
+            (quadratic_tet_grid((2, 2, 2)), 1:48),
+            (generate_grid(QuadraticQuadrilateral, (3, 3)), 1:9),
+            (generate_grid(Hexahedron, (3, 3, 3)), 1:27),
+            (generate_grid(Quadrilateral, (4, 4)), 1:12),
+        )
+        predicates = conflict_predicates(grid, cellset)
+        topology = ExclusiveTopology(grid)
+        for (mode, conflict) in zip((:facet, :sharp, :product), predicates)
+            im = Ferrite.create_incidence_matrix(grid, cellset; interface_mode = mode)
+            @test Matrix(im) == brute_force_matrix(grid, cellset, conflict)
+            # Facet adjacency from a topology gives the same graph
+            im2 = Ferrite.create_incidence_matrix(grid, cellset; interface_mode = mode, topology)
+            @test im2 == im
+        end
+    end
+
+    # Hand-verified cases on a 3x3x3 Hexahedron grid (cell (i, j, k) has id
+    # i + 3(j-1) + 9(k-1)): cell 14 = (2, 2, 2) is vertex-diagonal to cell 1 and their
+    # interface writes do not conflict in pure DG, while cell 5 = (2, 2, 1) is
+    # edge-diagonal and conflicts through the shared facet neighbors 2 and 4.
+    let grid = generate_grid(Hexahedron, (3, 3, 3))
+        im_facet = Ferrite.create_incidence_matrix(grid; interface_mode = :facet)
+        im_sharp = Ferrite.create_incidence_matrix(grid; interface_mode = :sharp)
+        @test !im_facet[1, 14]
+        @test im_sharp[1, 14] # continuous fields share dofs at the vertex
+        @test im_facet[1, 5]
+        @test im_facet[1, 3] # two apart in a row: shared facet neighbor 2
+        @test !im_facet[1, 15] # (3, 2, 2): no shared facet neighbor, no shared vertex
+    end
+    # 2D corner neighbors conflict also in pure DG (via the two shared facet neighbors)
+    let grid = generate_grid(Quadrilateral, (3, 3))
+        im_facet = Ferrite.create_incidence_matrix(grid; interface_mode = :facet)
+        @test im_facet[1, 5] # corner diagonal
+        @test im_facet[1, 3] # two apart in a row
+        @test !im_facet[1, 6] # closures {1,2,4} and {6,5,3,9} are disjoint
+    end
+
+    # Product-mode necessity: with a continuous field crossing interfaces, cells three
+    # apart in a row conflict through the shared dofs of the two cells between them.
+    let grid = generate_grid(Quadrilateral, (6, 1))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefQuadrilateral, 1}())
+        close!(dh)
+        im = Ferrite.create_incidence_matrix(grid; interface_mode = :product)
+        @test im[1, 4]
+        @test !im[1, 5]
+        for alg in both_algs
+            colors = create_coloring(dh; alg, interface_coupling = true)
+            @test cell_color(colors, 1) != cell_color(colors, 4)
+            colors = create_coloring(grid; alg, interface_coupling = true)
+            @test cell_color(colors, 1) != cell_color(colors, 4)
+        end
+    end
+
+    # Constraint conflicts: periodic constraints make cells on opposite sides conflict
+    # through the master dofs written during condensation.
+    function nontrivial_constraints(ch)
+        masters = Dict{Int, Vector{Int}}()
+        for (i, d) in pairs(ch.prescribed_dofs)
+            coefficients = ch.dofcoefficients[i]
+            (coefficients === nothing || isempty(coefficients)) && continue
+            masters[d] = [m for (m, _) in coefficients]
+        end
+        return masters
+    end
+    function condensation_write_sets(dh, ch, Nf = nothing)
+        masters = nontrivial_constraints(ch)
+        grid = Ferrite.get_grid(dh)
+        write_sets = Dict{Int, Set{Int}}()
+        for cellid in 1:getncells(grid)
+            closure = Nf === nothing ? [cellid] : vcat([cellid], Nf[cellid])
+            s = Set{Int}()
+            for c in closure, d in celldofs(dh, c)
+                push!(s, d)
+                union!(s, get(masters, d, Int[]))
+            end
+            write_sets[cellid] = s
+        end
+        return write_sets
+    end
+    for celltype in (Quadrilateral, Hexahedron)
+        dim = celltype === Quadrilateral ? 2 : 3
+        grid = generate_grid(celltype, ntuple(_ -> 3, dim))
+        refshape = Ferrite.getrefshape(celltype)
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{refshape, 1}())
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid, "left", "right")))
+        close!(ch)
+        write_sets = condensation_write_sets(dh, ch)
+        for alg in both_algs
+            colors = create_coloring(dh, ch; alg)
+            check_partition(colors, 1:getncells(grid))
+            # Safety: same-color cells must have disjoint write sets (covers both the
+            # node graph and the constraint conflicts)
+            check_safe(colors, (c1, c2) -> !isempty(intersect(write_sets[c1], write_sets[c2])))
+            # Necessity: cells containing a constrained dof conflict with cells
+            # containing one of its masters
+            masters = nontrivial_constraints(ch)
+            @test !isempty(masters)
+            for (d, ms) in masters, m in ms
+                for c1 in 1:getncells(grid), c2 in 1:getncells(grid)
+                    c1 == c2 && continue
+                    if d in celldofs(dh, c1) && m in celldofs(dh, c2)
+                        @test cell_color(colors, c1) != cell_color(colors, c2)
+                    end
+                end
+            end
+        end
+        # Dirichlet-only constraints add no conflicts
+        ch_dbc = ConstraintHandler(dh)
+        add!(ch_dbc, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0))
+        close!(ch_dbc)
+        @test create_coloring(dh, ch_dbc) == create_coloring(dh)
+    end
+
+    # Long-range AffineConstraint: couples the first and last cells of the grid
+    let grid = generate_grid(Quadrilateral, (5, 5))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefQuadrilateral, 1}())
+        close!(dh)
+        d1 = first(celldofs(dh, 1))
+        d2 = last(celldofs(dh, 25))
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(d1, [d2 => 1.0], 0.0))
+        close!(ch)
+        for alg in both_algs
+            colors = create_coloring(dh, ch; alg)
+            @test cell_color(colors, 1) != cell_color(colors, 25)
+        end
+    end
+
+    # Combined DG + periodic constraints: the mixed dh has a periodic CG field and a DG
+    # field crossing interfaces, so master conflicts extend over the facet closure.
+    # The (nonzero) write set of an item is: all own dofs, the DG field dofs of the
+    # facet neighbors, and the masters of constrained dofs anywhere in the facet closure
+    # (interface items condense the neighbor's dofs too).
+    let grid = generate_grid(Quadrilateral, (4, 4))
+        dh = DofHandler(grid)
+        add!(dh, :u, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        add!(dh, :p, Lagrange{RefQuadrilateral, 1}())
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, PeriodicDirichlet(:p, collect_periodic_facets(grid, "left", "right")))
+        close!(ch)
+        Nf = facet_neighbors_ref(grid, 1:getncells(grid))
+        masters = nontrivial_constraints(ch)
+        @test !isempty(masters)
+        sdh = first(dh.subdofhandlers)
+        urange = dof_range(sdh, :u)
+        write_sets = Dict{Int, Set{Int}}()
+        for cellid in 1:getncells(grid)
+            s = Set{Int}(celldofs(dh, cellid))
+            for n in Nf[cellid]
+                union!(s, celldofs(dh, n)[urange])
+            end
+            for c in vcat([cellid], Nf[cellid]), d in celldofs(dh, c)
+                union!(s, get(masters, d, Int[]))
+            end
+            write_sets[cellid] = s
+        end
+        ic_dg_only = [true false; false false]
+        for alg in both_algs
+            colors = create_coloring(dh, ch; alg, interface_coupling = ic_dg_only)
+            check_partition(colors, 1:getncells(grid))
+            check_safe(colors, (c1, c2) -> !isempty(intersect(write_sets[c1], write_sets[c2])))
+        end
+    end
+
+    # Kwarg mirror contract: the same kwargs as for allocate_matrix/add_sparsity_entries!
+    let grid = generate_grid(Quadrilateral, (3, 3))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefQuadrilateral, 1}())
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 0))
+        close!(ch)
+        topology = ExclusiveTopology(grid)
+        colors = create_coloring(
+            dh, ch;
+            keep_constrained = false, coupling = trues(1, 1),
+            interface_coupling = trues(1, 1), topology,
+        )
+        check_partition(colors, 1:getncells(grid))
+        # coupling and keep_constrained have no effect
+        @test colors == create_coloring(dh, ch; interface_coupling = trues(1, 1), topology)
+        # interface_coupling matrix with no coupling is equivalent to no interface coupling
+        @test create_coloring(dh; interface_coupling = falses(1, 1)) == create_coloring(dh)
+        # algebraic couplings are refused
+        @test_throws ArgumentError create_coloring(dh; algebraic_couplings = (1,))
+        # validation
+        @test_throws ErrorException create_coloring(DofHandler(grid)) # unclosed dh
+        ch_other = ConstraintHandler(close!(add!(DofHandler(grid), :u, Lagrange{RefQuadrilateral, 1}())))
+        @test_throws ErrorException create_coloring(dh, ch_other) # ch from another dh
+    end
+
+    # User-provided extra conflicts
+    let grid = generate_grid(Quadrilateral, (4, 4))
+        for alg in both_algs
+            # Dict form, asymmetric input is symmetrized
+            colors = create_coloring(grid; alg, extra_conflicts = Dict(1 => [16]))
+            @test cell_color(colors, 1) != cell_color(colors, 16)
+            # Clique form
+            colors = create_coloring(grid; alg, extra_conflicts = [[1, 13, 16]])
+            @test cell_color(colors, 1) != cell_color(colors, 13) !=
+                cell_color(colors, 16) != cell_color(colors, 1)
+        end
+        # Clique form is equivalent to the pairwise Dict form
+        @test Ferrite.create_incidence_matrix(grid; extra_conflicts = [[1, 13, 16]]) ==
+            Ferrite.create_incidence_matrix(
+            grid; extra_conflicts = Dict(1 => [13, 16], 13 => [16])
+        )
+        # Edges to cells outside the cellset are ignored
+        @test Ferrite.create_incidence_matrix(grid, 1:8; extra_conflicts = Dict(1 => [16])) ==
+            Ferrite.create_incidence_matrix(grid, 1:8)
+        # Out of range cell ids throw
+        @test_throws ArgumentError create_coloring(grid; extra_conflicts = Dict(1 => [17]))
+        @test_throws ArgumentError create_coloring(grid; extra_conflicts = [[0, 1]])
+        # Composes with other conflict sources
+        colors = create_coloring(grid; interface_coupling = true, extra_conflicts = Dict(1 => [16]))
+        @test cell_color(colors, 1) != cell_color(colors, 16)
+    end
+
+    # Set cellset and sorted vector cellset give the same result with the new kwargs
+    let grid = generate_grid(Quadrilateral, (4, 4))
+        @test create_coloring(grid, Set(1:9); interface_coupling = true) ==
+            create_coloring(grid, collect(1:9); interface_coupling = true)
+        # Empty and single-cell sets
+        @test create_coloring(grid, Int[]; interface_coupling = true) == Vector{Int}[]
+        @test create_coloring(grid, [5]; interface_coupling = true) == [[5]]
+    end
+end
+
 @testset "High order dof distribution" begin
     # 3-----4
     # | \   |
