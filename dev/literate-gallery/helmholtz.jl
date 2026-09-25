@@ -1,7 +1,7 @@
 # # [Helmholtz equation](@id tutorial-helmholtz)
 #
 # In this example, we want to solve a (variant of) the [Helmholtz equation](https://en.wikipedia.org/wiki/Helmholtz_equation).
-# The example is inspired by [deal.II step-7](https://www.dealii.org/8.4.1/doxygen/deal.II/step_7.html) on the standard square.
+# The example is inspired by [deal.II step-7](https://dealii.org/current/doxygen/deal.II/step_7.html) on the standard square.
 #
 # ```math
 #  - \Delta u + u = f
