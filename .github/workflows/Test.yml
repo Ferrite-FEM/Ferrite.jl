@@ -20,7 +20,7 @@ jobs:
         os: ['ubuntu-latest']
         include:
           - os: windows-latest
-            julia-version: '1'
+            julia-version: '1.12'
           - os: macOS-latest
             julia-version: '1'
     steps:
