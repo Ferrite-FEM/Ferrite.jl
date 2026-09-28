@@ -78,15 +78,8 @@ The reduced system of equations can be used to solve for ``\boldsymbol{a}_f``, w
 be used to calculate the dependent DoFs. Ferrite has functionality for setting up the
 ``\hat{\boldsymbol{K}}`` and ``\hat{\boldsymbol{f}}`` in an efficient way.
 
-!!! note "Limitations"
-    Ferrite currently cannot untangle constraints where a DoF is both *master* and *slave*
-    DoF. For example, if we have two affine constraints such as:
-    ```math
-    a_1 = 2a_2 + 4 \\
-    a_2 = 3a_3 + 1
-    ```
-    Ferrite will not be able to resolve this situation because `` a_2 `` is both a master
-    and a slave DoF in different constraints.
+!!! note "Tangled affine constraints"
+    In  `close!` the tangled affine constraints are untangled. To check if your `ConstraintHandler` is tangled you can call `Ferrite._istangled`. It should be noted that this is internal and can change on non-breaking releases without warning.
 
 ### Affine constraints in Ferrite
 
