@@ -174,8 +174,7 @@ export
     apply_assemble!,
     add!,
     free_dofs,
-    istangled,
-
+    
     # iterators
     CellCache,
     CellIterator,

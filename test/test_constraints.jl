@@ -1506,7 +1506,7 @@ end # testset
     # u2 = u3 + 4*u10 + 4.0
     # u9 = 3*u2 - 2.0
     #
-    # A * a_c = C * a_f + g
+    # A * u_c = C * u_f + g
     # | 1  -1  ⋅ | |u1|   |1  ⋅||u5|   | 1.0|
     # | ⋅   1  ⋅ | |u2| = |⋅  1||u3| + | 4.0|
     # | ⋅  -3  1 | |u9|   |⋅  ⋅|        |-2.0|
@@ -1538,11 +1538,7 @@ end # testset
         ch = ConstraintHandler(dh)
         add!(ch, AffineConstraint(1, [1 => 1.0], 0.0))
 
-        @test_throws ArgumentError(
-            "the affine constraints are tangled and untangling them fails. " *
-                "This can be due to e.g. redundant constraints. A possibility to avoid this is to guarantee that " *
-                "the constraints are not tangled before calling close!"
-        ) close!(ch)
+        @test_throws ArgumentError close!(ch)
     end # subtestset
 
 end # testset

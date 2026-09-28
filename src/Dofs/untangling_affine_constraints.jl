@@ -8,9 +8,9 @@ tangled as `u2` appears as a master and a slave dof.
     u2 = u3 + 4 * u10 + 4.0
     u9 = 3 * u2 - 2.0
 
-To untangle this the following linear system is assembled, here `a_c` and `a_f` are the vectors of the individual dofs `u_i`.
+To untangle this the following linear system is assembled, here `u_c` and `u_f` are the vectors of the individual dofs `u_i`.
 
-    A * a_c = C * a_f + g.
+    A * u_c = C * u_f + g.
 
 Concretely, for the above example we get
 
@@ -34,7 +34,7 @@ which are then used to update the `ConstraintHandler` accordingly. A couple of t
 
 """
 function _untangle_affine_constraints!(ch::ConstraintHandler)
-    @assert istangled(ch) "ConstraintHandler is not tangled"
+    @assert _istangled(ch) "ConstraintHandler is not tangled"
     A, affine_equation_ordering, new_dofcoefficients = _create_lhs_affine_constraint_matrix(ch)
     C, g, affine_fdof_ordering = _create_rhs_affine_constraint_matrices(ch, new_dofcoefficients, affine_equation_ordering)
 
@@ -68,14 +68,14 @@ function _untangle_affine_constraints!(ch::ConstraintHandler)
     # finally update the dofcoefficients in the constraint handler
     ch.dofcoefficients .= new_dofcoefficients
 
-    @assert !istangled(ch)
+    @assert !_istangled(ch)
     return ch
 end
 
 """
     _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, Tv, Ti}) where {DH, Tv, Ti}
 
-Create and returns the left-hand side constraint matrix `A` from the system `A * a_c = C * a_f + g`. As `A` only contains the
+Create and returns the left-hand side constraint matrix `A` from the system `A * u_c = C * u_f + g`. As `A` only contains the
 tangled affine constraints its structure is built from the ground up. This means there is a mapping required to associate
 each row in `A` to its original position. To do this `affine_equation_ordering` returned. Finally, `new_dofcoefficients` are returned
 which have the entries that are now in `A` removed.
@@ -83,9 +83,9 @@ which have the entries that are now in `A` removed.
 """
 function _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, Tv, Ti}) where {DH, Tv, Ti}
 
-    # maps the constrained dofs to a position in `a_c`
+    # maps the constrained dofs to a position in `u_c`
     affine_cdof_ordering = Dict{Int, Int}()
-    # maps the constraint equation to a row in `A * a_c = C * a_f + g`
+    # maps the constraint equation to a row in `A * u_c = C * u_f + g`
     affine_equation_ordering = Dict{Int, Int}()
     # collect the position of the dof coefficients that need to be removed for ch.dofcoefficients
     dofcoeffs_to_remove = Dict{Int, Vector{Int}}()
@@ -160,7 +160,7 @@ end
 """
     _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, Tv, Ti}, new_dofcoefficients, affine_equation_ordering::Dict{Int, Int}) where {DH, Tv, Ti}
 
-Create and returns the right-hand side constraint matrix `C` and its inhomogenties `g` from the system `A * a_c = C * a_f + g`. Returned are `C`,
+Create and returns the right-hand side constraint matrix `C` and its inhomogenties `g` from the system `A * u_c = C * u_f + g`. Returned are `C`,
 `g` and `affine_fdof_ordering` which maps the "free" dofs to the columns of `C`.
 
 """
@@ -170,7 +170,7 @@ function _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, Tv, Ti
     I = Ti[]; J = Ti[]; V = Tv[]
     g = Vector{Tv}(undef, n_tangled_constraints) # inhomogeneities
 
-    # maps the free dofs to a position in `a_f`
+    # maps the free dofs to a position in `u_f`
     affine_fdof_ordering = Dict{Int, Int}()
 
     for (eq, coeffs) in enumerate(new_dofcoefficients)
@@ -224,7 +224,7 @@ function _update_dof_coefficients!(dc::Vector{Union{Nothing, DofCoefficients{Tv,
 end
 
 """
-    istangled(ch::ConstraintHandler)
+    _istangled(ch::ConstraintHandler)
 
 Check if the constraint handler has any tangled dofs. An example of a tangled dof is
 
@@ -233,7 +233,7 @@ Check if the constraint handler has any tangled dofs. An example of a tangled do
 
 Here, `u2` is a tangled dof as it appears on the left- and right-hand side of the constraints.
 """
-function istangled(ch::ConstraintHandler)
+function _istangled(ch::ConstraintHandler)
     for coeffs in ch.dofcoefficients
         coeffs === nothing && continue
         for (d, _) in coeffs
