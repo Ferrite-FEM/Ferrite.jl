@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+ - Adaptive mesh refinement for tetrahedral and triangular (linear) grids. `ForestBWG` now
+   accepts any conforming `Tetrahedron`/`Triangle` `Grid` and builds a forest of simplex trees
+   after Burstedde & Holke (Bey's red refinement into `2^dim` children, ordered along the
+   tetrahedral space-filling curve of the paper). `refine!`, `coarsen!`,
+   `refine_and_coarsen!`, `refine_all!`, `balanceforest!`, `creategrid`, `facetskeleton` and
+   `ConformityConstraint` work unchanged; hanging nodes of simplex grids are edge midpoints
+   constrained by the two edge endpoints. The 2:1 balance of simplex forests is enforced
+   across shared vertices (the condition needed for hanging nodes to have non-hanging
+   masters), and `creategrid`/`facetskeleton` reject an unbalanced simplex forest with an
+   `ArgumentError`. Like the hexahedral AMR this feature is experimental.
+
 ### Fixes
 
  - Symmetric CSC assembly now rejects incompatible row/column dof lists and

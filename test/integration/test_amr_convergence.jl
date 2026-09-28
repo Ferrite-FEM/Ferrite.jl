@@ -41,6 +41,8 @@ end
     @testset "$interpolation" for (interpolation, L2target) in (
             (Lagrange{RefQuadrilateral, 1}(), 1.0e-3),
             (Lagrange{RefHexahedron, 1}(), 5.0e-3),
+            (Lagrange{RefTriangle, 1}(), 1.0e-3),
+            (Lagrange{RefTetrahedron, 1}(), 5.0e-3),
         )
         # Start from a deliberately coarse macro grid so that the adaptive
         # loop below has to do the resolving.

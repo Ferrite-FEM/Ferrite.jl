@@ -632,3 +632,120 @@ The hanging-node map produced by `creategrid` is turned into affine constraints 
 `ConformityConstraint` to a `ConstraintHandler`; the constraint weights and their
 justification are user-facing and documented in the [AMR topic guide](@ref topic-amr) and
 [`ConformityConstraint`](@ref).
+
+## Simplex forests (Burstedde–Holke)
+
+Triangular and tetrahedral grids use the same `ForestBWG`, the same refinement/coarsening
+drivers and the same `balancetree`, but a different element: the `SimplexBH` of
+[BH2016](@citet) instead of the `OctantBWG`. Everything below is what differs from the
+octree case; `src/Adaptivity/simplex.jl` holds the element and tree,
+`src/Adaptivity/simplex_forest.jl` the forest-level parts.
+
+### Tet-id, types and the tetrahedral Morton order
+
+Bey's red refinement splits a simplex into `2^dim` children of equal volume by cutting off
+the corner simplices and subdividing the inner octahedron along one fixed diagonal. Refining
+the six *Kuhn* tetrahedra of a cube this way reproduces the Kuhn triangulation of the eight
+subcubes (Property 4 of the paper), so every simplex of a refinement is a scaled copy of one
+of `dim!` *types* `S_0, …, S_{dim!-1}` sitting in one cube of a uniform refinement. Its
+*Tet-id* is the anchor node of that cube plus the type; with the level this identifies the
+simplex, and all element operations are integer arithmetic plus small lookup tables
+(transcribed at the top of `simplex.jl`, verified against brute-force geometry in
+`test/test_bey_simplex.jl`). The root of a tree is `2^b S_0`, the simplex
+`0 ≤ y ≤ z ≤ x ≤ 2^b` (`0 ≤ y ≤ x ≤ 2^b` in 2D), with the macro cell's vertices in Ferrite's
+order as `x_0, …, x_dim`.
+
+The leaves are kept in the *tetrahedral Morton* order of the paper, whose digit for each level
+is `(cube-id, type)` of the ancestor at that level. Children are emitted in this order
+(Table 2), and a tree's sort key is the consecutive index of eq. (55), shifted to the maximum
+level. Unlike the octant Morton key it needs the tree's maximum level `b` (the type of each
+ancestor is read off the anchor bits), so the shared tree code compares `_sortkey(o, b)` and
+`Base.isless` is deliberately not defined for `SimplexBH`.
+
+```@docs
+Ferrite.AMR.SimplexBH
+Ferrite.AMR.SimplexTreeBH
+Ferrite.AMR._local_barycentric
+Ferrite.AMR._barycentric
+Ferrite.AMR.cube_id
+Ferrite.AMR.parent
+Ferrite.AMR._bey_child
+Ferrite.AMR.child_id
+Ferrite.AMR.consecutive_index
+Ferrite.AMR._sortkey
+Ferrite.AMR.facet_neighbor_face
+Ferrite.AMR._orientation
+```
+
+### Points transform across trees, elements do not
+
+Two trees sharing a face have unrelated Kuhn structures: only the shared face itself is
+refined identically from both sides (the midpoint refinement of a triangle does not depend on
+the vertex order). A same-level simplex lying outside the root is therefore *not* a simplex
+of the neighbouring tree, and the octree recipe — push the out-of-tree `possibleneighbors`
+through `transform_facet`/`transform_edge`/`transform_corner` — has no counterpart. Instead
+every inter-tree operation is formulated on integer *points*, which transform exactly: a
+point's root barycentric coordinates `μ` (scaled by `2^b`, so integers) are permuted by the
+correspondence of the shared macro nodes and re-expanded in the neighbour's root. The trees
+touching a point are read off the topology's `vertex_to_cell` as those containing every
+macro node with `μᵢ ≠ 0`, which covers faces, edges and vertices alike. The element across a
+shared root face is rebuilt from its transformed face corners. Note that leaves of several
+types have faces on the root boundary (away from the root's diagonal planes the faces of
+types 1, 2, 4 and 5 tile them too), so the root face of a leaf face is a barycentric query,
+not a type test.
+
+```@docs
+Ferrite.AMR._transform_point
+Ferrite.AMR._trees_touching!
+Ferrite.AMR._root_face_of
+Ferrite.AMR._leaf_on_root_face
+Ferrite.AMR._physical_point
+Ferrite.AMR._tree_map_sign
+```
+
+### Vertex-based balancing
+
+Hanging nodes of a simplex grid are edge midpoints only (Bey adds no face or cell nodes), and
+a hanging node hangs on the unique level-`l` edge it is the midpoint of. For its two masters
+to be regular nodes the forest must be 2:1 balanced across *vertices*, not just faces: with a
+face-only balance a master can itself hang and the constraints nest. Same-level Kuhn
+simplices touch iff they share a corner, and a finer simplex touches a coarser one iff one of
+its corners lies in the coarser one's closure, so all neighbourhood queries are corner
+queries: the level-`l` simplices containing a corner are the `dim!` candidates of the `2^dim`
+level-`l` cubes around it. In-tree balancing is the same Sundar–Sampath–Biros algorithm as
+for octrees with this corner-based neighbour set; across trees, each boundary corner of a
+level-`l` leaf is carried into the trees sharing it, where no level-`(l-1)` simplex containing
+it may hide inside a coarser leaf. `creategrid` and `facetskeleton` check exactly this
+condition first — on an unbalanced simplex forest nodes can lie in the interior of a coarse
+leaf's edge or face without being its midpoint, and would silently stay unconstrained.
+
+```@docs
+Ferrite.AMR._push_simplices_at!
+Ferrite.AMR._push_same_level_neighbors!
+Ferrite.AMR._resolve_corner!
+Ferrite.AMR._balance_tree_boundary!
+Ferrite.AMR._isbalanced
+```
+
+### Materialization
+
+`creategrid` for simplex forests numbers the distinct leaf corners of each tree (sorted packed
+coordinates), fills the element-node matrix, records the root-boundary nodes in the same
+per-tree boundary tables as the octree code, and detects hanging nodes as edge midpoints that
+are nodes: within a tree by a lookup in the tree's own table, across trees by transforming
+the midpoint into every tree sharing the edge. Node identity across trees is again resolved by
+aliasing boundary nodes onto their image in the lowest tree holding them; the shared
+`_global_numbering` assigns the final ids.
+
+A leaf's canonical vertex order has orientation `(-1)^(type + 1)` in the tree frame (`(-1)^type`
+in 2D), and the affine map of the macro cell may flip it again; since Ferrite requires
+`det J > 0`, cells whose physical orientation would be negative are built with their second
+and third vertex swapped, and every local facet index goes through the corresponding
+permutation. Facet sets are transferred by testing each boundary leaf face for the root face
+it lies on; the facet skeleton pairs each leaf face with the same-level neighbour (a leaf:
+conforming pair; the child of a leaf: hanging pair, fine side first; refined: emitted from
+the finer side), rebuilding the neighbour in the adjacent tree across root faces.
+
+```@docs
+Ferrite.AMR._build_simplex_cells
+```
