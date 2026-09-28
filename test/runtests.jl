@@ -20,14 +20,15 @@ for name in (
         "test_utils",       # shared helpers, `include`d by the tests that need them
         "interpolation_test_utils",           # shared helpers for the test_interpolations* files
         "integration/convergence_test_utils", # shared helpers for the integration convergence tests
-        "GPU/runtests",                    # GPU tests, run separately
-        "GPU/heat_assembly",               # GPU tests, run separately
         "jet",              # JET tests, run separately
         "test_notebooks",   # notebook tests, opt-in
         "coverage/coverage", # coverage tooling, not a test
     )
     delete!(testsuite, name)
 end
+# GPU tests run separately on Buildkite (see test/GPU/runtests.jl). The CPU-backend
+# variant is `test_ka_cpu.jl`, which includes the shared files from test/GPU itself.
+filter!(((name, _),) -> !startswith(name, "GPU/"), testsuite)
 
 # Auto CPU thread count detection in ParallelTestRunner is bad
 push!(ARGS, "--jobs=$(Sys.CPU_THREADS)")
