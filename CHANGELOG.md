@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixes
 
  - Untangle the tangled `AffineConstraints` in `close!` ([#1327])
+ - Untangling of `AffineConstraint`s in `close!` no longer scales quadratically with the
+   number of tangled constraints (substitution in topological order instead of a global
+   sparse solve). Untangled coefficients are sorted by dof.
  - Symmetric CSC assembly now rejects incompatible row/column dof lists and
    lower-triangle storage before modifying the system. Constraint application also
    rejects unsupported lower-triangle CSC storage.

@@ -1524,7 +1524,7 @@ end # testset
         close!(ch)
 
         correct_dc = [
-            [Pair(5, 1.0), Pair(3, 1)],
+            [Pair(3, 1.0), Pair(5, 1.0)],
             [Pair(3, 1.0)],
             [Pair(3, 3.0)],
         ]
@@ -1532,12 +1532,91 @@ end # testset
 
         @test ch.dofcoefficients == correct_dc
         @test ch.inhomogeneities ≈ correct_inhomogeneities
+
+        # Chain through a Dirichlet dof: the Dirichlet master is kept and its (time
+        # dependent) value enters the inhomogeneity in update!
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 2.0 * t))
+        ldof = first(ch.prescribed_dofs)
+        @test ldof ∉ (6, 7, 9)
+        add!(ch, AffineConstraint(9, [6 => 1.0, ldof => 1.0], 0.0))
+        add!(ch, AffineConstraint(6, [7 => 2.0, ldof => 1.0], 1.0))
+        close!(ch)
+        update!(ch, 1.0)
+        i9, i6 = ch.dofmapping[9], ch.dofmapping[6]
+        @test ch.dofcoefficients[i9] == [ldof => 2.0, 7 => 2.0]
+        @test ch.dofcoefficients[i6] == [7 => 2.0, ldof => 1.0] # not tangled: untouched
+        @test ch.inhomogeneities[i9] ≈ 1.0 + 2 * 2.0
+        @test ch.inhomogeneities[i6] ≈ 1.0 + 2.0
+    end # subtestset
+
+    @testset "untangle edge cases" begin
+        # A constraint that simplifies to a constant must still be substituted:
+        # u1 = u2, u2 = u3 - 2 u4, u3 = u7 + 10, u4 = 0.5 u7 + 2  =>  u2 = 6, u1 = 6
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, [2 => 1.0], 0.0))
+        add!(ch, AffineConstraint(2, [3 => 1.0, 4 => -2.0], 0.0))
+        add!(ch, AffineConstraint(3, [7 => 1.0], 10.0))
+        add!(ch, AffineConstraint(4, [7 => 0.5], 2.0))
+        close!(ch)
+        @test ch.dofcoefficients[1:2] == [[], []]
+        @test ch.inhomogeneities[1:2] ≈ [6.0, 6.0]
+
+        # Coefficient vectors shared between constraints (or with the user) are not modified
+        entries = [3 => 1.0]
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, entries, 0.0))
+        add!(ch, AffineConstraint(2, entries, 0.0))
+        add!(ch, AffineConstraint(3, [4 => 1.0], 5.0))
+        close!(ch)
+        @test entries == [3 => 1.0]
+        @test ch.dofcoefficients[1:2] == [[4 => 1.0], [4 => 1.0]]
+        @test ch.inhomogeneities[1:2] ≈ [5.0, 5.0]
+
+        # Duplicate masters are summed, zero coefficients are dropped
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, [2 => 1.0, 5 => 1.0, 2 => 3.0], 0.0))
+        add!(ch, AffineConstraint(2, [5 => -0.25, 6 => 1.0], 0.0))
+        close!(ch)
+        @test ch.dofcoefficients[1] == [6 => 4.0]
+
+        # Solvable self loop: u1 = 0.5 u1 + u2 + 1  =>  u1 = 2 u2 + 2
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, [1 => 0.5, 2 => 1.0], 1.0))
+        close!(ch)
+        @test ch.dofcoefficients[1] == [2 => 2.0]
+        @test ch.inhomogeneities[1] ≈ 2.0
+
+        # Non-Int index type
+        ch = ConstraintHandler(Float64, Int32, dh)
+        add!(ch, AffineConstraint(Int32(1), [Int32(2) => 1.0], 1.0))
+        add!(ch, AffineConstraint(Int32(2), [Int32(3) => 2.0], 1.0))
+        close!(ch)
+        @test ch.dofcoefficients[1] == [Int32(3) => 2.0]
+        @test ch.dofcoefficients[1] isa Vector{Pair{Int32, Float64}}
+        @test ch.inhomogeneities[1] ≈ 2.0
+    end # subtestset
+
+    # Cyclic constraints are solvable when they are not redundant:
+    # u1 = 2 u2 + 1, u2 = u1 + u7 + 1  =>  u1 = -2 u7 - 3, u2 = -u7 - 2
+    @testset "untangle cyclic constraints" begin
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, [2 => 2.0], 1.0))
+        add!(ch, AffineConstraint(2, [1 => 1.0, 7 => 1.0], 1.0))
+        close!(ch)
+        @test ch.dofcoefficients == [[7 => -2.0], [7 => -1.0]]
+        @test ch.inhomogeneities ≈ [-3.0, -2.0]
     end # subtestset
 
     @testset "ill defined constraints error on close!" begin
         ch = ConstraintHandler(dh)
         add!(ch, AffineConstraint(1, [1 => 1.0], 0.0))
+        @test_throws ArgumentError close!(ch)
 
+        # redundant cycle: u1 = 2 u2, u2 = u1 / 2
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, [2 => 2.0], 0.0))
+        add!(ch, AffineConstraint(2, [1 => 0.5], 0.0))
         @test_throws ArgumentError close!(ch)
     end # subtestset
 

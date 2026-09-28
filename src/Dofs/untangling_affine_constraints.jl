@@ -1,226 +1,75 @@
 """
     _untangle_affine_constraints!(ch::ConstraintHandler)
 
-Untangle the affine constraints in `ch`. This is best illustrated using an example. The following system is
-tangled as `u2` appears as a master and a slave dof.
+Untangle the affine constraints in `ch`, i.e. rewrite them such that no master dof of an
+affine constraint is itself constrained by an affine constraint. For example, the system
 
     u1 = u2 + u5
     u2 = u3 + 4 * u10 + 4.0
     u9 = 3 * u2 - 2.0
 
-To untangle this the following linear system is assembled, here `u_c` and `u_f` are the vectors of the individual dofs `u_i`.
+is tangled since `u2` appears both as a master and a slave dof. After untangling it reads
 
-    A * u_c = C * u_f + g.
+    u1 = u3 + 4 * u10 + u5 + 4.0
+    u2 = u3 + 4 * u10 + 4.0
+    u9 = 3 * u3 + 12 * u10 + 10.0
 
-Concretely, for the above example we get
+Dirichlet-type master dofs (constraints without coefficients, e.g. `u3 = f3(t)`) are not
+substituted here; their contribution to the inhomogeneities is computed in `update!`.
 
-    | 1  -1  ⋅ | |u1|   |1  ⋅||u5|   | 1.0|
-    | ⋅   1  ⋅ | |u2| = |⋅  1||u3| + | 4.0|
-    | ⋅  -3  1 | |u9|   |⋅  ⋅|       |-2.0|.
-
-Solving this system we find the new master/slave dofs and their coefficients
-
-    |u1|   |1  1||u5|   | 5.0|
-    |u2| = |0  1||u3| + | 4.0|
-    |u9|   |0  3|       |10.0|
-
-which are then used to update the `ConstraintHandler` accordingly. A couple of things to note here:
-
-    * If a Dirichlet-type dof appears in a tangled fashion, i.e. `u3 = f3(t)` in the system above, this is not included in `A` or `C`
-    as Ferrite allows tangled dofs if they of Dirichlet-type.
-
-    * The case that a Dirichlet dof is also a master dof i.e., `u9 = f9(t)` in the above system, does not occur as Ferrite overwrites master
-    dofs in `add!` to ensure no two constraints share a master dof.
-
+The constraints are viewed as a directed graph where constraint `i` points to constraint
+`j` when the slave dof of `j` is a master dof of `i`. The strongly connected components of
+this graph are computed with Tarjan's algorithm, which emits them in reverse topological
+order. Processing the components in this order means that when a constraint is reached, all
+constraints it depends on are already untangled and can be substituted directly, so the
+cost is proportional to the total size of the substituted constraints. Only components with
+a genuine cycle (e.g. `u1 = 2 * u2 + 1, u2 = u1 + 1`) require solving a (small) linear system.
 """
-function _untangle_affine_constraints!(ch::ConstraintHandler)
+function _untangle_affine_constraints!(ch::ConstraintHandler{DH, Tv, Ti}) where {DH, Tv, Ti}
     @assert _istangled(ch) "ConstraintHandler is not tangled"
-    A, affine_equation_ordering, new_dofcoefficients = _create_lhs_affine_constraint_matrix(ch)
-    C, g, affine_fdof_ordering = _create_rhs_affine_constraint_matrices(ch, new_dofcoefficients, affine_equation_ordering)
-
-    luA = try
-        LinearAlgebra.lu(A; check = true)
-    catch e
-        if e isa LinearAlgebra.SingularException
-            throw(
-                ArgumentError(
-                    "the affine constraints are tangled and untangling them fails. " *
-                        "This can be due to e.g. redundant constraints. A possibility to avoid this is to guarantee that " *
-                        "the constraints are not tangled before calling close!"
-                )
-            )
+    # Which constraints are affine is decided once, from the original constraints: a
+    # constraint that simplifies to a constant during untangling must still be substituted.
+    isaffine = _isaffine(ch)
+    sccs = _affine_constraint_sccs(ch, isaffine)
+    resolved = falses(length(isaffine))
+    spa = _SparseAccumulator{Tv, Ti}(ndofs(ch.dh))
+    for scc in sccs
+        if length(scc) == 1 && !_has_affine_master(ch, isaffine, scc[1])
+            # no tangled master, leave the user given coefficients untouched
+        elseif length(scc) == 1 && !_has_self_loop(ch, scc[1])
+            _substitute_resolved!(ch, spa, isaffine, scc[1], resolved)
         else
-            rethrow(e)
+            _untangle_cyclic_scc!(ch, spa, isaffine, scc, resolved)
+        end
+        for i in scc
+            resolved[i] = true
         end
     end
-
-    A⁻¹C = _sparse_column_wise_solve(luA, C)
-    _update_dof_coefficients!(new_dofcoefficients, A⁻¹C, affine_equation_ordering, affine_fdof_ordering)
-
-    ldiv!(luA, g)
-
-    # we need to update ch.affine_inhomogeneities NOT ch.inhomogeneities
-    # as ch.inhomogeneities will be computed in update!
-    for (k, v) in affine_equation_ordering
-        ch.affine_inhomogeneities[k] = g[v]
-    end
-
-    # finally update the dofcoefficients in the constraint handler
-    ch.dofcoefficients .= new_dofcoefficients
-
     @assert !_istangled(ch)
     return ch
 end
 
-"""
-    _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, Tv, Ti}) where {DH, Tv, Ti}
-
-Create and returns the left-hand side constraint matrix `A` from the system `A * u_c = C * u_f + g`. As `A` only contains the
-tangled affine constraints its structure is built from the ground up. This means there is a mapping required to associate
-each row in `A` to its original position. To do this `affine_equation_ordering` returned. Finally, `new_dofcoefficients` are returned
-which have the entries that are now in `A` removed.
-
-"""
-function _create_lhs_affine_constraint_matrix(ch::ConstraintHandler{DH, Tv, Ti}) where {DH, Tv, Ti}
-
-    # maps the constrained dofs to a position in `u_c`
-    affine_cdof_ordering = Dict{Int, Int}()
-    # maps the constraint equation to a row in `A * u_c = C * u_f + g`
-    affine_equation_ordering = Dict{Int, Int}()
-    # collect the position of the dof coefficients that need to be removed for ch.dofcoefficients
-    dofcoeffs_to_remove = Dict{Int, Vector{Int}}()
-
-    I = Ti[]; J = Ti[]; V = Tv[]
-    dofmapping⁻¹ = Dict{Int, Int}(v => k for (k, v) in ch.dofmapping)
-
-    for (eq, coeffs) in enumerate(ch.dofcoefficients)
-        coeffs === nothing && continue # this constraint corresponds to a Dirichlet constraint
-        dof_position_counter = 0
-        for (d, c) in coeffs
-
-            tangled_eq = get(ch.dofmapping, d, 0)
-            dof_position_counter += 1
-            tangled_eq == 0 && continue # skip as d is not in the prescribed dofs and therefore not tangled
-
-            tangled_coeffs = ch.dofcoefficients[tangled_eq]
-            if !(tangled_coeffs === nothing || isempty(tangled_coeffs)) # nothing means Dirichlet, empty means Dirichlet but through AffineConstraint
-
-                # add the dof to the affine_cdof_ordering
-                _assign_new_index!(affine_cdof_ordering, d)
-                # add the equation to affine_equation_ordering
-                _assign_new_index!(affine_equation_ordering, tangled_eq)
-
-                # add the master dof to affine_cdof_ordering
-                _assign_new_index!(affine_cdof_ordering, dofmapping⁻¹[eq])
-                # add the equation pertaining to the master dof
-                _assign_new_index!(affine_equation_ordering, eq)
-
-                i = affine_equation_ordering[eq]
-                j = affine_cdof_ordering[d]
-                push!(I, i)
-                push!(J, j)
-                push!(V, -c)
-
-                # save the position of the dof that needs to be removed
-                if !haskey(dofcoeffs_to_remove, eq)
-                    dofcoeffs_to_remove[eq] = [dof_position_counter]
-                else
-                    push!(dofcoeffs_to_remove[eq], dof_position_counter)
-                end
-            end
-        end
-    end
-
-    # add the master dof contributions
-    for (eq, _) in enumerate(ch.dofcoefficients)
-        if haskey(affine_equation_ordering, eq)
-            i = affine_equation_ordering[eq]
-            j = affine_cdof_ordering[dofmapping⁻¹[eq]]
-            push!(I, i)
-            push!(J, j)
-            push!(V, 1)
-        end
-    end
-
-    m = length(affine_equation_ordering)
-    n = length(affine_cdof_ordering)
-    @assert m == n "The matrix A has dimensions m = $m != n = $n"
-
-    A = SparseArrays.sparse(I, J, V, m, n)
-
-    # finally remove the entries that have been moved into A so that new_dofcoefficients can be used to construct `C`
-    new_dofcoefficients = deepcopy(ch.dofcoefficients)
-    for (k, v) in dofcoeffs_to_remove
-        deleteat!(new_dofcoefficients[k], v)
-    end
-
-    return A, affine_equation_ordering, new_dofcoefficients
+# Affine constraints are the ones with (non-empty) coefficients; empty ones act as Dirichlet
+function _isaffine(ch::ConstraintHandler)
+    return BitVector(c !== nothing && !isempty(c) for c in ch.dofcoefficients)
 end
 
-"""
-    _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, Tv, Ti}, new_dofcoefficients, affine_equation_ordering::Dict{Int, Int}) where {DH, Tv, Ti}
-
-Create and returns the right-hand side constraint matrix `C` and its inhomogenties `g` from the system `A * u_c = C * u_f + g`. Returned are `C`,
-`g` and `affine_fdof_ordering` which maps the "free" dofs to the columns of `C`.
-
-"""
-function _create_rhs_affine_constraint_matrices(ch::ConstraintHandler{DH, Tv, Ti}, new_dofcoefficients::Vector{Union{Nothing, DofCoefficients{Tv, Ti}}}, affine_equation_ordering::Dict{Int, Int}) where {DH, Tv, Ti}
-
-    n_tangled_constraints = length(affine_equation_ordering)
-    I = Ti[]; J = Ti[]; V = Tv[]
-    g = Vector{Tv}(undef, n_tangled_constraints) # inhomogeneities
-
-    # maps the free dofs to a position in `u_f`
-    affine_fdof_ordering = Dict{Int, Int}()
-
-    for (eq, coeffs) in enumerate(new_dofcoefficients)
-        (isnothing(coeffs) || !haskey(affine_equation_ordering, eq)) && continue
-        i = affine_equation_ordering[eq]
-        if isempty(coeffs) && haskey(affine_equation_ordering, eq)
-            # the constraint was filled with tangled dofs and now the dof coefficients are empty
-            # therefore no contribution in `C` only in `g`
-            g[i] = ch.affine_inhomogeneities[eq]
-        else
-            for (d, v) in coeffs
-                _assign_new_index!(affine_fdof_ordering, d)
-                j = affine_fdof_ordering[d]
-                push!(I, i)
-                push!(J, j)
-                push!(V, v)
-                g[i] = ch.affine_inhomogeneities[eq]
-            end
-        end
-    end
-
-    n = length(affine_fdof_ordering)
-    C = SparseArrays.sparse(I, J, V, n_tangled_constraints, n)
-
-    return C, g, affine_fdof_ordering
+# Index of the affine constraint with slave dof `d`, or 0
+function _affine_constraint_index(ch::ConstraintHandler{DH, Tv, Ti}, isaffine::BitVector, d) where {DH, Tv, Ti}
+    # ch.isconstrained is only filled in close!, but when it is it avoids most dict lookups
+    isempty(ch.isconstrained) || ch.isconstrained[d] || return zero(Ti)
+    j = get(ch.dofmapping, d, zero(Ti))
+    return (j != 0 && isaffine[j]) ? j : zero(Ti)
 end
 
-"""
-    _update_dof_coefficients!(dc::Vector{Union{Nothing, DofCoefficients{Tv, Ti}}}, A⁻¹C::AbstractMatrix, affine_equation_ordering::Dict{Int, Int}, affine_fdof_ordering::Dict{Int, Int}) where {Tv, Ti}
+# Whether constraint `i` has a master dof constrained by an affine constraint
+function _has_affine_master(ch::ConstraintHandler, isaffine::BitVector, i)
+    return any(dc -> _affine_constraint_index(ch, isaffine, dc.first) != 0, ch.dofcoefficients[i]::DofCoefficients)
+end
 
-Update the dof coefficients `dc` using the constraint matrix `A⁻¹C` and the mappings `affine_equation_ordering` and `affine_fdof_ordering`.
-"""
-function _update_dof_coefficients!(dc::Vector{Union{Nothing, DofCoefficients{Tv, Ti}}}, A⁻¹C::SparseMatrixCSC, affine_equation_ordering::Dict{Int, Int}, affine_fdof_ordering::Dict{Int, Int}) where {Tv, Ti}
-
-    affine_fdof_mapping⁻¹ = Dict(v => k for (k, v) in affine_fdof_ordering) # Bijections.jl could avoid this but probably not worth it
-    affine_equation_ordering⁻¹ = Dict(v => k for (k, v) in affine_equation_ordering)
-
-    for (k, _) in affine_equation_ordering
-        dc[k] = DofCoefficients{Tv, Ti}()
-    end
-
-    for j in axes(A⁻¹C, 2)
-        for nz_i in nzrange(A⁻¹C, j)
-            i = A⁻¹C.rowval[nz_i]
-            dof = affine_fdof_mapping⁻¹[j]
-            coeffs = dc[affine_equation_ordering⁻¹[i]]
-            push!(coeffs, (dof => A⁻¹C.nzval[nz_i]))
-        end
-    end
-    return dc
+function _has_self_loop(ch::ConstraintHandler, i)
+    d = ch.prescribed_dofs[i]
+    return any(dc -> dc.first == d, ch.dofcoefficients[i])
 end
 
 """
@@ -234,47 +83,193 @@ Check if the constraint handler has any tangled dofs. An example of a tangled do
 Here, `u2` is a tangled dof as it appears on the left- and right-hand side of the constraints.
 """
 function _istangled(ch::ConstraintHandler)
-    for coeffs in ch.dofcoefficients
-        coeffs === nothing && continue
+    isaffine = _isaffine(ch)
+    for (i, coeffs) in enumerate(ch.dofcoefficients)
+        isaffine[i] || continue
         for (d, _) in coeffs
-            i = get(ch.dofmapping, d, 0)
-            i == 0 && continue
-            icoeffs = ch.dofcoefficients[i]
-            if !(icoeffs === nothing || isempty(icoeffs))
-                return true
-            end
+            _affine_constraint_index(ch, isaffine, d) != 0 && return true
         end
     end
     return false
 end
 
-function _assign_new_index!(d::Dict{Int, Int}, key::Int)
-    return get!(d, key, length(d) + 1)
-end
-
-"""
-    _sparse_column_wise_solve(A::SparseArrays.UMFPACK.UmfpackLU{T, TiA}, C::SparseMatrixCSC{T, TiC}) where {T, TiA, TiC}
-
-Perform a column wise solve of `AX = C` where `X` is expected to be a sparse matrix, this avoids the dense construction of `X`.
-The LU decomposition of `A` should be passed
-"""
-function _sparse_column_wise_solve(A::SparseArrays.UMFPACK.UmfpackLU{T, TiA}, C::SparseMatrixCSC{T, TiC}) where {T, TiA, TiC}
-    (m, n) = size(C)
-    I = TiC[]; J = TiC[]; V = T[]
-    sh = SparseArrays.nnz(C)
-    sizehint!(I, sh); sizehint!(J, sh); sizehint!(V, sh)
-    lhs = zeros(T, m)
-    rhs = zeros(T, m)
-    for j in axes(C, 2)
-        iszero(C[:, j]) && continue
-        copy!(rhs, C[:, j])
-        ldiv!(lhs, A, rhs)
-        for (i, v) in pairs(lhs)
-            v == zero(T) && continue
-            push!(I, i)
-            push!(J, j)
-            push!(V, v)
+# Strongly connected components of the affine constraint graph in reverse topological order
+# (every component is emitted after all components it depends on). Iterative Tarjan.
+function _affine_constraint_sccs(ch::ConstraintHandler, isaffine::BitVector)
+    n = length(isaffine)
+    index = zeros(Int, n)     # 0: not visited
+    lowlink = zeros(Int, n)
+    onstack = falses(n)
+    stack = Int[]
+    sccs = Vector{Int}[]
+    # DFS state: (node, position in its coefficient list)
+    dfs = Tuple{Int, Int}[]
+    counter = 0
+    for root in 1:n
+        (index[root] != 0 || !isaffine[root]) && continue
+        counter += 1
+        index[root] = lowlink[root] = counter
+        push!(stack, root); onstack[root] = true
+        push!(dfs, (root, 1))
+        while !isempty(dfs)
+            v, pos = dfs[end]
+            coeffs = ch.dofcoefficients[v]::DofCoefficients
+            descended = false
+            while pos <= length(coeffs)
+                w = _affine_constraint_index(ch, isaffine, coeffs[pos].first)
+                pos += 1
+                w == 0 && continue
+                if index[w] == 0
+                    dfs[end] = (v, pos)
+                    counter += 1
+                    index[w] = lowlink[w] = counter
+                    push!(stack, w); onstack[w] = true
+                    push!(dfs, (w, 1))
+                    descended = true
+                    break
+                elseif onstack[w]
+                    lowlink[v] = min(lowlink[v], index[w])
+                end
+            end
+            descended && continue
+            # all successors of v visited
+            pop!(dfs)
+            if lowlink[v] == index[v]
+                scc = Int[]
+                while true
+                    w = pop!(stack); onstack[w] = false
+                    push!(scc, w)
+                    w == v && break
+                end
+                push!(sccs, scc)
+            end
+            if !isempty(dfs)
+                u = dfs[end][1]
+                lowlink[u] = min(lowlink[u], lowlink[v])
+            end
         end
     end
-    return SparseArrays.sparse(I, J, V, m, n)
+    return sccs
+end
+
+# Sparse accumulator: dense value array indexed by dof plus the list of touched dofs.
+struct _SparseAccumulator{Tv, Ti}
+    values::Vector{Tv}
+    touched::Vector{Ti}
+    istouched::BitVector
+end
+function _SparseAccumulator{Tv, Ti}(n::Int) where {Tv, Ti}
+    return _SparseAccumulator{Tv, Ti}(zeros(Tv, n), Ti[], falses(n))
+end
+function _spa_add!(spa::_SparseAccumulator, d, v)
+    if !spa.istouched[d]
+        spa.istouched[d] = true
+        push!(spa.touched, d)
+    end
+    spa.values[d] += v
+    return spa
+end
+# Move the accumulated (nonzero) entries into `coeffs`, sorted by dof, and reset
+function _spa_collect!(coeffs::DofCoefficients, spa::_SparseAccumulator)
+    sort!(spa.touched)
+    for d in spa.touched
+        v = spa.values[d]
+        spa.values[d] = zero(v)
+        spa.istouched[d] = false
+        iszero(v) && continue
+        push!(coeffs, d => v)
+    end
+    empty!(spa.touched)
+    return coeffs
+end
+
+# Expand the constraint `i` into the accumulator by substituting the already resolved affine
+# masters. Masters that are affine but not resolved (i.e. in the same strongly connected
+# component) are pushed to `cyclic` instead. Returns the accumulated inhomogeneity.
+function _expand_constraint!(spa::_SparseAccumulator, cyclic, ch::ConstraintHandler{DH, Tv}, isaffine, i, resolved) where {DH, Tv}
+    coeffs = ch.dofcoefficients[i]::DofCoefficients
+    b = ch.affine_inhomogeneities[i]::Tv
+    for (d, c) in coeffs
+        j = _affine_constraint_index(ch, isaffine, d)
+        if j == 0
+            _spa_add!(spa, d, c)
+        elseif resolved[j]
+            for (dj, cj) in ch.dofcoefficients[j]::DofCoefficients
+                _spa_add!(spa, dj, c * cj)
+            end
+            b += c * ch.affine_inhomogeneities[j]::Tv
+        else
+            push!(cyclic, j => c)
+        end
+    end
+    return b
+end
+
+# The coefficient vectors in `ch` may be shared with the user's `AffineConstraint`s (and
+# between constraints), so they are never modified in place; new vectors are stored instead.
+function _set_untangled!(ch::ConstraintHandler, i, coeffs::DofCoefficients, b)
+    ch.dofcoefficients[i] = coeffs
+    ch.affine_inhomogeneities[i] = b
+    ch.inhomogeneities[i] = b # effective inhomogeneity, recomputed in update!
+    return ch
+end
+
+function _substitute_resolved!(ch::ConstraintHandler{DH, Tv, Ti}, spa, isaffine, i, resolved) where {DH, Tv, Ti}
+    cyclic = Pair{Int, Tv}[]
+    b = _expand_constraint!(spa, cyclic, ch, isaffine, i, resolved)
+    @assert isempty(cyclic)
+    return _set_untangled!(ch, i, _spa_collect!(DofCoefficients{Tv, Ti}(), spa), b)
+end
+
+# Untangle a component whose constraints depend on each other cyclically by solving the
+# linear system `A * u_c = C * u_f + g` for the slave dofs `u_c` of the component, where
+# `u_f` are the (already resolved) master dofs.
+function _untangle_cyclic_scc!(ch::ConstraintHandler{DH, Tv, Ti}, spa, isaffine, scc::Vector{Int}, resolved) where {DH, Tv, Ti}
+    k = length(scc)
+    local_index = Dict{Int, Int}(i => li for (li, i) in enumerate(scc))
+    # Expand all constraints of the component; collect the union of master dofs
+    expanded = Vector{DofCoefficients{Tv, Ti}}(undef, k)
+    cyclic = [Pair{Int, Tv}[] for _ in 1:k]
+    g = Vector{Tv}(undef, k)
+    for (li, i) in enumerate(scc)
+        g[li] = _expand_constraint!(spa, cyclic[li], ch, isaffine, i, resolved)
+        expanded[li] = _spa_collect!(DofCoefficients{Tv, Ti}(), spa)
+    end
+    masters = unique!(sort!(Ti[d for e in expanded for (d, _) in e]))
+    master_index = Dict{Ti, Int}(d => c for (c, d) in enumerate(masters))
+    m = length(masters)
+    # Build A (k × k) and the right hand side [C g] (k × (m + 1)). Every slave in the
+    # component depends on (almost) every master of the component, so the result is dense
+    # and a dense solve is appropriate.
+    A = Matrix{Tv}(LinearAlgebra.I, k, k)
+    B = zeros(Tv, k, m + 1)
+    for li in 1:k
+        for (j, c) in cyclic[li]
+            A[li, local_index[j]] -= c
+        end
+        for (d, c) in expanded[li]
+            B[li, master_index[d]] += c
+        end
+        B[li, m + 1] = g[li]
+    end
+    F = LinearAlgebra.lu(A; check = false)
+    if !LinearAlgebra.issuccess(F)
+        throw(
+            ArgumentError(
+                "the affine constraints contain a cycle that cannot be resolved, e.g. due to " *
+                    "redundant constraints such as u1 = u2 and u2 = u1"
+            )
+        )
+    end
+    X = F \ B
+    for (li, i) in enumerate(scc)
+        coeffs = DofCoefficients{Tv, Ti}()
+        for (c, d) in enumerate(masters)
+            v = X[li, c]
+            iszero(v) && continue
+            push!(coeffs, d => v)
+        end
+        _set_untangled!(ch, i, coeffs, X[li, m + 1])
+    end
+    return ch
 end
