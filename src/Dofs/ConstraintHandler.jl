@@ -315,7 +315,6 @@ function close!(ch::ConstraintHandler)
     for dof in ch.prescribed_dofs
         ch.isconstrained[dof] = true
     end
-
     _set_freedofs!(ch.free_dofs, ch.isconstrained, ndofs(ch.dh), length(ch.prescribed_dofs))
 
     for i in 1:length(ch.prescribed_dofs)
@@ -336,8 +335,8 @@ function close!(ch::ConstraintHandler)
     #   constraint when adding a new (TODO: Might change in the future, see comment in
     #   `add_prescribed_dof`.)
 
-    if istangled(ch) # untangle affine constraints
-        @debug @info "untangling tangled and cyclic affine constraints"
+    if _istangled(ch) # untangle affine constraints
+        @debug @info "untangling tangled affine constraints"
         _untangle_affine_constraints!(ch)
     end
 
