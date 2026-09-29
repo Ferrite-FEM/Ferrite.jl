@@ -138,6 +138,8 @@ include(joinpath(@__DIR__, "test_utils.jl"))
         # Lagrange{RefHexahedron, 3} exercises the quadrilateral-face permutation.
         Lagrange{RefTetrahedron, 3}(), Lagrange{RefTetrahedron, 4}(), Lagrange{RefTetrahedron, 4}()^3,
         Lagrange{RefHexahedron, 3}(),
+        # Higher order Lagrange on 2D shapes (GLL-warped nodes on triangles)
+        Lagrange{RefTriangle, 3}(), Lagrange{RefTriangle, 5}(), Lagrange{RefQuadrilateral, 3}(),
         Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(), Nedelec{RefQuadrilateral, 1}(), Nedelec{RefTetrahedron, 1}(), Nedelec{RefHexahedron, 1}(),
         RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), RaviartThomas{RefQuadrilateral, 1}(), RaviartThomas{RefTetrahedron, 1}(), RaviartThomas{RefHexahedron, 1}(),
         BrezziDouglasMarini{RefTriangle, 1}(),
@@ -179,6 +181,9 @@ include(joinpath(@__DIR__, "test_utils.jl"))
 
     # Test continuity for 2D mixed grid, Quadrilaterals and Triangles
     test_ips = [
+        # The edge nodes of triangles and quadrilaterals must coincide (GLL points) for
+        # continuity of higher order Lagrange in mixed grids
+        (Lagrange, 2), (Lagrange, 3),
         (Nedelec, 1), #(Nedelec, 2), # 2nd order Nedelec on Quadrilaterals not yet implemented
         (RaviartThomas, 1), #(RaviartThomas, 2) # 2nd order RT on Quadrilaterals not yet implemented
     ]

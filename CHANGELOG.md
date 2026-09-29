@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `InterfaceIterator(grid_or_dh, set)`, analogous to passing a cellset to
    `CellIterator`. ([#1522])
 
+### Changed
+
+ - `Lagrange` (and thus `DiscontinuousLagrange`) interpolations of order 3 and higher now
+   use Gauss–Lobatto–Legendre (GLL) based nodes instead of equispaced nodes:
+   tensor-product GLL nodes for `Lagrange{RefQuadrilateral, 3}` and
+   `Lagrange{RefHexahedron, 3}`, and the GLL-warped nodes of Basix (`gll_warped`) for
+   `Lagrange{RefTriangle, 3/4/5}` and `Lagrange{RefTetrahedron, 3/4}`. The nodes on each
+   edge are the 1D GLL points for all reference shapes, so mixed grids remain conforming.
+   The dof numbering is unchanged, but the shape functions, and hence nodal values, differ.
+   ([#1385], [#1523])
+
 ### Fixes
 
  - Untangle the tangled `AffineConstraints` in `close!` ([#1327])
@@ -1458,6 +1469,7 @@ poking into Ferrite internals:
 [#1381]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1381
 [#1382]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1382
 [#1384]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1384
+[#1385]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1385
 [#1396]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1396
 [#1387]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1387
 [#1388]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1388
@@ -1484,5 +1496,6 @@ poking into Ferrite internals:
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1522]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1522
+[#1523]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1523
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
