@@ -716,6 +716,67 @@ end
     @test isapprox(jump_int, 0.0, atol = 1.0e-6)
 end
 
+@testset "interfaceskeleton" begin
+    # Interfaces of the grid, independently derived from the facet skeleton and the
+    # facet neighborhood
+    function reference_interfaces(grid, topology)
+        ref = NTuple{2, FacetIndex}[]
+        neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
+        for facet in Ferrite.facetskeleton(topology, grid)
+            neighbors = neighborhood[facet[1], facet[2]]
+            isempty(neighbors) && continue
+            fb = neighbors[1]
+            push!(ref, (FacetIndex(facet[1], facet[2]), FacetIndex(fb[1], fb[2])))
+        end
+        return ref
+    end
+    # The skeleton matches the reference enumeration (content *and* order), is cached
+    # in the topology, and is what InterfaceIterator visits
+    for grid in (
+            generate_grid(Quadrilateral, (5, 4)),
+            generate_grid(Triangle, (3, 3)),
+            generate_grid(Tetrahedron, (2, 2, 2)),
+            generate_grid(Hexahedron, (2, 2, 2)),
+            generate_grid(Line, (5,)),
+        )
+        topology = ExclusiveTopology(grid)
+        skeleton = @inferred interfaceskeleton(topology, grid)
+        @test skeleton == reference_interfaces(grid, topology)
+        @test (@inferred interfaceskeleton(topology, grid)) === skeleton # cached
+        @test length(InterfaceIterator(grid, topology)) == length(skeleton)
+        visited = NTuple{2, FacetIndex}[]
+        for ic in InterfaceIterator(grid, topology)
+            fa = FacetIndex(cellid(ic.a), ic.a.current_facet_id)
+            fb = FacetIndex(cellid(ic.b), ic.b.current_facet_id)
+            push!(visited, (fa, fb))
+        end
+        @test visited == skeleton
+    end
+
+    # InterfaceIterator over an explicit subset of the skeleton
+    let grid = generate_grid(Quadrilateral, (5, 4)), topology = ExclusiveTopology(grid)
+        dh = DofHandler(grid)
+        add!(dh, :u, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        close!(dh)
+        skeleton = interfaceskeleton(topology, grid)
+        subset = skeleton[1:2:end]
+        n = 0
+        for ic in InterfaceIterator(dh, subset)
+            n += 1
+            @test length(interfacedofs(ic)) == 8
+            fa = FacetIndex(cellid(ic.a), ic.a.current_facet_id)
+            fb = FacetIndex(cellid(ic.b), ic.b.current_facet_id)
+            @test (fa, fb) == subset[n]
+        end
+        @test n == length(subset)
+        # Grid based iterator with a subset works too
+        @test length(InterfaceIterator(grid, subset)) == length(subset)
+        @test count(Returns(true), InterfaceIterator(grid, subset)) == length(subset)
+        # The set is duck typed: any iterable of facet pairs works
+        @test count(Returns(true), InterfaceIterator(grid, Iterators.take(subset, 3))) == 3
+    end
+end
+
 @testset "grid coloring" begin
     function test_coloring(grid, cellset = 1:getncells(grid))
         for alg in (ColoringAlgorithm.Greedy, ColoringAlgorithm.WorkStream)
