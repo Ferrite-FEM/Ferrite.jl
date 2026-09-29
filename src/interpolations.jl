@@ -565,7 +565,15 @@ end
 """
     Lagrange{refshape, order} <: ScalarInterpolation
 
-Standard continuous Lagrange polynomials with equidistant node placement.
+Standard continuous Lagrange polynomials with nodal (point evaluation) degrees of freedom.
+
+The nodes are placed at the Gauss–Lobatto–Legendre (GLL) points: on `RefLine`,
+`RefQuadrilateral` and `RefHexahedron` the nodes are tensor products of the 1D GLL points
+(the GLL variant on [DefElement](https://defelement.org/elements/lagrange.html)), and on
+`RefTriangle` and `RefTetrahedron` the nodes are the GLL-warped points of
+[Basix](https://github.com/FEniCS/basix) (`LagrangeVariant.gll_warped`), which have the 1D
+GLL points on every edge. For `order ≤ 2`, and for `RefPrism` and `RefPyramid`, the nodes
+are equispaced (for `order ≤ 2` the GLL points and the equispaced points coincide).
 """
 struct Lagrange{shape, order} <: ScalarInterpolation{shape, order}
     function Lagrange{shape, order}() where {shape <: AbstractRefShape, order}
@@ -591,6 +599,39 @@ vertexdof_indices(::Lagrange{RefPyramid}) = ((1,), (2,), (3,), (4,), (5,))
 
 getlowerorder(::Lagrange{shape, order}) where {shape, order} = Lagrange{shape, order - 1}()
 getlowerorder(::Lagrange{shape, 1}) where {shape} = DiscontinuousLagrange{shape, 0}()
+
+#################################
+# Gauss–Lobatto–Legendre points #
+#################################
+# The order + 1 Gauss–Lobatto–Legendre (GLL) points on [-1, 1] in increasing order,
+# computed in the precision of `T` such that the element type of the evaluation point is
+# preserved. For order ≤ 2 these coincide with the equispaced points.
+_gll_points(::Val{1}, ::Type{T}) where {T} = (-one(T), one(T))
+_gll_points(::Val{2}, ::Type{T}) where {T} = (-one(T), zero(T), one(T))
+function _gll_points(::Val{3}, ::Type{T}) where {T}
+    a = inv(sqrt(T(5)))
+    return (-one(T), -a, a, one(T))
+end
+function _gll_points(::Val{4}, ::Type{T}) where {T}
+    a = sqrt(T(3) / T(7))
+    return (-one(T), -a, zero(T), a, one(T))
+end
+function _gll_points(::Val{5}, ::Type{T}) where {T}
+    s = 2 * sqrt(T(7)) / 21
+    a = sqrt(inv(T(3)) + s)
+    b = sqrt(inv(T(3)) - s)
+    return (-one(T), -a, -b, b, a, one(T))
+end
+
+# The 1D Lagrange polynomial ∏_{b ≠ a} (t - x_b) / (x_a - x_b) for the nodes x, at t.
+@inline function _lagrange_basis_1d(x::NTuple{N, T}, a::Int, t::T) where {N, T}
+    val = one(T)
+    for b in 1:N
+        b == a && continue
+        val *= (t - x[b]) / (x[a] - x[b])
+    end
+    return val
+end
 
 ############################
 # Lagrange RefLine order 1 #
@@ -698,54 +739,54 @@ end
 #####################################
 # Lagrange RefQuadrilateral order 3 #
 #####################################
+# Bicubic tensor-product interpolation. The 16 nodes are tensor products of the 1D order-3
+# GLL points (the GLL variant in https://defelement.org/elements/lagrange.html). The
+# interior face dofs follow the lattice enumeration assumed by `permute_and_push!`.
 getnbasefunctions(::Lagrange{RefQuadrilateral, 3}) = 16
 
 edgedof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = ((5, 6), (7, 8), (9, 10), (11, 12))
 facedof_interior_indices(::Lagrange{RefQuadrilateral, 3}) = ((13, 14, 15, 16),)
 
-function reference_coordinates(::Lagrange{RefQuadrilateral, 3})
-    return [
-        Vec{2, Float64}((-1.0, -1.0)),
-        Vec{2, Float64}((1.0, -1.0)),
-        Vec{2, Float64}((1.0, 1.0)),
-        Vec{2, Float64}((-1.0, 1.0)),
-        Vec{2, Float64}((-1 / 3, -1.0)),
-        Vec{2, Float64}((1 / 3, -1.0)),
-        Vec{2, Float64}((1.0, -1 / 3)),
-        Vec{2, Float64}((1.0, 1 / 3)),
-        Vec{2, Float64}((1 / 3, 1.0)),
-        Vec{2, Float64}((-1 / 3, 1.0)),
-        Vec{2, Float64}((-1.0, 1 / 3)),
-        Vec{2, Float64}((-1.0, -1 / 3)),
-        Vec{2, Float64}((-1 / 3, -1 / 3)),
-        Vec{2, Float64}((1 / 3, -1 / 3)),
-        Vec{2, Float64}((-1 / 3, 1 / 3)),
-        Vec{2, Float64}((1 / 3, 1 / 3)),
-    ]
+# Tensor-product multi-indices (a, b) ∈ (1:4)² for the 16 nodes, in local dof order:
+# vertices, edge interior dofs (following the local edge direction), and face interior dofs
+# (in the lattice enumeration assumed by `permute_and_push!`). The node for (a, b) is
+# located at (x_a, x_b) with x the 1D GLL points.
+function _build_lagrange_quad3_multiindices()
+    # Topology of RefQuadrilateral, given as the tensor-product index of each vertex. Must
+    # match reference_edges in Grid/grid.jl, which is not yet defined when this file is
+    # included.
+    vertex_idx = ((1, 1), (4, 1), (4, 4), (1, 4))
+    quad_edges = ((1, 2), (2, 3), (3, 4), (4, 1))
+    αs = NTuple{2, Int}[]
+    for v in 1:4 # vertex nodes
+        push!(αs, vertex_idx[v])
+    end
+    for (a, b) in quad_edges # edge interior nodes, from vertex a towards vertex b
+        ia, ib = vertex_idx[a], vertex_idx[b]
+        for k in 1:2
+            push!(αs, ntuple(t -> ia[t] + (k * (ib[t] - ia[t])) ÷ 3, 2))
+        end
+    end
+    for j in 2:3, i in 2:3 # face interior nodes, i (1→2) fastest, j (1→4) slowest
+        push!(αs, (i, j))
+    end
+    return αs
 end
 
-function reference_shape_value(ip::Lagrange{RefQuadrilateral, 3}, ξ::Vec{2}, i::Int)
-    # See https://defelement.org/elements/examples/quadrilateral-lagrange-equispaced-3.html
-    # Transform domain from [-1, 1] × [-1, 1] to [0, 1] × [0, 1]
-    ξ_x = (ξ[1] + 1) / 2
-    ξ_y = (ξ[2] + 1) / 2
-    i == 1 && return (81 * ξ_x^3 * ξ_y^3) / 4 - (81 * ξ_x^3 * ξ_y^2) / 2 + (99 * ξ_x^3 * ξ_y) / 4 - (9 * ξ_x^3) / 2 - (81 * ξ_x^2 * ξ_y^3) / 2 + (81 * ξ_x^2 * ξ_y^2) - (99 * ξ_x^2 * ξ_y) / 2 + (9 * ξ_x^2) + (99 * ξ_x * ξ_y^3) / 4 - (99 * ξ_x * ξ_y^2) / 2 + (121 * ξ_x * ξ_y) / 4 - (11 * ξ_x) / 2 - (9 * ξ_y^3) / 2 + 9 * ξ_y^2 - (11 * ξ_y) / 2 + 1
-    i == 2 && return (ξ_x * (- 81 * ξ_x^2 * ξ_y^3 + 162 * ξ_x^2 * ξ_y^2 - 99 * ξ_x^2 * ξ_y + 18 * ξ_x^2 + 81 * ξ_x * ξ_y^3 - 162 * ξ_x * ξ_y^2 + 99 * ξ_x * ξ_y - 18 * ξ_x - 18 * ξ_y^3 + 36 * ξ_y^2 - 22 * ξ_y + 4)) / 4
-    i == 4 && return (ξ_y * (- 81 * ξ_x^3 * ξ_y^2 + 81 * ξ_x^3 * ξ_y - 18 * ξ_x^3 + 162 * ξ_x^2 * ξ_y^2 - 162 * ξ_x^2 * ξ_y + 36 * ξ_x^2 - 99 * ξ_x * ξ_y^2 + 99 * ξ_x * ξ_y - 22 * ξ_x + 18 * ξ_y^2 - 18 * ξ_y + 4)) / 4
-    i == 3 && return (ξ_x * ξ_y * (81 * ξ_x^2 * ξ_y^2 - 81 * ξ_x^2 * ξ_y + 18 * ξ_x^2 - 81 * ξ_x * ξ_y^2 + 81 * ξ_x * ξ_y - 18 * ξ_x + 18 * ξ_y^2 - 18 * ξ_y + 4)) / 4
-    i == 5 && return (9 * ξ_x * (- 27 * ξ_x^2 * ξ_y^3 + 54 * ξ_x^2 * ξ_y^2 - 33 * ξ_x^2 * ξ_y + 6 * ξ_x^2 + 45 * ξ_x * ξ_y^3 - 90 * ξ_x * ξ_y^2 + 55 * ξ_x * ξ_y - 10 * ξ_x - 18 * ξ_y^3 + 36 * ξ_y^2 - 22 * ξ_y + 4)) / 4
-    i == 6 && return (9 * ξ_x * (27 * ξ_x^2 * ξ_y^3 - 54 * ξ_x^2 * ξ_y^2 + 33 * ξ_x^2 * ξ_y - 6 * ξ_x^2 - 36 * ξ_x * ξ_y^3 + 72 * ξ_x * ξ_y^2 - 44 * ξ_x * ξ_y + 8 * ξ_x + 9 * ξ_y^3 - 18 * ξ_y^2 + 11 * ξ_y - 2)) / 4
-    i == 12 && return (9 * ξ_y * (- 27 * ξ_x^3 * ξ_y^2 + 45 * ξ_x^3 * ξ_y - 18 * ξ_x^3 + 54 * ξ_x^2 * ξ_y^2 - 90 * ξ_x^2 * ξ_y + 36 * ξ_x^2 - 33 * ξ_x * ξ_y^2 + 55 * ξ_x * ξ_y - 22 * ξ_x + 6 * ξ_y^2 - 10 * ξ_y + 4)) / 4
-    i == 11 && return (9 * ξ_y * (27 * ξ_x^3 * ξ_y^2 - 36 * ξ_x^3 * ξ_y + 9 * ξ_x^3 - 54 * ξ_x^2 * ξ_y^2 + 72 * ξ_x^2 * ξ_y - 18 * ξ_x^2 + 33 * ξ_x * ξ_y^2 - 44 * ξ_x * ξ_y + 11 * ξ_x - 6 * ξ_y^2 + 8 * ξ_y - 2)) / 4
-    i == 7 && return (9 * ξ_x * ξ_y * (27 * ξ_x^2 * ξ_y^2 - 45 * ξ_x^2 * ξ_y + 18 * ξ_x^2 - 27 * ξ_x * ξ_y^2 + 45 * ξ_x * ξ_y - 18 * ξ_x + 6 * ξ_y^2 - 10 * ξ_y + 4)) / 4
-    i == 8 && return (9 * ξ_x * ξ_y * (- 27 * ξ_x^2 * ξ_y^2 + 36 * ξ_x^2 * ξ_y - 9 * ξ_x^2 + 27 * ξ_x * ξ_y^2 - 36 * ξ_x * ξ_y + 9 * ξ_x - 6 * ξ_y^2 + 8 * ξ_y - 2)) / 4
-    i == 10 && return (9 * ξ_x * ξ_y * (27 * ξ_x^2 * ξ_y^2 - 27 * ξ_x^2 * ξ_y + 6 * ξ_x^2 - 45 * ξ_x * ξ_y^2 + 45 * ξ_x * ξ_y - 10 * ξ_x + 18 * ξ_y^2 - 18 * ξ_y + 4)) / 4
-    i == 9 && return (9 * ξ_x * ξ_y * (- 27 * ξ_x^2 * ξ_y^2 + 27 * ξ_x^2 * ξ_y - 6 * ξ_x^2 + 36 * ξ_x * ξ_y^2 - 36 * ξ_x * ξ_y + 8 * ξ_x - 9 * ξ_y^2 + 9 * ξ_y - 2)) / 4
-    i == 13 && return (81 * ξ_x * ξ_y * (9 * ξ_x^2 * ξ_y^2 - 15 * ξ_x^2 * ξ_y + 6 * ξ_x^2 - 15 * ξ_x * ξ_y^2 + 25 * ξ_x * ξ_y - 10 * ξ_x + 6 * ξ_y^2 - 10 * ξ_y + 4)) / 4
-    i == 14 && return (81 * ξ_x * ξ_y * (- 9 * ξ_x^2 * ξ_y^2 + 15 * ξ_x^2 * ξ_y - 6 * ξ_x^2 + 12 * ξ_x * ξ_y^2 - 20 * ξ_x * ξ_y + 8 * ξ_x - 3 * ξ_y^2 + 5 * ξ_y - 2)) / 4
-    i == 15 && return (81 * ξ_x * ξ_y * (- 9 * ξ_x^2 * ξ_y^2 + 12 * ξ_x^2 * ξ_y - 3 * ξ_x^2 + 15 * ξ_x * ξ_y^2 - 20 * ξ_x * ξ_y + 5 * ξ_x - 6 * ξ_y^2 + 8 * ξ_y - 2)) / 4
-    i == 16 && return (81 * ξ_x * ξ_y * (9 * ξ_x^2 * ξ_y^2 - 12 * ξ_x^2 * ξ_y + 3 * ξ_x^2 - 12 * ξ_x * ξ_y^2 + 16 * ξ_x * ξ_y - 4 * ξ_x + 3 * ξ_y^2 - 4 * ξ_y + 1)) / 4
-    throw(ArgumentError("no shape function $i for interpolation $ip"))
+const _lagrange_quad3_multiindices = _build_lagrange_quad3_multiindices()
+
+function reference_coordinates(::Lagrange{RefQuadrilateral, 3})
+    x = _gll_points(Val(3), Float64)
+    return [Vec{2, Float64}((x[α[1]], x[α[2]])) for α in _lagrange_quad3_multiindices]
+end
+
+function reference_shape_value(ip::Lagrange{RefQuadrilateral, 3}, ξ::Vec{2, T}, i::Int) where {T}
+    if !(0 < i <= 16)
+        throw(ArgumentError("no shape function $i for interpolation $ip"))
+    end
+    x = _gll_points(Val(3), T)
+    α = _lagrange_quad3_multiindices[i]
+    return _lagrange_basis_1d(x, α[1], ξ[1]) * _lagrange_basis_1d(x, α[2], ξ[2])
 end
 
 ################################
@@ -843,31 +884,16 @@ function facedof_interior_indices(ip::Lagrange2Tri345)
     return (ntuple(i -> totaldofs - ncellintdofs + i, ncellintdofs),)
 end
 
-function reference_coordinates(ip::Lagrange2Tri345)
-    order = getorder(ip)
-    coordpts = Vector{Vec{2, Float64}}()
-    for k in 0:order
-        for l in 0:(order - k)
-            push!(coordpts, Vec{2, Float64}((l / order, k / order)))
-        end
+# Barycentric multi-indices α (with |α| = order) for the nodes of the interpolation in local
+# dof order, with respect to the reference vertices (1, 0), (0, 1) and (0, 0). The
+# equispaced lattice point corresponding to α is located at ∑ₜ αₜ xₜ / order, with xₜ the
+# reference vertex coordinates. The actual nodes are obtained by warping these lattice
+# points, see "Lagrange on simplices with GLL-warped nodes" below.
+function _lagrange_tri_lattice_multiindices(order::Int)
+    return map(permdof2DLagrange2Tri345[order]) do p
+        i1, i2, i3 = _numlin_basis2D(p, order)
+        return (i2, i3, i1)
     end
-    return permute!(coordpts, permdof2DLagrange2Tri345[order])
-end
-
-function reference_shape_value(ip::Lagrange2Tri345, ξ::Vec{2}, i::Int)
-    if !(0 < i <= getnbasefunctions(ip))
-        throw(ArgumentError("no shape function $i for interpolation $ip"))
-    end
-    order = getorder(ip)
-    i = permdof2DLagrange2Tri345[order][i]
-    ξ_x = ξ[1]
-    ξ_y = ξ[2]
-    i1, i2, i3 = _numlin_basis2D(i, order)
-    val = one(ξ_y)
-    i1 ≥ 1 && (val *= prod((order - order * (ξ_x + ξ_y) - j) / (j + 1) for j in 0:(i1 - 1)))
-    i2 ≥ 1 && (val *= prod((order * ξ_x - j) / (j + 1) for j in 0:(i2 - 1)))
-    i3 ≥ 1 && (val *= prod((order * ξ_y - j) / (j + 1) for j in 0:(i3 - 1)))
-    return val
 end
 
 function _numlin_basis2D(i, order)
@@ -884,6 +910,13 @@ function _numlin_basis2D(i, order)
     j1 = order - j2 - j3
     return j1, j2, j3
 end
+
+const _lagrange_tri3_multiindices = _lagrange_tri_lattice_multiindices(3)
+const _lagrange_tri4_multiindices = _lagrange_tri_lattice_multiindices(4)
+const _lagrange_tri5_multiindices = _lagrange_tri_lattice_multiindices(5)
+_lattice_multiindices(::Lagrange{RefTriangle, 3}) = _lagrange_tri3_multiindices
+_lattice_multiindices(::Lagrange{RefTriangle, 4}) = _lagrange_tri4_multiindices
+_lattice_multiindices(::Lagrange{RefTriangle, 5}) = _lagrange_tri5_multiindices
 
 ###################################
 # Lagrange RefTetrahedron order 1 #
@@ -975,8 +1008,10 @@ volumedof_interior_indices(::Lagrange{RefTetrahedron, 4}) = (35,)
 # Barycentric multi-indices α (with |α| = order) for the nodes of the interpolation, in
 # local dof order: vertex dofs, then edge interior dofs (following the local edge
 # direction), then face interior dofs (in the lattice enumeration assumed by
-# `permute_and_push!`), and finally volume interior dofs. The node corresponding to α is
-# located at ∑ₜ αₜ xₜ / order, with xₜ the reference vertex coordinates.
+# `permute_and_push!`), and finally volume interior dofs. The equispaced lattice point
+# corresponding to α is located at ∑ₜ αₜ xₜ / order, with xₜ the reference vertex
+# coordinates. The actual nodes are obtained by warping these lattice points, see "Lagrange
+# on simplices with GLL-warped nodes" below.
 function _lagrange_tet_lattice_multiindices(order::Int)
     # Topology of RefTetrahedron. This must match reference_edges/reference_faces in
     # Grid/grid.jl, which are not yet defined when this file is included.
@@ -1009,25 +1044,111 @@ const _lagrange_tet4_multiindices = _lagrange_tet_lattice_multiindices(4)
 _lattice_multiindices(::Lagrange{RefTetrahedron, 3}) = _lagrange_tet3_multiindices
 _lattice_multiindices(::Lagrange{RefTetrahedron, 4}) = _lagrange_tet4_multiindices
 
-function reference_coordinates(ip::Lagrange3DTet34)
-    order = getorder(ip)
-    return [Vec{3, Float64}((α[2], α[3], α[4]) ./ order) for α in _lattice_multiindices(ip)]
-end
+###########################################################
+# Lagrange on simplices with GLL-warped nodes (order 3+) #
+###########################################################
+# The nodes of Lagrange{RefTriangle, 3/4/5} and Lagrange{RefTetrahedron, 3/4} are the
+# GLL-warped lattice points of Basix (`LagrangeVariant.gll_warped`, i.e. the GLL lattice
+# with `LatticeSimplexMethod.warp`, see https://github.com/FEniCS/basix). The equispaced
+# lattice points are displaced such that the nodes on every edge are the 1D GLL points.
+# This keeps the interpolations conforming with the tensor-product GLL nodes of Lagrange on
+# hypercubes (e.g. in mixed triangle/quadrilateral grids). The nodes on a facet coincide
+# with the nodes of the lower-dimensional simplex, i.e. the face nodes of
+# `Lagrange{RefTetrahedron, order}` are the nodes of `Lagrange{RefTriangle, order}`.
+#
+# The shape functions are expressed in terms of the equispaced Lagrange basis {Eⱼ} (with
+# nodes on the equispaced lattice) as Nᵢ = ∑ⱼ Cᵢⱼ Eⱼ, where C = V⁻¹ with Vᵢⱼ = Eᵢ(yⱼ)
+# for the warped nodes yⱼ, such that Nᵢ(yⱼ) = δᵢⱼ. C is stored transposed such that the
+# coefficients of each Nᵢ are contiguous in memory.
 
-function reference_shape_value(ip::Lagrange3DTet34, ξ::Vec{3}, i::Int)
-    if !(0 < i <= getnbasefunctions(ip))
-        throw(ArgumentError("no shape function $i for interpolation $ip"))
-    end
-    order = getorder(ip)
-    α = _lattice_multiindices(ip)[i]
-    λ = (1 - ξ[1] - ξ[2] - ξ[3], ξ[1], ξ[2], ξ[3])
-    # The basis function for the node with barycentric multi-index α is
-    # N(λ) = ∏ₜ ∏ⱼ (order λₜ - j) / (j + 1) for j ∈ {0, ..., αₜ - 1}
-    val = one(λ[1])
-    for t in 1:4
+const LagrangeSimplexGLL = Union{Lagrange2Tri345, Lagrange3DTet34}
+
+# Barycentric coordinates with respect to the reference vertices, in vertex order.
+_reference_barycentric(::Lagrange{RefTriangle}, ξ::Vec{2}) = (ξ[1], ξ[2], 1 - ξ[1] - ξ[2])
+_reference_barycentric(::Lagrange{RefTetrahedron}, ξ::Vec{3}) = (1 - ξ[1] - ξ[2] - ξ[3], ξ[1], ξ[2], ξ[3])
+
+# Equispaced Lagrange basis function for the lattice point with barycentric multi-index α:
+# E(λ) = ∏ₜ ∏ⱼ (order λₜ - j) / (j + 1) for j ∈ {0, ..., αₜ - 1}
+function _equispaced_simplex_lagrange(α::NTuple{N, Int}, order::Int, λ::NTuple{N, T}) where {N, T}
+    val = one(T)
+    for t in 1:N
         for j in 0:(α[t] - 1)
             val *= (order * λ[t] - j) / (j + 1)
         end
+    end
+    return val
+end
+
+# Warp factors w̄ₘ, m = 0, ..., 2 order (stored at index m + 1), as in Basix: with gᵢ the
+# GLL points on [0, 1] and ℓᵢ the 1D Lagrange basis on the equispaced nodes i / order, the
+# warp is w(r) = ∑ᵢ (gᵢ - i / order) ℓᵢ(r), and w̄ₘ = w(r) / (r (1 - r)) at r = m / (2 order).
+# The endpoint factors are never used with nonzero weight and are set to zero.
+function _gll_warp_factors(order::Int)
+    g = map(x -> (x + 1) / 2, _gll_points(Val(order), Float64))
+    xeq = ntuple(i -> (i - 1) / order, order + 1)
+    wbar = zeros(2 * order + 1)
+    for m in 1:(2 * order - 1)
+        r = m / (2 * order)
+        w = sum((g[i] - xeq[i]) * _lagrange_basis_1d(xeq, i, r) for i in 1:(order + 1))
+        wbar[m + 1] = w / (r * (1 - r))
+    end
+    return wbar
+end
+
+# The warped node for the barycentric multi-index α. With λₜ = αₜ / order, the barycentric
+# coordinates of the node are λₜ (1 + ∑_{s ≠ t} λₛ w̄[order + αₜ - αₛ]). This is the
+# vertex-numbering-independent form of `create_tri_warped` and `create_tet_warped` in Basix.
+function _gll_warped_node(vertices::Vector{<:Vec}, α::NTuple{N, Int}, wbar::Vector{Float64}) where {N}
+    order = sum(α)
+    λ = α ./ order
+    λw = ntuple(N) do t
+        Δ = 0.0
+        for s in 1:N
+            s == t && continue
+            Δ += λ[s] * wbar[order + α[t] - α[s] + 1]
+        end
+        return λ[t] * (1 + Δ)
+    end
+    return sum(λw[t] * vertices[t] for t in 1:N)
+end
+
+# Returns the warped nodes (in local dof order) and the transposed coefficient matrix Cᵀ.
+function _build_lagrange_simplex_gll(ip::LagrangeSimplexGLL)
+    order = getorder(ip)
+    αs = _lattice_multiindices(ip)
+    vertices = reference_coordinates(Lagrange{getrefshape(ip), 1}())
+    wbar = _gll_warp_factors(order)
+    nodes = [_gll_warped_node(vertices, α, wbar) for α in αs]
+    n = length(αs)
+    V = [_equispaced_simplex_lagrange(αs[i], order, _reference_barycentric(ip, nodes[j])) for i in 1:n, j in 1:n]
+    return nodes, permutedims(LinearAlgebra.inv(V))
+end
+
+const _lagrange_tri3_gll = _build_lagrange_simplex_gll(Lagrange{RefTriangle, 3}())
+const _lagrange_tri4_gll = _build_lagrange_simplex_gll(Lagrange{RefTriangle, 4}())
+const _lagrange_tri5_gll = _build_lagrange_simplex_gll(Lagrange{RefTriangle, 5}())
+const _lagrange_tet3_gll = _build_lagrange_simplex_gll(Lagrange{RefTetrahedron, 3}())
+const _lagrange_tet4_gll = _build_lagrange_simplex_gll(Lagrange{RefTetrahedron, 4}())
+_gll_data(::Lagrange{RefTriangle, 3}) = _lagrange_tri3_gll
+_gll_data(::Lagrange{RefTriangle, 4}) = _lagrange_tri4_gll
+_gll_data(::Lagrange{RefTriangle, 5}) = _lagrange_tri5_gll
+_gll_data(::Lagrange{RefTetrahedron, 3}) = _lagrange_tet3_gll
+_gll_data(::Lagrange{RefTetrahedron, 4}) = _lagrange_tet4_gll
+
+reference_coordinates(ip::LagrangeSimplexGLL) = copy(_gll_data(ip)[1])
+
+function reference_shape_value(ip::LagrangeSimplexGLL, ξ::Vec{<:Any, T}, i::Int) where {T}
+    n = getnbasefunctions(ip)
+    if !(0 < i <= n)
+        throw(ArgumentError("no shape function $i for interpolation $ip"))
+    end
+    order = getorder(ip)
+    αs = _lattice_multiindices(ip)
+    Cᵀ = _gll_data(ip)[2]
+    λ = _reference_barycentric(ip, ξ)
+    val = zero(T)
+    for j in 1:n
+        val += T(Cᵀ[j, i]) * _equispaced_simplex_lagrange(αs[j], order, λ)
     end
     return val
 end
@@ -1161,10 +1282,10 @@ end
 ##################################
 # Lagrange RefHexahedron order 3 #
 ##################################
-# Tricubic tensor-product interpolation. The 64 nodes sit on the regular 4×4×4 lattice of
-# the reference hexahedron, each node being a tensor product of the equispaced 1D order-3
-# nodes. The interior face dofs follow the lattice enumeration assumed by
-# `permute_and_push!` (matching `Lagrange{RefQuadrilateral, 3}`).
+# Tricubic tensor-product interpolation. The 64 nodes are tensor products of the 1D order-3
+# GLL points (the GLL variant in https://defelement.org/elements/lagrange.html). The
+# interior face dofs follow the lattice enumeration assumed by `permute_and_push!`
+# (matching `Lagrange{RefQuadrilateral, 3}`).
 getnbasefunctions(::Lagrange{RefHexahedron, 3}) = 64
 
 edgedof_interior_indices(::Lagrange{RefHexahedron, 3}) = (
@@ -1177,14 +1298,10 @@ facedof_interior_indices(::Lagrange{RefHexahedron, 3}) = (
 )
 volumedof_interior_indices(::Lagrange{RefHexahedron, 3}) = (57, 58, 59, 60, 61, 62, 63, 64)
 
-# The equispaced 1D order-3 Lagrange nodes on [-1, 1], scaled by 3 to keep them integer
-# (the actual nodes are these divided by 3: -1, -1/3, 1/3, 1).
-const _lagrange_hex3_nodes_1d_x3 = (-3, -1, 1, 3)
-
 # Tensor-product multi-indices (a, b, c) ∈ (1:4)³ for the 64 nodes, in local dof order:
 # vertices, edge interior dofs (following the local edge direction), face interior dofs (in
 # the lattice enumeration assumed by `permute_and_push!`), and volume interior dofs. The
-# node for (a, b, c) is located at (x_a, x_b, x_c) with x the 1D nodes above.
+# node for (a, b, c) is located at (x_a, x_b, x_c) with x the 1D GLL points.
 function _build_lagrange_hex3_multiindices()
     # Topology of RefHexahedron, given as the tensor-product index of each vertex. Must
     # match reference_edges/reference_faces in Grid/grid.jl, which are not yet defined when
@@ -1226,28 +1343,18 @@ end
 const _lagrange_hex3_multiindices = _build_lagrange_hex3_multiindices()
 
 function reference_coordinates(::Lagrange{RefHexahedron, 3})
-    m = _lagrange_hex3_nodes_1d_x3
-    return [Vec{3, Float64}((m[α[1]] / 3, m[α[2]] / 3, m[α[3]] / 3)) for α in _lagrange_hex3_multiindices]
+    x = _gll_points(Val(3), Float64)
+    return [Vec{3, Float64}((x[α[1]], x[α[2]], x[α[3]])) for α in _lagrange_hex3_multiindices]
 end
 
-function reference_shape_value(ip::Lagrange{RefHexahedron, 3}, ξ::Vec{3}, i::Int)
+function reference_shape_value(ip::Lagrange{RefHexahedron, 3}, ξ::Vec{3, T}, i::Int) where {T}
     if !(0 < i <= 64)
         throw(ArgumentError("no shape function $i for interpolation $ip"))
     end
-    m = _lagrange_hex3_nodes_1d_x3
+    x = _gll_points(Val(3), T)
     α = _lagrange_hex3_multiindices[i]
-    # Product of the 1D Lagrange basis L_a(t) = ∏_{b≠a} (t - x_b) / (x_a - x_b) per axis,
-    # evaluated with the nodes scaled by 3 (s = 3t) to preserve the element type of ξ.
-    val = one(ξ[1])
-    for d in 1:3
-        a = α[d]
-        s = 3 * ξ[d]
-        for b in 1:4
-            b == a && continue
-            val *= (s - m[b]) / (m[a] - m[b])
-        end
-    end
-    return val
+    return _lagrange_basis_1d(x, α[1], ξ[1]) * _lagrange_basis_1d(x, α[2], ξ[2]) *
+        _lagrange_basis_1d(x, α[3], ξ[3])
 end
 
 

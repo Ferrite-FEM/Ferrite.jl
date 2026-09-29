@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `InterfaceIterator(grid_or_dh, set)`, analogous to passing a cellset to
    `CellIterator`. ([#1522])
 
+### Changed
+
+ - `Lagrange` (and thus `DiscontinuousLagrange`) interpolations of order 3 and higher now
+   use Gauss–Lobatto–Legendre (GLL) based nodes instead of equispaced nodes:
+   tensor-product GLL nodes for `Lagrange{RefQuadrilateral, 3}` and
+   `Lagrange{RefHexahedron, 3}`, and the GLL-warped nodes of Basix (`gll_warped`) for
+   `Lagrange{RefTriangle, 3/4/5}` and `Lagrange{RefTetrahedron, 3/4}`. The nodes on each
+   edge are the 1D GLL points for all reference shapes, so mixed grids remain conforming.
+   The dof numbering is unchanged, but the shape functions, and hence nodal values, differ.
+
 ### Fixes
 
  - Untangle the tangled `AffineConstraints` in `close!` ([#1327])
