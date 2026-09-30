@@ -537,6 +537,7 @@ function test_l2proj_errorpaths()
         e
     end
     @test err isa MethodError && err.f === project
+    @test occursin("The element type `Vec{2}` of the data is not concrete", sprint(showerror, err))
     return
 end
 

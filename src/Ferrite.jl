@@ -157,6 +157,7 @@ include("PointEvalHandler.jl")
 # Other
 include("soa_utils.jl")
 include("deprecations.jl")
+include("error_hints.jl")
 
 # Adaptivity
 include("Adaptivity/AMR.jl")
