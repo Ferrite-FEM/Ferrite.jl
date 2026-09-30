@@ -352,6 +352,10 @@ end
     sp_ic = add_sparsity_entries!(SparsityPattern(ndofs(dh), ndofs(dh)), dh; interface_coupling = trues(2, 2))
     sp_ic_topo = add_sparsity_entries!(SparsityPattern(ndofs(dh), ndofs(dh)), dh; interface_coupling = trues(2, 2), topology = ExclusiveTopology(grid))
     compare_patterns(sp_ic, sp_ic_topo)
+    # Passing only a topology (no interface_coupling) should not error
+    # (https://github.com/Ferrite-FEM/Ferrite.jl/issues/1029)
+    K_topo = allocate_matrix(dh; topology = ExclusiveTopology(grid))
+    @test K_topo == allocate_matrix(dh)
 end
 
 @testset "SparsityPattern counting build" begin
