@@ -292,7 +292,7 @@ Two ideas carry the whole construction:
   themselves: every conformity constraint is resolved within one level and never chains through
   other hanging nodes. The algorithms of [IBWG2015](@citet) assume a balanced forest throughout.
 
-### Vocabulary: points, closure, support, part
+### Vocabulary: Points, closure, support, part
 
 The traversal machinery speaks the vocabulary of [IBWG2015](@citet) §2. Four terms carry
 everything, and all of them are purely integer/topological — no physical coordinate and no

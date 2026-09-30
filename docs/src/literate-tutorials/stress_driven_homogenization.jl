@@ -503,7 +503,7 @@ VTKGridFile("stress_driven_homogenization", dh) do vtk
     write_cell_data(vtk, phase, "phase")
 end;
 
-# ## Advanced: blocked matrix and a Schur complement solve
+# ## Advanced: Blocked matrix and a Schur complement solve
 #
 # The monolithic solve above is the right choice at this problem size: direct sparse
 # solvers are unfazed by the three dense rows and columns that the algebraic variable
