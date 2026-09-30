@@ -36,6 +36,9 @@ TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 VTKHDF = "45d8cf6f-ab5f-45bc-ab92-77e36ab192e6"
 WriteVTK = "64499a7a-5c06-52f2-abe2-ccb03c286192"
 
+[sources]
+Ferrite = {path = ".."}
+
 [compat]
 Documenter = "1.18"
 OrdinaryDiffEqRosenbrock = "2"
