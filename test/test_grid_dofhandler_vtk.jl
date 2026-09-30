@@ -943,6 +943,15 @@ end
         @test write_cell_data(vtk1, celldata2, "celldata2") === vtk1
         @test write_cell_data(vtk1, celldata3, "celldata3") === vtk1
         @test write_cell_data(vtk1, celldata4, "celldata4") === vtk1
+        # Non-concrete element types should give a MethodError for the public function
+        nodedata_nonconcrete = Vec{2}[]
+        foreach(_ -> push!(nodedata_nonconcrete, rand(Vec{2})), 1:getnnodes(grid))
+        err = try
+            write_node_data(vtk1, nodedata_nonconcrete, "nodedata")
+        catch e
+            e
+        end
+        @test err isa MethodError && err.f === write_node_data
         @assert isopen(vtk1.vtk)
         pvd[0.5] = vtk1
         @test !isopen(vtk1.vtk) # Should be closed when adding it

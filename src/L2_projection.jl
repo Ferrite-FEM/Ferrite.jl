@@ -212,6 +212,14 @@ function _assemble_L2_matrix!(assembler, cellvalues::CellValues, sdh::SubDofHand
     return assembler
 end
 
+# Data for each cell given as a vector with the values in the quadrature points. Note that
+# e.g. `Vec{3}` is not an `AbstractTensor`, so vectors with non-concrete element types such as
+# `Vec{3}[]` are not accepted (they would be slow to project).
+const ProjectionData = Union{
+    AbstractVector{<:AbstractVector{<:Union{Number, AbstractTensor}}},
+    AbstractDict{Int, <:AbstractVector{<:Union{Number, AbstractTensor}}},
+}
+
 """
     project(proj::L2Projector, vals, [qr_rhs::QuadratureRule])
 
@@ -258,16 +266,16 @@ Supported data types to project are `Number`s and `AbstractTensor`s.
     [`evaluate_at_grid_nodes`](@ref). Use [`write_projection`](@ref) to export the result.
 
 """
-function project(proj::L2Projector, vars::Union{AbstractVector, AbstractDict})
+function project(proj::L2Projector, vars::ProjectionData)
     return _project(proj, vars, proj.qrs_rhs)
 end
 # Old-style providing quadrature rule to project
-function project(p::L2Projector, vars::Union{AbstractVector, AbstractDict}, qr_rhs::QuadratureRule)
+function project(p::L2Projector, vars::ProjectionData, qr_rhs::QuadratureRule)
     length(p.dh.subdofhandlers) == 1 || error("For multiple domains, provide the right-hand-side quadrature rule to the L2Projector")
     return _project(p, vars, [qr_rhs])
 end
 # Providing matrix data instead of Vector / Dict
-function project(p::L2Projector, vars::AbstractMatrix, args...)
+function project(p::L2Projector, vars::AbstractMatrix{<:Union{Number, AbstractTensor}}, args...)
     # TODO: Random access into vars is required for now, hence the collect
     return project(p, collect(eachcol(vars)), args...)
 end

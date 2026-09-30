@@ -162,7 +162,7 @@ toparaview!(data::AbstractVector, val::Number) = (data[1] = val)
 
 function _vtk_write_node_data(
         vtk::WriteVTK.DatasetFile,
-        nodedata::Vector{S},
+        nodedata::AbstractVector{S},
         name::AbstractString
     ) where {O, D, T, M, S <: Union{Tensor{O, D, T, M}, SymmetricTensor{O, D, T, M}}}
     noutputs = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
@@ -173,10 +173,10 @@ function _vtk_write_node_data(
     end
     return WriteVTK.vtk_point_data(vtk, out, name; component_names = component_names(S))
 end
-function _vtk_write_node_data(vtk::WriteVTK.DatasetFile, nodedata::Vector{<:Real}, name::AbstractString)
+function _vtk_write_node_data(vtk::WriteVTK.DatasetFile, nodedata::AbstractVector{<:Real}, name::AbstractString)
     return WriteVTK.vtk_point_data(vtk, nodedata, name)
 end
-function _vtk_write_node_data(vtk::WriteVTK.DatasetFile, nodedata::Matrix{<:Real}, name::AbstractString; component_names = nothing)
+function _vtk_write_node_data(vtk::WriteVTK.DatasetFile, nodedata::AbstractMatrix{<:Real}, name::AbstractString; component_names = nothing)
     return WriteVTK.vtk_point_data(vtk, nodedata, name; component_names = component_names)
 end
 
@@ -260,8 +260,9 @@ function write_cell_data(vtk::VTKGridFile, celldata::AbstractVector{S}, name) wh
 end
 
 """
-    write_node_data(vtk::VTKGridFile, nodedata::Vector{Real}, name)
-    write_node_data(vtk::VTKGridFile, nodedata::Vector{<:AbstractTensor}, name)
+    write_node_data(vtk::VTKGridFile, nodedata::AbstractVector{<:Real}, name)
+    write_node_data(vtk::VTKGridFile, nodedata::AbstractMatrix{<:Real}, name)
+    write_node_data(vtk::VTKGridFile, nodedata::AbstractVector{<:AbstractTensor}, name)
 
 Write the `nodedata` that is ordered by the nodes in the grid to `vtk`.
 
@@ -271,7 +272,11 @@ Two-dimensional vectors are padded with zeros.
 When `nodedata` contains second order tensors, the index order,
 `[11, 22, 33, 23, 13, 12, 32, 31, 21]`, follows the default Voigt order in Tensors.jl.
 """
-function write_node_data(vtk::VTKGridFile, nodedata, name)
+function write_node_data(
+        vtk::VTKGridFile,
+        nodedata::Union{AbstractVector{<:Real}, AbstractMatrix{<:Real}, AbstractVector{<:AbstractTensor}},
+        name,
+    )
     if write_discontinuous(vtk)
         data = _map_to_discontinuous_nodes(vtk.node_mapping, nodedata)
         _vtk_write_node_data(vtk.vtk, data, name)

@@ -526,6 +526,17 @@ function test_l2proj_errorpaths()
     wrongnqp_exception = ErrorException("The number of variables per cell doesn't match the number of quadrature points")
     @test_throws wrongnqp_exception project(proj1, data_invalid2, qr_tria)
     @test_throws wrongnqp_exception project(proj1, data_invalid3, qr_tria)
+    # Giving data with a non-concrete element type (https://github.com/Ferrite-FEM/Ferrite.jl/issues/1263)
+    data_nonconcrete = [Vec{2}[] for _ in 1:getncells(grid)]
+    for cell_data in data_nonconcrete, _ in 1:getnquadpoints(qr_tria)
+        push!(cell_data, rand(Vec{2}))
+    end
+    err = try
+        project(proj1, data_nonconcrete, qr_tria)
+    catch e
+        e
+    end
+    @test err isa MethodError && err.f === project
     return
 end
 

@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - L2 projection supports complex scalar and tensor data.
  - `ArrayOfVectorViews` validates offsets before constructing unchecked views.
  - `write_cell_data` supports cell-wise `SymmetricTensor` data. ([#768], [#1374], [#1375])
+ - `project` and `write_node_data` now throw a `MethodError` for the function itself (instead
+   of for an internal function) when called with unsupported data, e.g. with a non-concrete
+   element type such as `Vec{3}[]` instead of `Vec{3, Float64}[]`. ([#1263])
 
 ### Performance
 
@@ -1430,6 +1433,7 @@ poking into Ferrite internals:
 [#1251]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1251
 [#1252]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1252
 [#1259]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1259
+[#1263]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1263
 [#1268]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1268
 [#1271]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1271
 [#1278]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1278
