@@ -27,7 +27,7 @@ jobs:
       - uses: julia-actions/cache@v3
       - uses: fredrikekre/runic-action@v1
         with:
-          version: "1.7" # Keep version in sync with .pre-commit-config.yaml
+          version: "1.11" # Keep version in sync with .pre-commit-config.yaml
           docstrings: true
           extensions: 'jl,md'
 

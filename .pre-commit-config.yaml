@@ -15,7 +15,7 @@ repos:
       - id: runic
         args: ["--inplace", "--diff", "--docstrings"]
         additional_dependencies:
-          - 'Runic@1.7' # Keep version in sync with .github/workflows/Check.yml
+          - 'Runic@1.11' # Keep version in sync with .github/workflows/Check.yml
       - id: runic-md
         additional_dependencies:
-          - 'Runic@1.7' # Keep version in sync with .github/workflows/Check.yml
+          - 'Runic@1.11' # Keep version in sync with .github/workflows/Check.yml
