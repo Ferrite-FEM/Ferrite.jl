@@ -546,7 +546,7 @@ main()
 # The resulting magnitude of the velocity field is visualized in
 # [*Figure 1*](@ref tutorial-stokes-flow-figure-1).
 
-# ## [Alternative: retaining the Lagrange multiplier](@id stokes-multiplier)
+# ## [Alternative: Retaining the Lagrange multiplier](@id stokes-multiplier)
 #
 # As discussed in the introduction, the mean value constraint can also be enforced by
 # keeping the Lagrange multiplier ``\lambda`` as an unknown -- the

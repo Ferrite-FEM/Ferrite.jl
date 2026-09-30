@@ -292,7 +292,7 @@ nothing # hide
 #     end
 #     ```
 
-# ### [Assembly without coloring: atomic accumulation](@id howto-threaded-assembly-atomic)
+# ### [Assembly without coloring: Atomic accumulation](@id howto-threaded-assembly-atomic)
 #
 # The grid coloring above ensures that no two concurrently running tasks write to the
 # same entries of `K` and `f`. An alternative is to allow concurrent writes, but make the

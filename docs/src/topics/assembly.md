@@ -122,7 +122,7 @@ const K = allocate_matrix(dh)
 nothing # hide
 ```
 
-#### Strategy 1: matrix indexing
+#### Strategy 1: Matrix indexing
 
 The first strategy is to index directly, using the vector of global dofs, into the global
 matrix:
@@ -173,7 +173,7 @@ Now the problem with this strategy becomes a bit more obvious:
     In theory this should be as efficient as the explicit loop presented in the next
     section.
 
-#### Strategy 2: scalar indexing
+#### Strategy 2: Scalar indexing
 
 A variant of the first strategy is to explicitly loop over the indices and add the elements
 individually as scalars:
@@ -204,7 +204,7 @@ that `tmp1` and `tmp2` are scalars which don't need to be allocated on the heap.
 strategy thus eliminates all allocations that were present in the first strategy. However,
 we still lookup the same location in `K` twice, and we still have a random access pattern.
 
-#### Strategy 3: scalar indexing with single lookup
+#### Strategy 3: Scalar indexing with single lookup
 
 To improve on the second strategy we will get rid of the double lookup into the sparse
 matrix `K`. While Julia doesn't have a "`+=`"-operation, Ferrite has an internal `addindex!`-function which does exactly what we want: it adds a value to a specific location in a sparse
@@ -225,7 +225,7 @@ nothing # hide
 With this method we remove the double lookup, but the issue of random access patterns still
 remains.
 
-#### Strategy 4: using an assembler
+#### Strategy 4: Using an assembler
 
 Finally, the last strategy we consider uses an assembler. The assembler is a specific
 datastructure that pre-allocates some workspace to make the assembly more efficient:
