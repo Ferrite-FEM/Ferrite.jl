@@ -1,7 +1,7 @@
 """
-    Interpolation{ref_shape, order}()
+    Interpolation{refshape, order}()
 
-Abstract type for interpolations defined on `ref_shape`
+Abstract type for interpolations defined on `refshape`
 (see [`AbstractRefShape`](@ref)).
 `order` corresponds to the order of the interpolation.
 The interpolation is used to define shape functions to interpolate
@@ -9,48 +9,23 @@ a function between nodes.
 
 The following interpolations are implemented:
 
-* `Lagrange{RefLine, 1}`
-* `Lagrange{RefLine, 2}`
-* `Lagrange{RefQuadrilateral, 1}`
-* `Lagrange{RefQuadrilateral, 2}`
-* `Lagrange{RefQuadrilateral, 3}`
-* `Lagrange{RefTriangle, 1}`
-* `Lagrange{RefTriangle, 2}`
-* `Lagrange{RefTriangle, 3}`
-* `Lagrange{RefTriangle, 4}`
-* `Lagrange{RefTriangle, 5}`
-* `BubbleEnrichedLagrange{RefTriangle, 1}`
-* `CrouzeixRaviart{RefTriangle, 1}`
-* `CrouzeixRaviart{RefTetrahedron, 1}`
-* `RannacherTurek{RefQuadrilateral, 1}`
-* `RannacherTurek{RefHexahedron, 1}`
-* `Lagrange{RefHexahedron, 1}`
-* `Lagrange{RefHexahedron, 2}`
-* `Lagrange{RefHexahedron, 3}`
-* `Lagrange{RefTetrahedron, 1}`
-* `Lagrange{RefTetrahedron, 2}`
-* `Lagrange{RefTetrahedron, 3}`
-* `Lagrange{RefTetrahedron, 4}`
-* `Lagrange{RefPrism, 1}`
-* `Lagrange{RefPrism, 2}`
-* `Lagrange{RefPyramid, 1}`
-* `Lagrange{RefPyramid, 2}`
-* `Serendipity{RefQuadrilateral, 2}`
-* `Serendipity{RefHexahedron, 2}`
-* `Nedelec{RefTriangle, 1}`
-* `Nedelec{RefTriangle, 2}`
-* `Nedelec{RefQuadrilateral, 1}`
-* `Nedelec{RefTetrahedron, 1}`
-* `Nedelec{RefHexahedron, 1}`
-* `RaviartThomas{RefTriangle, 1}`
-* `RaviartThomas{RefTriangle, 2}`
-* `RaviartThomas{RefQuadrilateral, 1}`
-* `RaviartThomas{RefTetrahedron, 1}`
-* `RaviartThomas{RefHexahedron, 1}`
-* `BrezziDouglasMarini{RefTriangle, 1}`
+* [`Lagrange`](@ref)
+* [`DiscontinuousLagrange`](@ref)
+* [`Serendipity`](@ref)
+* [`BubbleEnrichedLagrange`](@ref)
+* [`CrouzeixRaviart`](@ref)
+* [`RannacherTurek`](@ref)
+* [`RaviartThomas`](@ref)
+* [`BrezziDouglasMarini`](@ref)
+* [`Nedelec`](@ref)
 
-Additionally, `DiscontinuousLagrange` is implemented for the same reference shapes
-and orders as `Lagrange`, as well as for `order = 0` on any reference shape.
+See the docstring of each interpolation for the supported reference shapes and orders.
+Scalar interpolations can be vectorized, i.e. used for each component of a vector field,
+see [`VectorizedInterpolation`](@ref).
+
+!!! tip "More interpolations"
+    [FerriteInterpolations.jl](https://github.com/Ferrite-FEM/FerriteInterpolations.jl)
+    implements many more interpolations that are compatible with Ferrite.
 
 # Examples
 ```jldoctest
@@ -510,6 +485,8 @@ get_face_direction(cell, facenr) = get_face_direction(faces(cell)[facenr])
     DiscontinuousLagrange{refshape, order} <: ScalarInterpolation
 
 Piecewise discontinuous Lagrange basis via Gauss-Lobatto points.
+
+See also the [discontinuous Lagrange element on DefElement](https://defelement.org/elements/discontinuous-lagrange.html).
 """
 struct DiscontinuousLagrange{shape, order} <: ScalarInterpolation{shape, order}
     function DiscontinuousLagrange{shape, order}() where {shape <: AbstractRefShape, order}
@@ -566,6 +543,8 @@ end
     Lagrange{refshape, order} <: ScalarInterpolation
 
 Standard continuous Lagrange polynomials with equidistant node placement.
+
+See also the [Lagrange element on DefElement](https://defelement.org/elements/lagrange.html).
 """
 struct Lagrange{shape, order} <: ScalarInterpolation{shape, order}
     function Lagrange{shape, order}() where {shape <: AbstractRefShape, order}
@@ -1454,7 +1433,13 @@ end
 # Bubble elements #
 ###################
 """
+    BubbleEnrichedLagrange{refshape, order} <: ScalarInterpolation
+
 Lagrange element with bubble stabilization.
+
+Currently only `BubbleEnrichedLagrange{RefTriangle, 1}` is implemented.
+
+See also the [bubble enriched Lagrange element on DefElement](https://defelement.org/elements/bubble-enriched-lagrange.html).
 """
 struct BubbleEnrichedLagrange{shape, order} <: ScalarInterpolation{shape, order}
     function BubbleEnrichedLagrange{shape, order}() where {shape <: AbstractRefShape, order}
@@ -1499,6 +1484,8 @@ end
     Serendipity{refshape, order} <: ScalarInterpolation
 
 Serendipity element on hypercubes. Currently only second order variants are implemented.
+
+See also the [serendipity element on DefElement](https://defelement.org/elements/serendipity.html).
 """
 struct Serendipity{shape, order} <: ScalarInterpolation{shape, order}
     function Serendipity{shape, order}() where {shape <: AbstractRefShape, order}
@@ -1626,6 +1613,8 @@ end
 Classical non-conforming Crouzeix–Raviart element.
 
 For details we refer to the original paper [CroRav:1973:cnf](@cite).
+
+See also the [Crouzeix–Raviart element on DefElement](https://defelement.org/elements/crouzeix-raviart.html).
 """
 struct CrouzeixRaviart{shape, order} <: ScalarInterpolation{shape, order}
     CrouzeixRaviart{RefTriangle, 1}() = new{RefTriangle, 1}()
@@ -1695,6 +1684,8 @@ Classical non-conforming Rannacher-Turek element.
 
 This element is basically the idea from Crouzeix and Raviart applied to
 hypercubes. For details see the original paper [RanTur:1992:snq](@cite).
+
+See also the [Rannacher–Turek element on DefElement](https://defelement.org/elements/rannacher-turek.html).
 """
 struct RannacherTurek{shape, order} <: ScalarInterpolation{shape, order} end
 conformity(::RannacherTurek) = L2Conformity()
@@ -1766,6 +1757,25 @@ end
 ##################################################
 # VectorizedInterpolation{<:ScalarInterpolation} #
 ##################################################
+"""
+    VectorizedInterpolation{vdim}(ip::ScalarInterpolation)
+    VectorizedInterpolation(ip::ScalarInterpolation)
+    ip^vdim
+
+Vector valued interpolation with `vdim` components where each component is interpolated
+using the scalar interpolation `ip`. If `vdim` is not given it defaults to the reference
+dimension of `ip`. A `VectorizedInterpolation` is typically constructed using the `^`
+syntax, e.g. `Lagrange{RefTriangle, 2}()^2`.
+
+# Examples
+```jldoctest
+julia> ip = Lagrange{RefTriangle, 2}()^2
+Lagrange{RefTriangle, 2}()^2
+
+julia> getnbasefunctions(ip)
+12
+```
+"""
 struct VectorizedInterpolation{vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}} <: VectorInterpolation{vdim, refshape, order}
     ip::SI
     function VectorizedInterpolation{vdim}(ip::SI) where {vdim, refshape, order, SI <: ScalarInterpolation{refshape, order}}
@@ -1861,6 +1871,18 @@ function get_direction end
 #####################################
 # RaviartThomas (1st kind), H(div)  #
 #####################################
+"""
+    RaviartThomas{refshape, order} <: VectorInterpolation
+
+Raviart-Thomas element (of the first kind) for ``H(\\mathrm{div})``-conforming
+discretizations, i.e. the normal component is continuous across cell boundaries.
+
+The following combinations of reference shape and order are implemented:
+`RefTriangle` (order 1 and 2), `RefQuadrilateral` (order 1),
+`RefTetrahedron` (order 1), and `RefHexahedron` (order 1).
+
+See also the [Raviart–Thomas element on DefElement](https://defelement.org/elements/raviart-thomas.html).
+"""
 struct RaviartThomas{shape, order, vdim} <: VectorInterpolation{vdim, shape, order}
     function RaviartThomas{shape, order}() where {rdim, shape <: AbstractRefShape{rdim}, order}
         return new{shape, order, rdim}()
@@ -1991,6 +2013,16 @@ end
 #####################################
 # Brezzi-Douglas–Marini, H(div)     #
 #####################################
+"""
+    BrezziDouglasMarini{refshape, order} <: VectorInterpolation
+
+Brezzi-Douglas-Marini element for ``H(\\mathrm{div})``-conforming discretizations,
+i.e. the normal component is continuous across cell boundaries.
+
+Currently only `BrezziDouglasMarini{RefTriangle, 1}` is implemented.
+
+See also the [Brezzi–Douglas–Marini element on DefElement](https://defelement.org/elements/brezzi-douglas-marini.html).
+"""
 struct BrezziDouglasMarini{shape, order, vdim} <: VectorInterpolation{vdim, shape, order}
     function BrezziDouglasMarini{shape, order}() where {rdim, shape <: AbstractRefShape{rdim}, order}
         return new{shape, order, rdim}()
@@ -2030,6 +2062,18 @@ end
 #####################################
 # Nedelec (1st kind), H(curl)       #
 #####################################
+"""
+    Nedelec{refshape, order} <: VectorInterpolation
+
+Nédélec element (of the first kind) for ``H(\\mathrm{curl})``-conforming
+discretizations, i.e. the tangential component is continuous across cell boundaries.
+
+The following combinations of reference shape and order are implemented:
+`RefTriangle` (order 1 and 2), `RefQuadrilateral` (order 1),
+`RefTetrahedron` (order 1), and `RefHexahedron` (order 1).
+
+See also the [Nédélec (first kind) element on DefElement](https://defelement.org/elements/nedelec1.html).
+"""
 struct Nedelec{shape, order, vdim} <: VectorInterpolation{vdim, shape, order}
     function Nedelec{shape, order}() where {rdim, shape <: AbstractRefShape{rdim}, order}
         return new{shape, order, rdim}()

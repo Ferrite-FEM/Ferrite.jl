@@ -13,13 +13,22 @@ getrefshape
 getorder
 ```
 
-Implemented interpolations:
+## Scalar interpolations
 
 ```@docs
 Lagrange
-Serendipity
 DiscontinuousLagrange
+Serendipity
 BubbleEnrichedLagrange
 CrouzeixRaviart
 RannacherTurek
+```
+
+## Vector interpolations
+
+```@docs
+VectorizedInterpolation
+RaviartThomas
+BrezziDouglasMarini
+Nedelec
 ```
