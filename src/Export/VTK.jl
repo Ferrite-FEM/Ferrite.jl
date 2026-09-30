@@ -240,9 +240,22 @@ end
     write_cell_data(vtk::VTKGridFile, celldata::AbstractVector, name::String)
 
 Write the `celldata` that is ordered by the cells in the grid to the vtk file.
+
+When `celldata` contains `Tensors.Vec`s or second order tensors, each component is exported
+in the same way as for [`write_node_data`](@ref).
 """
 function write_cell_data(vtk::VTKGridFile, celldata, name)
     WriteVTK.vtk_cell_data(vtk.vtk, celldata, name)
+    return vtk
+end
+function write_cell_data(vtk::VTKGridFile, celldata::AbstractVector{S}, name) where {O, D, T, M, S <: Union{Tensor{O, D, T, M}, SymmetricTensor{O, D, T, M}}}
+    noutputs = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
+    npoints = length(celldata)
+    out = zeros(T, noutputs, npoints)
+    for i in 1:npoints
+        toparaview!(@view(out[:, i]), celldata[i])
+    end
+    WriteVTK.vtk_cell_data(vtk.vtk, out, name; component_names = component_names(eltype(celldata)))
     return vtk
 end
 
