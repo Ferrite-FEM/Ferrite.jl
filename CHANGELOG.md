@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Fixed the single-argument `InterfaceValues(facetvalues)` constructor.
  - L2 projection supports complex scalar and tensor data.
  - `ArrayOfVectorViews` validates offsets before constructing unchecked views.
+ - `write_cell_data` supports cell-wise `SymmetricTensor` data. ([#768], [#1374], [#1375])
 
 ### Performance
 
@@ -1374,6 +1375,7 @@ poking into Ferrite internals:
 [#754]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/754
 [#756]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/756
 [#759]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/759
+[#768]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/768
 [#779]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/779
 [#780]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/780
 [#835]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/835
@@ -1452,6 +1454,8 @@ poking into Ferrite internals:
 [#1355]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1355
 [#1365]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1365
 [#1367]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1367
+[#1374]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1374
+[#1375]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1375
 [#1376]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1376
 [#1379]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1379
 [#1380]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1380
