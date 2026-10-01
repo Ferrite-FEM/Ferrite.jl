@@ -171,27 +171,35 @@ struct ScratchData{CC, CV, T, A}
     assembler::A
 end
 
-# This constructor will be called within each task to create a independent `ScratchData`
-# object. For `cell_cache`, `Ke`, and `fe` we simply call the constructors to allocate
-# independent objects. For `cellvalues` we use `copy` which Ferrite defines for this
-# purpose. Finally, for the assembler we call `start_assemble` to create a new assembler but
-# note that we set `fillzero = false` because we don't want to risk that a task that starts
-# a bit later will zero out data that another task have already assembled. The `atomic`
-# flag is forwarded to `start_assemble` and will be used for the [atomic
-# accumulation](@ref howto-threaded-assembly-atomic) version at the end of this howto.
-# Note that it is passed as `Val(true)`/`Val(false)`: the type of the returned assembler
-# depends on the flag, so passing it in the type domain makes sure that the `ScratchData`
-# type (and thus the assembly loop) is concretely typed.
-function ScratchData(
-        dh::DofHandler, K::SparseMatrixCSC, f::Vector, cellvalues::CellValues,
-        ::Val{atomic} = Val(false)
-    ) where {atomic}
+# Since `ScratchData` contain buffers that are modified during assembly each task needs
+# its own, independent, instance. We first create a "template" `ScratchData` once, outside
+# of the parallel loop, and then each task duplicates this template using
+# [`task_local_copy`](@ref). `task_local_copy` is similar to `copy`, but only the data
+# that is modified during assembly ("scratch data") is duplicated: for example, the
+# duplicated `CellValues` and `CellCache` get their own internal buffers, and the
+# duplicated assembler gets its own internal buffers but still assembles into the same
+# global matrix `K` and vector `f`.
+#
+# The following convenience constructor creates the template. Note that the assembler is
+# passed as an argument: this lets us use a regular assembler for the colored assembly
+# below, and an [atomic assembler](@ref howto-threaded-assembly-atomic) for the version at
+# the end of this howto.
+function ScratchData(dh::DofHandler, cellvalues::CellValues, assembler)
     cell_cache = CellCache(dh)
     n = ndofs_per_cell(dh)
     Ke = zeros(n, n)
     fe = zeros(n)
-    asm = start_assemble(K, f; fillzero = false, atomic = atomic)
-    return ScratchData(cell_cache, copy(cellvalues), Ke, fe, asm)
+    return ScratchData(cell_cache, cellvalues, Ke, fe, assembler)
+end
+
+# This function will be called within each task to create an independent `ScratchData`
+# object from the template by calling `task_local_copy` on all of the fields:
+function copy_scratch(scratch::ScratchData)
+    return ScratchData(
+        task_local_copy(scratch.cell_cache), task_local_copy(scratch.cellvalues),
+        task_local_copy(scratch.Ke), task_local_copy(scratch.fe),
+        task_local_copy(scratch.assembler)
+    )
 end
 nothing # hide
 
@@ -233,13 +241,14 @@ using OhMyThreads, TaskLocalValues
 
 function assemble_global!(
         K::SparseMatrixCSC, f::Vector, dh::DofHandler, colors,
-        cellvalues_template::CellValues; ntasks = Threads.nthreads()
+        cellvalues::CellValues; ntasks = Threads.nthreads()
     )
-    ## Zero-out existing data in K and f
-    _ = start_assemble(K, f)
     ## Body force and material stiffness
     b = Vec{3}((0.0, 0.0, -1.0))
     C = create_material_stiffness()
+    ## Template scratch data. Note that `start_assemble` zeroes out existing data in K
+    ## and f, but since this is only done once, before the parallel loop, it is safe.
+    scratch_template = ScratchData(dh, cellvalues, start_assemble(K, f))
     ## Loop over the colors
     for color in colors
         ## Dynamic scheduler spawning `ntasks` tasks where each task will process a chunk of
@@ -250,8 +259,8 @@ function assemble_global!(
             ## Tell the @tasks loop to use the scheduler defined above
             @set scheduler = scheduler
             ## Obtain a task local scratch and unpack it
-            @local scratch = ScratchData(dh, K, f, cellvalues_template)
-            (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
+            @local scratch = copy_scratch(scratch_template)
+            local (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
             ## Reinitialize the cell cache and then the cellvalues
             reinit!(cell_cache, cellidx)
             reinit!(cellvalues, cell_cache)
@@ -274,7 +283,7 @@ nothing # hide
 #     ```julia
 #     # using TaskLocalValues
 #     scratches = TaskLocalValue() do
-#         ScratchData(dh, K, f, cellvalues)
+#         copy_scratch(scratch_template)
 #     end
 #     OhMyThreads.tforeach(color; scheduler) do cellidx
 #         # Obtain a task local scratch and unpack it
@@ -317,26 +326,28 @@ nothing # hide
 #    coloring approach is deterministic).
 #
 # Note that each task still needs its own assembler (the assembler wraps buffers that are
-# used during `assemble!`) which is why the `atomic` flag is part of `ScratchData` above.
-# The global assembly routine is like before, but with a single loop over all cells:
+# used during `assemble!`). Calling `task_local_copy` on an atomic assembler returns a new
+# atomic assembler, so the `copy_scratch` function from above can be reused as is. The
+# global assembly routine is like before, but with an atomic assembler in the template
+# scratch data and a single loop over all cells:
 
 function assemble_global_atomic!(
         K::SparseMatrixCSC, f::Vector, dh::DofHandler,
-        cellvalues_template::CellValues; ntasks = Threads.nthreads()
+        cellvalues::CellValues; ntasks = Threads.nthreads()
     )
-    ## Zero-out existing data in K and f
-    _ = start_assemble(K, f)
     ## Body force and material stiffness
     b = Vec{3}((0.0, 0.0, -1.0))
     C = create_material_stiffness()
+    ## Template scratch data with an atomic assembler
+    scratch_template = ScratchData(dh, cellvalues, start_assemble(K, f; atomic = true))
     scheduler = OhMyThreads.DynamicScheduler(; ntasks)
     ## Parallelize the loop over all cells
     OhMyThreads.@tasks for cellidx in 1:getncells(dh.grid)
         ## Tell the @tasks loop to use the scheduler defined above
         @set scheduler = scheduler
         ## Obtain a task local scratch (with an atomic assembler) and unpack it
-        @local scratch = ScratchData(dh, K, f, cellvalues_template, #= atomic = =# Val(true))
-        (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
+        @local scratch = copy_scratch(scratch_template)
+        local (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
         ## Reinitialize the cell cache and then the cellvalues
         reinit!(cell_cache, cellidx)
         reinit!(cellvalues, cell_cache)

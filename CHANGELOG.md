@@ -16,6 +16,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    materialized skeleton, and gains methods taking an explicit subset of it,
    `InterfaceIterator(grid_or_dh, set)`, analogous to passing a cellset to
    `CellIterator`. ([#1522])
+ - New function `task_local_copy` for duplicating data structures such that they can be
+   used concurrently from multiple tasks, e.g. for multithreaded assembly. Only data that
+   is modified during assembly (internal buffers) is duplicated, while e.g. the global
+   matrix and vector of assemblers and the grid and `DofHandler` of caches are shared.
+   Methods are defined for `CellValues`, `MultiFieldCellValues`, `FacetValues`,
+   `InterfaceValues`, `PointValues`, `CellCache`, `FacetCache`, `InterfaceCache`, the
+   assemblers returned by `start_assemble` (including atomic assemblers), and dense
+   arrays. See the [howto on multithreaded
+   assembly](https://ferrite-fem.github.io/Ferrite.jl/dev/howto/threaded_assembly/) for
+   example usage. ([#1070])
+
+### Deprecated
+
+ - `Base.copy` for `CellValues`, `MultiFieldCellValues`, `FacetValues`,
+   `InterfaceValues`, `FunctionValues`, `GeometryMapping`, interpolations, and
+   quadrature rules has been deprecated in favor of `task_local_copy`. Note that, unlike
+   the previous `copy` methods, `task_local_copy` also duplicates the quadrature rule.
+   ([#1070])
 
 ### Fixes
 
@@ -1401,6 +1419,7 @@ poking into Ferrite internals:
 [#1058]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1058
 [#1059]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1059
 [#1063]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1063
+[#1070]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1070
 [#1083]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1083
 [#1089]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1089
 [#1096]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1096

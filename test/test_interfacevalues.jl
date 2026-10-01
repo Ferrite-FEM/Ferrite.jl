@@ -339,26 +339,6 @@ end
         ic = first(InterfaceIterator(dh))
         @test dof_range(ic, :p) == (9:12, 25:28)
     end
-    # Test copy
-    iv = InterfaceValues(FacetQuadratureRule{RefQuadrilateral}(2), DiscontinuousLagrange{RefQuadrilateral, 1}())
-    ivc = copy(iv)
-    @test typeof(iv) == typeof(ivc)
-    for fname in fieldnames(typeof(iv))
-        v = getfield(iv, fname)
-        vc = getfield(ivc, fname)
-        if hasmethod(pointer, Tuple{typeof(v)})
-            @test pointer(v) != pointer(vc)
-        end
-        v isa FacetValues && continue
-        for fname in fieldnames(typeof(vc))
-            v2 = getfield(v, fname)
-            vc2 = getfield(vc, fname)
-            if hasmethod(pointer, Tuple{typeof(v2)})
-                @test pointer(v2) != pointer(vc2)
-            end
-            @test v2 == vc2
-        end
-    end
     @testset "undefined transformation matrix error path" begin
         it = Ferrite.InterfaceOrientationInfo{DummyRefShapes.RefDodecahedron, DummyRefShapes.RefDodecahedron}(false, 0, 0, 1, 1)
         @test_throws ArgumentError("transformation is not implemented") Ferrite.get_transformation_matrix(it)
@@ -392,7 +372,7 @@ end
         grid = generate_grid(Quadrilateral, (2, 2))
         ip = Lagrange{RefQuadrilateral, 1}()
         iv = InterfaceValues(FacetQuadratureRule{RefQuadrilateral}(2), ip)
-        test_conforming_equivalence(grid, iv, copy(iv))
+        test_conforming_equivalence(grid, iv, task_local_copy(iv))
         # ... including a rotated/flipped hexahedron pair (cf. the "Unordered nodes 3D" testset)
         hexnodes = [
             Node((-1.0, 0.0, 0.0)), Node((0.0, 0.0, 0.0)), Node((1.0, 0.0, 0.0)),
@@ -403,9 +383,9 @@ end
         hexgrid = Grid([Hexahedron((1, 2, 5, 4, 7, 8, 11, 10)), Hexahedron((5, 6, 12, 11, 2, 3, 9, 8))], hexnodes)
         ip3 = Lagrange{RefHexahedron, 1}()
         iv3 = InterfaceValues(FacetQuadratureRule{RefHexahedron}(2), ip3)
-        test_conforming_equivalence(hexgrid, iv3, copy(iv3))
+        test_conforming_equivalence(hexgrid, iv3, task_local_copy(iv3))
         hexgrid2 = generate_grid(Hexahedron, (2, 2, 2))
-        test_conforming_equivalence(hexgrid2, iv3, copy(iv3))
+        test_conforming_equivalence(hexgrid2, iv3, task_local_copy(iv3))
 
         # Hand-built 2D hanging-node interface: coarse cell 1 next to two fine cells.
         #   4-------3
