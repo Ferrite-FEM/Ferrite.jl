@@ -129,7 +129,7 @@ dh = DofHandler(grid); add!(dh, :u, Lagrange{RefQuadrilateral, 1}()); close!(dh)
 fv = FacetValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 1}())
 f = zeros(ndofs(dh))
 fe = zeros(ndofs_per_cell(dh))
-qn = 1.0    # Normal flux
+qn = 1.0    # Outward normal flux, q ⋅ n (heat leaving the domain)
 for fc in FacetIterator(dh, getfacetset(grid, "right"))
     reinit!(fv, fc)
     fill!(fe, 0)
@@ -137,7 +137,7 @@ for fc in FacetIterator(dh, getfacetset(grid, "right"))
         dΓ = getdetJdV(fv, q_point)
         for i in 1:getnbasefunctions(fv)
             δu = shape_value(fv, q_point, i)
-            fe[i] += δu * qn * dΓ
+            fe[i] -= δu * qn * dΓ
         end
     end
     assemble!(f, celldofs(fc), fe)
@@ -150,7 +150,7 @@ through the local `fe` vector and then using `assemble!`):
 # ...
 dofs = celldofs(fc)
 for i in 1:getnbasefunctions(fv)
-    f[dofs[i]] += δu * qn * dΓ
+    f[dofs[i]] -= δu * qn * dΓ
 end
 ```
 
@@ -166,7 +166,7 @@ for facet in 1:nfacets(cell)
             dΓ = getdetJdV(facetvalues, q_point)
             for i in 1:getnbasefunctions(facetvalues)
                 δu = shape_value(facetvalues, q_point, i)
-                fe[i] += δu * qn * dΓ
+                fe[i] -= δu * qn * dΓ
             end
         end
     end
