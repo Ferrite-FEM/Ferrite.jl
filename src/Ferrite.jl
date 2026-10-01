@@ -32,6 +32,9 @@ using .CollectionsOfViews:
 include("exports.jl")
 include("refshapes.jl")
 
+# Task based multithreading support
+include("multithreading.jl")
+
 """
     Ferrite.getrefdim(RefShape::Type{<:AbstractRefShape})
 

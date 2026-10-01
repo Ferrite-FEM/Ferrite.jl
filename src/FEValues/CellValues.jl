@@ -82,8 +82,11 @@ function CellValues(::Type{T}, qr::QuadratureRule, ip::Interpolation, ip_geo::Ve
     return CellValues(T, qr, ip, ip_geo, ValuesUpdateFlags(ip; kwargs...))
 end
 
-function Base.copy(cv::CellValues)
-    return CellValues(copy(get_fun_values(cv)), copy(get_geo_mapping(cv)), copy(cv.qr), _copy_or_nothing(cv.detJdV))
+function task_local_copy(cv::CellValues)
+    return CellValues(
+        task_local_copy(cv.fun_values), task_local_copy(cv.geo_mapping),
+        task_local_copy(cv.qr), task_local_copy(cv.detJdV)
+    )
 end
 
 # Access geometry values
@@ -255,10 +258,11 @@ function MultiFieldCellValues(::Type{T}, qr, ip_funs::NamedTuple, ip_geo::Vector
     return MultiFieldCellValues(T, qr, ip_funs, ip_geo, ValuesUpdateFlags(ip_funs; kwargs...))
 end
 
-function Base.copy(cv::CMV) where {CMV <: MultiFieldCellValues}
-    fun_values = map(copy, get_fun_values(cv))
+function task_local_copy(cv::CMV) where {CMV <: MultiFieldCellValues}
+    fun_values = map(task_local_copy, get_fun_values(cv))
+    # Preserve aliasing between fields with equal interpolations
     fun_values_nt = NamedTuple((key => fun_values[findfirst(fv -> fv === named_fv, get_fun_values(cv))] for (key, named_fv) in pairs(getfield(cv, :fun_values_nt))))
-    return CMV(fun_values_nt, fun_values, copy(get_geo_mapping(cv)), copy(get_quadrature_rule(cv)), _copy_or_nothing(getdetJdVs(cv)))
+    return CMV(fun_values_nt, fun_values, task_local_copy(get_geo_mapping(cv)), task_local_copy(get_quadrature_rule(cv)), task_local_copy(getdetJdVs(cv)))
 end
 
 # Access geometry values

@@ -390,10 +390,6 @@ function spatial_coordinate(interpolation::ScalarInterpolation, ξ::Vec, x::Abst
     return vec
 end
 
-# Utility functions used by GeometryMapping, FunctionValues
-_copy_or_nothing(x) = copy(x)
-_copy_or_nothing(::Nothing) = nothing
-
 function reference_shape_values!(values::AbstractMatrix, ip, qr_points::AbstractVector{<:Vec})
     for (qp, ξ) in pairs(qr_points)
         reference_shape_values!(@view(values[:, qp]), ip, ξ)

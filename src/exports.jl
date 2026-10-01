@@ -209,4 +209,7 @@ export
     evaluate_at_points,
     PointIterator,
     PointLocation,
-    PointValues
+    PointValues,
+
+    # Misc
+    task_local_copy

@@ -159,19 +159,6 @@ end
             for (i, qp_x) in pairs(Ferrite.getpoints(quad_rule))
                 @test spatial_coordinate(cv, i, coords) ≈ qp_x
             end
-
-            @testset "copy(::CellValues)" begin
-                cvc = copy(cv)
-                @test typeof(cv) == typeof(cvc)
-
-                test_equal_but_unaliased(cv.fun_values, cvc.fun_values)
-                test_equal_but_unaliased(cv.geo_mapping, cvc.geo_mapping)
-                # qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
-                @test cvc.qr === cv.qr
-                # While detJdV is copied
-                @test cvc.detJdV !== cv.detJdV
-                @test cvc.detJdV == cv.detJdV
-            end
         end
     end
 
@@ -361,8 +348,8 @@ end
                 end
             end
         end
-        @testset "copy(::MultiFieldCellValues)" begin
-            cmv_copy = @inferred copy(cmv)
+        @testset "task_local_copy(::MultiFieldCellValues)" begin
+            cmv_copy = @inferred task_local_copy(cmv)
             @test cmv_copy isa typeof(cmv)
 
             # Test that all mutable types in FunctionValues and GeometryMapping have been copied
@@ -374,9 +361,10 @@ end
             # Test that aliasing is preserved between equal interpolations
             @test cmv_copy.p === cmv_copy.T
 
-            # qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
-            @test Ferrite.get_quadrature_rule(cmv_copy) === Ferrite.get_quadrature_rule(cmv)
-            # While detJdV is copied
+            # qr and detJdV are copied
+            @test Ferrite.get_quadrature_rule(cmv_copy) !== Ferrite.get_quadrature_rule(cmv)
+            @test Ferrite.getweights(Ferrite.get_quadrature_rule(cmv_copy)) == Ferrite.getweights(Ferrite.get_quadrature_rule(cmv))
+            @test Ferrite.getpoints(Ferrite.get_quadrature_rule(cmv_copy)) == Ferrite.getpoints(Ferrite.get_quadrature_rule(cmv))
             @test Ferrite.getdetJdVs(cmv_copy) !== Ferrite.getdetJdVs(cmv)
             @test Ferrite.getdetJdVs(cmv_copy) == Ferrite.getdetJdVs(cmv)
         end
