@@ -132,10 +132,11 @@ codeblocks_plugin = CodeBlocks(
     ]
 )
 
-# Make sure there are no generated VTK files left around from the build.
-@timeit dto "remove vtk files" cd(joinpath(@__DIR__, "build", "tutorials")) do
-    foreach(readdir()) do file
-        any(ext -> endswith(file, ext), (".vtu", ".pvd", ".vtkhdf")) && rm(file)
+# Make sure there are no generated VTK files left around from the build (they are large and
+# would otherwise be deployed with every version and preview).
+@timeit dto "remove vtk files" for (root, _, files) in walkdir(joinpath(@__DIR__, "build"))
+    for file in files
+        any(ext -> endswith(file, ext), (".vtu", ".pvd", ".vtkhdf")) && rm(joinpath(root, file))
     end
 end
 
@@ -159,6 +160,9 @@ if !(liveserver || dependabot)
     @timeit dto "deploydocs" deploydocs(
         repo = "github.com/Ferrite-FEM/Ferrite.jl.git",
         push_preview = true,
+        # Amend the previous commit instead of stacking a new one (pushed with --force-with-lease)
+        # so that old builds and previews do not accumulate in the gh-pages history.
+        forcepush = true,
         versions = [
             "stable" => "v^",
             "v#.#",
