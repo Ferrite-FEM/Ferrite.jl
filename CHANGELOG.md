@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    with abstract cell storage. Recreate the iterator after changing the grid or topology.
  - L2 right-hand-side assembly avoids temporary row-slice allocations.
 
+### Documentation
+
+ - The boundary conditions topic guide has a new section on Robin boundary conditions,
+   covering the weak form and how to assemble the contributions. ([#762], [#774], [#1534])
+
 ## [v1.7.0] - 2026-08-31
 
 ### Added
@@ -1375,7 +1380,9 @@ poking into Ferrite internals:
 [#754]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/754
 [#756]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/756
 [#759]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/759
+[#762]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/762
 [#768]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/768
+[#774]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/774
 [#779]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/779
 [#780]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/780
 [#835]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/835
@@ -1488,5 +1495,6 @@ poking into Ferrite internals:
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1522]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1522
+[#1534]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1534
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
