@@ -1,0 +1,49 @@
+# Remove documentation previews of pull requests that are no longer open from gh-pages, and
+# squash the gh-pages history. Based on the cleanup workflow in the Documenter.jl manual, but run
+# on a schedule instead of when a pull request is closed: this also catches previews pushed by a
+# docs build that finished after its pull request was closed. Pushes with --force-with-lease so
+# that a concurrent push to gh-pages (docs deploy, benchmark publish) is not silently overwritten;
+# a rejected push is simply retried by the next run.
+name: Doc Preview Cleanup
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+# Ensure that only one "Doc Preview Cleanup" workflow is force pushing at a time
+concurrency:
+  group: doc-preview-cleanup
+  cancel-in-progress: false
+
+jobs:
+  doc-preview-cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v7
+        with:
+          ref: gh-pages
+      - name: Delete previews of closed pull requests and history + push changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          open_prs="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open --limit 1000 --json number --jq '.[].number')"
+          lease="$(git rev-parse HEAD)"
+          for preview_dir in previews/PR*; do
+              [ -d "${preview_dir}" ] || continue
+              if ! grep -qx "${preview_dir#previews/PR}" <<< "${open_prs}"; then
+                  git rm -rqf "${preview_dir}"
+                  echo "Deleted ${preview_dir}"
+              fi
+          done
+          if ! git diff --cached --quiet; then
+              git config user.name "Documenter.jl"
+              git config user.email "documenter@juliadocs.github.io"
+              git commit -m "delete previews"
+              git branch gh-pages-new "$(echo "delete history" | git commit-tree "HEAD^{tree}")"
+              git push --force-with-lease="gh-pages:${lease}" origin gh-pages-new:gh-pages
+          fi
