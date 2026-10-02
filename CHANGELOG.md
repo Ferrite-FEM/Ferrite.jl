@@ -16,6 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    materialized skeleton, and gains methods taking an explicit subset of it,
    `InterfaceIterator(grid_or_dh, set)`, analogous to passing a cellset to
    `CellIterator`. ([#1522])
+ - New function `create_interface_coloring` for coloring the interfaces of a grid,
+   for multithreading assembly loops over interfaces (e.g. interface terms in DG
+   methods). The returned colors partition `interfaceskeleton` such that concurrent
+   assembly of the interfaces within one color is safe. When no dofs are shared
+   between cells (`shared_dofs = false`, e.g. for `DiscontinuousLagrange`
+   discretizations) two interfaces conflict only if they share a cell, resulting in
+   very few colors. An explicit vector of interfaces (any subset of
+   `interfaceskeleton`) can also be passed to color exactly those interfaces. See the
+   updated
+   [multithreaded assembly how-to](https://ferrite-fem.github.io/Ferrite.jl/dev/howto/threaded_assembly/)
+   for usage. ([#1518])
 
 ### Fixes
 
@@ -1488,5 +1499,6 @@ poking into Ferrite internals:
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1522]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1522
+[#1518]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1518
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490

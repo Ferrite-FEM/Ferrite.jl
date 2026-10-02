@@ -556,7 +556,7 @@ This is the subset of [`facetskeleton`](@ref) that excludes boundary facets, wit
 neighboring facet attached to each entry. The enumeration order matches the order in
 which [`InterfaceIterator`](@ref) visits the interfaces, and subsets of the returned
 vector can be iterated with `InterfaceIterator(grid_or_dh, subset)`, e.g. for
-multithreaded assembly of interface terms.
+multithreaded assembly of interface terms (see [`create_interface_coloring`](@ref)).
 
 Like `facetskeleton` the result is cached in the topology, so repeated calls return the
 same vector (which therefore must not be modified).
