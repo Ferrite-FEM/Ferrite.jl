@@ -1,5 +1,6 @@
-# Remove documentation previews of pull requests that are no longer open from gh-pages, and
-# squash the gh-pages history. Based on the cleanup workflow in the Documenter.jl manual, but run
+# Remove documentation previews of pull requests that are no longer open, or that have not been
+# updated in the last 14 days, from gh-pages, and squash the gh-pages history. The preview of a
+# stale pull request is recreated by the docs build of its next push. Based on the cleanup workflow in the Documenter.jl manual, but run
 # on a schedule instead of when a pull request is closed: this also catches previews pushed by a
 # docs build that finished after its pull request was closed. Pushes with --force-with-lease so
 # that a concurrent push to gh-pages (docs deploy, benchmark publish) is not silently overwritten;
@@ -27,15 +28,17 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: gh-pages
-      - name: Delete previews of closed pull requests and history + push changes
+      - name: Delete previews of closed and stale pull requests and history + push changes
         env:
           GH_TOKEN: ${{ github.token }}
+          max_age_days: 14
         run: |
-          open_prs="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open --limit 1000 --json number --jq '.[].number')"
+          active_prs="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open --limit 1000 --json number,updatedAt \
+              --jq ".[] | select((.updatedAt | fromdateiso8601) > now - ${max_age_days} * 86400) | .number")"
           lease="$(git rev-parse HEAD)"
           for preview_dir in previews/PR*; do
               [ -d "${preview_dir}" ] || continue
-              if ! grep -qx "${preview_dir#previews/PR}" <<< "${open_prs}"; then
+              if ! grep -qx "${preview_dir#previews/PR}" <<< "${active_prs}"; then
                   git rm -rqf "${preview_dir}"
                   echo "Deleted ${preview_dir}"
               fi
