@@ -189,18 +189,16 @@ nothing # hide
 ```
 
 ### In the element routine
-Alternatively, the boundary integral can be evaluated in the element routine, i.e. in the
-loop over the cells:
+Alternatively, the boundary integral can be evaluated in the element routine, together
+with the contributions from the domain integrals:
 
 ```@example neumann
-addfacetset!(grid, "Neumann Boundary", x -> x[1] ≈ 1.0) # hide
-facetvalues = fv # hide
-fill!(f, 0) # hide
-for cell in CellIterator(dh)
-    fill!(fe, 0)
-    # ... domain contributions to fe ...
+function assemble_element!(Ke, fe, cell, facetvalues, ΓN, qn)
+    # ... contributions from the domain integrals to Ke and fe ...
+
+    # Contributions from the Neumann boundary
     for facet in 1:nfacets(cell)
-        if (cellid(cell), facet) ∈ getfacetset(grid, "Neumann Boundary")
+        if (cellid(cell), facet) ∈ ΓN
             reinit!(facetvalues, cell, facet)
             for q_point in 1:getnquadpoints(facetvalues)
                 dΓ = getdetJdV(facetvalues, q_point)
@@ -211,19 +209,38 @@ for cell in CellIterator(dh)
             end
         end
     end
-    assemble!(f, celldofs(cell), fe)
+    return
 end
-@assert f ≈ f_fe # hide
 nothing # hide
 ```
 
-For each cell we loop over all the facets of the cell, and check if this particular facet is
-located on our facetset of interest called `"Neumann Boundary"`. If we have determined
+In the element routine we loop over all the facets of the cell, and check if this particular
+facet is located on the Neumann boundary, given by the facetset `ΓN`. If we have determined
 that the current facet is indeed on the boundary and in our facetset, then we
 reinitialize `FacetValues` for this facet, using [`reinit!`](@ref). When `reinit!`ing
 `FacetValues` we also need to give the facet number in addition to the cell.
 Next we simply loop over the quadrature points of the facet, and then loop over
-all the test functions and assemble the contribution to the force vector.
+all the test functions and add the contribution to the element force vector.
+
+The element routine is then called in the loop over the cells, where the facetset is
+fetched from the grid once before the loop:
+
+```@example neumann
+addfacetset!(grid, "Neumann Boundary", x -> x[1] ≈ 1.0) # hide
+facetvalues = fv # hide
+K = allocate_matrix(dh) # hide
+Ke = zeros(ndofs_per_cell(dh), ndofs_per_cell(dh)) # hide
+assembler = start_assemble(K, f) # hide
+ΓN = getfacetset(grid, "Neumann Boundary")
+for cell in CellIterator(dh)
+    fill!(Ke, 0)
+    fill!(fe, 0)
+    assemble_element!(Ke, fe, cell, facetvalues, ΓN, qn)
+    assemble!(assembler, celldofs(cell), Ke, fe)
+end
+@assert f ≈ f_fe # hide
+nothing # hide
+```
 
 ## Periodic boundary conditions
 
