@@ -60,11 +60,11 @@
 # &= \int_\Gamma \boldsymbol{\delta u} \cdot \boldsymbol{t} \mathrm{d} \Gamma \\
 # \int_\Omega \left[\delta p \left[\alpha \dot{\boldsymbol{u}} \cdot \boldsymbol{\nabla} + \beta \dot{p}\right] +
 # \boldsymbol{\nabla}(\delta p) \cdot [k \boldsymbol{\nabla}(p)]\right] \mathrm{d}\Omega
-# &= \int_\Gamma \delta p w_\mathrm{n} \mathrm{d} \Gamma
+# &= -\int_\Gamma \delta p w_\mathrm{n} \mathrm{d} \Gamma
 # \end{aligned}
 # ```
 # where ``\boldsymbol{t}=\boldsymbol{n}\cdot\boldsymbol{\sigma}`` is the traction and
-# ``w_\mathrm{n} = \boldsymbol{n}\cdot\boldsymbol{w}`` is the normal flux.
+# ``w_\mathrm{n} = \boldsymbol{n}\cdot\boldsymbol{w}`` is the outward normal flux.
 #
 # ### Finite element form
 # Discretizing in space using finite elements, we obtain the vector equation
@@ -79,7 +79,7 @@
 # - [\boldsymbol{\delta N}^\mathrm{u}_i \cdot \boldsymbol{\nabla}] \alpha p \mathrm{d}\Omega
 # &= \int_\Gamma \boldsymbol{\delta N}^\mathrm{u}_i \cdot \boldsymbol{t} \mathrm{d} \Gamma \\
 # f_i^\mathrm{int,p} &= \int_\Omega \delta N_i^\mathrm{p} [\alpha [\dot{\boldsymbol{u}}\cdot\boldsymbol{\nabla}]  + \beta\dot{p}] + \boldsymbol{\nabla}(\delta N_i^\mathrm{p}) \cdot [k \boldsymbol{\nabla}(p)] \mathrm{d}\Omega
-# &= \int_\Gamma \delta N_i^\mathrm{p} w_\mathrm{n} \mathrm{d} \Gamma
+# &= -\int_\Gamma \delta N_i^\mathrm{p} w_\mathrm{n} \mathrm{d} \Gamma
 # \end{aligned}
 # ```
 # Approximating the time-derivatives, ``\dot{\boldsymbol{u}}\approx \left[\boldsymbol{u}-{}^n\boldsymbol{u}\right]/\Delta t``

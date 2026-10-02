@@ -12,7 +12,7 @@ the weak form, and then finally to the discrete FE problem.
 The strong form of the heat equation may be written as:
 
 ```math
-- \nabla \cdot \mathbf{q}(u) = f \quad \forall \, \mathbf{x} \in \Omega,
+\nabla \cdot \mathbf{q}(u) = f \quad \forall \, \mathbf{x} \in \Omega,
 ```
 
 where $u$ is the unknown temperature field, $\mathbf{q}$ is the heat flux, $f$ is an
@@ -31,7 +31,8 @@ u = u^\mathrm{p} \quad \forall \, \mathbf{x} \in \Gamma_\mathrm{D},\\
 i.e. the temperature is prescribed to a known function $u^\mathrm{p}$ at the Dirichlet part
 of the boundary, $\Gamma_\mathrm{D}$, and the heat flux is prescribed to $q^\mathrm{p}$ at
 the Neumann part of the boundary, $\Gamma_\mathrm{N}$, where $\mathbf{n}$ describes the outward
-pointing normal vector at the boundary.
+pointing normal vector at the boundary. Note that $q^\mathrm{p}$ is the heat flux leaving the domain,
+i.e. a positive value means that heat flows out through the boundary.
 
 We also need a constitutive equation which links the temperature field, $u$, to the heat
 flux, $\mathbf{q}$. The simplest case is to use Fourier's law
@@ -55,8 +56,8 @@ Find $u \in \mathbb{U}$ s.t.
 
 ```math
 \int_\Omega \nabla \delta u \cdot (k \nabla u) \, \mathrm{d}\Omega =
-\int_{\Gamma_\mathrm{N}} \delta u \, q^\mathrm{p} \, \mathrm{d}\Gamma +
-\int_\Omega \delta u \, f \, \mathrm{d}\Omega \quad \forall \, \delta u \in \mathbb{T}
+\int_\Omega \delta u \, f \, \mathrm{d}\Omega -
+\int_{\Gamma_\mathrm{N}} \delta u \, q^\mathrm{p} \, \mathrm{d}\Gamma \quad \forall \, \delta u \in \mathbb{T}
 ```
 
 where $\mathbb{U}, \mathbb{T}$ are suitable function spaces with sufficiently regular
@@ -97,8 +98,8 @@ We may now insert these approximations in the weak form, which results in
 
 ```math
 \sum_i^N \delta \hat{u}_i \left(\sum_j^N \int_{\Omega_\mathrm{h}} \nabla \phi_i \cdot (k \nabla \phi_j) \, \mathrm{d}\Omega \ \hat{u}_j \right) =
-\sum_i^N \delta \hat{u}_i \left( \int_{\Gamma_\mathrm{N}} \phi_i \, q^\mathrm{p} \, \mathrm{d}\Gamma +
-\int_{\Omega_\mathrm{h}} \phi_i \, f \, \mathrm{d}\Omega \right) \, .
+\sum_i^N \delta \hat{u}_i \left( \int_{\Omega_\mathrm{h}} \phi_i \, f \, \mathrm{d}\Omega -
+\int_{\Gamma_\mathrm{N}} \phi_i \, q^\mathrm{p} \, \mathrm{d}\Gamma \right) \, .
 ```
 
 Since this equation must hold for arbitrary $\delta u_\mathrm{h}$, the equation must especially
@@ -120,7 +121,7 @@ of $\underline{\underline{K}}$ and $\underline{\hat{f}}$ are given by
     \int_{\Omega_\mathrm{h}} \nabla \phi_i \cdot (k \nabla \phi_j) \mathrm{d}\Omega \, , \\
 
 (\underline{\hat{f}})_{i} =
-    \int_{\Gamma_\mathrm{N}} \phi_i \, q^\mathrm{p} \, \mathrm{d}\Gamma + \int_{\Omega_\mathrm{h}} \phi_i \, f \, \mathrm{d}\Omega \, .
+    \int_{\Omega_\mathrm{h}} \phi_i \, f \, \mathrm{d}\Omega - \int_{\Gamma_\mathrm{N}} \phi_i \, q^\mathrm{p} \, \mathrm{d}\Gamma \, .
 ```
 
 Finally we also need to take care of the Dirichlet boundary conditions. These are enforced by
