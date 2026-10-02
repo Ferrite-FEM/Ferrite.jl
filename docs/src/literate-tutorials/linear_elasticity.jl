@@ -265,7 +265,7 @@ C = gradient(ϵ -> 2 * Gmod * dev(ϵ) + 3 * Kmod * vol(ϵ), zero(SymmetricTensor
 # Note that the elastic stiffness tensor $\mathsf{C}$ is constant.
 # Thus it needs to be computed only once and can then be used for all integration points.
 function assemble_cell!(ke, cellvalues, C)
-    for q_point in 1:getnquadpoints(cellvalues)
+    @inbounds for q_point in 1:getnquadpoints(cellvalues)
         ## Get the integration weight for the quadrature point
         dΩ = getdetJdV(cellvalues, q_point)
         for i in 1:getnbasefunctions(cellvalues)
@@ -404,6 +404,247 @@ end
 # [[*Figure 2*](@ref tutorial-linear-elasticity-figure-2)](@id tutorial-linear-elasticity-figure-2):
 # Vertical normal stresses (MPa) exported using the `L2Projector` (left)
 # and constant stress in each cell (right).
+
+#md # !!! details "Advanced: exploiting the structure of vectorized interpolations"
+#md #     The element routine above treats each vector valued shape function $\boldsymbol{N}_I$ as
+#md #     a black box. However, since `ip` was constructed by vectorizing a scalar interpolation,
+#md #     `Lagrange{RefTriangle, order}()^dim`, the vector valued shape functions have a lot of
+#md #     structure: shape function $I = \mathrm{dim}\,(i - 1) + c$ is the scalar shape function
+#md #     $N_i$ acting in direction $c$,
+#md #     ```math
+#md #     \boldsymbol{N}_I = N_i \boldsymbol{e}_c, \qquad
+#md #     \mathrm{grad}(\boldsymbol{N}_I) = \boldsymbol{e}_c \otimes \mathrm{grad}(N_i),
+#md #     ```
+#md #     so all rows but one of $\mathrm{grad}(\boldsymbol{N}_I)$ are zero. The double contractions
+#md #     in `assemble_cell!` multiply all these zeros anyway. Inserting the structure into the
+#md #     expression for $K_{IJ}$, with $J = \mathrm{dim}\,(j - 1) + d$, gives the expression below.
+#md #     The stress is symmetric, so contracting it with the full test-function gradient is the
+#md #     same as contracting it with the symmetric gradient.
+#md #     ```math
+#md #     K_{IJ}
+#md #     = \left[\boldsymbol{e}_c \otimes \mathrm{grad}(N_i)\right] : \mathsf{C} : \left[\boldsymbol{e}_d \otimes \mathrm{grad}(N_j)\right]^\mathrm{sym}
+#md #     = \boldsymbol{e}_c \cdot \underbrace{\left(\mathsf{C} : \left[\boldsymbol{e}_d \otimes \mathrm{grad}(N_j)\right]^\mathrm{sym}\right)}_{\boldsymbol{\sigma}_j^d} \cdot \mathrm{grad}(N_i)
+#md #     ```
+#md #     where $\boldsymbol{\sigma}_j^d$ is the stress caused by a unit value of the trial dof $J$.
+#md #     It only depends on $j$ and $d$, so it can be computed once per trial function and reused
+#md #     for all test functions. For given $(i, j, d)$, the vector
+#md #     $\boldsymbol{\sigma}_j^d \cdot \mathrm{grad}(N_i)$ then contains the entries $K_{IJ}$
+#md #     for all test components $c$ at once.
+#md #
+#md #     Only the *scalar* shape functions are needed for this, so we create `CellValues` for the
+#md #     scalar interpolation. The vectorized interpolation is still used for the `DofHandler`,
+#md #     and the local numbering `I = dim * (i - 1) + c` above is the ordering Ferrite uses for
+#md #     the shape functions of a vectorized interpolation.
+#md #     ````@example linear_elasticity
+#md #     cellvalues_scalar = CellValues(qr, Lagrange{RefTriangle, order}());
+#md #     nothing # hide
+#md #     ````
+#md #     For each pair of scalar shape functions, the result is a `dim × dim` block of `ke`.
+#md #     The following small helper contains the unavoidable component-wise writes of that block.
+#md #     Keeping this indexing detail out of the element routine makes its correspondence with the
+#md #     derivation above clearer: `σⱼ[d] ⋅ ∇Nᵢ` is precisely column `d` of the block. The loops in
+#md #     the helper are very short, so bounds checks would otherwise dominate their cost (about 2.5x
+#md #     slower without `@inbounds`). The size check in `assemble_cell_blocked!` makes them safe.
+#md #     ````@example linear_elasticity
+#md #     @inline function add_stiffness_block!(ke, σⱼ, ∇Nᵢ::Vec{dim}, dΩ, i, j) where {dim}
+#md #         row_offset = dim * (i - 1)
+#md #         column_offset = dim * (j - 1)
+#md #         @inbounds for d in 1:dim
+#md #             # Column d contains the test-component entries for trial direction d
+#md #             kᵢⱼ = (σⱼ[d] ⋅ ∇Nᵢ) * dΩ
+#md #             for c in 1:dim
+#md #                 ke[row_offset + c, column_offset + d] += kᵢⱼ[c]
+#md #             end
+#md #         end
+#md #         return ke
+#md #     end
+#md #
+#md #     function assemble_cell_blocked!(ke, cellvalues, C::SymmetricTensor{4, dim}) where {dim}
+#md #         n = getnbasefunctions(cellvalues) # number of scalar shape functions
+#md #         size(ke) == (dim * n, dim * n) || error("ke has the wrong size")
+#md #         @inbounds for q_point in 1:getnquadpoints(cellvalues)
+#md #             dΩ = getdetJdV(cellvalues, q_point)
+#md #             for j in 1:n
+#md #                 ∇Nⱼ = shape_gradient(cellvalues, q_point, j)
+#md #                 # Stress from a unit trial dof in each direction d
+#md #                 σⱼ = ntuple(d -> C ⊡ symmetric(basevec(∇Nⱼ, d) ⊗ ∇Nⱼ), Val(dim))
+#md #                 for i in 1:n
+#md #                     ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
+#md #                     add_stiffness_block!(ke, σⱼ, ∇Nᵢ, dΩ, i, j)
+#md #                 end
+#md #             end
+#md #         end
+#md #         return ke
+#md #     end
+#md #     nothing # hide
+#md #     ````
+#md #     The global assembly is the same as before, apart from the element routine, and
+#md #     the result is identical to the one from `assemble_global!`.
+#md #     ````@example linear_elasticity
+#md #     function assemble_global_blocked!(K, dh, cellvalues, C)
+#md #         ke = zeros(ndofs_per_cell(dh), ndofs_per_cell(dh))
+#md #         assembler = start_assemble(K)
+#md #         for cell in CellIterator(dh)
+#md #             reinit!(cellvalues, cell)
+#md #             fill!(ke, 0.0)
+#md #             assemble_cell_blocked!(ke, cellvalues, C)
+#md #             assemble!(assembler, celldofs(cell), ke)
+#md #         end
+#md #         return K
+#md #     end
+#md #     K_blocked = assemble_global_blocked!(allocate_matrix(dh), dh, cellvalues_scalar, C)
+#md #     K_blocked ≈ assemble_global!(allocate_matrix(dh), dh, cellvalues, C)
+#md #     ````
+#md #     ````@example linear_elasticity
+#md #     using Test # hide
+#md #     @test K_blocked ≈ assemble_global!(allocate_matrix(dh), dh, cellvalues, C) # hide
+#md #     nothing # hide
+#md #     ````
+#md #     How much this saves depends on the share of the element routine in the total assembly
+#md #     time. For the linear triangles with a single quadrature point used in this tutorial, the
+#md #     element routine is so cheap that the total assembly time hardly changes. For higher order
+#md #     elements and in 3D, the element routine dominates, and the whole assembly becomes several
+#md #     times faster. The table shows timings of the element routine (`assemble_cell!` vs.
+#md #     `assemble_cell_blocked!`) and the resulting speedup of the complete global assembly
+#md #     (including `reinit!` and `assemble!`). These are minimum times measured with
+#md #     BenchmarkTools on one core of an Intel Core Ultra 7 270K Plus using Julia 1.13.1. The
+#md #     global benchmarks use 3200 triangles, 343 hexahedra, or 2058 tetrahedra generated by
+#md #     `generate_grid` (i.e. with linear geometry).
+#md #
+#md #     | Interpolation         | Quadrature points | `assemble_cell!` | `assemble_cell_blocked!` | Element speedup | Global assembly speedup |
+#md #     |:----------------------|------------------:|-----------------:|-------------------------:|----------------:|------------------------:|
+#md #     | Linear triangle       |                 1 |            53 ns |                    51 ns |            1.0x |                    1.0x |
+#md #     | Quadratic triangle    |                 3 |           431 ns |                   264 ns |            1.6x |                    1.3x |
+#md #     | Linear hexahedron     |                 8 |           6.6 μs |                   2.0 μs |            3.4x |                    2.6x |
+#md #     | Quadratic tetrahedron |                 4 |           5.0 μs |                   1.3 μs |            3.8x |                    2.0x |
+#md #     | Quadratic hexahedron  |                27 |           237 μs |                   39.9 μs |            5.9x |                    4.8x |
+#md #
+#md #     The same idea applies to any element routine for a vectorized interpolation, e.g. the
+#md #     tangent in the [hyperelasticity tutorial](@ref tutorial-hyperelasticity).
+
+#md # !!! details "Advanced: specializing further for isotropic elasticity"
+#md #     The blocked routine above works for any elastic stiffness tensor `C`. For the isotropic
+#md #     material used in this tutorial, its constitutive structure can be inserted as well. Using
+#md #     the first Lamé parameter
+#md #     ```math
+#md #     \lambda = K - \frac{2G}{3},
+#md #     ```
+#md #     where the factor `3` comes from the three-dimensional material law underlying this
+#md #     plane-strain problem (it should not be replaced by `dim`). Then the stress law becomes
+#md #     ```math
+#md #     \boldsymbol{\sigma}
+#md #     = \lambda\,\mathrm{tr}(\boldsymbol{\varepsilon})\boldsymbol{I}
+#md #       + 2G\boldsymbol{\varepsilon},
+#md #     ```
+#md #     and hence
+#md #     ```math
+#md #     C_{pqrs}
+#md #     = \lambda\,\delta_{pq}\delta_{rs}
+#md #       + G\left(\delta_{pr}\delta_{qs} + \delta_{ps}\delta_{qr}\right).
+#md #     ```
+#md #     For test direction `c` and trial direction `d`, the block entry can first be written in
+#md #     components as
+#md #     ```math
+#md #     K^{ij}_{cd} = \partial_q N_i\,C_{cqds}\,\partial_s N_j.
+#md #     ```
+#md #     Substituting the isotropic tensor and applying the Kronecker deltas gives
+#md #     ```math
+#md #     K^{ij}_{cd}
+#md #     = \lambda\,\partial_c N_i\,\partial_d N_j
+#md #       + G\,\partial_d N_i\,\partial_c N_j
+#md #       + G\,\delta_{cd}\,\mathrm{grad}(N_i)\cdot\mathrm{grad}(N_j).
+#md #     ```
+#md #     Equivalently, the complete block is
+#md #     ```math
+#md #     \boldsymbol{K}^{ij}
+#md #     = \lambda\,\mathrm{grad}(N_i)\otimes\mathrm{grad}(N_j)
+#md #       + G\,\mathrm{grad}(N_j)\otimes\mathrm{grad}(N_i)
+#md #       + G\left[\mathrm{grad}(N_i)\cdot\mathrm{grad}(N_j)\right]\boldsymbol{I}.
+#md #     ```
+#md #     These are, respectively, a volumetric term, a transposed gradient outer product, and a
+#md #     diagonal term. This form avoids constructing strains and stresses altogether. The helper
+#md #     below evaluates the component formula while hoisting factors that are constant over the
+#md #     test-component loop. The conditional expression adds the last term only on the diagonal.
+#md #     ````@example linear_elasticity
+#md #     @inline function add_isotropic_stiffness_block!(
+#md #         ke, ∇Nᵢ::Vec{dim}, ∇Nⱼ, λdΩ, GdΩ, i, j,
+#md #     ) where {dim}
+#md #         row_offset = dim * (i - 1)
+#md #         column_offset = dim * (j - 1)
+#md #         diagonal_term = GdΩ * (∇Nᵢ ⋅ ∇Nⱼ)
+#md #         @inbounds for d in 1:dim
+#md #             volumetric_factor = λdΩ * ∇Nⱼ[d]
+#md #             transpose_factor = GdΩ * ∇Nᵢ[d]
+#md #             for c in 1:dim
+#md #                 kᵢⱼ = volumetric_factor * ∇Nᵢ[c] + transpose_factor * ∇Nⱼ[c]
+#md #                 kᵢⱼ += c == d ? diagonal_term : zero(diagonal_term)
+#md #                 ke[row_offset + c, column_offset + d] += kᵢⱼ
+#md #             end
+#md #         end
+#md #         return ke
+#md #     end
+#md #
+#md #     function assemble_cell_isotropic!(ke, cellvalues, λ, G, ::Val{dim}) where {dim}
+#md #         n = getnbasefunctions(cellvalues)
+#md #         size(ke) == (dim * n, dim * n) || error("ke has the wrong size")
+#md #         @inbounds for q_point in 1:getnquadpoints(cellvalues)
+#md #             dΩ = getdetJdV(cellvalues, q_point)
+#md #             λdΩ, GdΩ = λ * dΩ, G * dΩ
+#md #             for j in 1:n
+#md #                 ∇Nⱼ = shape_gradient(cellvalues, q_point, j)
+#md #                 for i in 1:n
+#md #                     ∇Nᵢ = shape_gradient(cellvalues, q_point, i)
+#md #                     add_isotropic_stiffness_block!(ke, ∇Nᵢ, ∇Nⱼ, λdΩ, GdΩ, i, j)
+#md #                 end
+#md #             end
+#md #         end
+#md #         return ke
+#md #     end
+#md #     nothing # hide
+#md #     ````
+#md #     We can use the same global assembly pattern and verify the specialization against the
+#md #     general blocked routine.
+#md #     ````@example linear_elasticity
+#md #     function assemble_global_isotropic!(K, dh, cellvalues, λ, G, ::Val{dim}) where {dim}
+#md #         ke = zeros(ndofs_per_cell(dh), ndofs_per_cell(dh))
+#md #         assembler = start_assemble(K)
+#md #         for cell in CellIterator(dh)
+#md #             reinit!(cellvalues, cell)
+#md #             fill!(ke, 0.0)
+#md #             assemble_cell_isotropic!(ke, cellvalues, λ, G, Val(dim))
+#md #             assemble!(assembler, celldofs(cell), ke)
+#md #         end
+#md #         return K
+#md #     end
+#md #     λ = Kmod - 2 * Gmod / 3
+#md #     K_isotropic = assemble_global_isotropic!(
+#md #         allocate_matrix(dh), dh, cellvalues_scalar, λ, Gmod, Val(dim),
+#md #     )
+#md #     K_isotropic ≈ K_blocked
+#md #     ````
+#md #     ````@example linear_elasticity
+#md #     @test K_isotropic ≈ K_blocked # hide
+#md #     nothing # hide
+#md #     ````
+#md #     The specialization reduces constitutive arithmetic and can make the element routine
+#md #     faster, especially for low-order elements. For larger element matrices, writing `ke` and
+#md #     the subsequent sparse assembly account for more of the cost, so the gain is problem- and
+#md #     hardware-dependent. This version also deliberately gives up the generality of `C`: it is
+#md #     valid only for homogeneous isotropic linear elasticity with constant `λ` and `G`.
+#md #
+#md #     The table compares this specialization with the general blocked routine on the same
+#md #     machine, Julia version, and grids as the previous table. A speedup below one means that
+#md #     the specialized routine is slower. In particular, the quadratic hexahedron is already
+#md #     dominated by efficient small-tensor operations and dense element-matrix writes, so the
+#md #     scalar specialization does not help that case on this machine.
+#md #
+#md #     | Interpolation         | `assemble_cell_blocked!` | `assemble_cell_isotropic!` | Element speedup | Global assembly speedup |
+#md #     |:----------------------|-------------------------:|----------------------------:|----------------:|------------------------:|
+#md #     | Linear triangle       |                    51 ns |                       26 ns |            2.0x |                    1.3x |
+#md #     | Quadratic triangle    |                   264 ns |                      132 ns |            2.0x |                    1.4x |
+#md #     | Linear hexahedron     |                   2.0 μs |                      1.3 μs |            1.5x |                    1.3x |
+#md #     | Quadratic tetrahedron |                   1.3 μs |                      991 ns |            1.3x |                    1.1x |
+#md #     | Quadratic hexahedron  |                  39.9 μs |                     46.7 μs |            0.9x |                    0.9x |
 
 # The mesh produced by gmsh is not stable between different OS        #src
 # For linux, we therefore test carefully, and for other OS we provide #src
