@@ -1,5 +1,6 @@
 """
     FacetValues([::Type{T}], quad_rule::FacetQuadratureRule, func_interpol::Interpolation, [geom_interpol::Interpolation])
+    FacetValues([::Type{T}], quad_rule::FacetQuadratureRule, func_interpols::NamedTuple, [geom_interpol::Interpolation])
 
 A `FacetValues` object facilitates the process of evaluating values of shape functions, gradients of shape functions,
 values of nodal functions, gradients and divergences of nodal functions etc. on the facets of finite elements.
@@ -9,6 +10,8 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 * `T`: an optional argument (default to `Float64`) to determine the type the internal data is stored as.
 * `quad_rule`: an instance of a [`FacetQuadratureRule`](@ref)
 * `func_interpol`: an instance of an [`Interpolation`](@ref) used to interpolate the approximated function
+* `func_interpols`: a named tuple with entries of type `Interpolation`, one for each field, see
+  *Multiple fields* below
 * `geom_interpol`: an optional instance of an [`Interpolation`](@ref) which is used to interpolate the geometry.
   By default linear Lagrange interpolation is used.
 
@@ -33,11 +36,20 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 * [`function_symmetric_gradient`](@ref)
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
+
+# Multiple fields
+
+Constructed with a `NamedTuple` of interpolations, `fv::FacetValues` works like the multi-field
+mode of [`CellValues`](@ref): functions related to specific shape functions are called on
+`fv.<name>` (of type [`FunctionValues`](@ref Ferrite.FunctionValues)) while geometric queries
+(e.g. `getdetJdV`, `getnormal`, and `spatial_coordinate`) are called on `fv` itself. Fields
+with equal interpolations share the same `FunctionValues`.
 """
 FacetValues
 
-mutable struct FacetValues{FV, GM, FQR, detT, nT, V_FV <: AbstractVector{FV}, V_GM <: AbstractVector{GM}} <: AbstractFacetValues
-    const fun_values::V_FV  # AbstractVector{FunctionValues}
+mutable struct FacetValues{NT, FV, GM, FQR, detT, nT, V_FV <: AbstractVector{FV}, V_GM <: AbstractVector{GM}} <: AbstractFacetValues
+    const fun_values_nt::NT # NamedTuple mapping field names to Val-indices into the fun_values tuples, or Nothing (single-field mode)
+    const fun_values::V_FV  # AbstractVector{<:Tuple}, one tuple of unique FunctionValues per facet
     const geo_mapping::V_GM # AbstractVector{GeometryMapping}
     const fqr::FQR          # FacetQuadratureRule
     # FacetValues are only functional for the types in the comments for the fields below.
@@ -48,6 +60,9 @@ mutable struct FacetValues{FV, GM, FQR, detT, nT, V_FV <: AbstractVector{FV}, V_
     current_facet::Int
 end
 
+const SingleFieldFacetValues = FacetValues{Nothing}
+const MultiFieldFacetValues = FacetValues{<:NamedTuple}
+
 function FacetValues(
         ::Type{T}, fqr::FacetQuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim},
         ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder}
@@ -55,54 +70,79 @@ function FacetValues(
 
     # max(GeoDiffOrder, 1) ensures that we get the jacobian needed to calculate the normal.
     geo_mapping = map(qr -> GeometryMapping{max(GeoDiffOrder, 1)}(T, ip_geo.ip, qr), fqr.facet_rules)
-    fun_values = map(qr -> FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo), fqr.facet_rules)
+    fun_values = map(qr -> (FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo),), fqr.facet_rules)
     max_nquadpoints = maximum(qr -> length(getweights(qr)), fqr.facet_rules)
     # detJdV always calculated, since we needed to calculate the jacobian anyways for the normal.
     detJdV = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
-    return FacetValues(fun_values, geo_mapping, fqr, detJdV, normals, 1)
+    return FacetValues(nothing, fun_values, geo_mapping, fqr, detJdV, normals, 1)
 end
 
-FacetValues(qr::FacetQuadratureRule, ip::Interpolation, args...; kwargs...) = FacetValues(Float64, qr, ip, args...; kwargs...)
-function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::ScalarInterpolation; kwargs...) where {T}
+function FacetValues(
+        ::Type{T}, fqr::FacetQuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation{sdim},
+        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder}
+    ) where {T, sdim, FunDiffOrder, GeoDiffOrder}
+
+    geo_mapping = map(qr -> GeometryMapping{max(GeoDiffOrder, 1)}(T, ip_geo.ip, qr), fqr.facet_rules)
+    unique_ips = unique(values(ip_funs)) # Not type-stable, but ok for advanced users this should be constructed outside...
+    fun_values = map(qr -> tuple((FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...), fqr.facet_rules)
+    fun_values_nt = NamedTuple((key => Val(findfirst(unique_ip -> ip == unique_ip, unique_ips)) for (key, ip) in pairs(ip_funs)))
+    max_nquadpoints = maximum(qr -> length(getweights(qr)), fqr.facet_rules)
+    detJdV = fill(T(NaN), max_nquadpoints)
+    normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
+    return FacetValues(fun_values_nt, fun_values, geo_mapping, fqr, detJdV, normals, 1)
+end
+
+FacetValues(qr::FacetQuadratureRule, ip::Union{Interpolation, NamedTuple}, args...; kwargs...) = FacetValues(Float64, qr, ip, args...; kwargs...)
+function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Union{Interpolation, NamedTuple}, ip_geo::ScalarInterpolation; kwargs...) where {T}
     return FacetValues(T, qr, ip, VectorizedInterpolation(ip_geo); kwargs...)
 end
-function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Interpolation, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip); kwargs...) where {T}
+function FacetValues(::Type{T}, qr::FacetQuadratureRule, ip::Union{Interpolation, NamedTuple}, ip_geo::VectorizedInterpolation = default_geometric_interpolation(ip); kwargs...) where {T}
     return FacetValues(T, qr, ip, ip_geo, ValuesUpdateFlags(ip; kwargs...))
 end
 
 function Base.copy(fv::FacetValues)
-    fun_values = map(copy, fv.fun_values)
-    geo_mapping = map(copy, fv.geo_mapping)
-    return FacetValues(fun_values, geo_mapping, copy(fv.fqr), copy(fv.detJdV), copy(fv.normals), fv.current_facet)
+    fun_values = map(fvals -> map(copy, fvals), getfield(fv, :fun_values))
+    geo_mapping = map(copy, getfield(fv, :geo_mapping))
+    return FacetValues(
+        getfield(fv, :fun_values_nt), fun_values, geo_mapping,
+        copy(getfield(fv, :fqr)), copy(getfield(fv, :detJdV)), copy(getfield(fv, :normals)), getcurrentfacet(fv)
+    )
 end
 
 getngeobasefunctions(fv::FacetValues) = getngeobasefunctions(get_geo_mapping(fv))
-getnbasefunctions(fv::FacetValues) = getnbasefunctions(get_fun_values(fv))
-getnquadpoints(fv::FacetValues) = @inbounds getnquadpoints(fv.fqr, getcurrentfacet(fv))
-@propagate_inbounds getdetJdV(fv::FacetValues, q_point) = fv.detJdV[q_point]
+getnquadpoints(fv::FacetValues) = @inbounds getnquadpoints(getfield(fv, :fqr), getcurrentfacet(fv))
+@propagate_inbounds getdetJdV(fv::FacetValues, q_point) = getfield(fv, :detJdV)[q_point]
 
-shape_value_type(fv::FacetValues) = shape_value_type(get_fun_values(fv))
-shape_gradient_type(fv::FacetValues) = shape_gradient_type(get_fun_values(fv))
-function_interpolation(fv::FacetValues) = function_interpolation(get_fun_values(fv))
-function_difforder(fv::FacetValues) = function_difforder(get_fun_values(fv))
 geometric_interpolation(fv::FacetValues) = geometric_interpolation(get_geo_mapping(fv))
 
-get_geo_mapping(fv::FacetValues) = @inbounds fv.geo_mapping[getcurrentfacet(fv)]
+get_geo_mapping(fv::FacetValues) = @inbounds getfield(fv, :geo_mapping)[getcurrentfacet(fv)]
 @propagate_inbounds geometric_value(fv::FacetValues, args...) = geometric_value(get_geo_mapping(fv), args...)
 
-get_fun_values(fv::FacetValues) = @inbounds fv.fun_values[getcurrentfacet(fv)]
+get_fun_values(fv::FacetValues) = @inbounds getfield(fv, :fun_values)[getcurrentfacet(fv)]
+@inline _single_fun_values(fv::SingleFieldFacetValues) = get_fun_values(fv)[1]
 
-@propagate_inbounds shape_value(fv::FacetValues, q_point::Int, i::Int) = shape_value(get_fun_values(fv), q_point, i)
-@propagate_inbounds shape_gradient(fv::FacetValues, q_point::Int, i::Int) = shape_gradient(get_fun_values(fv), q_point, i)
-@propagate_inbounds shape_hessian(fv::FacetValues, q_point::Int, i::Int) = shape_hessian(get_fun_values(fv), q_point, i)
+getnbasefunctions(fv::SingleFieldFacetValues) = getnbasefunctions(_single_fun_values(fv))
+shape_value_type(fv::SingleFieldFacetValues) = shape_value_type(_single_fun_values(fv))
+shape_gradient_type(fv::SingleFieldFacetValues) = shape_gradient_type(_single_fun_values(fv))
+function_interpolation(fv::SingleFieldFacetValues) = function_interpolation(_single_fun_values(fv))
+function_difforder(fv::SingleFieldFacetValues) = function_difforder(_single_fun_values(fv))
+
+@propagate_inbounds shape_value(fv::SingleFieldFacetValues, q_point::Int, i::Int) = shape_value(_single_fun_values(fv), q_point, i)
+@propagate_inbounds shape_gradient(fv::SingleFieldFacetValues, q_point::Int, i::Int) = shape_gradient(_single_fun_values(fv), q_point, i)
+@propagate_inbounds shape_hessian(fv::SingleFieldFacetValues, q_point::Int, i::Int) = shape_hessian(_single_fun_values(fv), q_point, i)
+
+# In multi-field mode, properties expose (only) the named FunctionValues of the current
+# facet, e.g. `fv.u`. Single-field mode keeps the default `getproperty`.
+@inline Base.getproperty(fv::MultiFieldFacetValues, key::Symbol) = _tuple_index(get_fun_values(fv), getproperty(getfield(fv, :fun_values_nt), key))
+Base.propertynames(fv::MultiFieldFacetValues) = propertynames(getfield(fv, :fun_values_nt))
 
 """
     getcurrentfacet(fv::FacetValues)
 
 Return the current active facet of the `FacetValues` object (from last `reinit!`).
 """
-getcurrentfacet(fv::FacetValues) = fv.current_facet[]
+getcurrentfacet(fv::FacetValues) = getfield(fv, :current_facet)
 
 """
     getnormal(fv::FacetValues, qp::Int)
@@ -110,15 +150,15 @@ getcurrentfacet(fv::FacetValues) = fv.current_facet[]
 Return the normal at the quadrature point `qp` for the active facet of the
 `FacetValues` object(from last `reinit!`).
 """
-getnormal(fv::FacetValues, qp::Int) = fv.normals[qp]
+getnormal(fv::FacetValues, qp::Int) = getfield(fv, :normals)[qp]
 
-nfacets(fv::FacetValues) = length(fv.geo_mapping)
+nfacets(fv::FacetValues) = length(getfield(fv, :geo_mapping))
 
 function set_current_facet!(fv::FacetValues, facet_nr::Int)
     # Checking facet_nr before setting current_facet allows us to use @inbounds
     # when indexing by getcurrentfacet(fv) in other places!
     checkbounds(Bool, 1:nfacets(fv), facet_nr) || throw(ArgumentError("Facet nr is out of range."))
-    fv.current_facet = facet_nr
+    setfield!(fv, :current_facet, facet_nr)
     return
 end
 
@@ -126,8 +166,16 @@ end
     return reinit!(fv, nothing, x, facet_nr)
 end
 
+@inline function reinit_needs_cell(fv::FacetValues)
+    return any(map(fvals -> !isa(mapping_type(fvals), IdentityMapping), get_fun_values(fv)))
+end
+
+function check_reinit_sdim_consistency(fv::FacetValues, ::AbstractVector{VT}) where {VT}
+    return map(fvals -> check_reinit_sdim_consistency(:FacetValues, shape_gradient_type(fvals), VT), get_fun_values(fv))
+end
+
 function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{Vec{dim, T}}, facet_nr::Int) where {dim, T}
-    check_reinit_sdim_consistency(:FacetValues, shape_gradient_type(fv), eltype(x))
+    check_reinit_sdim_consistency(fv, x)
     set_current_facet!(fv, facet_nr)
     n_geom_basefuncs = getngeobasefunctions(fv)
     if !checkbounds(Bool, x, 1:n_geom_basefuncs) || length(x) != n_geom_basefuncs
@@ -141,21 +189,33 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
         throw(ArgumentError("The cell::AbstractCell input is required to reinit! non-identity function mappings"))
     end
 
-    @inbounds for (q_point, w) in pairs(getweights(fv.fqr, facet_nr))
+    detJdV = getfield(fv, :detJdV)
+    normals = getfield(fv, :normals)
+    @inbounds for (q_point, w) in pairs(getweights(getfield(fv, :fqr), facet_nr))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         J = getjacobian(mapping)
         # See the `Ferrite.embedding_det` docstring for more background
         weight_norm = weighted_normal(J, getrefshape(geo_mapping.ip), facet_nr)
         detJ = norm(weight_norm)
         detJ > 0.0 || throw_detJ_not_pos(detJ)
-        @inbounds fv.detJdV[q_point] = detJ * w
-        @inbounds fv.normals[q_point] = weight_norm / norm(weight_norm)
+        @inbounds detJdV[q_point] = detJ * w
+        @inbounds normals[q_point] = weight_norm / norm(weight_norm)
         apply_mapping!(fun_values, q_point, mapping, cell)
     end
     return
 end
 
-function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
+function _show_nqp_per_facet(io::IO, fv::FacetValues)
+    nqp = getnquadpoints.(getfield(fv, :fqr).facet_rules)
+    if all(n == first(nqp) for n in nqp)
+        println(io, first(nqp), " quadrature points per facet")
+    else
+        println(io, tuple(nqp...), " quadrature points on each facet")
+    end
+    return
+end
+
+function Base.show(io::IO, d::MIME"text/plain", fv::SingleFieldFacetValues)
     ip_geo = geometric_interpolation(fv)
     rdim = getrefdim(ip_geo)
     vdim = isa(shape_value(fv, 1, 1), Vec) ? length(shape_value(fv, 1, 1)) : 0
@@ -163,17 +223,48 @@ function Base.show(io::IO, d::MIME"text/plain", fv::FacetValues)
     sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
     vstr = vdim == 0 ? "scalar" : "vdim=$vdim"
     print(io, "FacetValues(", vstr, ", rdim=$rdim, sdim=$sdim): ")
-    nqp = getnquadpoints.(fv.fqr.facet_rules)
-    if all(n == first(nqp) for n in nqp)
-        println(io, first(nqp), " quadrature points per facet")
-    else
-        println(io, tuple(nqp...), " quadrature points on each facet")
-    end
+    _show_nqp_per_facet(io, fv)
     print(io, " Function interpolation: "); show(io, d, function_interpolation(fv))
     print(io, "\nGeometric interpolation: ")
-    return sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
     sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
     return
+end
+
+function Base.show(io::IO, d::MIME"text/plain", fv::MultiFieldFacetValues)
+    ip_geo = geometric_interpolation(fv)
+    GradT = shape_gradient_type(first(get_fun_values(fv)))
+    sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
+    print(io, "FacetValues with ")
+    _show_nqp_per_facet(io, fv)
+    print(io, "Geometric interpolation: ")
+    sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
+    print(io, "\nFunction interpolations")
+    for key in propertynames(fv)
+        ip = function_interpolation(getproperty(fv, key))
+        print(io, "\n  ", key, ": "); show(io, d, ip)
+    end
+    return
+end
+
+# Error messages for functions that should be called on individual `FunctionValues` to help users
+function getnbasefunctions(fv::MultiFieldFacetValues)
+    k = first(propertynames(fv)) # Pick the first function values to use in example
+    throw(ArgumentError("getnbasefunctions isn't applicable to a multi-field FacetValues. Use on `FunctionValues` for the specific field, e.g. getnbasefunctions(fv.$k)"))
+end
+
+for f in (:shape_value, :shape_gradient, :shape_symmetric_gradient, :shape_divergence)
+    @eval function $f(fv::MultiFieldFacetValues, ::Int, ::Int)
+        k = first(propertynames(fv)) # Pick the first function values to use in example
+        fun = $f                       # Make the function name available to use in the error message
+        throw(ArgumentError("$fun isn't applicable to a multi-field FacetValues. Use on `FunctionValues` for the specific field, e.g. $fun(fv.$k, q_point, shapenr)"))
+    end
+end
+for f in (:function_value, :function_gradient, :function_symmetric_gradient, :function_divergence)
+    @eval function $f(fv::MultiFieldFacetValues, ::Int, ::AbstractVector, args...)
+        k = first(propertynames(fv)) # Pick the first function values to use in example
+        fun = $f                       # Make the function name available to use in the error message
+        throw(ArgumentError("$fun isn't applicable to a multi-field FacetValues. Use on `FunctionValues` for the specific field, e.g. $fun(fv.$k, q_point, ae, [dofrange])"))
+    end
 end
 
 """
