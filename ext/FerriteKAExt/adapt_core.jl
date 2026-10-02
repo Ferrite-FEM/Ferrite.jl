@@ -4,12 +4,22 @@
 # e.g. CUDA.KernelAdaptor(). Please consult Adapt.jl for further details.
 
 Adapt.@adapt_structure CellCache
-Adapt.@adapt_structure CellValues
 Adapt.@adapt_structure Ferrite.GeometryMapping
 Adapt.@adapt_structure Ferrite.SoAContainer
 
 # Wildcard adapt
 adapt_structure(to, ip::Ferrite.Interpolation) = ip
+
+# Adapted manually (instead of @adapt_structure) since getproperty is overloaded
+function adapt_structure(to, cv::CellValues)
+    fun_values = map(fv -> adapt(to, fv), Ferrite.get_fun_values(cv))
+    return CellValues(
+        getfield(cv, :fun_values_nt), fun_values,
+        adapt(to, Ferrite.get_geo_mapping(cv)),
+        adapt(to, Ferrite.get_quadrature_rule(cv)),
+        adapt(to, Ferrite.getdetJdVs(cv)),
+    )
+end
 
 # This is adapted manually to ensure the aliasing is kept correctly
 function adapt_structure(d, fv::Ferrite.FunctionValues)
