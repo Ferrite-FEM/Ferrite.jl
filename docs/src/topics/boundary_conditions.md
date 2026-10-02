@@ -20,20 +20,31 @@ FE-solution this means that there are some degrees of freedom that are fixed. To
 Dirichlet boundary conditions in Ferrite we use the [`ConstraintHandler`](@ref). A
 constraint handler is created from a DoF handler:
 
-```julia
+```@setup dirichlet
+using Ferrite
+grid = generate_grid(Hexahedron, (2, 2, 2))
+dh = DofHandler(grid)
+add!(dh, :u, Lagrange{RefHexahedron, 1}())
+add!(dh, :v, Lagrange{RefHexahedron, 1}()^3)
+close!(dh)
+```
+
+```@example dirichlet
 ch = ConstraintHandler(dh)
+nothing # hide
 ```
 
 We can now create Dirichlet constraints and add them to the constraint handler. To create a
 Dirichlet constraint we need to specify a field name, a part of the boundary, and a function
 for computing the prescribed value. Example:
 
-```julia
+```@example dirichlet
 dbc1 = Dirichlet(
     :u,                        # Name of the field
     getfacetset(grid, "left"), # Part of the boundary
     x -> 1.0,                  # Function mapping coordinate to a prescribed value
 )
+nothing # hide
 ```
 
 The field name is given as a symbol, just like when the field was added to the dof handler,
@@ -44,8 +55,10 @@ function computing the prescribed value should be of the form `f(x)` or `f(x, t)
 !!! note "Multiple sets"
     To apply a constraint on multiple facet sets in the grid you can use `union` to join
     them, for example
-    ```julia
+    ```@example dirichlet
     left_right = union(getfacetset(grid, "left"), getfacetset(grid, "right"))
+    @assert length(left_right) == 8 # hide
+    nothing # hide
     ```
     creates a new facetset containing all facets in the `"left"` and "`right`" facetsets,
     which can be passed to the `Dirichlet` constructor.
@@ -53,15 +66,16 @@ function computing the prescribed value should be of the form `f(x)` or `f(x, t)
 By default the constraint is added to all components of the given field. To add the
 constraint to selected components a fourth argument with the components should be passed to
 the constructor. Here is an example where a constraint is added to component 1 and 3 of a
-vector field `:u`:
+vector field `:v`:
 
-```julia
+```@example dirichlet
 dbc2 = Dirichlet(
-    :u,                        # Name of the field
+    :v,                        # Name of the field
     getfacetset(grid, "left"), # Part of the boundary
     x -> [0.0, 0.0],           # Function mapping coordinate to prescribed values
     [1, 3],                    # Components
 )
+nothing # hide
 ```
 
 Note that the return value of the function must match with the components -- in the example
@@ -69,20 +83,27 @@ above we prescribe components 1 and 3 to 0 so we return a vector of length 2.
 
 Adding the constraints to the constraint handler is done with [`add!`](@ref):
 
-```julia
+```@example dirichlet
 add!(ch, dbc1)
 add!(ch, dbc2)
+nothing # hide
 ```
 
 Finally, just like for the dof handler, we need to use [`close!`](@ref) to finalize the
 constraint handler. Internally this will then compute the degrees-of-freedom that match the
 constraints we added.
 
+```@example dirichlet
+close!(ch)
+@assert length(ch.prescribed_dofs) == 9 + 2 * 9 # hide
+nothing # hide
+```
+
 If one or more of the constraints depend on time, i.e. they are specified as `f(x, t)`, the
 prescribed values can be recomputed in each new time step by calling [`update!`](@ref) with
 the proper time, e.g.:
 
-```julia
+```@example dirichlet
 for t in 0.0:0.1:1.0
     update!(ch, t) # Compute prescribed values for this t
     # Solve for time t...
@@ -123,10 +144,11 @@ A Neumann boundary contribution can be added by iterating over
 the relevant `facetset` by using the [`FacetIterator`](@ref).
 For a scalar field, this can be done as
 
-```julia
+```@example neumann
+using Ferrite # hide
 grid = generate_grid(Quadrilateral, (3, 3))
 dh = DofHandler(grid); add!(dh, :u, Lagrange{RefQuadrilateral, 1}()); close!(dh)
-fv = FacetValues(QuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 1}())
+fv = FacetValues(FacetQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 1}())
 f = zeros(ndofs(dh))
 fe = zeros(ndofs_per_cell(dh))
 qn = 1.0    # Outward normal flux, q ⋅ n (heat leaving the domain)
@@ -142,45 +164,66 @@ for fc in FacetIterator(dh, getfacetset(grid, "right"))
     end
     assemble!(f, celldofs(fc), fe)
 end
+@assert sum(f) ≈ -2 * qn # hide
+nothing # hide
 ```
 
 Alternatively, it is possible to add the values directly to the global `f` (without going
 through the local `fe` vector and then using `assemble!`):
-```julia
-# ...
-dofs = celldofs(fc)
-for i in 1:getnbasefunctions(fv)
-    f[dofs[i]] -= δu * qn * dΓ
-end
-```
-
-### In the element routine
-Alternatively, the following code snippet can be included in the element routine,
-to evaluate the boundary integral:
-
-```julia
-for facet in 1:nfacets(cell)
-    if (cellid(cell), facet) ∈ getfacetset(grid, "Neumann Boundary")
-        reinit!(facetvalues, cell, facet)
-        for q_point in 1:getnquadpoints(facetvalues)
-            dΓ = getdetJdV(facetvalues, q_point)
-            for i in 1:getnbasefunctions(facetvalues)
-                δu = shape_value(facetvalues, q_point, i)
-                fe[i] -= δu * qn * dΓ
-            end
+```@example neumann
+f_fe = copy(f) # hide
+fill!(f, 0) # hide
+for fc in FacetIterator(dh, getfacetset(grid, "right"))
+    reinit!(fv, fc)
+    dofs = celldofs(fc)
+    for q_point in 1:getnquadpoints(fv)
+        dΓ = getdetJdV(fv, q_point)
+        for i in 1:getnbasefunctions(fv)
+            δu = shape_value(fv, q_point, i)
+            f[dofs[i]] -= δu * qn * dΓ
         end
     end
 end
+@assert f ≈ f_fe # hide
+nothing # hide
 ```
 
-We start by looping over all the facets of the cell, next we check if this particular facet is
+### In the element routine
+Alternatively, the boundary integral can be evaluated in the element routine, i.e. in the
+loop over the cells:
+
+```@example neumann
+addfacetset!(grid, "Neumann Boundary", x -> x[1] ≈ 1.0) # hide
+facetvalues = fv # hide
+fill!(f, 0) # hide
+for cell in CellIterator(dh)
+    fill!(fe, 0)
+    # ... domain contributions to fe ...
+    for facet in 1:nfacets(cell)
+        if (cellid(cell), facet) ∈ getfacetset(grid, "Neumann Boundary")
+            reinit!(facetvalues, cell, facet)
+            for q_point in 1:getnquadpoints(facetvalues)
+                dΓ = getdetJdV(facetvalues, q_point)
+                for i in 1:getnbasefunctions(facetvalues)
+                    δu = shape_value(facetvalues, q_point, i)
+                    fe[i] -= δu * qn * dΓ
+                end
+            end
+        end
+    end
+    assemble!(f, celldofs(cell), fe)
+end
+@assert f ≈ f_fe # hide
+nothing # hide
+```
+
+For each cell we loop over all the facets of the cell, and check if this particular facet is
 located on our facetset of interest called `"Neumann Boundary"`. If we have determined
 that the current facet is indeed on the boundary and in our facetset, then we
 reinitialize `FacetValues` for this facet, using [`reinit!`](@ref). When `reinit!`ing
 `FacetValues` we also need to give the facet number in addition to the cell.
 Next we simply loop over the quadrature points of the facet, and then loop over
 all the test functions and assemble the contribution to the force vector.
-
 
 ## Periodic boundary conditions
 
@@ -239,7 +282,15 @@ Here is a simple example where periodicity is enforced for components 1 and 2 of
 that no rotation matrix is needed here since the mirror and image are parallel, just shifted
 in the ``x``-direction (as seen by the mapping `φ`):
 
-```julia
+```@setup periodic
+using Ferrite
+grid = generate_grid(Quadrilateral, (2, 2), Vec((0.0, 0.0)), Vec((1.0, 1.0)))
+dofhandler = DofHandler(grid)
+add!(dofhandler, :u, Lagrange{RefQuadrilateral, 1}()^2)
+close!(dofhandler)
+```
+
+```@example periodic
 # Create a constraint handler from the dof handler
 ch = ConstraintHandler(dofhandler)
 
@@ -255,6 +306,8 @@ add!(ch, pdbc)
 
 # If no more constraints should be added we can close
 close!(ch)
+@assert length(ch.prescribed_dofs) == 2 * 3 # hide
+nothing # hide
 ```
 
 !!! note
@@ -287,13 +340,17 @@ a function to `PeriodicDirichlet`, similar to `Dirichlet`, which, given the coor
 Here is an example of how to implement this type of boundary condition, for a known function
 `f`:
 
-```julia
+```@example periodic
+f(x) = Vec((x[1], 2 * x[2])) # hide
 pdbc = PeriodicDirichlet(
     :u,
     facet_mapping,
     (x, t) -> f(x),
     [1, 2],
 )
+ch = ConstraintHandler(dofhandler); add!(ch, pdbc); close!(ch); update!(ch, 0.0) # hide
+@assert sort(abs.(ch.inhomogeneities)) ≈ [0, 0, 0, 1, 1, 1] # hide
+nothing # hide
 ```
 
 !!! note
@@ -309,12 +366,15 @@ pdbc = PeriodicDirichlet(
     constructed as ``u^{\mathrm{M}} = \bar{u} + \boldsymbol{\nabla} \bar{u} \cdot
     [\boldsymbol{x} - \bar{\boldsymbol{x}}]`` for known ``\bar{u}`` and
     ``\boldsymbol{\nabla} \bar{u}``. This could be implemented as
-    ```julia
+    ```@example periodic
+    ū = Vec((0.0, 0.0)); ∇ū = Tensor{2, 2}((0.1, 0.0, 0.0, 0.1)); x̄ = Vec((0.5, 0.5)) # hide
     pdbc = PeriodicDirichlet(
         :u,
         facet_mapping,
         (x, t) -> ū + ∇ū  ⋅ (x - x̄)
     )
+    ch = ConstraintHandler(dofhandler); add!(ch, pdbc); close!(ch); update!(ch, 0.0) # hide
+    nothing # hide
     ```
 
 ## Initial conditions
@@ -325,12 +385,15 @@ i.e. ``\boldsymbol{u}'(t) = \boldsymbol{f}(\boldsymbol{u}(t),t)``,
 where ``\boldsymbol{u}(t)`` are the degrees of freedom,
 initial conditions can be specified by the [`apply_analytical!`](@ref) function.
 For example, specify the initial pressure as a function of the y-coordinate
-```julia
+```@example initial
+using Ferrite # hide
 ρ = 1000; g = 9.81    # density [kg/m³] and gravity [N/kg]
 grid = generate_grid(Quadrilateral, (10, 10))
 dh = DofHandler(grid); add!(dh, :u, Lagrange{RefQuadrilateral, 1}()^2); add!(dh, :p, Lagrange{RefQuadrilateral, 1}()); close!(dh)
 u = zeros(ndofs(dh))
 apply_analytical!(u, dh, :p, x -> ρ * g * x[2])
+@assert maximum(u) ≈ ρ * g # hide
+nothing # hide
 ```
 
 See also [Transient heat equation](@ref tutorial-transient-heat-equation) for one example.
