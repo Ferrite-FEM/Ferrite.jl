@@ -179,10 +179,9 @@ matrix_handle, vector_handle
 # (LLVM neither unswitches a branch at the accumulation site out of the assembly loops,
 # nor generates as good code when both paths are inlined next to each other).
 
-# Buffers for sorting the dofs in `assemble!`. These are stored in a `TaskLocalValue` so
-# that each task gets its own buffers, which makes it safe to use the same assembler from
-# multiple tasks (but note that writing into the global matrix and vector still requires
-# either grid coloring or atomic assembly).
+# Buffers for sorting the dofs in `assemble!`. Each task gets its own buffers, which makes
+# it safe to use the same assembler from multiple tasks (but note that writing into the
+# global matrix and vector still requires either grid coloring or atomic assembly).
 struct AssemblyBuffers
     rowpermutation::Vector{Int}
     colpermutation::Vector{Int}
@@ -204,8 +203,23 @@ function (init::AssemblyBuffersInit)()
     end
 end
 
+# The task that creates the assembler (e.g. for serial assembly the only task) uses the
+# `owner_buffers` directly. Other tasks use buffers from the `TaskLocalValue`. This avoids
+# the (relatively expensive) task local storage lookup in the serial case.
+struct TaskLocalAssemblyBuffers
+    owner::Task
+    owner_buffers::AssemblyBuffers
+    buffers::TaskLocalValue{AssemblyBuffers, AssemblyBuffersInit}
+end
+function TaskLocalAssemblyBuffers(init::AssemblyBuffersInit)
+    return TaskLocalAssemblyBuffers(current_task(), init(), TaskLocalValue{AssemblyBuffers}(init))
+end
+@inline function Base.getindex(b::TaskLocalAssemblyBuffers)
+    return current_task() === b.owner ? b.owner_buffers : b.buffers[]
+end
+
 assembly_buffers(sizehint::Int; symmetric::Bool = false) =
-    TaskLocalValue{AssemblyBuffers}(AssemblyBuffersInit(sizehint, symmetric))
+    TaskLocalAssemblyBuffers(AssemblyBuffersInit(sizehint, symmetric))
 
 """
 Assembler for sparse matrix with CSC storage type.
@@ -213,7 +227,7 @@ Assembler for sparse matrix with CSC storage type.
 struct CSCAssembler{Tv, Ti, MT <: AbstractSparseMatrixCSC{Tv, Ti}, atomic} <: AbstractCSCAssembler{Tv}
     K::MT
     f::Vector{Tv}
-    buffers::TaskLocalValue{AssemblyBuffers, AssemblyBuffersInit}
+    buffers::TaskLocalAssemblyBuffers
 end
 
 """
@@ -222,7 +236,7 @@ Assembler for sparse matrix with CSR storage type.
 struct CSRAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}, atomic} <: AbstractCSRAssembler{Tv} #AbstractSparseMatrixCSR does not exist
     K::MT
     f::Vector{Tv}
-    buffers::TaskLocalValue{AssemblyBuffers, AssemblyBuffersInit}
+    buffers::TaskLocalAssemblyBuffers
 end
 
 """
@@ -231,7 +245,7 @@ Assembler for symmetric sparse matrix with CSC storage type.
 struct SymmetricCSCAssembler{Tv, Ti, MT <: Symmetric{Tv, <:AbstractSparseMatrixCSC{Tv, Ti}}, atomic} <: AbstractCSCAssembler{Tv}
     K::MT
     f::Vector{Tv}
-    buffers::TaskLocalValue{AssemblyBuffers, AssemblyBuffersInit}
+    buffers::TaskLocalAssemblyBuffers
 end
 
 # Whether accumulation into the global matrix and vector uses atomic additions. This is a
