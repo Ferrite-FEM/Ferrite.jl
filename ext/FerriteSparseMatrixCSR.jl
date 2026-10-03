@@ -9,7 +9,7 @@ import Base: @propagate_inbounds
 Base.@constprop :aggressive function Ferrite.start_assemble(K::SparseMatrixCSR{<:Any, T, Ti}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T, Ti}
     Ferrite._check_atomic_eltype(atomic, T)
     fillzero && (Ferrite.fillzero!(K); Ferrite.fillzero!(f))
-    return CSRAssembler{T, Ti, typeof(K), atomic}(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
+    return CSRAssembler{T, Ti, typeof(K), atomic}(K, f, Ferrite.assembly_buffers(maxcelldofs_hint))
 end
 
 @propagate_inbounds function Ferrite._assemble_inner!(
