@@ -192,24 +192,24 @@ coupling = CellCoupling(1:getncells(grid); algebraic_coupling = ((:u, :εbar), (
 # enforces with [`AffineConstraint`](@ref)s between the "mirror" and "image" boundary
 # dofs (see the strain-driven tutorial). The periodic constraints determine
 # ``\boldsymbol{u}^\mu`` only up to a constant translation (a zero-energy mode), so we
-# additionally pin the fluctuation in the corner ``(\tfrac{1}{2}, \tfrac{1}{2})`` (the
-# periodicity ties all four corners together, so this grounds all of them). The same
-# constraints are needed again in the verification and in the blocked solve at the end
-# of the tutorial, so we match the periodic facet pairs and the corner vertex once, and
-# share a small helper that adds the constraints to a `ConstraintHandler`:
+# additionally pin the fluctuation to zero in the four corners (the periodicity ties
+# them together, see the strain-driven tutorial). The same constraints are needed again
+# in the verification and in the blocked solve at the end of the tutorial, so we match
+# the periodic facet pairs and the corner vertices once, and share a small helper that
+# adds the constraints to a `ConstraintHandler`:
 periodic_facets = collect_periodic_facets(grid, "left", "right")
 collect_periodic_facets!(periodic_facets, grid, "bottom", "top")
-addvertexset!(grid, "corner", x -> x ≈ Vec((0.5, 0.5)))
-corner = getvertexset(grid, "corner")
+addvertexset!(grid, "corners", x -> all(abs.(x) .≈ 0.5))
+corners = getvertexset(grid, "corners")
 
-function add_fluctuation_constraints!(ch, periodic_facets, corner)
+function add_fluctuation_constraints!(ch, periodic_facets, corners)
     add!(ch, PeriodicDirichlet(:u, periodic_facets, [1, 2]))
-    add!(ch, Dirichlet(:u, corner, x -> zero(Vec{2})))
+    add!(ch, Dirichlet(:u, corners, x -> zero(Vec{2})))
     return ch
 end
 
 ch = ConstraintHandler(dh)
-add_fluctuation_constraints!(ch, periodic_facets, corner)
+add_fluctuation_constraints!(ch, periodic_facets, corners)
 close!(ch);
 
 # ### FE values
@@ -372,13 +372,13 @@ end
 # treat the right hand side per unit strain, with [`get_rhs_data`](@ref) and
 # [`apply_rhs!`](@ref) (the same technique as in the strain-driven tutorial). The
 # matrix is assembled anew since the monolithic solve above condensed `K` in place.
-function effective_stiffness(dh, cv_u, av_ε, coupling, Ei, Em, incl_cells, periodic_facets, corner)
+function effective_stiffness(dh, cv_u, av_ε, coupling, Ei, Em, incl_cells, periodic_facets, corners)
     nε = getnbasefunctions(av_ε)
     gdofs = algebraic_dofs(dh, :εbar)
     ## One constraint handler per unit strain Eβ, prescribing the algebraic dofs
     chs = map(1:nε) do β
         chβ = ConstraintHandler(dh)
-        add_fluctuation_constraints!(chβ, periodic_facets, corner)
+        add_fluctuation_constraints!(chβ, periodic_facets, corners)
         for (α, gdof) in pairs(gdofs)
             add!(chβ, AffineConstraint(gdof, Pair{Int, Float64}[], α == β ? 1.0 : 0.0))
         end
@@ -403,7 +403,7 @@ function effective_stiffness(dh, cv_u, av_ε, coupling, Ei, Em, incl_cells, peri
     end
     return Ē
 end
-Ē = effective_stiffness(dh, cv_u, av_ε, coupling, Ei, Em, incl_cells, periodic_facets, corner)
+Ē = effective_stiffness(dh, cv_u, av_ε, coupling, Ei, Em, incl_cells, periodic_facets, corners)
 
 # Note how the strain-driven problem reuses the same algebraic variable: prescribing
 # ``\bar{\boldsymbol{\varepsilon}}`` is just a matter of constraining the three
