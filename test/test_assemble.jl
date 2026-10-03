@@ -464,9 +464,10 @@ end
     element_matrix(dofs) = [sin(i * j / 100) for i in dofs, j in dofs] # symmetric
     element_vector(dofs) = [cos(i) for i in dofs]
 
-    # Each task gets separate buffers
+    # The task creating the assembler uses its own buffers, other tasks get separate ones
     a = start_assemble(allocate_matrix(dh))
-    @test fetch(Threads.@spawn a.buffers[]) !== a.buffers[]
+    @test a.buffers[] === a.buffers.owner_buffers
+    @test fetch(Threads.@spawn a.buffers[]) !== a.buffers.owner_buffers
 
     # A single (atomic) assembler shared between all tasks
     for MT in (SparseMatrixCSC{Float64, Int}, Symmetric{Float64, SparseMatrixCSC{Float64, Int}})
