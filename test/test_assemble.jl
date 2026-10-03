@@ -456,6 +456,43 @@ end
     @test (@inferred (K -> start_assemble(K))(K4)) isa CSCA{false}
 end
 
+@testset "assembler shared between tasks" begin
+    grid = generate_grid(Quadrilateral, (10, 10))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 2}())
+    close!(dh)
+    element_matrix(dofs) = [sin(i * j / 100) for i in dofs, j in dofs] # symmetric
+    element_vector(dofs) = [cos(i) for i in dofs]
+
+    # The task creating the assembler uses its own buffers, other tasks get separate ones
+    a = start_assemble(allocate_matrix(dh))
+    @test a.buffers[] === a.buffers.owner_buffers
+    @test fetch(Threads.@spawn a.buffers[]) !== a.buffers.owner_buffers
+
+    # A single (atomic) assembler shared between all tasks
+    for MT in (SparseMatrixCSC{Float64, Int}, Symmetric{Float64, SparseMatrixCSC{Float64, Int}})
+        K = allocate_matrix(MT, dh)
+        f = zeros(ndofs(dh))
+        a = start_assemble(K, f)
+        for cell in CellIterator(dh)
+            dofs = celldofs(cell)
+            assemble!(a, dofs, element_matrix(dofs), element_vector(dofs))
+        end
+        Ka = allocate_matrix(MT, dh)
+        fa = zeros(ndofs(dh))
+        asm = start_assemble(Ka, fa; atomic = true)
+        @sync for chunk in Iterators.partition(1:getncells(grid), cld(getncells(grid), 4))
+            Threads.@spawn for cellidx in chunk
+                dofs = celldofs(dh, cellidx)
+                assemble!(asm, dofs, element_matrix(dofs), element_vector(dofs))
+            end
+        end
+        # Equal up to the (task dependent) summation order
+        @test parent(Ka).nzval ≈ parent(K).nzval rtol = 1.0e-14
+        @test fa ≈ f rtol = 1.0e-14
+    end
+end
+
 @testset "addindex! matrix fallback" begin
     A = zeros(2, 2)
     Ferrite.addindex!(A, 1.0, 1, 2)
