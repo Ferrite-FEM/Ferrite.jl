@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Linear shell · Ferrite.jl</title><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.044/juliamono.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../manual/fe_intro/">Introduction to FEM</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../manual/assembly/">Assembly</a></li><li><a class="tocitem" href="../../manual/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../manual/constraints/">Constraints</a></li><li><a class="tocitem" href="../../manual/grid/">Grid</a></li><li><a class="tocitem" href="../../manual/export/">Export</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../heat_equation/">Heat Equation</a></li><li><a class="tocitem" href="../postprocessing/">Postprocessing</a></li><li><a class="tocitem" href="../helmholtz/">Helmholtz equation</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible Elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../threaded_assembly/">Threaded Assembly</a></li><li><a class="tocitem" href="../plasticity/">von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Time Dependent Problems</a></li><li><a class="tocitem" href="../landau/">Ginzburg-Landau model energy minimization</a></li><li class="is-active"><a class="tocitem" href>Linear shell</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Setting-up-the-problem"><span>Setting up the problem</span></a></li><li><a class="tocitem" href="#The-shell-element"><span>The shell element</span></a></li></ul></li><li><a class="tocitem" href="../quasi_incompressible_hyperelasticity/">Nearly Incompressible Hyperelasticity</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes Equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Linear shell</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Linear shell</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate/linear_shell.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Linear-shell"><a class="docs-heading-anchor" href="#Linear-shell">Linear shell</a><a id="Linear-shell-1"></a><a class="docs-heading-anchor-permalink" href="#Linear-shell" title="Permalink"></a></h1><p><img src="../linear_shell.png" alt/></p><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>In this example we show how shell elements can be analyzed in Ferrite.jl. The shell implemented here comes from the book &quot;The finite elment method - Linear static and dynamic finite element analysis&quot; by Hughes (1987), and a brief description of it is given at the end of this tutorial.  The first part of the tutorial explains how to set up the problem.</p><h2 id="Setting-up-the-problem"><a class="docs-heading-anchor" href="#Setting-up-the-problem">Setting up the problem</a><a id="Setting-up-the-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Setting-up-the-problem" title="Permalink"></a></h2><pre><code class="language-julia hljs">using Ferrite
+using ForwardDiff
+
+function main() #wrap everything in a function...</code></pre><p>First we generate a flat rectangular mesh. There is currently no built-in function for generating shell meshes in Ferrite, so we have to create our own simple mesh generator (see the function <code>generate_shell_grid</code> further down in this file).</p><pre><code class="language-julia hljs">nels = (10,10)
+size = (10.0, 10.0)
+grid = generate_shell_grid(nels, size)</code></pre><p>Here we define the bi-linear interpolation used for the geometrical description of the shell. We also create two quadrature rules for the in-plane and out-of-plane directions. Note that we use under integration for the inplane integration, to avoid shear locking.</p><pre><code class="language-julia hljs">ip = Lagrange{2,RefCube,1}()
+qr_inplane = QuadratureRule{2,RefCube}(1)
+qr_ooplane = QuadratureRule{1,RefCube}(2)
+cv = CellScalarValues(qr_inplane, ip)</code></pre><p>Next we distribute displacement dofs,<code>:u = (x,y,z)</code> and rotational dofs, <code>:θ = (θ₁,  θ₂)</code>.</p><pre><code class="language-julia hljs">dh = DofHandler(grid)
+push!(dh, :u, 3, ip)
+push!(dh, :θ, 2, ip)
+close!(dh)</code></pre><p>In order to apply our boundary conditions, we first need to create some edge- and vertex-sets. This is done with <code>addedgeset!</code> and <code>addvertexset!</code> (similar to <code>addfaceset!</code>)</p><pre><code class="language-julia hljs">addedgeset!(grid, &quot;left&quot;,  (x) -&gt; x[1] ≈ 0.0)
+addedgeset!(grid, &quot;right&quot;, (x) -&gt; x[1] ≈ size[1])
+addvertexset!(grid, &quot;corner&quot;, (x) -&gt; x[1] ≈ 0.0 &amp;&amp; x[2] ≈ 0.0 &amp;&amp; x[3] ≈ 0.0)</code></pre><p>Here we define the boundary conditions. On the left edge, we lock the displacements in the x- and z- directions, and all the rotations.</p><pre><code class="language-julia hljs">ch = ConstraintHandler(dh)
+add!(ch,  Dirichlet(:u, getedgeset(grid, &quot;left&quot;), (x, t) -&gt; (0.0, 0.0), [1,3])  )
+add!(ch,  Dirichlet(:θ, getedgeset(grid, &quot;left&quot;), (x, t) -&gt; (0.0, 0.0), [1,2])  )</code></pre><p>On the right edge, we also lock the displacements in the x- and z- directions, but apply a precribed roation.</p><pre><code class="language-julia hljs">add!(ch,  Dirichlet(:u, getedgeset(grid, &quot;right&quot;), (x, t) -&gt; (0.0, 0.0), [1,3])  )
+add!(ch,  Dirichlet(:θ, getedgeset(grid, &quot;right&quot;), (x, t) -&gt; (0.0, pi/10), [1,2])  )</code></pre><p>In order to not get rigid body motion, we lock the y-displacement in one fo the corners.</p><pre><code class="language-julia hljs">add!(ch,  Dirichlet(:θ, getvertexset(grid, &quot;corner&quot;), (x, t) -&gt; (0.0), [2])  )
+
+close!(ch)
+update!(ch, 0.0)</code></pre><p>Next we define relevant data for the shell, such as shear correction factor and stiffness matrix for the material. In this linear shell, plane stress is assumed, ie \\sigma_{zz} = 0 $. Therefor, the stiffness matrix is 5x5 (opposed to the normal 6x6).</p><pre><code class="language-julia hljs">κ = 5/6 # Shear correction factor
+E = 210.0
+ν = 0.3
+a = (1-ν)/2
+C = E/(1-ν^2) * [1 ν 0   0   0;
+                ν 1 0   0   0;
+                0 0 a*κ 0   0;
+                0 0 0   a*κ 0;
+                0 0 0   0   a*κ]
+
+
+data = (thickness = 1.0, C = C); #Named tuple</code></pre><p>We now assemble the problem in standard finite element fashion</p><pre><code class="language-julia hljs">nnodes = getnbasefunctions(ip)
+ndofs_shell = ndofs_per_cell(dh)
+
+K = create_sparsity_pattern(dh)
+f = zeros(Float64, ndofs(dh))
+
+ke = zeros(ndofs_shell, ndofs_shell)
+fe = zeros(ndofs_shell)
+
+celldofs = zeros(Int, ndofs_shell)
+cellcoords = zeros(Vec{3,Float64}, nnodes)
+
+assembler = start_assemble(K, f)
+for cellid in 1:getncells(grid)
+    fill!(ke, 0.0)
+
+    celldofs!(celldofs, dh, cellid)
+    getcoordinates!(cellcoords, grid, cellid)
+
+    #Call the element routine
+    integrate_shell!(ke, cv, qr_ooplane, cellcoords, data)
+
+    assemble!(assembler, celldofs, fe, ke)
+end</code></pre><p>Apply BC and solve.</p><pre><code class="language-julia hljs">apply!(K, f, ch)
+a = K\f</code></pre><p>Output results.</p><pre><code class="language-julia hljs">vtk_grid(&quot;linear_shell&quot;, dh) do vtk
+    vtk_point_data(vtk, dh, a)
+end
+
+end; #end main functions</code></pre><p>Below is the function that creates the shell mesh. It simply generates a 2d-quadrature mesh, and appends a third coordinate (z-direction) to the node-positions.</p><pre><code class="language-julia hljs">function generate_shell_grid(nels, size)
+    _grid = generate_grid(Quadrilateral, nels, Vec((0.0,0.0)), Vec(size))
+    nodes = [(n.x[1], n.x[2], 0.0) |&gt; Vec{3} |&gt; Node  for n in _grid.nodes]
+    cells = [Quadrilateral3D(cell.nodes) for cell in _grid.cells]
+
+    grid = Grid(cells, nodes)
+
+    return grid
+end;</code></pre><h2 id="The-shell-element"><a class="docs-heading-anchor" href="#The-shell-element">The shell element</a><a id="The-shell-element-1"></a><a class="docs-heading-anchor-permalink" href="#The-shell-element" title="Permalink"></a></h2><p>The shell presented here comes from the book &quot;The finite elment method - Linear static and dynamic finite element analysis&quot; by Hughes (1987). The shell is a so called degenerate shell element, meaning it is based on a continuum element. A brief describtion of the shell is given here.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>This element might experience various locking phenomenas, and should only be seen as a proof of concept.</p></div></div><h5 id="Fiber-coordinate-system"><a class="docs-heading-anchor" href="#Fiber-coordinate-system">Fiber coordinate system</a><a id="Fiber-coordinate-system-1"></a><a class="docs-heading-anchor-permalink" href="#Fiber-coordinate-system" title="Permalink"></a></h5><p>The element uses two coordinate systems. The first coordianate system, called the fiber system, is created for each element node, and is used as a reference frame for the rotations. The function below implements an algorthim that return the fiber directions, <span>$\boldsymbol{e}^{f}_{a1}$</span>, <span>$\boldsymbol{e}^{f}_{a2}$</span> and <span>$\boldsymbol{e}^{f}_{a3}$</span>, at each node <span>$a$</span>.</p><pre><code class="language-julia hljs">function fiber_coordsys(Ps::Vector{Vec{3,Float64}})
+
+    ef1 = Vec{3,Float64}[]
+    ef2 = Vec{3,Float64}[]
+    ef3 = Vec{3,Float64}[]
+    for P in Ps
+        a = abs.(P)
+        j = 1
+        if a[1] &gt; a[3]; a[3] = a[1]; j = 2; end
+        if a[2] &gt; a[3]; j = 3; end
+
+        e3 = P
+        e2 = Tensors.cross(P, basevec(Vec{3}, j))
+        e2 /= norm(e2)
+        e1 = Tensors.cross(e2, P)
+
+        push!(ef1, e1)
+        push!(ef2, e2)
+        push!(ef3, e3)
+    end
+    return ef1, ef2, ef3
+
+end;</code></pre><h5 id="Lamina-coordinate-system"><a class="docs-heading-anchor" href="#Lamina-coordinate-system">Lamina coordinate system</a><a id="Lamina-coordinate-system-1"></a><a class="docs-heading-anchor-permalink" href="#Lamina-coordinate-system" title="Permalink"></a></h5><p>The second coordinate system is the so called Lamina Coordinate system. It is created for each integration point, and is defined to be tangent to the mid-surface. It is in this system that we enforce that plane stress assumption, i.e. <span>$\sigma_{zz} = 0$</span>. The function below returns the rotation matrix, <span>$\boldsymbol{q}$</span>, for this coordinate system.</p><pre><code class="language-julia hljs">function lamina_coordsys(dNdξ, ζ, x, p, h)
+
+    e1 = zero(Vec{3})
+    e2 = zero(Vec{3})
+
+    for i in 1:length(dNdξ)
+        e1 += dNdξ[i][1] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
+        e2 += dNdξ[i][2] * x[i] + 0.5*h*ζ * dNdξ[i][1] * p[i]
+    end
+
+    e1 /= norm(e1)
+    e2 /= norm(e2)
+
+    ez = Tensors.cross(e1,e2)
+    ez /= norm(ez)
+
+    a = 0.5*(e1 + e2)
+    a /= norm(a)
+
+    b = Tensors.cross(ez,a)
+    b /= norm(b)
+
+    ex = sqrt(2)/2 * (a - b)
+    ey = sqrt(2)/2 * (a + b)
+
+    return Tensor{2,3}(hcat(ex,ey,ez))
+end;</code></pre><h5 id="Geometrical-description"><a class="docs-heading-anchor" href="#Geometrical-description">Geometrical description</a><a id="Geometrical-description-1"></a><a class="docs-heading-anchor-permalink" href="#Geometrical-description" title="Permalink"></a></h5><p>A material point in the shell is defined as</p><p class="math-container">\[\boldsymbol x(\xi, \eta, \zeta) = \sum_{a=1}^{N_{\text{nodes}}} N_a(\xi, \eta) \boldsymbol{\bar{x}}_{a} + ζ \frac{h}{2} \boldsymbol{\bar{p}_a}\]</p><p>where <span>$\boldsymbol{\bar{x}}_{a}$</span> are nodal positions on the mid-surface, and <span>$\boldsymbol{\bar{p}_a}$</span> is an vector that defines the fiber direction on the reference surface. <span>$N_a$</span> arethe shape functions.</p><p>Based on the defintion of the position vector, we create an function for obtaining the Jacobian-matrix,</p><p class="math-container">\[J_{ij} = \frac{\partial x_i}{\partial \xi_j},\]</p><pre><code class="language-julia hljs">function getjacobian(q, N, dNdξ, ζ, X, p, h)
+
+    J = zeros(3,3)
+    for a in 1:length(N)
+        for i in 1:3, j in 1:3
+            _dNdξ = (j==3) ? 0.0 : dNdξ[a][j]
+            _dζdξ = (j==3) ? 1.0 : 0.0
+            _N = N[a]
+
+            J[i,j] += _dNdξ * X[a][i]  +  (_dNdξ*ζ + _N*_dζdξ) * h/2 * p[a][i]
+        end
+    end
+
+    return (q&#39; * J) |&gt; Tensor{2,3,Float64}
+end;</code></pre><h5 id="Strains"><a class="docs-heading-anchor" href="#Strains">Strains</a><a id="Strains-1"></a><a class="docs-heading-anchor-permalink" href="#Strains" title="Permalink"></a></h5><p>Small deformation is assumed,</p><p class="math-container">\[\varepsilon_{ij}= \frac{1}{2}(\frac{\partial u_{i}}{\partial x_j} + \frac{\partial u_{j}}{\partial x_i})\]</p><p>The displacement field is calculated as:</p><p class="math-container">\[\boldsymbol u = \sum_{a=1}^{N_{\text{nodes}}} N_a \bar{\boldsymbol u}_{a} +
+ N_a ζ\frac{h}{2}(\theta_{a2} \boldsymbol e^{f}_{a1} - \theta_{a1} \boldsymbol e^{f}_{a2})
+\]</p><p>The gradient of the displacement (in the lamina coordinate system), then becomes:</p><p class="math-container">\[\frac{\partial u_{i}}{\partial x_j} = \sum_{m=1}^3 q_{im} \sum_{a=1}^{N_{\text{nodes}}} \frac{\partial N_a}{\partial x_j} \bar{u}_{am} +
+ \frac{\partial(N_a ζ)}{\partial x_j} \frac{h}{2} (\theta_{a2} e^{f}_{am1} - \theta_{a1} e^{f}_{am2})\]</p><pre><code class="language-julia hljs">function strain(dofvec::Vector{T}, N, dNdx, ζ, dζdx, q, ef1, ef2, h) where T
+
+    u = reinterpret(Vec{3,T}, dofvec[1:12])
+    θ = reinterpret(Vec{2,T}, dofvec[13:20])
+
+    dudx = zeros(T, 3, 3)
+    for m in 1:3, j in 1:3
+        for a in 1:length(N)
+            dudx[m,j] += dNdx[a][j] * u[a][m] + h/2 * (dNdx[a][j]*ζ + N[a]*dζdx[j]) * (θ[a][2]*ef1[a][m] - θ[a][1]*ef2[a][m])
+        end
+    end
+
+    dudx = q*dudx
+    ε = [dudx[1,1], dudx[2,2], dudx[1,2]+dudx[2,1], dudx[2,3]+dudx[3,2], dudx[1,3]+dudx[3,1]]
+    return ε
+
+end;</code></pre><h5 id="Main-element-routine"><a class="docs-heading-anchor" href="#Main-element-routine">Main element routine</a><a id="Main-element-routine-1"></a><a class="docs-heading-anchor-permalink" href="#Main-element-routine" title="Permalink"></a></h5><p>Below is the main routine that calculates the stiffness matrix of the shell element. Since it is a so called degenerate shell element, the code is similar to that for an standard continuum element.</p><pre><code class="language-julia hljs">function integrate_shell!(ke, cv, qr_ooplane, X, data)
+    nnodes = getnbasefunctions(cv)
+    ndofs = nnodes*5
+    h = data.thickness
+
+    #Create the directors in each node.
+    #Note: For a more general case, the directors should
+    #be input parameters for the element routine.
+    p = zeros(Vec{3}, nnodes)
+    for i in 1:nnodes
+        a = Vec{3}((0.0, 0.0, 1.0))
+        p[i] = a/norm(a)
+    end
+
+    ef1, ef2, ef3 = fiber_coordsys(p)
+
+    for iqp in 1:getnquadpoints(cv)
+
+        dNdξ = cv.dNdξ[:,iqp]
+        N = cv.N[:,iqp]
+
+        for oqp in 1:length(qr_ooplane.weights)
+
+            ζ = qr_ooplane.points[oqp][1]
+
+            q = lamina_coordsys(dNdξ, ζ, X, p, h)
+            J = getjacobian(q, N, dNdξ, ζ, X, p, h)
+            Jinv = inv(J)
+
+            dζdx = Vec{3}((0.0, 0.0, 1.0)) ⋅ Jinv
+            dNdx = [Vec{3}((dNdξ[i][1], dNdξ[i][2], 0.0)) ⋅ Jinv for i in 1:nnodes]
+
+
+            #For simplicity, use automatic differentiation to construct the B-matrix from the strain.
+            B = ForwardDiff.jacobian(
+                (a) -&gt; strain(a, N, dNdx, ζ, dζdx, q, ef1, ef2, h), zeros(Float64, ndofs) )
+
+            dV = det(J) * cv.qr.weights[iqp] * qr_ooplane.weights[oqp]
+            ke .+= B&#39;*data.C*B * dV
+        end
+    end
+end;</code></pre><p>Run everything:</p><pre><code class="language-julia hljs">main()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1-element Vector{String}:
+ &quot;linear_shell.vtu&quot;</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../landau/">« Ginzburg-Landau model energy minimization</a><a class="docs-footer-nextpage" href="../quasi_incompressible_hyperelasticity/">Nearly Incompressible Hyperelasticity »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.19 on <span class="colophon-date" title="Thursday 30 June 2022 13:08">Thursday 30 June 2022</span>. Using Julia version 1.7.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

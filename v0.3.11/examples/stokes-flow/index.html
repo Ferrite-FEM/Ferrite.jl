@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Stokes flow · Ferrite.jl</title><meta name="title" content="Stokes flow · Ferrite.jl"/><meta property="og:title" content="Stokes flow · Ferrite.jl"/><meta property="twitter:title" content="Stokes flow · Ferrite.jl"/><meta name="description" content="Documentation for Ferrite.jl."/><meta property="og:description" content="Documentation for Ferrite.jl."/><meta property="twitter:description" content="Documentation for Ferrite.jl."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script><link href="../../assets/custom.css" rel="stylesheet" type="text/css"/><link href="../../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../../"><img src="../../assets/logo.svg" alt="Ferrite.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../manual/fe_intro/">Introduction to FEM</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../manual/assembly/">Assembly</a></li><li><a class="tocitem" href="../../manual/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../manual/constraints/">Constraints</a></li><li><a class="tocitem" href="../../manual/grid/">Grid</a></li><li><a class="tocitem" href="../../manual/export/">Export</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../../overview/">Documentation of examples</a></li><li><a class="tocitem" href="../heat_equation/">Heat Equation</a></li><li><a class="tocitem" href="../postprocessing/">Postprocessing</a></li><li><a class="tocitem" href="../helmholtz/">Helmholtz equation</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible Elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../threaded_assembly/">Threaded Assembly</a></li><li><a class="tocitem" href="../plasticity/">von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Time Dependent Problems</a></li><li><a class="tocitem" href="../landau/">Ginzburg-Landau model energy minimization</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../quasi_incompressible_hyperelasticity/">Nearly Incompressible Hyperelasticity</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes Equations via DifferentialEquations.jl</a></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li><li class="is-active"><a class="tocitem" href>Stokes flow</a><ul class="internal"><li><a class="tocitem" href="#Introduction-and-problem-formulation"><span>Introduction and problem formulation</span></a></li><li><a class="tocitem" href="#Commented-program"><span>Commented program</span></a></li><li><a class="tocitem" href="#stokes-flow-plain-program"><span>Plain program</span></a></li></ul></li><li><a class="tocitem" href="../topology_optimization/">Topology optimization</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li><li><a class="tocitem" href="../../reference/utils/">Development utility functions</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Stokes flow</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Stokes flow</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl" title="View the repository on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate/stokes-flow.jl" title="View source on GitHub"><span class="docs-icon fas"></span></a><a class="docs-settings-button docs-navbar-link fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button docs-navbar-link fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Stokes-flow"><a class="docs-heading-anchor" href="#Stokes-flow">Stokes flow</a><a id="Stokes-flow-1"></a><a class="docs-heading-anchor-permalink" href="#Stokes-flow" title="Permalink"></a></h1><p><strong>Keywords</strong>: <em>periodic boundary conditions, multiple fields, mean value constraint</em></p><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/v0.3.11/examples/stokes-flow.ipynb"><code>stokes-flow.ipynb</code></a>.</p></div></div><p><img src="../stokes-flow.png" alt/> <em>Figure 1</em>: Left: Computational domain <span>$\Omega$</span> with boundaries <span>$\Gamma_1$</span>, <span>$\Gamma_3$</span> (periodic boundary conditions) and <span>$\Gamma_2$</span>, <span>$\Gamma_4$</span> (homogeneous Dirichlet boundary conditions). Right: Magnitude of the resulting velocity field.</p><h2 id="Introduction-and-problem-formulation"><a class="docs-heading-anchor" href="#Introduction-and-problem-formulation">Introduction and problem formulation</a><a id="Introduction-and-problem-formulation-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction-and-problem-formulation" title="Permalink"></a></h2><p>This example is a translation of the <a href="https://www.dealii.org/current/doxygen/deal.II/step_45.html">step-45 example from deal.ii</a> which solves Stokes flow on a quarter circle. In particular it shows how to use periodic boundary conditions, how to solve a problem with multiple unknown fields, and how to enforce a specific mean value of the solution. For the mesh generation we use <a href="https://github.com/JuliaFEM/Gmsh.jl"><code>Gmsh.jl</code></a> and then use <a href="https://github.com/Ferrite-FEM/FerriteGmsh.jl"><code>FerriteGmsh.jl</code></a> to import the mesh into Ferrite&#39;s format.</p><p>The strong form of Stokes flow with velocity <span>$\boldsymbol{u}$</span> and pressure <span>$p$</span> can be written as follows:</p><p class="math-container">\[\begin{align*}
+-\Delta \boldsymbol{u} + \boldsymbol{\nabla} p &amp;= \bigl(\exp(-100||\boldsymbol{x} - (0.75, 0.1)||^2), 0\bigr) =:
+\boldsymbol{b} \quad \forall \boldsymbol{x} \in \Omega,\\
+-\boldsymbol{\nabla} \cdot \boldsymbol{u} &amp;= 0 \quad \forall \boldsymbol{x} \in \Omega,
+\end{align*}\]</p><p>where the domain is defined as <span>$\Omega = \{\boldsymbol{x} \in (0, 1)^2: \ ||\boldsymbol{x}|| \in (0.5, 1)\}$</span>, see <em>Figure 1</em>. For the velocity we use periodic boundary conditions on the inlet <span>$\Gamma_1$</span> and outlet <span>$\Gamma_3$</span>:</p><p class="math-container">\[\begin{align*}
+u_x(0,\nu) &amp;= -u_y(\nu, 0) \quad &amp; \nu\ \in\ [0.5, 1],\\
+u_y(0,\nu) &amp;= u_x(\nu, 0) \quad &amp; \nu\ \in\ [0.5, 1],
+\end{align*}\]</p><p>and homogeneous Dirichlet boundary conditions for <span>$\Gamma_2$</span> and <span>$\Gamma_4$</span>:</p><p class="math-container">\[\boldsymbol{u} = \boldsymbol{0} \quad \forall \boldsymbol{x}\ \in\
+\Gamma_2 \cup \Gamma_4 := \{ \boldsymbol{x}:\ ||\boldsymbol{x}|| \in \{0.5, 1\}\}.\]</p><p>The corresponding weak form reads as follows: Find <span>$(\boldsymbol{u}, p) \in \mathbb{U} \times \mathrm{L}_2$</span> s.t.</p><p class="math-container">\[\begin{align*}
+\int_\Omega \Bigl[[\delta\boldsymbol{u}\otimes\boldsymbol{\nabla}]:[\boldsymbol{u}\otimes\boldsymbol{\nabla}] -
+(\boldsymbol{\nabla}\cdot\delta\boldsymbol{u})\ p\ \Bigr] \mathrm{d}\Omega &amp;=
+\int_\Omega \delta\boldsymbol{u} \cdot \boldsymbol{b}\ \mathrm{d}\Omega \quad \forall
+\delta \boldsymbol{u} \in \mathbb{U},\\
+\int_\Omega - (\boldsymbol{\nabla}\cdot\boldsymbol{u})\ \delta p\ \mathrm{d}\Omega &amp;= 0
+\quad \forall \delta p \in \mathrm{L}_2,
+\end{align*}\]</p><p>where <span>$\mathbb{U}$</span> is a suitable function space, that, in particular, enforces the Dirichlet boundary conditions, and the periodicity constraints. This formulation is a saddle point problem, and, just like the example with <a href="../incompressible_elasticity/#Incompressible-Elasticity">Incompressible Elasticity</a>, we need our formulation to fulfill the <a href="https://en.wikipedia.org/wiki/Ladyzhenskaya%E2%80%93Babu%C5%A1ka%E2%80%93Brezzi_condition">LBB condition</a>. We ensure this by using a quadratic approximation for the velocity field, and a linear approximation for the pressure.</p><p>With this formulation and boundary conditions for <span>$\boldsymbol{u}$</span> the pressure will only be determined up to a constant. We will therefore add an additional constraint which fixes this constant (see <a href="https://www.dealii.org/current/doxygen/deal.II/step_11.html">deal.ii step-11</a> for some more discussion around this). In particular, we will enforce the mean value of the pressure on the boundary to be 0, i.e. <span>$\int_{\Gamma} p\ \mathrm{d}\Gamma = 0$</span>. One option is to enforce this using a Lagrange multipler. This would give a contribution <span>$\lambda \int_{\Gamma} \delta p\ \mathrm{d}\Gamma$</span> to the second equation in the weak form above, and a third equation <span>$\delta\lambda \int_{\Gamma} p\ \mathrm{d}\Gamma = 0$</span> so that we can solve for <span>$\lambda$</span>. However, since we in this case are not interested in computing <span>$\lambda$</span>, and since the constraint is linear, we can directly embed this constraint using an <code>AffineConstraint</code> in Ferrite.</p><p>After FE discretization we obtain a linear system of the form <span>$\underline{\underline{K}}\ \underline{a} = \underline{f}$</span>, where</p><p class="math-container">\[\underline{\underline{K}} =
+\begin{bmatrix}
+\underline{\underline{K}}_{uu} &amp; \underline{\underline{K}}_{pu}^\textrm{T} \\
+\underline{\underline{K}}_{pu} &amp; \underline{\underline{0}}
+\end{bmatrix}, \quad
+\underline{a} = \begin{bmatrix}
+\underline{a}_{u} \\
+\underline{a}_{p}
+\end{bmatrix}, \quad
+\underline{f} = \begin{bmatrix}
+\underline{f}_{u} \\
+\underline{0}
+\end{bmatrix},\]</p><p>and where</p><p class="math-container">\[\begin{align*}
+(\underline{\underline{K}}_{uu})_{ij} &amp;= \int_\Omega [\boldsymbol{\phi}^u_i\otimes\boldsymbol{\nabla}]:[\boldsymbol{\phi}^u_j\otimes\boldsymbol{\nabla}] \mathrm{d}\Omega, \\
+(\underline{\underline{K}}_{pu})_{ij} &amp;= \int_\Omega - (\boldsymbol{\nabla}\cdot\boldsymbol{\phi}^u_j)\ \phi^p_i\ \mathrm{d}\Omega, \\
+(\underline{f}_{u})_{i} &amp;= \int_\Omega \boldsymbol{\phi}^u_i \cdot \boldsymbol{b}\ \mathrm{d}\Omega.
+\end{align*}\]</p><p>The affine constraint to enforce zero mean pressure on the boundary is obtained from <span>$\underline{\underline{C}}_p\ \underline{a}_p = \underline{0}$</span>, where</p><p class="math-container">\[(\underline{\underline{C}}_p)_{1j} = \int_{\Gamma} \phi^p_j\ \mathrm{d}\Gamma.\]</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>The constraint matrix <span>$\underline{\underline{C}}_p$</span> is the same matrix we would have obtained when assembling the system with the Lagrange multiplier. In that case the full system would be</p><p class="math-container">\[\underline{\underline{K}} =
+\begin{bmatrix}
+\underline{\underline{K}}_{uu} &amp; \underline{\underline{K}}_{pu}^\textrm{T} &amp;
+\underline{\underline{0}}\\
+\underline{\underline{K}}_{pu} &amp; \underline{\underline{0}} &amp; \underline{\underline{C}}_p^\mathrm{T} \\
+\underline{\underline{0}} &amp; \underline{\underline{C}}_p &amp; 0 \\
+\end{bmatrix}, \quad
+\underline{a} = \begin{bmatrix}
+\underline{a}_{u} \\
+\underline{a}_{p} \\
+\underline{a}_{\lambda}
+\end{bmatrix}, \quad
+\underline{f} = \begin{bmatrix}
+\underline{f}_{u} \\
+\underline{0} \\
+\underline{0}
+\end{bmatrix}.\]</p></div></div><h2 id="Commented-program"><a class="docs-heading-anchor" href="#Commented-program">Commented program</a><a id="Commented-program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-program" title="Permalink"></a></h2><p>What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#stokes-flow-plain-program">section</a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh, Gmsh, Tensors, LinearAlgebra, SparseArrays</code></pre><h3 id="Geometry-and-mesh-generation-with-Gmsh.jl"><a class="docs-heading-anchor" href="#Geometry-and-mesh-generation-with-Gmsh.jl">Geometry and mesh generation with <code>Gmsh.jl</code></a><a id="Geometry-and-mesh-generation-with-Gmsh.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Geometry-and-mesh-generation-with-Gmsh.jl" title="Permalink"></a></h3><p>In the <code>setup_grid</code> function below we use the <a href="https://github.com/JuliaFEM/Gmsh.jl"><code>Gmsh.jl</code></a> package for setting up the geometry and performing the meshing. We will not discuss this part in much detail but refer to the <a href="https://gmsh.info/doc/texinfo/gmsh.html#Gmsh-API">Gmsh API documentation</a> instead. The most important thing to note is the mesh periodicity constraint that is applied between the &quot;inlet&quot; and &quot;outlet&quot; parts using <code>gmsh.model.set_periodic</code>. This is necessary to later on apply a periodicity constraint for the approximated velocity field.</p><pre><code class="language-julia hljs">function setup_grid(h=0.05)
+    # Initialize gmsh
+    Gmsh.initialize()
+    gmsh.option.set_number(&quot;General.Verbosity&quot;, 2)
+
+    # Add the points
+    o = gmsh.model.geo.add_point(0.0, 0.0, 0.0, h)
+    p1 = gmsh.model.geo.add_point(0.5, 0.0, 0.0, h)
+    p2 = gmsh.model.geo.add_point(1.0, 0.0, 0.0, h)
+    p3 = gmsh.model.geo.add_point(0.0, 1.0, 0.0, h)
+    p4 = gmsh.model.geo.add_point(0.0, 0.5, 0.0, h)
+
+    # Add the lines
+    l1 = gmsh.model.geo.add_line(p1, p2)
+    l2 = gmsh.model.geo.add_circle_arc(p2, o, p3)
+    l3 = gmsh.model.geo.add_line(p3, p4)
+    l4 = gmsh.model.geo.add_circle_arc(p4, o, p1)
+
+    # Create the closed curve loop and the surface
+    loop = gmsh.model.geo.add_curve_loop([l1, l2, l3, l4])
+    surf = gmsh.model.geo.add_plane_surface([loop])
+
+    # Synchronize the model
+    gmsh.model.geo.synchronize()
+
+    # Create the physical domains
+    gmsh.model.add_physical_group(1, [l1], -1, &quot;Γ1&quot;)
+    gmsh.model.add_physical_group(1, [l2], -1, &quot;Γ2&quot;)
+    gmsh.model.add_physical_group(1, [l3], -1, &quot;Γ3&quot;)
+    gmsh.model.add_physical_group(1, [l4], -1, &quot;Γ4&quot;)
+    gmsh.model.add_physical_group(2, [surf])
+
+    # Add the periodicity constraint using 4x4 affine transformation matrix,
+    # see https://en.wikipedia.org/wiki/Transformation_matrix#Affine_transformations
+    transformation_matrix = zeros(4, 4)
+    transformation_matrix[1, 2] = 1  # -sin(-pi/2)
+    transformation_matrix[2, 1] = -1 #  cos(-pi/2)
+    transformation_matrix[3, 3] = 1
+    transformation_matrix[4, 4] = 1
+    transformation_matrix = vec(transformation_matrix&#39;)
+    gmsh.model.mesh.set_periodic(1, [l1], [l3], transformation_matrix)
+
+    # Generate a 2D mesh
+    gmsh.model.mesh.generate(2)
+
+    # Save the mesh, and read back in as a Ferrite Grid
+    grid = mktempdir() do dir
+        path = joinpath(dir, &quot;mesh.msh&quot;)
+        gmsh.write(path)
+        togrid(path)
+    end
+
+    # Finalize the Gmsh library
+    Gmsh.finalize()
+
+    return grid
+end</code></pre><h3 id="Degrees-of-freedom"><a class="docs-heading-anchor" href="#Degrees-of-freedom">Degrees of freedom</a><a id="Degrees-of-freedom-1"></a><a class="docs-heading-anchor-permalink" href="#Degrees-of-freedom" title="Permalink"></a></h3><p>As mentioned in the introduction we will use a quadratic approximation for the velocity field and a linear approximation for the pressure to ensure that we fulfill the LBB condition. We create the corresponding FE values with interpolations <code>ipu</code> for the velocity and <code>ipp</code> for the pressure. Note that we use linear geometric interpolation (<code>ipg</code>) for both the velocity and pressure, this is because our grid contains linear triangles. We also construct face-values for the pressure since we need to integrate along the boundary when assembling the constraint matrix <span>$\underline{\underline{C}}$</span>.</p><pre><code class="language-julia hljs">function setup_fevalues(ipu, ipp, ipg)
+    qr = QuadratureRule{2,RefTetrahedron}(2)
+    cvu = CellVectorValues(qr, ipu, ipg)
+    cvp = CellScalarValues(qr, ipp, ipg)
+    qr_face = QuadratureRule{1,RefTetrahedron}(2)
+    fvp = FaceScalarValues(qr_face, ipp, ipg)
+    return cvu, cvp, fvp
+end</code></pre><p>The <code>setup_dofs</code> function creates the <code>DofHandler</code>, and adds the two fields: a vector field <code>:u</code> with interpolation <code>ipu</code>, and a scalar field <code>:p</code> with interpolation <code>ipp</code>.</p><pre><code class="language-julia hljs">function setup_dofs(grid, ipu, ipp)
+    dh = DofHandler(grid)
+    add!(dh, :u, 2, ipu)
+    add!(dh, :p, 1, ipp)
+    close!(dh)
+    return dh
+end</code></pre><h3 id="Boundary-conditions-and-constraints"><a class="docs-heading-anchor" href="#Boundary-conditions-and-constraints">Boundary conditions and constraints</a><a id="Boundary-conditions-and-constraints-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-conditions-and-constraints" title="Permalink"></a></h3><p>Now it is time to setup the <code>ConstraintHandler</code> and add our boundary conditions and the mean value constraint. This is perhaps the most interesting section in this example, and deserves some attention.</p><p>Let&#39;s first discuss the assembly of the constraint matrix <span>$\underline{\underline{C}}$</span> and how to create an <code>AffineConstraint</code> from it. This is done in the <code>setup_mean_constraint</code> function below. Assembling this is not so different from standard assembly in Ferrite: we loop over all the faces, loop over the quadrature points, and loop over the shape functions. Note that since there is only one constraint the matrix will only have one row. After assembling <code>C</code> we construct an <code>AffineConstraint</code> from it. We select the constrained dof to be the one with the highest weight (just to avoid selecting one with 0 or a very small weight), then move the remaining to the right hand side. As an example, consider the case where the constraint equation <span>$\underline{\underline{C}}_p\ \underline{a}_p$</span> is</p><p class="math-container">\[w_{10} p_{10} + w_{23} p_{23} + w_{154} p_{154} = 0\]</p><p>i.e. dofs 10, 23, and 154, are the ones located on the boundary (all other dofs naturally gives 0 contribution). If <span>$w_{23}$</span> is the largest weight, then we select <span>$p_{23}$</span> to be the constrained one, and thus reorder the constraint to the form</p><p class="math-container">\[p_{23} = -\frac{w_{10}}{w_{23}} p_{10} -\frac{w_{154}}{w_{23}} p_{154} + 0,\]</p><p>which is the form the <code>AffineConstraint</code> constructor expects.</p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>If all nodes along the boundary are equidistant all the weights would be the same. In this case we can construct the constraint without having to do any integration by simply finding all degrees of freedom that are located along the boundary (and using 1 as the weight). This is what is done in the <a href="https://www.dealii.org/current/doxygen/deal.II/step_11.html">deal.ii step-11 example</a>.</p></div></div><pre><code class="language-julia hljs">function setup_mean_constraint(dh, fvp)
+    assembler = start_assemble()
+    # All external boundaries
+    set = union(
+        getfaceset(dh.grid, &quot;Γ1&quot;),
+        getfaceset(dh.grid, &quot;Γ2&quot;),
+        getfaceset(dh.grid, &quot;Γ3&quot;),
+        getfaceset(dh.grid, &quot;Γ4&quot;),
+    )
+    # Allocate buffers
+    range_p = dof_range(dh, :p)
+    element_dofs = zeros(Int, ndofs_per_cell(dh))
+    element_dofs_p = view(element_dofs, range_p)
+    element_coords = zeros(Vec{2}, 3)
+    Ce = zeros(1, length(range_p)) # Local constraint matrix (only 1 row)
+    # Loop over all the boundaries
+    for (ci, fi) in set
+        Ce .= 0
+        getcoordinates!(element_coords, dh.grid, ci)
+        reinit!(fvp, element_coords, fi)
+        celldofs!(element_dofs, dh, ci)
+        for qp in 1:getnquadpoints(fvp)
+            dΓ = getdetJdV(fvp, qp)
+            for i in 1:getnbasefunctions(fvp)
+                Ce[1, i] += shape_value(fvp, qp, i) * dΓ
+            end
+        end
+        # Assemble to row 1
+        assemble!(assembler, [1], element_dofs_p, Ce)
+    end
+    C = end_assemble(assembler)
+    # Create an AffineConstraint from the C-matrix
+    _, J, V = findnz(C)
+    _, constrained_dof = findmax(abs2, V)
+    V ./= V[constrained_dof]
+    mean_value_constraint = AffineConstraint(
+        constrained_dof,
+        Pair{Int,Float64}[J[i] =&gt; -V[i] for i in 1:length(J) if J[i] != constrained_dof],
+        0.0,
+    )
+    return mean_value_constraint
+end</code></pre><p>We now setup all the boundary conditions in the <code>setup_constraints</code> function below. Since the periodicity constraint for this example is between two boundaries which are not parallel to each other we need to i) compute the mapping between each mirror face and the corresponding image face (on the element level) and ii) describe the dof relation between dofs on these two faces. In Ferrite this is done by defining a transformation of entities on the image boundary such that they line up with the matching entities on the mirror boundary. In this example we consider the inlet <span>$\Gamma_1$</span> to be the image, and the outlet <span>$\Gamma_3$</span> to be the mirror. The necessary transformation to apply then becomes a rotation of <span>$\pi/2$</span> radians around the out-of-plane axis. We set up the rotation matrix <code>R</code>, and then compute the mapping between mirror and image faces using <a href="../../reference/boundary_conditions/#Ferrite.collect_periodic_faces"><code>collect_periodic_faces</code></a> where the rotation is applied to the coordinates. In the next step we construct the constraint using the <a href="../../reference/boundary_conditions/#Ferrite.PeriodicDirichlet"><code>PeriodicDirichlet</code></a> constructor. We pass the constructor the computed mapping, and also the rotation matrix. This matrix is used to rotate the dofs on the mirror surface such that we properly constrain <span>$\boldsymbol{u}_x$</span>-dofs on the mirror to <span>$-\boldsymbol{u}_y$</span>-dofs on the image, and <span>$\boldsymbol{u}_y$</span>-dofs on the mirror to <span>$\boldsymbol{u}_x$</span>-dofs on the image.</p><p>For the remaining part of the boundary we add a homogeneous Dirichlet boundary condition on both components of the velocity field. This is done using the <a href="../../reference/boundary_conditions/#Ferrite.Dirichlet"><code>Dirichlet</code></a> constructor, which we have discussed in other tutorials.</p><pre><code class="language-julia hljs">function setup_constraints(dh, fvp)
+    ch = ConstraintHandler(dh)
+    # Periodic BC
+    R = rotation_tensor(π / 2)
+    periodic_faces = collect_periodic_faces(dh.grid, &quot;Γ3&quot;, &quot;Γ1&quot;, x -&gt; R ⋅ x)
+    periodic = PeriodicDirichlet(:u, periodic_faces, R, [1, 2])
+    add!(ch, periodic)
+    # Dirichlet BC
+    Γ24 = union(getfaceset(dh.grid, &quot;Γ2&quot;), getfaceset(dh.grid, &quot;Γ4&quot;))
+    dbc = Dirichlet(:u, Γ24, (x, t) -&gt; [0, 0], [1, 2])
+    add!(ch, dbc)
+    # Compute mean value constraint and add it
+    mean_value_constraint = setup_mean_constraint(dh, fvp)
+    add!(ch, mean_value_constraint)
+    # Finalize
+    close!(ch)
+    update!(ch, 0)
+    return ch
+end</code></pre><h3 id="Global-and-local-assembly"><a class="docs-heading-anchor" href="#Global-and-local-assembly">Global and local assembly</a><a id="Global-and-local-assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Global-and-local-assembly" title="Permalink"></a></h3><p>Assembly of the global system is also something that we have seen in many previous tutorials. One interesting thing to note here is that, since we have two unknown fields, we use the <a href="../../reference/dofhandler/#Ferrite.dof_range"><code>dof_range</code></a> function to make sure we assemble the element contributions to the correct block of the local stiffness matrix <code>ke</code>.</p><pre><code class="language-julia hljs">function assemble_system!(K, f, dh, cvu, cvp)
+    assembler = start_assemble(K, f)
+    ke = zeros(ndofs_per_cell(dh), ndofs_per_cell(dh))
+    fe = zeros(ndofs_per_cell(dh))
+    range_u = dof_range(dh, :u)
+    ndofs_u = length(range_u)
+    range_p = dof_range(dh, :p)
+    ndofs_p = length(range_p)
+    ϕᵤ = Vector{Vec{2,Float64}}(undef, ndofs_u)
+    ∇ϕᵤ = Vector{Tensor{2,2,Float64,4}}(undef, ndofs_u)
+    divϕᵤ = Vector{Float64}(undef, ndofs_u)
+    ϕₚ = Vector{Float64}(undef, ndofs_p)
+    for cell in CellIterator(dh)
+        reinit!(cvu, cell)
+        reinit!(cvp, cell)
+        ke .= 0
+        fe .= 0
+        for qp in 1:getnquadpoints(cvu)
+            dΩ = getdetJdV(cvu, qp)
+            for i in 1:ndofs_u
+                ϕᵤ[i] = shape_value(cvu, qp, i)
+                ∇ϕᵤ[i] = shape_gradient(cvu, qp, i)
+                divϕᵤ[i] = shape_divergence(cvu, qp, i)
+            end
+            for i in 1:ndofs_p
+                ϕₚ[i] = shape_value(cvp, qp, i)
+            end
+            # u-u
+            for (i, I) in pairs(range_u), (j, J) in pairs(range_u)
+                ke[I, J] += ( ∇ϕᵤ[i] ⊡ ∇ϕᵤ[j] ) * dΩ
+            end
+            # u-p
+            for (i, I) in pairs(range_u), (j, J) in pairs(range_p)
+                ke[I, J] += ( -divϕᵤ[i] * ϕₚ[j] ) * dΩ
+            end
+            # p-u
+            for (i, I) in pairs(range_p), (j, J) in pairs(range_u)
+                ke[I, J] += ( -divϕᵤ[j] * ϕₚ[i] ) * dΩ
+            end
+            # rhs
+            for (i, I) in pairs(range_u)
+                x = spatial_coordinate(cvu, qp, getcoordinates(cell))
+                b = exp(-100 * norm(x - Vec{2}((0.75, 0.1)))^2)
+                bv = Vec{2}((b, 0.0))
+                fe[I] += (ϕᵤ[i] ⋅ bv) * dΩ
+            end
+        end
+        assemble!(assembler, celldofs(cell), ke, fe)
+    end
+    return K, f
+end</code></pre><h3 id="Running-the-simulation"><a class="docs-heading-anchor" href="#Running-the-simulation">Running the simulation</a><a id="Running-the-simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Running-the-simulation" title="Permalink"></a></h3><p>We now have all the puzzle pieces, and just need to define the main function, which puts them all together.</p><pre><code class="language-julia hljs">function main()
+    # Grid
+    h = 0.05 # approximate element size
+    grid = setup_grid(h)
+    # Interpolations
+    ipu = Lagrange{2,RefTetrahedron,2}() # quadratic
+    ipp = Lagrange{2,RefTetrahedron,1}() # linear
+    # Dofs
+    dh = setup_dofs(grid, ipu, ipp)
+    # FE values
+    ipg = Lagrange{2,RefTetrahedron,1}() # linear geometric interpolation
+    cvu, cvp, fvp = setup_fevalues(ipu, ipp, ipg)
+    # Boundary conditions
+    ch = setup_constraints(dh, fvp)
+    # Global tangent matrix and rhs
+    coupling = [true true; true false] # no coupling between pressure test/trial functions
+    K = create_sparsity_pattern(dh, ch; coupling=coupling)
+    f = zeros(ndofs(dh))
+    # Assemble system
+    assemble_system!(K, f, dh, cvu, cvp)
+    # Apply boundary conditions and solve
+    apply!(K, f, ch)
+    u = K \ f
+    apply!(u, ch)
+    # Export the solution
+    vtk_grid(&quot;stokes-flow&quot;, grid) do vtk
+        vtk_point_data(vtk, dh, u)
+    end
+    return
+end</code></pre><p>Run it!</p><pre><code class="language-julia hljs">main()</code></pre><p>The resulting magnitude of the velocity field is visualized in <em>Figure 1</em>.</p><h2 id="stokes-flow-plain-program"><a class="docs-heading-anchor" href="#stokes-flow-plain-program">Plain program</a><a id="stokes-flow-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#stokes-flow-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../stokes-flow.jl"><code>stokes-flow.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, FerriteGmsh, Gmsh, Tensors, LinearAlgebra, SparseArrays
+
+function setup_grid(h=0.05)
+    # Initialize gmsh
+    Gmsh.initialize()
+    gmsh.option.set_number(&quot;General.Verbosity&quot;, 2)
+
+    # Add the points
+    o = gmsh.model.geo.add_point(0.0, 0.0, 0.0, h)
+    p1 = gmsh.model.geo.add_point(0.5, 0.0, 0.0, h)
+    p2 = gmsh.model.geo.add_point(1.0, 0.0, 0.0, h)
+    p3 = gmsh.model.geo.add_point(0.0, 1.0, 0.0, h)
+    p4 = gmsh.model.geo.add_point(0.0, 0.5, 0.0, h)
+
+    # Add the lines
+    l1 = gmsh.model.geo.add_line(p1, p2)
+    l2 = gmsh.model.geo.add_circle_arc(p2, o, p3)
+    l3 = gmsh.model.geo.add_line(p3, p4)
+    l4 = gmsh.model.geo.add_circle_arc(p4, o, p1)
+
+    # Create the closed curve loop and the surface
+    loop = gmsh.model.geo.add_curve_loop([l1, l2, l3, l4])
+    surf = gmsh.model.geo.add_plane_surface([loop])
+
+    # Synchronize the model
+    gmsh.model.geo.synchronize()
+
+    # Create the physical domains
+    gmsh.model.add_physical_group(1, [l1], -1, &quot;Γ1&quot;)
+    gmsh.model.add_physical_group(1, [l2], -1, &quot;Γ2&quot;)
+    gmsh.model.add_physical_group(1, [l3], -1, &quot;Γ3&quot;)
+    gmsh.model.add_physical_group(1, [l4], -1, &quot;Γ4&quot;)
+    gmsh.model.add_physical_group(2, [surf])
+
+    # Add the periodicity constraint using 4x4 affine transformation matrix,
+    # see https://en.wikipedia.org/wiki/Transformation_matrix#Affine_transformations
+    transformation_matrix = zeros(4, 4)
+    transformation_matrix[1, 2] = 1  # -sin(-pi/2)
+    transformation_matrix[2, 1] = -1 #  cos(-pi/2)
+    transformation_matrix[3, 3] = 1
+    transformation_matrix[4, 4] = 1
+    transformation_matrix = vec(transformation_matrix&#39;)
+    gmsh.model.mesh.set_periodic(1, [l1], [l3], transformation_matrix)
+
+    # Generate a 2D mesh
+    gmsh.model.mesh.generate(2)
+
+    # Save the mesh, and read back in as a Ferrite Grid
+    grid = mktempdir() do dir
+        path = joinpath(dir, &quot;mesh.msh&quot;)
+        gmsh.write(path)
+        togrid(path)
+    end
+
+    # Finalize the Gmsh library
+    Gmsh.finalize()
+
+    return grid
+end
+
+function setup_fevalues(ipu, ipp, ipg)
+    qr = QuadratureRule{2,RefTetrahedron}(2)
+    cvu = CellVectorValues(qr, ipu, ipg)
+    cvp = CellScalarValues(qr, ipp, ipg)
+    qr_face = QuadratureRule{1,RefTetrahedron}(2)
+    fvp = FaceScalarValues(qr_face, ipp, ipg)
+    return cvu, cvp, fvp
+end
+
+function setup_dofs(grid, ipu, ipp)
+    dh = DofHandler(grid)
+    add!(dh, :u, 2, ipu)
+    add!(dh, :p, 1, ipp)
+    close!(dh)
+    return dh
+end
+
+function setup_mean_constraint(dh, fvp)
+    assembler = start_assemble()
+    # All external boundaries
+    set = union(
+        getfaceset(dh.grid, &quot;Γ1&quot;),
+        getfaceset(dh.grid, &quot;Γ2&quot;),
+        getfaceset(dh.grid, &quot;Γ3&quot;),
+        getfaceset(dh.grid, &quot;Γ4&quot;),
+    )
+    # Allocate buffers
+    range_p = dof_range(dh, :p)
+    element_dofs = zeros(Int, ndofs_per_cell(dh))
+    element_dofs_p = view(element_dofs, range_p)
+    element_coords = zeros(Vec{2}, 3)
+    Ce = zeros(1, length(range_p)) # Local constraint matrix (only 1 row)
+    # Loop over all the boundaries
+    for (ci, fi) in set
+        Ce .= 0
+        getcoordinates!(element_coords, dh.grid, ci)
+        reinit!(fvp, element_coords, fi)
+        celldofs!(element_dofs, dh, ci)
+        for qp in 1:getnquadpoints(fvp)
+            dΓ = getdetJdV(fvp, qp)
+            for i in 1:getnbasefunctions(fvp)
+                Ce[1, i] += shape_value(fvp, qp, i) * dΓ
+            end
+        end
+        # Assemble to row 1
+        assemble!(assembler, [1], element_dofs_p, Ce)
+    end
+    C = end_assemble(assembler)
+    # Create an AffineConstraint from the C-matrix
+    _, J, V = findnz(C)
+    _, constrained_dof = findmax(abs2, V)
+    V ./= V[constrained_dof]
+    mean_value_constraint = AffineConstraint(
+        constrained_dof,
+        Pair{Int,Float64}[J[i] =&gt; -V[i] for i in 1:length(J) if J[i] != constrained_dof],
+        0.0,
+    )
+    return mean_value_constraint
+end
+
+function setup_constraints(dh, fvp)
+    ch = ConstraintHandler(dh)
+    # Periodic BC
+    R = rotation_tensor(π / 2)
+    periodic_faces = collect_periodic_faces(dh.grid, &quot;Γ3&quot;, &quot;Γ1&quot;, x -&gt; R ⋅ x)
+    periodic = PeriodicDirichlet(:u, periodic_faces, R, [1, 2])
+    add!(ch, periodic)
+    # Dirichlet BC
+    Γ24 = union(getfaceset(dh.grid, &quot;Γ2&quot;), getfaceset(dh.grid, &quot;Γ4&quot;))
+    dbc = Dirichlet(:u, Γ24, (x, t) -&gt; [0, 0], [1, 2])
+    add!(ch, dbc)
+    # Compute mean value constraint and add it
+    mean_value_constraint = setup_mean_constraint(dh, fvp)
+    add!(ch, mean_value_constraint)
+    # Finalize
+    close!(ch)
+    update!(ch, 0)
+    return ch
+end
+
+function assemble_system!(K, f, dh, cvu, cvp)
+    assembler = start_assemble(K, f)
+    ke = zeros(ndofs_per_cell(dh), ndofs_per_cell(dh))
+    fe = zeros(ndofs_per_cell(dh))
+    range_u = dof_range(dh, :u)
+    ndofs_u = length(range_u)
+    range_p = dof_range(dh, :p)
+    ndofs_p = length(range_p)
+    ϕᵤ = Vector{Vec{2,Float64}}(undef, ndofs_u)
+    ∇ϕᵤ = Vector{Tensor{2,2,Float64,4}}(undef, ndofs_u)
+    divϕᵤ = Vector{Float64}(undef, ndofs_u)
+    ϕₚ = Vector{Float64}(undef, ndofs_p)
+    for cell in CellIterator(dh)
+        reinit!(cvu, cell)
+        reinit!(cvp, cell)
+        ke .= 0
+        fe .= 0
+        for qp in 1:getnquadpoints(cvu)
+            dΩ = getdetJdV(cvu, qp)
+            for i in 1:ndofs_u
+                ϕᵤ[i] = shape_value(cvu, qp, i)
+                ∇ϕᵤ[i] = shape_gradient(cvu, qp, i)
+                divϕᵤ[i] = shape_divergence(cvu, qp, i)
+            end
+            for i in 1:ndofs_p
+                ϕₚ[i] = shape_value(cvp, qp, i)
+            end
+            # u-u
+            for (i, I) in pairs(range_u), (j, J) in pairs(range_u)
+                ke[I, J] += ( ∇ϕᵤ[i] ⊡ ∇ϕᵤ[j] ) * dΩ
+            end
+            # u-p
+            for (i, I) in pairs(range_u), (j, J) in pairs(range_p)
+                ke[I, J] += ( -divϕᵤ[i] * ϕₚ[j] ) * dΩ
+            end
+            # p-u
+            for (i, I) in pairs(range_p), (j, J) in pairs(range_u)
+                ke[I, J] += ( -divϕᵤ[j] * ϕₚ[i] ) * dΩ
+            end
+            # rhs
+            for (i, I) in pairs(range_u)
+                x = spatial_coordinate(cvu, qp, getcoordinates(cell))
+                b = exp(-100 * norm(x - Vec{2}((0.75, 0.1)))^2)
+                bv = Vec{2}((b, 0.0))
+                fe[I] += (ϕᵤ[i] ⋅ bv) * dΩ
+            end
+        end
+        assemble!(assembler, celldofs(cell), ke, fe)
+    end
+    return K, f
+end
+
+function main()
+    # Grid
+    h = 0.05 # approximate element size
+    grid = setup_grid(h)
+    # Interpolations
+    ipu = Lagrange{2,RefTetrahedron,2}() # quadratic
+    ipp = Lagrange{2,RefTetrahedron,1}() # linear
+    # Dofs
+    dh = setup_dofs(grid, ipu, ipp)
+    # FE values
+    ipg = Lagrange{2,RefTetrahedron,1}() # linear geometric interpolation
+    cvu, cvp, fvp = setup_fevalues(ipu, ipp, ipg)
+    # Boundary conditions
+    ch = setup_constraints(dh, fvp)
+    # Global tangent matrix and rhs
+    coupling = [true true; true false] # no coupling between pressure test/trial functions
+    K = create_sparsity_pattern(dh, ch; coupling=coupling)
+    f = zeros(ndofs(dh))
+    # Assemble system
+    assemble_system!(K, f, dh, cvu, cvp)
+    # Apply boundary conditions and solve
+    apply!(K, f, ch)
+    u = K \ f
+    apply!(u, ch)
+    # Export the solution
+    vtk_grid(&quot;stokes-flow&quot;, grid) do vtk
+        vtk_point_data(vtk, dh, u)
+    end
+    return
+end
+
+main()</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../computational_homogenization/">« Computational homogenization</a><a class="docs-footer-nextpage" href="../topology_optimization/">Topology optimization »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.28.0-DEV on <span class="colophon-date" title="Tuesday 17 January 2023 15:33">Tuesday 17 January 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
