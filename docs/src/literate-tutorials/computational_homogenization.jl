@@ -242,26 +242,20 @@ dirichlet = Dirichlet(
     [1, 2]
 )
 add!(ch_dirichlet, dirichlet)
-close!(ch_dirichlet)
-update!(ch_dirichlet, 0.0)
+close!(ch_dirichlet);
 
 # For periodic boundary conditions we use the [`PeriodicDirichlet`](@ref) constraint type,
 # which is very similar to the `Dirichlet` type, but instead of a passing a facetset we pass
 # a vector with "facet pairs", i.e. the mapping between mirror and image parts of the
-# boundary. In this example the `"left"` and `"bottom"` boundaries are mirrors, and the
-# `"right"` and `"top"` boundaries are the images.
+# boundary. The facet pairs are computed with [`collect_periodic_facets`](@ref). In this
+# example the `"left"` and `"bottom"` boundaries are mirrors, and the `"right"` and `"top"`
+# boundaries are the images.
 
-ch_periodic = ConstraintHandler(dh);
-periodic = PeriodicDirichlet(
-    :u,
-    ["left" => "right", "bottom" => "top"],
-    [1, 2]
-)
-add!(ch_periodic, periodic)
-close!(ch_periodic)
-update!(ch_periodic, 0.0)
+periodic_facets = collect_periodic_facets(grid, "left", "right")
+collect_periodic_facets!(periodic_facets, grid, "bottom", "top")
+periodic = PeriodicDirichlet(:u, periodic_facets, [1, 2]);
 
-# This will now constrain any degrees of freedom located on the mirror boundaries to
+# This will constrain any degrees of freedom located on the mirror boundaries to
 # the matching degree of freedom on the image boundaries. Internally this will create
 # a number of `AffineConstraint`s of the form `u_i = 1 * u_j + 0`:
 # ```julia
@@ -272,6 +266,25 @@ update!(ch_periodic, 0.0)
 # constructing such affine constraints since it computes the degree of freedom mapping
 # automatically.
 #
+# The periodic constraints determine the fluctuation field only up to a constant
+# translation, so we also need to remove this rigid body motion. Since the periodicity ties
+# the four corners of the RVE together we do this by prescribing the fluctuation to zero
+# in all of them, using a regular `Dirichlet` constraint on a vertexset with the corners.
+# We add it after the `PeriodicDirichlet` constraint, which means that it replaces the
+# periodic constraints between the corners, so all corners are simply prescribed to zero.
+# Note that it is generally not enough to lock just one of the corners: adding a
+# constraint for a degree of freedom that is already constrained replaces the old
+# constraint, so either the periodic constraint or the `Dirichlet` constraint of that
+# corner would be lost.
+
+addvertexset!(grid, "corners", x -> all(abs.(x) .≈ 0.5))
+corners = Dirichlet(:u, getvertexset(grid, "corners"), x -> zero(Vec{2}), [1, 2])
+
+ch_periodic = ConstraintHandler(dh)
+add!(ch_periodic, periodic)
+add!(ch_periodic, corners)
+close!(ch_periodic);
+
 # To simplify things we group the constraint handlers into a named tuple
 
 ch = (dirichlet = ch_dirichlet, periodic = ch_periodic);

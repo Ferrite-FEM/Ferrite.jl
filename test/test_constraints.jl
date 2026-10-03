@@ -1374,6 +1374,56 @@ end # testset
 
 end # testset
 
+@testset "periodic bc: legacy facet pairs" begin
+    # The legacy constructor, which takes facetset name pairs, also locks the corners with
+    # a Dirichlet constraint. Check that this gives the same constraints as the
+    # `collect_periodic_facets` constructor with a Dirichlet on the corners added after.
+    function get_constraints(ch)
+        return Dict(
+            d => (ch.inhomogeneities[i], ch.dofcoefficients[i] === nothing ? nothing : sort(ch.dofcoefficients[i]))
+                for (i, d) in pairs(ch.prescribed_dofs)
+        )
+    end
+    function compare_with_legacy(grid, ip, facet_pairs; f = nothing, components = nothing)
+        dh = DofHandler(grid)
+        add!(dh, :u, ip)
+        close!(dh)
+        # Legacy
+        ch_legacy = ConstraintHandler(dh)
+        pdbc = PeriodicDirichlet(:u, facet_pairs, f, components)
+        @test_deprecated r"legacy code for PeriodicDirichlet" add!(ch_legacy, pdbc)
+        close!(ch_legacy)
+        # Explicit corners
+        facet_map = collect_periodic_facets(grid, facet_pairs[1]...)
+        for facet_pair in facet_pairs[2:end]
+            collect_periodic_facets!(facet_map, grid, facet_pair...)
+        end
+        corners = Set(i for (i, n) in pairs(getnodes(grid)) if all(x -> abs(x) ≈ 1, get_node_coordinate(n)))
+        @test length(corners) == 2^Ferrite.getspatialdim(grid)
+        n = components === nothing ? 1 : length(components)
+        g = f === nothing ? (x, t) -> (n == 1 ? 0.0 : zeros(n)) : f
+        ch = ConstraintHandler(dh)
+        add!(ch, PeriodicDirichlet(:u, facet_map, f, components))
+        add!(ch, Dirichlet(:u, corners, g, components))
+        close!(ch)
+        @test get_constraints(ch_legacy) == get_constraints(ch)
+        return
+    end
+
+    # 2D, scalar
+    grid = generate_grid(Quadrilateral, (3, 3))
+    ip = Lagrange{RefQuadrilateral, 1}()
+    compare_with_legacy(grid, ip, ["left" => "right", "bottom" => "top"])
+    # 2D, vector, all and some components
+    compare_with_legacy(grid, ip^2, ["left" => "right", "bottom" => "top"]; components = [1, 2])
+    compare_with_legacy(grid, ip^2, ["left" => "right", "bottom" => "top"]; components = [2])
+    # 2D, inhomogeneous
+    compare_with_legacy(grid, ip, ["left" => "right", "bottom" => "top"]; f = (x, t) -> x[1] + 2x[2])
+    # 3D
+    grid = generate_grid(Hexahedron, (2, 2, 2))
+    compare_with_legacy(grid, Lagrange{RefHexahedron, 1}(), ["left" => "right", "bottom" => "top", "front" => "back"])
+end # testset
+
 @testset "Affine constraints with master dofs that are prescribed" begin
     grid = generate_grid(Quadrilateral, (2, 2))
     dh = DofHandler(grid); add!(dh, :u, Lagrange{RefQuadrilateral, 1}()); close!(dh)
