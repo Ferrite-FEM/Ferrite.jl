@@ -78,6 +78,14 @@ Base.@constprop :aggressive function Ferrite.start_assemble(K::BlockMatrix{Tv}, 
     return BlockAssembler{eltype(K), typeof(K), typeof(f), atomic}(K, f, Int[], Int[], Int[])
 end
 
+# The global matrix and vector are shared, only the buffers are duplicated
+function Ferrite.task_local_copy(ba::BA) where {BA <: BlockAssembler}
+    return BA(
+        ba.K, ba.f, Ferrite.task_local_copy(ba.sorteddofs),
+        Ferrite.task_local_copy(ba.permutation), Ferrite.task_local_copy(ba.blockstops)
+    )
+end
+
 # The global index range of block `B` along axis `d`.
 blockrange(K::BlockMatrix, d::Int, B::Block{1}) = axes(K, d)[B]
 

@@ -9,7 +9,6 @@ end
 UpdateFlags(; nodes::Bool = true, coords::Bool = true, dofs::Bool = true) =
     UpdateFlags(nodes, coords, dofs)
 
-
 ###############
 ## CellCache ##
 ###############
@@ -86,6 +85,13 @@ function reinit!(cc::CellCache, i::Integer)
     return cc
 end
 
+function task_local_copy(cc::CellCache)
+    return CellCache(
+        cc.flags, cc.grid, task_local_copy(cc.cellid), task_local_copy(cc.nodes),
+        task_local_copy(cc.coords), cc.dh, task_local_copy(cc.dofs)
+    )
+end
+
 # reinit! FEValues with CellCache
 function reinit!(cv::AbstractCellValues, cc::CellCache)
     cell = reinit_needs_cell(cv) ? getcells(cc.grid, cellid(cc)) : nothing
@@ -132,6 +138,11 @@ end
 function FacetCache(args...)
     cc = CellCache(args...)
     return FacetCache(cc, cc.dofs, 0)
+end
+
+function task_local_copy(fc::FacetCache)
+    cc = task_local_copy(fc.cc)
+    return FacetCache(cc, cc.dofs, fc.current_facet_id) # Preserve aliasing of dofs
 end
 
 function reinit!(fc::FacetCache, facet::BoundaryIndex)
@@ -183,6 +194,12 @@ function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler})
     fc_a = FacetCache(gridordh)
     fc_b = FacetCache(gridordh)
     return InterfaceCache(fc_a, fc_b, Int[])
+end
+
+function task_local_copy(ic::InterfaceCache)
+    return InterfaceCache(
+        task_local_copy(ic.a), task_local_copy(ic.b), task_local_copy(ic.dofs)
+    )
 end
 
 function reinit!(cache::InterfaceCache, (facet_a, facet_b)::NTuple{2, FacetIndex})

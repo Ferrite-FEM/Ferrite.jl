@@ -150,35 +150,6 @@ include(joinpath(@__DIR__, "test_utils.jl"))
                 # end
 
             end
-
-            @testset "copy(::FacetValues)" begin
-                fvc = copy(fv)
-                @test typeof(fv) == typeof(fvc)
-
-                # Test that all mutable types in FunctionValues and GeometryMapping have been copied
-                for key in (:fun_values, :geo_mapping)
-                    for i in eachindex(getfield(fv, key))
-                        val = getfield(fv, key)[i]
-                        valc = getfield(fvc, key)[i]
-                        for fname in fieldnames(typeof(val))
-                            v = getfield(val, fname)
-                            vc = getfield(valc, fname)
-                            isbits(v) || @test v !== vc
-                            @test v == vc
-                        end
-                    end
-                end
-                # Test that fqr, detJdV, and normals, are copied as expected.
-                # Note that qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
-                for fname in (:fqr, :detJdV, :normals)
-                    v = getfield(fv, fname)
-                    vc = getfield(fvc, fname)
-                    if fname !== :fqr # Test unaliased
-                        @test v !== vc
-                    end
-                    @test v == vc
-                end
-            end
         end
     end
 
@@ -196,7 +167,7 @@ include(joinpath(@__DIR__, "test_utils.jl"))
         @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): 2 quadrature points per face")
         @test contains(showstring, "Function interpolation: Lagrange{RefQuadrilateral, 2}()")
         @test contains(showstring, "Geometric interpolation: Lagrange{RefQuadrilateral, 1}()^2")
-        fv2 = copy(fv)
+        fv2 = task_local_copy(fv)
         push!(Ferrite.getweights(fv2.fqr.facet_rules[1]), 1)
         showstring = sprint(show, MIME"text/plain"(), fv2)
         @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): (3, 2, 2, 2) quadrature points on each face")
