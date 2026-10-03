@@ -179,16 +179,41 @@ matrix_handle, vector_handle
 # (LLVM neither unswitches a branch at the accumulation site out of the assembly loops,
 # nor generates as good code when both paths are inlined next to each other).
 
+# Buffers for sorting the dofs in `assemble!`. These are stored in a `TaskLocalValue` so
+# that each task gets its own buffers, which makes it safe to use the same assembler from
+# multiple tasks (but note that writing into the global matrix and vector still requires
+# either grid coloring or atomic assembly).
+struct AssemblyBuffers
+    rowpermutation::Vector{Int}
+    colpermutation::Vector{Int}
+    sortedrowdofs::Vector{Int}
+    sortedcoldofs::Vector{Int}
+end
+
+struct AssemblyBuffersInit
+    sizehint::Int
+    symmetric::Bool # Symmetric assembly doesn't need separate row and col buffers
+end
+function (init::AssemblyBuffersInit)()
+    colpermutation = zeros(Int, init.sizehint)
+    sortedcoldofs = zeros(Int, init.sizehint)
+    if init.symmetric
+        return AssemblyBuffers(colpermutation, colpermutation, sortedcoldofs, sortedcoldofs)
+    else
+        return AssemblyBuffers(zeros(Int, init.sizehint), colpermutation, zeros(Int, init.sizehint), sortedcoldofs)
+    end
+end
+
+assembly_buffers(sizehint::Int; symmetric::Bool = false) =
+    TaskLocalValue{AssemblyBuffers}(AssemblyBuffersInit(sizehint, symmetric))
+
 """
 Assembler for sparse matrix with CSC storage type.
 """
 struct CSCAssembler{Tv, Ti, MT <: AbstractSparseMatrixCSC{Tv, Ti}, atomic} <: AbstractCSCAssembler{Tv}
     K::MT
     f::Vector{Tv}
-    rowpermutation::Vector{Int}
-    colpermutation::Vector{Int}
-    sortedrowdofs::Vector{Int}
-    sortedcoldofs::Vector{Int}
+    buffers::TaskLocalValue{AssemblyBuffers, AssemblyBuffersInit}
 end
 
 """
@@ -197,10 +222,7 @@ Assembler for sparse matrix with CSR storage type.
 struct CSRAssembler{Tv, Ti, MT <: AbstractSparseMatrix{Tv, Ti}, atomic} <: AbstractCSRAssembler{Tv} #AbstractSparseMatrixCSR does not exist
     K::MT
     f::Vector{Tv}
-    rowpermutation::Vector{Int}
-    colpermutation::Vector{Int}
-    sortedrowdofs::Vector{Int}
-    sortedcoldofs::Vector{Int}
+    buffers::TaskLocalValue{AssemblyBuffers, AssemblyBuffersInit}
 end
 
 """
@@ -209,10 +231,7 @@ Assembler for symmetric sparse matrix with CSC storage type.
 struct SymmetricCSCAssembler{Tv, Ti, MT <: Symmetric{Tv, <:AbstractSparseMatrixCSC{Tv, Ti}}, atomic} <: AbstractCSCAssembler{Tv}
     K::MT
     f::Vector{Tv}
-    rowpermutation::Vector{Int} # Symmetric assembly doesn't need separate row and
-    colpermutation::Vector{Int} # col permutation and dofs, but simplifies code reuse
-    sortedrowdofs::Vector{Int}  # reuse with non-symmetric cases. sortedrowdofs and
-    sortedcoldofs::Vector{Int}  # rowpermutation always aliased to sortedcoldofs and colpermutation.
+    buffers::TaskLocalValue{AssemblyBuffers, AssemblyBuffersInit}
 end
 
 # Whether accumulation into the global matrix and vector uses atomic additions. This is a
@@ -271,9 +290,7 @@ some overhead and a non-deterministic result: the order in which contributions a
 to a given entry depends on the task scheduling, and floating point addition is not
 associative. Atomic accumulation is only supported for the value types `Float16`,
 `Float32`, and `Float64`, and `Complex` of these (other value types throw an
-`ArgumentError`). Note that each task still needs
-its own assembler since the assembler contains buffers that are modified during
-`assemble!`. Note also that the value of `atomic` determines a type parameter of the
+`ArgumentError`). Note also that the value of `atomic` determines a type parameter of the
 returned assembler, so for a type stable setup the value should be a literal (or
 otherwise a compile time constant). See the [howto on multithreaded assembly](@ref
 howto-threaded-assembly) for more details.
@@ -288,15 +305,13 @@ start_assemble(K::Union{AbstractSparseMatrixCSC, Symmetric{<:Any, <:AbstractSpar
 Base.@constprop :aggressive function start_assemble(K::AbstractSparseMatrixCSC{T, Ti}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T, Ti}
     _check_atomic_eltype(atomic, T)
     fillzero && (fillzero!(K); fillzero!(f))
-    return CSCAssembler{T, Ti, typeof(K), atomic}(K, f, zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint), zeros(Int, maxcelldofs_hint))
+    return CSCAssembler{T, Ti, typeof(K), atomic}(K, f, assembly_buffers(maxcelldofs_hint))
 end
 Base.@constprop :aggressive function start_assemble(K::Symmetric{T, <:SparseMatrixCSC{T, Ti}}, f::Vector = T[]; fillzero::Bool = true, maxcelldofs_hint::Int = 0, atomic::Bool = false) where {T, Ti}
     _check_upper_triangle(K)
     _check_atomic_eltype(atomic, T)
     fillzero && (fillzero!(K); fillzero!(f))
-    permutation = zeros(Int, maxcelldofs_hint)
-    sorteddofs = zeros(Int, maxcelldofs_hint)
-    return SymmetricCSCAssembler{T, Ti, typeof(K), atomic}(K, f, permutation, permutation, sorteddofs, sorteddofs)
+    return SymmetricCSCAssembler{T, Ti, typeof(K), atomic}(K, f, assembly_buffers(maxcelldofs_hint; symmetric = true))
 end
 
 function finish_assemble(a::Union{CSCAssembler, CSRAssembler, SymmetricCSCAssembler})
@@ -369,9 +384,10 @@ end
     # We assume that the input dofs are not sorted, because the cells need the dofs in
     # a specific order, which might not be the sorted order. Hence we sort them.
     # Note that we are not allowed to mutate `dofs` in the process.
-    sortedcoldofs, colpermutation = _sortdofs_for_assembly!(A.colpermutation, A.sortedcoldofs, coldofs)
+    buffers = A.buffers[]
+    sortedcoldofs, colpermutation = _sortdofs_for_assembly!(buffers.colpermutation, buffers.sortedcoldofs, coldofs)
     sortedrowdofs, rowpermutation = if rowdofs !== coldofs
-        _sortdofs_for_assembly!(A.rowpermutation, A.sortedrowdofs, rowdofs)
+        _sortdofs_for_assembly!(buffers.rowpermutation, buffers.sortedrowdofs, rowdofs)
     else
         sortedcoldofs, colpermutation
     end
@@ -537,9 +553,7 @@ function _missing_sparsity_pattern_error(Krow::Integer, Kcol::Integer)
     msg = "You are trying to assemble values in to K[$(Krow), $(Kcol)], but K[$(Krow), " *
         "$(Kcol)] is missing in the sparsity pattern. Make sure you have called `K = " *
         "allocate_matrix(dh)` or `K = allocate_matrix(dh, ch)` if you " *
-        "have affine constraints. This error might also happen if you are using " *
-        "the assembler in a threaded assembly loop (you need to create one " *
-        "`assembler` for each task)."
+        "have affine constraints."
     throw(ErrorException(msg))
 end
 
