@@ -37,9 +37,14 @@ push!(ARGS, "--jobs=$(Sys.CPU_THREADS)")
 # `Main`: loading these there makes type names print unqualified (e.g.
 # `Lagrange`, `SparseMatrixCSC`), matching a normal `using Ferrite` session,
 # which the `show`/`repr` tests rely on.
+#
+# ParallelTestRunner starts the workers with `JULIA_NUM_THREADS=1`, so pass the thread
+# count of this process explicitly with `--threads` (which takes precedence) to make sure
+# that the threaded tests actually run with multiple threads.
 runtests(
     Ferrite, ARGS;
     testsuite,
+    exeflags = ["--threads=$(Threads.nthreads())"],
     init_code = :(using Ferrite),
     init_worker_code = :(using Ferrite, LinearAlgebra, SparseArrays, SparseMatricesCSR),
 )
