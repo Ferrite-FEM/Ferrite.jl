@@ -245,6 +245,21 @@ matrix_handle(a::Union{AbstractCSCAssembler, AbstractCSRAssembler}) = a.K
 matrix_handle(a::SymmetricCSCAssembler) = a.K.data
 vector_handle(a::Union{AbstractCSCAssembler, AbstractCSRAssembler}) = a.f
 
+# The global matrix and vector are shared, only the buffers are duplicated
+function task_local_copy(asm::A) where {A <: Union{CSCAssembler, CSRAssembler}}
+    return A(
+        asm.K, asm.f,
+        task_local_copy(asm.rowpermutation), task_local_copy(asm.colpermutation),
+        task_local_copy(asm.sortedrowdofs), task_local_copy(asm.sortedcoldofs)
+    )
+end
+function task_local_copy(asm::A) where {A <: SymmetricCSCAssembler}
+    # Preserve aliasing of row and col buffers (see struct definition)
+    permutation = task_local_copy(asm.colpermutation)
+    sorteddofs = task_local_copy(asm.sortedcoldofs)
+    return A(asm.K, asm.f, permutation, permutation, sorteddofs, sorteddofs)
+end
+
 """
     start_assemble(K::AbstractSparseMatrixCSC{Tv}; fillzero = true, atomic = false) -> CSCAssembler{Tv}
     start_assemble(K::AbstractSparseMatrixCSC{Tv}, f::Vector{Tv}; fillzero = true, atomic = false) -> CSCAssembler{Tv}

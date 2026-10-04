@@ -46,6 +46,8 @@ function PointValues(::Type{T}, ip::IP, ipg::GIP = default_geometric_interpolati
     return PointValues{typeof(cv)}(cv)
 end
 
+task_local_copy(pv::PV) where {PV <: PointValues} = PV(task_local_copy(pv.cv))
+
 # Functions used by function_(value|gradient)
 getnbasefunctions(pv::PointValues) = getnbasefunctions(pv.cv)
 shape_value_type(pv::PointValues) = shape_value_type(pv.cv)
