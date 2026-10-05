@@ -176,13 +176,13 @@ end
         # Just smoke test to make sure show doesn't error.
         fv = FacetValues(FacetQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 2}())
         showstring = sprint(show, MIME"text/plain"(), fv)
-        @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): 2 quadrature points per face")
+        @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): 2 quadrature points per facet")
         @test contains(showstring, "Function interpolation: Lagrange{RefQuadrilateral, 2}()")
         @test contains(showstring, "Geometric interpolation: Lagrange{RefQuadrilateral, 1}()^2")
         fv2 = task_local_copy(fv)
         push!(Ferrite.getweights(fv2.fqr.facet_rules[1]), 1)
         showstring = sprint(show, MIME"text/plain"(), fv2)
-        @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): (3, 2, 2, 2) quadrature points on each face")
+        @test startswith(showstring, "FacetValues(scalar, rdim=2, sdim=2): (3, 2, 2, 2) quadrature points on each facet")
     end
 
     @testset "Multi-field FacetValues" begin
@@ -239,6 +239,18 @@ end
             fmv_copy = @inferred task_local_copy(fmv)
             @test typeof(fmv_copy) === typeof(fmv)
             @test fmv_copy.p === fmv_copy.T # Aliasing preserved
+            @test Ferrite.getcurrentfacet(fmv_copy) == Ferrite.getcurrentfacet(fmv)
+            @test getfield(fmv_copy, :fqr) !== getfield(fmv, :fqr)
+            for (qr, qr_copy) in zip(getfield(fmv, :fqr).facet_rules, getfield(fmv_copy, :fqr).facet_rules)
+                @test Ferrite.getpoints(qr_copy) !== Ferrite.getpoints(qr)
+                @test Ferrite.getpoints(qr_copy) == Ferrite.getpoints(qr)
+                @test Ferrite.getweights(qr_copy) !== Ferrite.getweights(qr)
+                @test Ferrite.getweights(qr_copy) == Ferrite.getweights(qr)
+            end
+            for name in (:detJdV, :normals)
+                @test getfield(fmv_copy, name) !== getfield(fmv, name)
+                @test getfield(fmv_copy, name) == getfield(fmv, name)
+            end
             for i in eachindex(getfield(fmv, :fun_values))
                 for (v, vc) in zip(getfield(fmv, :fun_values)[i], getfield(fmv_copy, :fun_values)[i])
                     test_equal_but_unaliased(v, vc)
