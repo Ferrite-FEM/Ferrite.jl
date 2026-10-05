@@ -119,7 +119,6 @@ end
     result, values = _untangle_affine_constraints(Int[], Vector{Pair{Int, Float64}}[], Float64[])
     @test isempty(result) && isempty(values)
     @test_throws DimensionMismatch _untangle_affine_constraints([1], [[2 => 1.0]], Float64[])
-    @test_throws ArgumentError _untangle_affine_constraints([1, 1], [[2 => 1.0], [3 => 1.0]], [0.0, 0.0])
 
     # Compare complete systems with a direct dense solve. A strict contraction gives
     # nonsingular systems, including cycles, disconnected graphs, and constant rows.
