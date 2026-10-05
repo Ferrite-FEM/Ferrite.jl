@@ -38,7 +38,7 @@ view_from_shared(a::AbstractArray{<:Any, 3}, i::Integer) = view(a, i, :, :)
 # Extract the i-th worker's local slice from batched device data
 function get_substruct(cv::CellValues, i)
     fun_values = map(fv -> get_substruct(fv, i), get_fun_values(cv))
-    return CellValues(getfield(cv, :fun_values_nt), fun_values, get_geo_mapping(cv), get_quadrature_rule(cv), view_from_shared(getdetJdVs(cv), i))
+    return CellValues(getfield(cv, :fun_values_nt), fun_values, get_geo_mapping(cv), get_quadrature_rule(cv), view_from_shared(getdetJdVs(cv), i), view_from_shared(getjacobians(cv), i))
 end
 
 # In the SoA layout an unaliased Nx is batched with one dimension more than Nξ, so equal
@@ -51,7 +51,9 @@ function get_substruct(fv::FunctionValues, i)
     Nx = _soa_Nx_slice(fv.Nx, fv.Nξ, i)
     dNdx = view_from_shared(fv.dNdx, i)
     d2Ndx2 = view_from_shared(fv.d2Ndx2, i)
-    return FunctionValues(fv.ip, Nx, fv.Nξ, dNdx, fv.dNdξ, d2Ndx2, fv.d2Ndξ2)
+    dNds = view_from_shared(fv.dNds, i)
+    d2Nds2 = view_from_shared(fv.d2Nds2, i)
+    return FunctionValues(fv.ip, Nx, fv.Nξ, dNdx, fv.dNdξ, d2Ndx2, fv.d2Ndξ2, dNds, d2Nds2)
 end
 
 function get_substruct(cc::CellCache, i)
