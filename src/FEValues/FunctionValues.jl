@@ -18,10 +18,14 @@ typeof_d2Ndx2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{
 typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}}) where {T, vdim, sdim, rdim} = Tensors.regular_if_possible(MixedTensor3{vdim, rdim, rdim, T})
 
 """
-    FunctionValues{DiffOrder}(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
+    FunctionValues{DiffOrder_x, DiffOrder_s}(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
+    FunctionValues{DiffOrder_x}(::Type{T}, ip_fun, qr::QuadratureRule, ip_geo::VectorizedInterpolation)
 
-Create a `FunctionValues <: AbstractValues` object containing the shape values and gradients (up to order
-`DiffOrder`) for both the reference cell (precalculated) and the real cell (updated in `reinit!`).
+Create a `FunctionValues <: AbstractValues` object containing the shape values and derivatives for both the
+reference cell (precalculated) and the real cell (updated in `reinit!`). Derivatives with respect to the
+spatial coordinates, ``\\mathbf{x}``, are stored up to order `DiffOrder_x`, and derivatives with respect to
+the local-frame coordinates, ``\\mathbf{s}``, (see [`shape_local_gradient`](@ref)) are stored up to order
+`DiffOrder_s` (defaults to 0).
 The user should normally not create `FunctionValues`, these are typically only created from the constructors
 of `AbstractCellValues` and `AbstractFacetValues`. However, the user will interact with `fv::FunctionValues`
 when indexing e.g. `cmv::MultiFieldCellValues` (e.g. `fv = cmv.u`), as `fv` supports
@@ -31,14 +35,18 @@ when indexing e.g. `cmv::MultiFieldCellValues` (e.g. `fv = cmv.u`), as `fv` supp
 * [`shape_gradient`](@ref)
 * [`shape_symmetric_gradient`](@ref)
 * [`shape_divergence`](@ref)
+* [`shape_local_gradient`](@ref)
+* [`shape_local_hessian`](@ref)
 * [`function_value`](@ref)
 * [`function_gradient`](@ref)
 * [`function_symmetric_gradient`](@ref)
 * [`function_divergence`](@ref)
+* [`function_local_gradient`](@ref)
+* [`function_local_hessian`](@ref)
 """
 FunctionValues
 
-struct FunctionValues{DiffOrder, IP, Nx_t, Nξ_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t} <: AbstractValues
+struct FunctionValues{DiffOrder_x, DiffOrder_s, IP, Nx_t, Nξ_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t, dNds_t, d2Nds2_t} <: AbstractValues
     ip::IP          # ::Interpolation
     # FunctionValues are only functional for the types in the comments for the fields below.
     # However, e.g. for GPU support, we allow arrays of one order higher to be passed, allowing this type to be used as a struct-of-arrays (SoA) type.
@@ -49,52 +57,80 @@ struct FunctionValues{DiffOrder, IP, Nx_t, Nξ_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2N
     dNdξ::dNdξ_t    # ::AbstractMatrix{Union{<:Tensor,<:StaticArray}} or Nothing
     d2Ndx2::d2Ndx2_t   # ::AbstractMatrix{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
     d2Ndξ2::d2Ndξ2_t   # ::AbstractMatrix{<:Tensor{2}}  Hessians of geometric shape functions in ref-domain
-    function FunctionValues(ip::Interpolation, Nx::Nx_t, Nξ::Nξ_t, ::Nothing, ::Nothing, ::Nothing, ::Nothing) where {Nx_t <: AbstractArray, Nξ_t <: AbstractArray}
-        return new{0, typeof(ip), Nx_t, Nξ_t, Nothing, Nothing, Nothing, Nothing}(ip, Nx, Nξ, nothing, nothing, nothing, nothing)
-    end
-    function FunctionValues(ip::Interpolation, Nx::Nx_t, Nξ::Nξ_t, dNdx::AbstractArray, dNdξ::AbstractArray, ::Nothing, ::Nothing) where {Nx_t <: AbstractArray, Nξ_t <: AbstractArray}
-        return new{1, typeof(ip), Nx_t, Nξ_t, typeof(dNdx), typeof(dNdξ), Nothing, Nothing}(ip, Nx, Nξ, dNdx, dNdξ, nothing, nothing)
-    end
-    function FunctionValues(ip::Interpolation, Nx::Nx_t, Nξ::Nξ_t, dNdx::AbstractArray, dNdξ::AbstractArray, d2Ndx2::AbstractArray, d2Ndξ2::AbstractArray) where {Nx_t <: AbstractArray, Nξ_t <: AbstractArray}
-        return new{2, typeof(ip), Nx_t, Nξ_t, typeof(dNdx), typeof(dNdξ), typeof(d2Ndx2), typeof(d2Ndξ2)}(ip, Nx, Nξ, dNdx, dNdξ, d2Ndx2, d2Ndξ2)
+    dNds::dNds_t       # ::AbstractMatrix{<:Tensor} or Nothing   Gradients wrt. the local frame coordinates
+    d2Nds2::d2Nds2_t   # ::AbstractMatrix{<:Tensor} or Nothing   Hessians wrt. the local frame coordinates
+
+    function FunctionValues(
+            ip::Interpolation,
+            Nx::Nx_t,
+            Nξ::Nξ_t,
+            dNdx::dNdx_t = nothing,
+            dNdξ::dNdξ_t = nothing,
+            d2Ndx2::d2Ndx2_t = nothing,
+            d2Ndξ2::d2Ndξ2_t = nothing,
+            dNds::dNds_t = nothing,
+            d2Nds2::d2Nds2_t = nothing,
+        ) where {Nx_t <: AbstractArray, Nξ_t <: AbstractArray, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t, dNds_t, d2Nds2_t}
+
+        difforder_x = !isnothing(d2Ndx2) ? 2 : (!isnothing(dNdx) ? 1 : 0)
+        difforder_s = !isnothing(d2Nds2) ? 2 : (!isnothing(dNds) ? 1 : 0)
+
+        return new{difforder_x, difforder_s, typeof(ip), Nx_t, Nξ_t, dNdx_t, dNdξ_t, d2Ndx2_t, d2Ndξ2_t, dNds_t, d2Nds2_t}(
+            ip, Nx, Nξ, dNdx, dNdξ, d2Ndx2, d2Ndξ2, dNds, d2Nds2
+        )
     end
 end
-function FunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder, T}
+#For backwards-compatibility:
+function FunctionValues{DiffOrder_x}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder_x, T}
+    return FunctionValues{DiffOrder_x, 0}(T, ip, qr, ip_geo)
+end
+function FunctionValues{DiffOrder_x, DiffOrder_s}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder_x, DiffOrder_s, T}
     assert_same_refshapes(qr, ip, ip_geo)
     n_shape = getnbasefunctions(ip)
     n_qpoints = getnquadpoints(qr)
 
     Nξ = zeros(typeof_N(T, ip, ip_geo), n_shape, n_qpoints)
     Nx = isa(mapping_type(ip), IdentityMapping) ? Nξ : similar(Nξ)
-    dNdξ = dNdx = d2Ndξ2 = d2Ndx2 = nothing
+    dNdξ = dNdx = d2Ndξ2 = d2Ndx2 = dNds = d2Nds2 = nothing
 
-    if DiffOrder >= 1
-        dNdξ = zeros(typeof_dNdξ(T, ip, ip_geo), n_shape, n_qpoints)
-        dNdx = fill(zero(typeof_dNdx(T, ip, ip_geo)) * T(NaN), n_shape, n_qpoints)
+    if DiffOrder_s > 0 && !isa(mapping_type(ip), IdentityMapping)
+        throw(ArgumentError("Local frame derivatives are only supported for interpolations with identity mapping"))
     end
-
-    if DiffOrder >= 2
-        d2Ndξ2 = zeros(typeof_d2Ndξ2(T, ip, ip_geo), n_shape, n_qpoints)
-        d2Ndx2 = fill(zero(typeof_d2Ndx2(T, ip, ip_geo)) * T(NaN), n_shape, n_qpoints)
-    end
-
-    if DiffOrder > 2
+    if max(DiffOrder_x, DiffOrder_s) > 2
         throw(ArgumentError("Currently only values, gradients, and hessians can be updated in FunctionValues"))
     end
 
-    fv = FunctionValues(ip, Nx, Nξ, dNdx, dNdξ, d2Ndx2, d2Ndξ2)
+    if DiffOrder_x >= 1 || DiffOrder_s >= 1
+        dNdξ = zeros(typeof_dNdξ(T, ip, ip_geo), n_shape, n_qpoints)
+    end
+    if DiffOrder_x >= 1
+        dNdx = fill(zero(typeof_dNdx(T, ip, ip_geo)) * T(NaN), n_shape, n_qpoints)
+    end
+    if DiffOrder_s >= 1
+        dNds = fill(zero(typeof_dNdξ(T, ip, ip_geo)) * T(NaN), n_shape, n_qpoints)
+    end
+
+    if DiffOrder_x >= 2 || DiffOrder_s >= 2
+        d2Ndξ2 = zeros(typeof_d2Ndξ2(T, ip, ip_geo), n_shape, n_qpoints)
+    end
+    if DiffOrder_x >= 2
+        d2Ndx2 = fill(zero(typeof_d2Ndx2(T, ip, ip_geo)) * T(NaN), n_shape, n_qpoints)
+    end
+    if DiffOrder_s >= 2
+        d2Nds2 = fill(zero(typeof_d2Ndξ2(T, ip, ip_geo)) * T(NaN), n_shape, n_qpoints)
+    end
+
+    fv = FunctionValues(ip, Nx, Nξ, dNdx, dNdξ, d2Ndx2, d2Ndξ2, dNds, d2Nds2)
     precompute_values!(fv, getpoints(qr)) # Separate function for qr point update in PointValues
     return fv
 end
 
-function precompute_values!(fv::FunctionValues{0}, qr_points::AbstractVector{<:Vec})
-    return reference_shape_values!(fv.Nξ, fv.ip, qr_points)
-end
-function precompute_values!(fv::FunctionValues{1}, qr_points::AbstractVector{<:Vec})
-    return reference_shape_gradients_and_values!(fv.dNdξ, fv.Nξ, fv.ip, qr_points)
-end
-function precompute_values!(fv::FunctionValues{2}, qr_points::AbstractVector{<:Vec})
-    return reference_shape_hessians_gradients_and_values!(fv.d2Ndξ2, fv.dNdξ, fv.Nξ, fv.ip, qr_points)
+function precompute_values!(fv::FunctionValues{DiffOrder_x, DiffOrder_s}, qr_points::AbstractVector{<:Vec}) where {DiffOrder_x, DiffOrder_s}
+    max_order = max(DiffOrder_x, DiffOrder_s)
+    max_order == 0 && return reference_shape_values!(fv.Nξ, fv.ip, qr_points)
+    max_order == 1 && return reference_shape_gradients_and_values!(fv.dNdξ, fv.Nξ, fv.ip, qr_points)
+    max_order == 2 && return reference_shape_hessians_gradients_and_values!(fv.d2Ndξ2, fv.dNdξ, fv.Nξ, fv.ip, qr_points)
+    error("Unsupported derivative order: $max_order")
 end
 
 function task_local_copy(v::FunctionValues)
@@ -102,7 +138,7 @@ function task_local_copy(v::FunctionValues)
     Nx = v.Nξ === v.Nx ? Nξ : task_local_copy(v.Nx) # Preserve aliasing
     return FunctionValues(
         task_local_copy(v.ip), Nx, Nξ, task_local_copy(v.dNdx), task_local_copy(v.dNdξ),
-        task_local_copy(v.d2Ndx2), task_local_copy(v.d2Ndξ2)
+        task_local_copy(v.d2Ndx2), task_local_copy(v.d2Ndξ2), task_local_copy(v.dNds), task_local_copy(v.d2Nds2)
     )
 end
 
@@ -111,15 +147,23 @@ getnquadpoints(funvals::FunctionValues) = size(funvals.Nx, 2)
 @propagate_inbounds shape_value(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.Nx[base_func, q_point]
 @propagate_inbounds shape_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.dNdx[base_func, q_point]
 @propagate_inbounds shape_hessian(funvals::FunctionValues{2}, q_point::Int, base_func::Int) = funvals.d2Ndx2[base_func, q_point]
+@propagate_inbounds shape_local_gradient(funvals::FunctionValues, q_point::Int, base_func::Int) = funvals.dNds[base_func, q_point]
+@propagate_inbounds shape_local_hessian(funvals::FunctionValues{<:Any, 2}, q_point::Int, base_func::Int) = funvals.d2Nds2[base_func, q_point]
 
 function_interpolation(funvals::FunctionValues) = funvals.ip
 function_difforder(::FunctionValues{DiffOrder}) where {DiffOrder} = DiffOrder
+function_local_difforder(::FunctionValues{<:Any, DiffOrder_s}) where {DiffOrder_s} = DiffOrder_s
 shape_value_type(funvals::FunctionValues) = eltype(funvals.Nx)
 shape_gradient_type(funvals::FunctionValues) = eltype(funvals.dNdx)
 shape_gradient_type(::FunctionValues{0}) = nothing
 shape_hessian_type(funvals::FunctionValues) = eltype(funvals.d2Ndx2)
 shape_hessian_type(::FunctionValues{0}) = nothing
 shape_hessian_type(::FunctionValues{1}) = nothing
+shape_local_gradient_type(funvals::FunctionValues) = eltype(funvals.dNds)
+shape_local_gradient_type(::FunctionValues{<:Any, 0}) = nothing
+shape_local_hessian_type(funvals::FunctionValues) = eltype(funvals.d2Nds2)
+shape_local_hessian_type(::FunctionValues{<:Any, 0}) = nothing
+shape_local_hessian_type(::FunctionValues{<:Any, 1}) = nothing
 
 
 # Checks that the user provides the right dimension of coordinates to reinit! methods to ensure good error messages if not
@@ -174,15 +218,17 @@ end
 # Apply mapping
 # =============
 @inline function apply_mapping!(funvals::FunctionValues, q_point::Int, args...)
-    return apply_mapping!(funvals, mapping_type(funvals), q_point, args...)
-end
-
-# Identity mapping
-@inline function apply_mapping!(::FunctionValues{0}, ::IdentityMapping, ::Int, mapping_values, args...)
+    _apply_mapping!(funvals, mapping_type(funvals), q_point, args...)
+    _apply_mapping_local_frame!(funvals, mapping_type(funvals), q_point, args...)
     return nothing
 end
 
-@inline function apply_mapping!(funvals::FunctionValues{1}, ::IdentityMapping, q_point::Int, mapping_values, args...)
+# Identity mapping
+@inline function _apply_mapping!(::FunctionValues{0}, ::IdentityMapping, ::Int, mapping_values, args...)
+    return nothing
+end
+
+@inline function _apply_mapping!(funvals::FunctionValues{1}, ::IdentityMapping, q_point::Int, mapping_values, args...)
     Jinv = calculate_Jinv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
         funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv
@@ -190,11 +236,11 @@ end
     return nothing
 end
 
-@inline function apply_mapping!(funvals::FunctionValues{2}, ::IdentityMapping, q_point::Int, mapping_values, args...)
+@inline function _apply_mapping!(funvals::FunctionValues{2}, ::IdentityMapping, q_point::Int, mapping_values, args...)
     Jinv = calculate_Jinv(getjacobian(mapping_values))
 
     sdim, rdim = size(Jinv)
-    (rdim != sdim) && error("apply_mapping! for second order gradients and embedded elements not implemented")
+    (rdim != sdim) && error("_apply_mapping! for second order gradients and embedded elements not implemented")
 
     H = gethessian(mapping_values)
     is_vector_valued = first(funvals.Nx) isa Vec
@@ -213,8 +259,72 @@ end
     return nothing
 end
 
+"""
+    gram_schmidt_frame(J)
+
+Return the orthonormal local frame, `E`, obtained by Gram-Schmidt orthonormalization of the columns
+of the jacobian `J = ∂x/∂ξ` (size `sdim × rdim`). `E` has the same size as `J`, and its columns span
+the same (tangent) space as the columns of `J`. The first column of `E` is aligned with the first column of `J`.
+"""
+@inline gram_schmidt_frame(J::Tensor{2, dim}) where {dim} = _gram_schmidt_frame(Tensor{2, dim}, J, Val(dim))
+@inline gram_schmidt_frame(J::MixedTensor2{sdim, rdim}) where {sdim, rdim} = _gram_schmidt_frame(MixedTensor2{sdim, rdim}, J, Val(rdim))
+
+@inline function _gram_schmidt_frame(::Type{TT}, J, ::Val{1}) where {TT}
+    e1 = normalize(J[:, 1])
+    return TT((e1...,))
+end
+@inline function _gram_schmidt_frame(::Type{TT}, J, ::Val{2}) where {TT}
+    e1 = normalize(J[:, 1])
+    x2 = J[:, 2]
+    e2 = normalize(x2 - (e1 ⋅ x2) * e1)
+    return TT((e1..., e2...))
+end
+@inline function _gram_schmidt_frame(::Type{TT}, J, ::Val{3}) where {TT}
+    e1 = normalize(J[:, 1])
+    x2 = J[:, 2]
+    e2 = normalize(x2 - (e1 ⋅ x2) * e1)
+    x3 = J[:, 3]
+    e3 = normalize(x3 - (e1 ⋅ x3) * e1 - (e2 ⋅ x3) * e2)
+    return TT((e1..., e2..., e3...))
+end
+
+@inline function _apply_mapping_local_frame!(::FunctionValues{<:Any, 0}, ::Any, ::Int, mapping_values, args...)
+    return nothing
+end
+
+@inline function _apply_mapping_local_frame!(funvals::FunctionValues{<:Any, 1}, ::IdentityMapping, q_point::Int, mapping_values, args...)
+    J = getjacobian(mapping_values)
+    E = gram_schmidt_frame(J)
+    Binv = inv(E' ⋅ J)
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        funvals.dNds[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Binv
+    end
+    return nothing
+end
+
+@inline function _apply_mapping_local_frame!(funvals::FunctionValues{<:Any, 2}, ::IdentityMapping, q_point::Int, mapping_values, args...)
+    J = getjacobian(mapping_values)
+    H = gethessian(mapping_values)
+    E = gram_schmidt_frame(J)
+    Binv = inv(E' ⋅ J)
+    Hs = E' ⋅ H
+    is_vector_valued = first(funvals.Nx) isa Vec
+    Binv_otimesu_Binv = is_vector_valued ? otimesu(Binv, Binv) : nothing
+    @inbounds for j in 1:getnbasefunctions(funvals)
+        dNds = funvals.dNdξ[j, q_point] ⋅ Binv
+        if is_vector_valued
+            d2Nds2 = (funvals.d2Ndξ2[j, q_point] - dNds ⋅ Hs) ⊡ Binv_otimesu_Binv
+        else
+            d2Nds2 = Binv' ⋅ (funvals.d2Ndξ2[j, q_point] - dNds ⋅ Hs) ⋅ Binv
+        end
+        funvals.dNds[j, q_point] = dNds
+        funvals.d2Nds2[j, q_point] = d2Nds2
+    end
+    return nothing
+end
+
 # Covariant Piola Mapping
-@inline function apply_mapping!(funvals::FunctionValues{0}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
+@inline function _apply_mapping!(funvals::FunctionValues{0}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
     Jinv = inv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
         d = get_direction(funvals.ip, j, cell)
@@ -224,7 +334,7 @@ end
     return nothing
 end
 
-@inline function apply_mapping!(funvals::FunctionValues{1}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
+@inline function _apply_mapping!(funvals::FunctionValues{1}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
     H = gethessian(mapping_values)
     Jinv = inv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
@@ -238,7 +348,7 @@ end
 end
 
 # Contravariant Piola Mapping
-@inline function apply_mapping!(funvals::FunctionValues{0}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
+@inline function _apply_mapping!(funvals::FunctionValues{0}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
     J = getjacobian(mapping_values)
     detJ = det(J)
     @inbounds for j in 1:getnbasefunctions(funvals)
@@ -249,7 +359,7 @@ end
     return nothing
 end
 
-@inline function apply_mapping!(funvals::FunctionValues{1}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
+@inline function _apply_mapping!(funvals::FunctionValues{1}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
     H = gethessian(mapping_values)
     J = getjacobian(mapping_values)
     Jinv = inv(J)

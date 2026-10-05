@@ -33,30 +33,50 @@ end
 conformity(fe_values::AbstractValues) = conformity(function_interpolation(fe_values))
 
 """
-    ValuesUpdateFlags(ip_fun::Interpolation; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
+    ValuesUpdateFlags(
+        ip_fun::Union{Interpolation, NamedTuple};
+        update_gradients = Val(true), update_hessians = Val(false),
+        update_local_gradients = Val(false), update_local_hessians = Val(false),
+        update_detJdV = Val(true), update_jacobians = Val(false)
+    )
 
 Creates a singleton type for specifying what parts of the AbstractValues should be updated. Note that this is internal
 API used to get type-stable construction. Keyword arguments in `AbstractValues` constructors are forwarded, and the public API
 is passing these as `Bool`, while the `ValuesUpdateFlags` method supports both boolean and `Val(::Bool)` keyword args.
+
+The type parameters are `ValuesUpdateFlags{FunDiffOrder_x, FunDiffOrder_s, GeoDiffOrder, DetJdV, StoreJacobian}`, where
+* `FunDiffOrder_x` is the order of the derivatives of the function wrt. the spatial coordinates (`update_gradients`, `update_hessians`)
+* `FunDiffOrder_s` is the order of the derivatives of the function wrt. the local frame coordinates (`update_local_gradients`, `update_local_hessians`)
+* `GeoDiffOrder` is the order of the derivatives of the geometric mapping required to calculate the above
+* `DetJdV` specifies if the integration weights `detJdV` should be stored
+* `StoreJacobian` specifies if the jacobian of the geometric mapping should be stored in each quadrature point
 """
-function ValuesUpdateFlags(ip_fun::Union{Interpolation, NamedTuple}; update_gradients = Val(true), update_hessians = Val(false), update_detJdV = Val(true))
+function ValuesUpdateFlags(
+        ip_fun::Union{Interpolation, NamedTuple};
+        update_gradients = Val(true), update_hessians = Val(false),
+        update_local_gradients = Val(false), update_local_hessians = Val(false),
+        update_detJdV = Val(true), update_jacobians = Val(false)
+    )
     toval(v::Bool) = Val(v)
     toval(V::Val) = V
-    return ValuesUpdateFlags(ip_fun, toval(update_gradients), toval(update_hessians), toval(update_detJdV))
+    return ValuesUpdateFlags(
+        ip_fun, toval(update_gradients), toval(update_hessians), toval(update_local_gradients),
+        toval(update_local_hessians), toval(update_detJdV), toval(update_jacobians)
+    )
 end
 function ValuesUpdateFlags(
-        ip_fun::Interpolation, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
-    ) where {update_gradients, update_hessians, update_detJdV}
-    FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
-    GeoDiffOrder = max(required_geo_diff_order(mapping_type(ip_fun), FunDiffOrder), update_detJdV)
-    return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
+        ip_fun::Union{Interpolation, NamedTuple}, ::Val{update_gradients}, ::Val{update_hessians},
+        ::Val{update_local_gradients}, ::Val{update_local_hessians}, ::Val{update_detJdV}, ::Val{update_jacobians}
+    ) where {update_gradients, update_hessians, update_local_gradients, update_local_hessians, update_detJdV, update_jacobians}
+    FunDiffOrder_x = update_hessians ? 2 : (update_gradients ? 1 : 0)
+    FunDiffOrder_s = update_local_hessians ? 2 : (update_local_gradients ? 1 : 0)
+    FunDiffOrder = max(FunDiffOrder_x, FunDiffOrder_s)
+    GeoDiffOrder = max(_required_geo_diff_order(ip_fun, FunDiffOrder), update_detJdV, update_jacobians)
+    return ValuesUpdateFlags{FunDiffOrder_x, FunDiffOrder_s, GeoDiffOrder, update_detJdV, update_jacobians}()
 end
-function ValuesUpdateFlags( # For MultiFieldCellValues
-        ip_fun::NamedTuple, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
-    ) where {update_gradients, update_hessians, update_detJdV}
-    FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
-    GeoDiffOrder = max(maximum(ip -> required_geo_diff_order(mapping_type(ip), FunDiffOrder), ip_fun), update_detJdV)
-    return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
+_required_geo_diff_order(ip_fun::Interpolation, fun_diff_order::Int) = required_geo_diff_order(mapping_type(ip_fun), fun_diff_order)
+function _required_geo_diff_order(ip_funs::NamedTuple, fun_diff_order::Int) # For MultiFieldCellValues
+    return maximum(ip -> required_geo_diff_order(mapping_type(ip), fun_diff_order), ip_funs)
 end
 
 """
@@ -128,6 +148,39 @@ Return the gradient of shape function `base_function` evaluated in
 quadrature point `q_point`.
 """
 shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
+
+"""
+    shape_local_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
+
+Return the gradient of shape function `base_function` wrt. the local frame coordinates, ``\\mathbf{s}``,
+evaluated in quadrature point `q_point`. Requires `update_local_gradients = true` (or
+`update_local_hessians = true`) when creating `fe_v`, and is only supported for interpolations with identity mapping.
+
+The local frame, ``\\mathbf{E}``, is obtained by Gram-Schmidt orthonormalization of the columns
+of the jacobian, ``\\mathbf{J} = \\partial \\mathbf{x} / \\partial \\boldsymbol{\\xi}``, in the quadrature point.
+Hence, its first basis vector is aligned with ``\\partial \\mathbf{x} / \\partial \\xi_1``, and for embedded
+elements (e.g. shells) the frame spans the tangent space of the element. The local coordinates are defined as
+``\\mathbf{s} = \\mathbf{E}^\\mathrm{T} \\cdot (\\mathbf{x} - \\mathbf{x}_q)``, with ``\\mathbf{E}`` frozen
+at the quadrature point, ``\\mathbf{x}_q``, and the local gradient is
+``\\mathbf{\\nabla}_s N = \\partial N / \\partial \\boldsymbol{\\xi} \\cdot \\mathbf{B}^{-1}``,
+where ``\\mathbf{B} = \\mathbf{E}^\\mathrm{T} \\cdot \\mathbf{J}``. For non-embedded elements,
+``\\mathbf{\\nabla}_s N = \\mathbf{\\nabla} N \\cdot \\mathbf{E}``.
+"""
+shape_local_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
+
+"""
+    shape_local_hessian(fe_v::AbstractValues, q_point::Int, base_function::Int)
+
+Return the hessian of shape function `base_function` wrt. the local frame coordinates, ``\\mathbf{s}``,
+(see [`shape_local_gradient`](@ref)) evaluated in quadrature point `q_point`.
+Requires `update_local_hessians = true` when creating `fe_v`.
+
+With ``\\mathbf{H} = \\partial^2 \\mathbf{x} / \\partial \\boldsymbol{\\xi}^2``, the local hessian of a scalar
+shape function is calculated as
+``\\mathbf{\\nabla}_s \\mathbf{\\nabla}_s N = \\mathbf{B}^{-\\mathrm{T}} \\cdot \\left[\\partial^2 N / \\partial \\boldsymbol{\\xi}^2 - \\mathbf{\\nabla}_s N \\cdot (\\mathbf{E}^\\mathrm{T} \\cdot \\mathbf{H}) \\right] \\cdot \\mathbf{B}^{-1}``.
+For non-embedded elements, ``\\mathbf{\\nabla}_s \\mathbf{\\nabla}_s N = \\mathbf{E}^\\mathrm{T} \\cdot \\mathbf{\\nabla} \\mathbf{\\nabla} N \\cdot \\mathbf{E}``.
+"""
+shape_local_hessian(fe_v::AbstractValues, q_point::Int, base_function::Int)
 
 """
     shape_symmetric_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
@@ -240,6 +293,28 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
 end
 
 """
+    function_local_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
+
+Compute the gradient of the function wrt. the local frame coordinates, ``\\mathbf{s}``, in a quadrature point,
+see [`shape_local_gradient`](@ref). `u` is a vector with scalar values for the degrees of freedom.
+The local gradient is computed as
+``\\mathbf{\\nabla}_s u = \\sum\\limits_{i = 1}^n \\mathbf{\\nabla}_s N_i u_i``,
+where ``u_i`` are the nodal values of the function.
+Requires `update_local_gradients = true` (or `update_local_hessians = true`) when creating `fe_v`.
+"""
+function function_local_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
+    n_base_funcs = getnbasefunctions(fe_v)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
+    @boundscheck checkquadpoint(fe_v, q_point)
+    grad = function_local_gradient_init(fe_v, u)
+    @inbounds for (i, j) in enumerate(dof_range)
+        grad += shape_local_gradient(fe_v, q_point, i) * u[j]
+    end
+    return grad
+end
+
+"""
     shape_gradient_type(fe_v::AbstractValues)
 
 Return the type of `shape_gradient(fe_v, q_point, base_function)`
@@ -254,6 +329,53 @@ function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {
 end
 function function_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {T <: AbstractVector}
     return zero(T) ⊗ zero(shape_gradient_type(cv))
+end
+
+"""
+    shape_local_gradient_type(fe_v::AbstractValues)
+
+Return the type of `shape_local_gradient(fe_v, q_point, base_function)`
+"""
+function shape_local_gradient_type(fe_v::AbstractValues)
+    # Default fallback
+    return typeof(shape_local_gradient(fe_v, 1, 1))
+end
+
+function function_local_gradient_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
+    return zero(shape_local_gradient_type(cv)) * zero(T)
+end
+
+"""
+    function_local_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
+
+Compute the hessian of the function wrt. the local frame coordinates, ``\\mathbf{s}``, in a quadrature point,
+see [`shape_local_hessian`](@ref). `u` is a vector with scalar values for the degrees of freedom.
+Requires `update_local_hessians = true` when creating `fe_v`.
+"""
+function function_local_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
+    n_base_funcs = getnbasefunctions(fe_v)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
+    @boundscheck checkquadpoint(fe_v, q_point)
+    hess = function_local_hessian_init(fe_v, u)
+    @inbounds for (i, j) in enumerate(dof_range)
+        hess += shape_local_hessian(fe_v, q_point, i) * u[j]
+    end
+    return hess
+end
+
+"""
+    shape_local_hessian_type(fe_v::AbstractValues)
+
+Return the type of `shape_local_hessian(fe_v, q_point, base_function)`
+"""
+function shape_local_hessian_type(fe_v::AbstractValues)
+    # Default fallback
+    return typeof(shape_local_hessian(fe_v, 1, 1))
+end
+
+function function_local_hessian_init(cv::AbstractValues, ::AbstractVector{T}) where {T}
+    return zero(shape_local_hessian_type(cv)) * zero(T)
 end
 
 """

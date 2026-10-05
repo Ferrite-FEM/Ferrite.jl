@@ -44,6 +44,25 @@ function_divergence
 function_curl
 ```
 
+### Local frame derivatives
+For e.g. shell elements, it is convenient to work with derivatives wrt. coordinates in a local
+orthonormal frame that is tangent to the element. This frame is obtained by Gram-Schmidt
+orthonormalization of the columns of the jacobian, ``\mathbf{J} = \partial \mathbf{x} / \partial \boldsymbol{\xi}``,
+in each quadrature point, see [`shape_local_gradient`](@ref) for details. The gradients and hessians
+wrt. the local frame coordinates are updated if the keyword arguments `update_local_gradients = true`
+and `update_local_hessians = true`, respectively, are given when constructing the values object.
+This is supported for interpolations with identity mapping, also for embedded elements
+(e.g. `CellValues(qr, ip, ip_geo^3)` for surfaces in 3D). Furthermore, the jacobians of the geometric mapping
+are stored if `update_jacobians = true` is given.
+
+```@docs
+shape_local_gradient
+shape_local_hessian
+function_local_gradient
+function_local_hessian
+Ferrite.getjacobian
+```
+
 In addition, there are some methods that are unique for `FacetValues`.
 
 ```@docs
