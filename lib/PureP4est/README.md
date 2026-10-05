@@ -12,9 +12,9 @@ A native Julia implementation of the forest-of-octrees adaptive mesh refinement 
 It is independent of any finite element framework. The algorithms follow
 
 - C. Burstedde, L. C. Wilcox, O. Ghattas, *p4est: Scalable Algorithms for Parallel Adaptive
-  Mesh Refinement on Forests of Octrees*, SIAM J. Sci. Comput. 33 (2011).
+  Mesh Refinement on Forests of Octrees*, SIAM Journal on Scientific Computing 33 (2011).
 - T. Isaac, C. Burstedde, L. C. Wilcox, O. Ghattas, *Recursive Algorithms for Distributed
-  Forests of Octrees*, SIAM J. Sci. Comput. 37 (2015).
+  Forests of Octrees*, SIAM Journal on Scientific Computing 37 (2015).
 
 This package is developed as part of [Ferrite.jl](https://github.com/Ferrite-FEM/Ferrite.jl),
 whose adaptive mesh refinement is built on it.
