@@ -165,7 +165,6 @@ export
     collect_periodic_facets!,
     PeriodicFacetPair,
     AffineConstraint,
-    LinearConstraint,
     ConformityConstraint,
     update!,
     apply!,

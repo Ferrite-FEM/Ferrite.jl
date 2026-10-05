@@ -14,7 +14,6 @@ Dirichlet
 ProjectedDirichlet
 PeriodicDirichlet
 AffineConstraint
-LinearConstraint
 collect_periodic_facets
 collect_periodic_facets!
 add!
