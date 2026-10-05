@@ -92,10 +92,18 @@ cell_to_vtkcell(::Type{QuadraticHexahedron}) = VTKCellTypes.VTK_TRIQUADRATIC_HEX
 cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
+cell_to_vtkcell(::Type{QuadraticWedge}) = VTKCellTypes.VTK_BIQUADRATIC_QUADRATIC_WEDGE
 cell_to_vtkcell(::Type{Pyramid}) = VTKCellTypes.VTK_PYRAMID
 
 nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
 nodes_to_vtkorder(cell::Pyramid) = cell.nodes[[1, 2, 4, 3, 5]]
+nodes_to_vtkorder(cell::QuadraticWedge) = cell.nodes[
+    [
+        1, 2, 3, 4, 5, 6, # vertices
+        7, 10, 8, 13, 15, 14, 9, 11, 12, # edges
+        16, 18, 17, # faces
+    ],
+]
 nodes_to_vtkorder(cell::QuadraticHexahedron) = [
     cell.nodes[1], # faces
     cell.nodes[2],

@@ -230,7 +230,7 @@ end
             end
         end
         test_ips = [
-            Lagrange{RefTriangle, 2}(), Lagrange{RefQuadrilateral, 2}(), Lagrange{RefHexahedron, 2}()^3, # Test should also work for identity mapping
+            Lagrange{RefTriangle, 2}(), Lagrange{RefQuadrilateral, 2}(), Lagrange{RefHexahedron, 2}()^3, Lagrange{RefPrism, 2}(), # Test should also work for identity mapping
             Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(),
             RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), BrezziDouglasMarini{RefTriangle, 1}(),
         ]
@@ -238,6 +238,7 @@ end
         cell_from_refshape(::Type{RefTriangle}) = QuadraticTriangle((ntuple(identity, 6)))
         cell_from_refshape(::Type{RefQuadrilateral}) = QuadraticQuadrilateral((ntuple(identity, 9)))
         cell_from_refshape(::Type{RefHexahedron}) = QuadraticHexahedron((ntuple(identity, 27)))
+        cell_from_refshape(::Type{RefPrism}) = QuadraticWedge((ntuple(identity, 18)))
         for ip in test_ips
             cell = cell_from_refshape(getrefshape(ip))
             @testset "$ip" begin
