@@ -312,6 +312,9 @@ end
 struct Wedge <: AbstractCell{RefPrism}
     nodes::NTuple{6, Int}
 end
+struct QuadraticWedge <: AbstractCell{RefPrism}
+    nodes::NTuple{18, Int}
+end
 struct Pyramid <: AbstractCell{RefPyramid}
     nodes::NTuple{5, Int}
 end
@@ -327,6 +330,7 @@ geometric_interpolation(::Type{QuadraticTetrahedron}) = Lagrange{RefTetrahedron,
 geometric_interpolation(::Type{Hexahedron}) = Lagrange{RefHexahedron, 1}()
 geometric_interpolation(::Type{QuadraticHexahedron}) = Lagrange{RefHexahedron, 2}()
 geometric_interpolation(::Type{Wedge}) = Lagrange{RefPrism, 1}()
+geometric_interpolation(::Type{QuadraticWedge}) = Lagrange{RefPrism, 2}()
 geometric_interpolation(::Type{Pyramid}) = Lagrange{RefPyramid, 1}()
 
 # Serendipity interpolation based cells

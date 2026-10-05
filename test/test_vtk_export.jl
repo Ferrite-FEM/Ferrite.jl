@@ -165,6 +165,55 @@ import SHA
             @test bytes2hex(open(SHA.sha1, manual * ".vtu")) == bytes2hex(open(SHA.sha1, auto * ".vtu"))
         end
     end
+    @testset "quadratic cells without grid generator" begin
+        # Parametric coordinates of the VTK cells in [0, 1]^3, as returned by
+        # `vtkCell::GetParametricCoords` (vtkQuadraticTetra, vtkTriQuadraticHexahedron and
+        # vtkBiQuadraticQuadraticWedge).
+        vtk_coords = [
+            QuadraticTetrahedron => [
+                (0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1),
+                (0.5, 0, 0), (0.5, 0.5, 0), (0, 0.5, 0), (0, 0, 0.5), (0.5, 0, 0.5), (0, 0.5, 0.5),
+            ],
+            QuadraticHexahedron => [
+                (0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 1, 0), (0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1),
+                (0.5, 0, 0), (1, 0.5, 0), (0.5, 1, 0), (0, 0.5, 0), (0.5, 0, 1), (1, 0.5, 1),
+                (0.5, 1, 1), (0, 0.5, 1), (0, 0, 0.5), (1, 0, 0.5), (1, 1, 0.5), (0, 1, 0.5),
+                (0, 0.5, 0.5), (1, 0.5, 0.5), (0.5, 0, 0.5), (0.5, 1, 0.5), (0.5, 0.5, 0), (0.5, 0.5, 1),
+                (0.5, 0.5, 0.5),
+            ],
+            QuadraticWedge => [
+                (0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 1), (0, 1, 1),
+                (0.5, 0, 0), (0.5, 0.5, 0), (0, 0.5, 0), (0.5, 0, 1), (0.5, 0.5, 1), (0, 0.5, 1),
+                (0, 0, 0.5), (1, 0, 0.5), (0, 1, 0.5), (0.5, 0, 0.5), (0.5, 0.5, 0.5), (0, 0.5, 0.5),
+            ],
+        ]
+        # Read a `DataArray` of the ascii .vtu file
+        function read_dataarray(T, str, name)
+            m = match(Regex("Name=\"$(name)\"[^>]*>([^<]*)<"), str)
+            return parse.(T, split(m[1]))
+        end
+        mktempdir() do tmp
+            for (C, coords) in vtk_coords
+                @testset "$C" begin
+                    # A single cell with the nodes placed at the reference coordinates, mapped
+                    # to [0, 1]^3, such that each node's position identifies it.
+                    ip = geometric_interpolation(C)
+                    ξs = Ferrite.reference_coordinates(ip)
+                    to_unit(ξ) = getrefshape(ip) === RefHexahedron ? (ξ + ones(ξ)) / 2 : ξ
+                    grid = Grid([C(ntuple(identity, length(ξs)))], [Node(to_unit(ξ)) for ξ in ξs])
+                    fname = joinpath(tmp, string(C))
+                    VTKGridFile(fname, grid; ascii = true, compress = false, append = false) do vtk
+                    end
+                    str = read(fname * ".vtu", String)
+                    @test read_dataarray(Int, str, "types") == [Ferrite.cell_to_vtkcell(C).vtk_id]
+                    points = reshape(read_dataarray(Float64, str, "Points"), 3, :)
+                    connectivity = read_dataarray(Int, str, "connectivity") .+ 1
+                    @test length(connectivity) == length(coords)
+                    @test points[:, connectivity] ≈ reduce(hcat, collect.(coords))
+                end
+            end
+        end
+    end
     @testset "type promotion" begin
         grid = generate_grid(Triangle, (2, 2))
         dh = DofHandler(grid)
