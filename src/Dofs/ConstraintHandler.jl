@@ -149,6 +149,30 @@ struct AffineConstraint{Tv, Ti}
 end
 
 """
+    LinearConstraint(entries::Vector{Pair{Ti, Tv}}, b; prefer = nothing) where {Ti, Tv}
+
+Define a linear constraint `∑(u[j] * a[j]) = b` between degrees of freedom, where each
+element of `entries` is `j => a[j]`. Unlike [`AffineConstraint`](@ref), no dof is designated
+as the constrained one; instead [`close!`](@ref) picks one of the dofs in `entries` to
+eliminate, skipping dofs that are already constrained (e.g. by `Dirichlet`,
+`PeriodicDirichlet`, `AffineConstraint` or another `LinearConstraint`) and preferring dofs
+that appear in few other constraints. With `prefer = j` dof `j` is eliminated if it is a
+valid choice, otherwise the automatic choice is used.
+
+Typical uses are constraints without a natural constrained dof, such as fixing the mean
+value or integral of a field.
+"""
+struct LinearConstraint{Tv, Ti}
+    entries::DofCoefficients{Tv, Ti}
+    b::Tv
+    prefer::Union{Nothing, Ti}
+end
+function LinearConstraint(entries::Vector{Pair{Ti, Tv}}, b::Number; prefer::Union{Nothing, Integer} = nothing) where {Ti, Tv}
+    T = promote_type(Tv, typeof(b))
+    return LinearConstraint{T, Ti}(entries, b, prefer)
+end
+
+"""
     ConstraintHandler([Tv = Float64, [Ti = Int]], dh::AbstractDofHandler)
 
 A collection of constraints associated with the dof handler `dh`.
@@ -167,6 +191,8 @@ mutable struct ConstraintHandler{DH <: AbstractDofHandler, Tv, Ti}
     const dofcoefficients::Vector{Union{Nothing, DofCoefficients{Tv, Ti}}}
     # global dof -> index into dofs and inhomogeneities and dofcoefficients
     const dofmapping::Dict{Ti, Ti}
+    # Constraints without a designated constrained dof, eliminated in `close!`
+    const linear_constraints::Vector{LinearConstraint{Tv, Ti}}
     const isconstrained::BitVector # Fast check if dof is constrained or not
     const bcvalues::Vector{BCValues{Tv, Ti}}
     const dh::DH
@@ -179,7 +205,7 @@ function ConstraintHandler(::Type{Tv}, ::Type{Ti}, dh::AbstractDofHandler) where
     @assert isclosed(dh)
     return ConstraintHandler(
         Dirichlet[], ProjectedDirichlet[], Ti[], Ti[], Tv[], Union{Nothing, Tv}[],
-        Union{Nothing, DofCoefficients{Tv, Ti}}[], Dict{Ti, Ti}(), BitVector(), BCValues{Tv, Ti}[], dh, false,
+        Union{Nothing, DofCoefficients{Tv, Ti}}[], Dict{Ti, Ti}(), LinearConstraint{Tv, Ti}[], BitVector(), BCValues{Tv, Ti}[], dh, false,
     )
 end
 
@@ -302,6 +328,7 @@ Close and finalize the `ConstraintHandler`.
 """
 function close!(ch::ConstraintHandler)
     @assert(!isclosed(ch))
+    _eliminate_linear_constraints!(ch)
     @assert(allunique(ch.prescribed_dofs))
 
     I = sortperm(ch.prescribed_dofs)
@@ -360,6 +387,78 @@ function add!(ch::ConstraintHandler, ac::AffineConstraint)
     #       that this constraint is an AffineConstraint which is currently needed in update!
     #       in order to not update inhomogeneities for affine constraints
     add_prescribed_dof!(ch, ac.constrained_dof, ac.b, #=isempty(ac.entries) ? nothing : =# ac.entries)
+    return ch
+end
+
+"""
+    add!(ch::ConstraintHandler, lc::LinearConstraint)
+
+Add the `LinearConstraint` to the `ConstraintHandler`. The dof to eliminate is chosen in
+[`close!`](@ref).
+"""
+function add!(ch::ConstraintHandler{<:Any, Tv, Ti}, lc::LinearConstraint) where {Tv, Ti}
+    @assert(!isclosed(ch))
+    # Merge duplicate dofs and drop zero coefficients
+    entries = DofCoefficients{Tv, Ti}()
+    for (d, a) in sort(lc.entries; by = first)
+        @assert(1 ≤ d ≤ ndofs(ch.dh))
+        if !isempty(entries) && first(last(entries)) == d
+            entries[end] = d => last(last(entries)) + a
+        else
+            push!(entries, d => a)
+        end
+    end
+    filter!(e -> !iszero(last(e)), entries)
+    push!(ch.linear_constraints, LinearConstraint{Tv, Ti}(entries, lc.b, lc.prefer))
+    return ch
+end
+
+# Turn each `LinearConstraint` into an affine constraint by choosing one of its dofs as the
+# constrained dof (pivot). Pivots are distinct from all other constrained dofs since they
+# are registered in `ch.dofmapping` as they are picked. The resulting constraints can be
+# tangled, which is resolved by the untangling in `close!`.
+function _eliminate_linear_constraints!(ch::ConstraintHandler{<:Any, Tv, Ti}) where {Tv, Ti}
+    lcs = ch.linear_constraints
+    isempty(lcs) && return ch
+    # Number of constraints referencing each dof. Pivoting on a dof referenced by many
+    # constraints (e.g. a periodic master) would spread the constraint to all of them.
+    count = zeros(Int, ndofs(ch.dh))
+    for lc in lcs, (d, _) in lc.entries
+        count[d] += 1
+    end
+    for coeffs in ch.dofcoefficients
+        coeffs === nothing && continue
+        for (d, _) in coeffs
+            count[d] += 1
+        end
+    end
+    # Short rows first, so that long rows (e.g. mean value constraints) pick among the rest
+    for k in sort(eachindex(lcs); by = k -> (length(lcs[k].entries), k))
+        (; entries, b, prefer) = lcs[k]
+        if isempty(entries)
+            iszero(b) || throw(ArgumentError("LinearConstraint $k is inconsistent: 0 = $b"))
+            continue
+        end
+        # Prefer coefficients that are not small relative to the row (threshold pivoting),
+        # then dofs referenced by few constraints
+        amax = maximum(e -> abs(last(e)), entries)
+        cost((d, a)) = (abs(a) < amax / 10, count[d])
+        isfree((d, _)) = !haskey(ch.dofmapping, d)
+        ip = prefer === nothing ? nothing : findfirst(e -> first(e) == prefer, entries)
+        if ip === nothing || !isfree(entries[ip]) || first(cost(entries[ip]))
+            ip = 0
+            for (i, e) in pairs(entries)
+                isfree(e) || continue
+                if ip == 0 || cost(e) < cost(entries[ip])
+                    ip = i
+                end
+            end
+            ip == 0 && throw(ArgumentError("LinearConstraint $k has no dof left to eliminate: all its dofs are already constrained"))
+        end
+        p, ap = entries[ip]
+        coeffs = DofCoefficients{Tv, Ti}([d => -a / ap for (d, a) in entries if d != p])
+        add_prescribed_dof!(ch, p, b / ap, coeffs)
+    end
     return ch
 end
 
