@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `getnodes`, `getnnodes`, `getspatialdim` and the cell/node/facet/vertex set getters still
    work on it, other `AbstractGrid` functions such as `getcelltype` and `getneighborhood` do
    not (the coarse topology is `PureP4est.connectivity(forest)`). Internals formerly reached
-   as `Ferrite.AMR.<name>` are now `PureP4est.<name>`.
+   as `Ferrite.AMR.<name>` are now `PureP4est.<name>`. ([#1542])
 
 ### Added
 
@@ -1530,3 +1530,4 @@ poking into Ferrite internals:
 [#1534]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1534
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
+[#1542]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1542
