@@ -5,4 +5,5 @@ using Test
 @test CUDA.functional()
 
 include("heat_assembly.jl")
-include("multifield_cellvalues.jl")
+include("../test_multifield_cellvalues.jl")
+test_multifield_cellvalues(CUDABackend())
