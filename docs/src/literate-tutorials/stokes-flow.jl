@@ -90,8 +90,8 @@
 # and a third equation ``\delta\lambda \int_{\Gamma} p\ \mathrm{d}\Gamma = 0`` so that we
 # can solve for ``\lambda``. However, since we in this case are not interested in computing
 # ``\lambda``, and since the constraint is linear, we can directly embed this constraint
-# using a [`LinearConstraint`](@ref) in Ferrite. Both alternatives are implemented in this
-# tutorial: the main program uses the `LinearConstraint`, and the
+# using an [`AffineConstraint`](@ref) in Ferrite. Both alternatives are implemented in this
+# tutorial: the main program uses the `AffineConstraint`, and the
 # [last section](@ref stokes-multiplier) shows the Lagrange multiplier variant, where
 # ``\lambda`` is added as an *algebraic variable*.
 #
@@ -275,20 +275,20 @@ end
 # deserves some attention.
 #
 # Let's first discuss the assembly of the constraint matrix ``\underline{\underline{C}}``
-# and how to create a [`LinearConstraint`](@ref) from it. This is done in the
+# and how to create an [`AffineConstraint`](@ref) from it. This is done in the
 # `setup_mean_constraint` function below. Assembling this is not so different from standard
 # assembly in Ferrite: we loop over all the facets, loop over the quadrature points, and loop
 # over the shape functions. Note that since there is only one constraint the matrix will
 # only have one row.
-# After assembling `C` we construct a `LinearConstraint` from it. As an example, consider the
+# After assembling `C` we construct an `AffineConstraint` from it. As an example, consider the
 # case where the constraint equation ``\underline{\underline{C}}_p\ \underline{a}_p`` is
 # ```math
 # w_{10} p_{10} + w_{23} p_{23} + w_{154} p_{154} = 0
 # ```
 # i.e. dofs 10, 23, and 154, are the ones located on the boundary (all other dofs naturally
-# gives 0 contribution). The `LinearConstraint` stores this equation as is, and when the
-# `ConstraintHandler` is closed one of the dofs is selected to be expressed in terms of the
-# others, e.g. ``p_{23} = -\frac{w_{10}}{w_{23}} p_{10} -\frac{w_{154}}{w_{23}} p_{154}``.
+# gives 0 contribution). Since no constrained dof is given, the `AffineConstraint` stores
+# this equation as is, and when the `ConstraintHandler` is closed one of the dofs is
+# selected to be expressed in terms of the others, e.g. ``p_{23} = -\frac{w_{10}}{w_{23}} p_{10} -\frac{w_{154}}{w_{23}} p_{154}``.
 #
 # !!! note
 #     If all nodes along the boundary are equidistant all the weights would be the same. In
@@ -328,9 +328,9 @@ function setup_mean_constraint(dh, fvp)
         assemble!(assembler, [1], element_dofs_p, Ce)
     end
     C, _ = finish_assemble(assembler)
-    ## Create a LinearConstraint from the C-matrix
+    ## Create an AffineConstraint from the C-matrix
     _, J, V = findnz(C)
-    return LinearConstraint(J .=> V, 0.0)
+    return AffineConstraint(J .=> V, 0.0)
 end
 #md nothing #hide
 
@@ -541,7 +541,7 @@ main()
 # this variant too, since it is a good illustration
 # of [algebraic variables](@ref topic-algebraic-variables): ``\lambda`` is a single
 # scalar unknown without spatial variation, which is exactly what an
-# [`AlgebraicVariable`](@ref) declares. In contrast to the `LinearConstraint`, this
+# [`AlgebraicVariable`](@ref) declares. In contrast to the `AffineConstraint`, this
 # approach also generalizes to constraints where the multiplier cannot be eliminated
 # (e.g. nonlinear constraints), or where its value is of interest.
 #
@@ -591,7 +591,7 @@ end
 # is a global dof, its number (from [`algebraic_dofs`](@ref)) is simply appended after
 # the cell dofs, once, outside the loop, and only the cell dofs are refreshed per facet.
 # Compare with `setup_mean_constraint` above: it is the same integral, but assembled
-# directly into the matrix blocks instead of being turned into a `LinearConstraint`.
+# directly into the matrix blocks instead of being turned into an `AffineConstraint`.
 # (The augmented local matrix also contains (zero) entries coupling `:u` and `:λ`, which
 # is fine: assembling an explicit zero into an entry that is missing from the sparsity
 # pattern is allowed.)
@@ -648,9 +648,9 @@ function main_multiplier(h = 0.05)
     a = K \ f
     apply!(a, ch)
 
-    ## Check the result against the LinearConstraint variant. Here the mean constraint  #src
+    ## Check the result against the AffineConstraint variant. Here the mean constraint  #src
     ## holds to solver precision only (it is a residual row of K \ f, not enforced      #src
-    ## algebraically like the LinearConstraint), hence the looser tolerance.            #src
+    ## algebraically like the AffineConstraint), hence the looser tolerance.            #src
     if h == 0.05                                     #src
         check_L2(dh, cvu, cvp, a)                    #src
         check_mean_constraint(dh, fvp, a; atol = 1.0e-12) #src

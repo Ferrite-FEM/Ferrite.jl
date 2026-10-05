@@ -13,11 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `Lagrange{RefPrism, 2}()`, including VTK export. Gmsh "Prism 18" elements can be
    imported as `QuadraticWedge` with FerriteGmsh (see
    [FerriteGmsh.jl#61](https://github.com/Ferrite-FEM/FerriteGmsh.jl/pull/61)). ([#1538])
- - New constraint type `LinearConstraint(entries, b)` for a linear equation
-   `∑ a[j] u[j] = b` between dofs without a designated constrained dof. `close!` picks the
-   dof to eliminate, skipping already constrained dofs and preferring dofs that appear in
-   few other constraints (to avoid fill-in); `prefer = dof` biases the choice. Useful for
-   e.g. mean value constraints combined with periodic boundary conditions. ([#1541])
+ - New `AffineConstraint(entries, b)` constructor for an equation `∑ a[j] u[j] = b`
+   between dofs without a designated constrained dof. `close!` picks the dof to eliminate,
+   skipping already constrained dofs and preferring dofs that appear in few other
+   constraints (to avoid fill-in); `prefer = dof` biases the choice. Useful for e.g. mean
+   value constraints combined with periodic boundary conditions. ([#1541])
  - New function `interfaceskeleton(topology, grid)` returning the *interfaces* of the
    grid (the interior facets, i.e. the subset of `facetskeleton` shared between two
    cells) as a `Vector` of facet pairs `(facet_here, facet_there)`. Like the facet

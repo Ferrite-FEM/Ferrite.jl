@@ -109,12 +109,12 @@ add!(ch, lc2)
 ```
 
 If a constraint has no natural dof to eliminate, e.g. a constraint on the mean value of a
-field, it can instead be given as an equation ``\sum_j c_j a_j = b`` with
-[`LinearConstraint`](@ref). In `close!` one of the DoFs is chosen as the dependent one,
+field, the constrained dof can be left out and the constraint given as an equation
+``\sum_j c_j a_j = b``. In `close!` one of the DoFs is chosen as the dependent one,
 avoiding DoFs that are already constrained, for example by periodic boundary conditions:
 
 ```julia
-lc3 = LinearConstraint([1 => 1.0, 2 => -5.0, 3 => -3.0], 1.0) # same equation as lc1
+lc3 = Ferrite.AffineConstraint([1 => 1.0, 2 => -5.0, 3 => -3.0], 1.0) # same equation as lc1
 ```
 
 Affine constraints will impact the sparsity pattern of the matrix, and as such, it is
