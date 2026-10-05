@@ -95,14 +95,14 @@ be used to calculate the dependent DoFs. Ferrite has functionality for setting u
 ### Affine constraints in Ferrite
 
 To explain how affine constraints are handled in Ferrite, we will use the same example as
-above. The constraint equations can be constructed with `Ferrite.AffineConstraint` and
+above. The constraint equations can be constructed with `AffineConstraint` and
 added to the `ConstraintHandler`:
 
 ```julia
 ch = ConstraintHandler(dh)
 
-lc1 = Ferrite.AffineConstraint(1, [2 => 5.0, 3 => 3.0], 1.0)
-lc2 = Ferrite.AffineConstraint(4, [3 => 2.0, 5 => 6.0], 0.0)
+lc1 = AffineConstraint(1, [2 => 5.0, 3 => 3.0], 1.0)
+lc2 = AffineConstraint(4, [3 => 2.0, 5 => 6.0], 0.0)
 
 add!(ch, lc1)
 add!(ch, lc2)
@@ -114,7 +114,7 @@ field, the constrained dof can be left out and the constraint given as an equati
 avoiding DoFs that are already constrained, for example by periodic boundary conditions:
 
 ```julia
-lc3 = Ferrite.AffineConstraint([1 => 1.0, 2 => -5.0, 3 => -3.0], 1.0) # same equation as lc1
+lc3 = AffineConstraint([1 => 1.0, 2 => -5.0, 3 => -3.0], 1.0) # same equation as lc1
 ```
 
 Affine constraints will impact the sparsity pattern of the matrix, and as such, it is
