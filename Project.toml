@@ -9,6 +9,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 NearestNeighbors = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
 OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 Preferences = "21216c6a-2e73-6563-6e65-726566657250"
+PureP4est = "1d1c2c9a-f64a-4c09-8465-780881add6b2"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
@@ -34,6 +35,9 @@ FerriteMetis = "Metis"
 FerriteSparseMatrixCSR = "SparseMatricesCSR"
 FerriteVTKHDF = "VTKHDF"
 
+[sources]
+PureP4est = {path = "lib/PureP4est"}
+
 [compat]
 Adapt = "4"
 BlockArrays = "0.16, 1"
@@ -51,6 +55,7 @@ NearestNeighbors = "0.4"
 OrderedCollections = "1, 2"
 ParallelTestRunner = "2.6"
 Preferences = "1"
+PureP4est = "0.1"
 Reexport = "1"
 Tensors = "1.17"
 VTKHDF = "1"

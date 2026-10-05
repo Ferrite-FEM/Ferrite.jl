@@ -35,21 +35,32 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
       - uses: julia-actions/cache@v3
+      # Julia < 1.11 does not support `[sources]`: develop the in-repo PureP4est explicitly.
+      - name: Develop lib/PureP4est
+        if: ${{ matrix.julia-version == 'lts' }}
+        shell: julia --color=yes --project {0}
+        run: |
+          using Pkg
+          Pkg.develop(path = "lib/PureP4est")
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         env:
           JULIA_NUM_THREADS: ${{ matrix.threads }}
+      - name: PureP4est tests
+        uses: julia-actions/julia-runtest@v1
+        with:
+          project: lib/PureP4est
       - name: JET tests
         shell: julia --color=yes --project=@jet {0}
         run: |
           using Pkg
           Pkg.add("JET")
-          Pkg.develop(path = pwd())
+          Pkg.develop([PackageSpec(path = joinpath(pwd(), "lib", "PureP4est")), PackageSpec(path = pwd())])
           include(joinpath(pwd(), "test/jet.jl"))
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.julia-version != 'pre' && matrix.julia-version != 'nightly' }}
       - uses: julia-actions/julia-processcoverage@v1
         with:
-          directories: 'src,ext'
+          directories: 'src,ext,lib/PureP4est/src'
       - uses: codecov/codecov-action@v7
         with:
           files: lcov.info

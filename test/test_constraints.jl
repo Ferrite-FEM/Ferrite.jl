@@ -1,4 +1,5 @@
 # Imports for parallel (isolated) test execution:
+import PureP4est
 using LinearAlgebra, SparseArrays, Logging
 
 @testset "symmetric constraint storage validation" begin
@@ -1897,8 +1898,8 @@ end
     # `AffineConstraint(0, ...)` (BoundsError at isconstrained[0]).
     grid = generate_grid(Quadrilateral, (2, 2))
     forest = ForestBWG(grid, 3)
-    Ferrite.AMR.refine_octant!(forest.cells[1], forest.cells[1].leaves[1])
-    Ferrite.AMR.balanceforest!(forest)
+    PureP4est.refine_octant!(forest.cells[1], forest.cells[1].leaves[1])
+    PureP4est.balanceforest!(forest)
     transferred_grid = Ferrite.AMR.creategrid(forest)
     ip = Lagrange{RefQuadrilateral, 1}()
 

@@ -8,6 +8,7 @@
 
 using Ferrite
 using Ferrite.AMR
+using Ferrite.AMR: PureP4est
 using Printf
 using Dates
 
@@ -93,7 +94,7 @@ function benchmark_balancetree(forest_template)
         forest = deepcopy(forest_template)
         t = @elapsed begin
             for k in 1:length(forest.cells)
-                forest.cells[k] = Ferrite.AMR.balancetree(forest.cells[k])
+                forest.cells[k] = PureP4est.balancetree(forest.cells[k])
             end
         end
         push!(times, t)
@@ -150,7 +151,7 @@ function benchmark_full_pipeline(dim, n, uniform_levels; max_level = 8, adaptive
     # Step 4: Balancing (individual tree + inter-tree)
     t_balance_trees = @elapsed begin
         for k in 1:length(forest.cells)
-            forest.cells[k] = Ferrite.AMR.balancetree(forest.cells[k])
+            forest.cells[k] = PureP4est.balancetree(forest.cells[k])
         end
     end
     # Now full forest balance (inter-tree)
@@ -298,7 +299,7 @@ function analyze_balance_complexity(dim; ns = [2, 4, 8], levels = [1, 2, 3], max
             forest_copy = deepcopy(forest)
             t_bt = @elapsed begin
                 for k in 1:length(forest_copy.cells)
-                    forest_copy.cells[k] = Ferrite.AMR.balancetree(forest_copy.cells[k])
+                    forest_copy.cells[k] = PureP4est.balancetree(forest_copy.cells[k])
                 end
             end
 

@@ -1,4 +1,5 @@
 # Imports for parallel (isolated) test execution:
+import PureP4est
 include(joinpath(@__DIR__, "test_utils.jl"))
 
 @testset "interface iteration with abstract cell storage" begin
@@ -483,7 +484,7 @@ end # of testset
     grid = generate_grid(Quadrilateral, (2, 2))
     grid.cells[2] = Quadrilateral((grid.cells[2].nodes[2], grid.cells[2].nodes[3], grid.cells[2].nodes[4], grid.cells[2].nodes[1]))
     forest = ForestBWG(grid, 3)
-    Ferrite.AMR.refine_octant!(forest.cells[2], forest.cells[2].leaves[1])
+    PureP4est.refine_octant!(forest.cells[2], forest.cells[2].leaves[1])
     check_interfacevalues(forest, RefQuadrilateral)
 
     # 3D multi-level, intra- + inter-tree
@@ -499,6 +500,6 @@ end # of testset
     grid.cells[1] = Hexahedron((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1], grid.cells[1].nodes[6], grid.cells[1].nodes[7], grid.cells[1].nodes[8], grid.cells[1].nodes[5]))
     grid.cells[1] = Hexahedron((grid.cells[1].nodes[2], grid.cells[1].nodes[3], grid.cells[1].nodes[4], grid.cells[1].nodes[1], grid.cells[1].nodes[6], grid.cells[1].nodes[7], grid.cells[1].nodes[8], grid.cells[1].nodes[5]))
     forest = ForestBWG(grid, 3)
-    Ferrite.AMR.refine_octant!(forest.cells[1], forest.cells[1].leaves[1])
+    PureP4est.refine_octant!(forest.cells[1], forest.cells[1].leaves[1])
     check_interfacevalues(forest, RefHexahedron)
 end

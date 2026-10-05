@@ -14,6 +14,41 @@ Ferrite's P4est implementation is based on these papers:
 
 where the basic data structures are implemented from the first paper combined with the algorithms to materialize a grid from the second paper in the serial case.
 
+### Code organization
+
+The forest of octrees itself does not depend on Ferrite: it lives in the package `PureP4est`,
+developed in this repository under `lib/PureP4est`. Ferrite's `AMR` submodule
+(`src/Adaptivity`) is a thin translation layer on top of it.
+
+- **`PureP4est`** knows only integers: octants and octrees, refinement, coarsening, 2:1
+  balancing, the inter-tree transformations, the point iterator, node numbering with
+  hanging-node detection ([`lnodes`](@ref PureP4est.lnodes)) and the facet skeleton. A forest
+  is anything implementing the [`AbstractForest`](@ref PureP4est.AbstractForest) interface —
+  the trees and the coarse-mesh [`Connectivity`](@ref PureP4est.Connectivity), which is
+  deduced from the coarse cells' vertex ids. [`Forest`](@ref PureP4est.Forest) is the minimal
+  implementation.
+- **`Ferrite.AMR`** provides [`ForestBWG`](@ref), an `AbstractForest` that also carries the
+  coarse grid's nodes and named sets, and turns the integer output of `lnodes` into a
+  `NonConformingGrid` ([`creategrid`](@ref)): physical node coordinates, Ferrite cells, the
+  hanging-node map and the transferred facet and cell sets. The conformity constraints are
+  Ferrite-only as well.
+
+Local vertices, edges and facets of the coarse cells use the counter-clockwise (VTK)
+numbering that Ferrite uses for `Quadrilateral` and `Hexahedron` on both sides of the
+boundary, so cells and `FacetIndex`es map over unchanged; the octants use the z-order of
+p4est internally, and the `*_perm` tables translate.
+
+```@docs
+PureP4est.AbstractForest
+PureP4est.trees
+PureP4est.connectivity
+PureP4est.Forest
+PureP4est.Connectivity
+PureP4est.NeighborTable
+PureP4est.nleaves
+PureP4est.forest_leaves
+```
+
 ### Important concepts
 
 One of the most important concepts, which everything is based on, are space filling curves (SFC).
@@ -29,7 +64,7 @@ and construct each octant/quadrant solely from the morton index and a given leve
 
 The current implementation of an octant looks like this:
 ```julia
-struct OctantBWG{dim, N, T <: Integer} <: AbstractCell{RefHypercube{dim}}
+struct OctantBWG{dim, N, T <: Integer}
     #Refinement level
     l::T
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)
@@ -66,14 +101,14 @@ So, our root is on level 0 of size 8 and has the lower left coordinates `(0,0)`
 # different constructors available, first one OctantBWG(dim,level,mortonid,maximumlevel)
 # other possibility by giving directly level and a tuple of coordinates OctantBWG(level,(x,y))
 julia > dim = 2; level = 0; maximumlevel = 3
-julia > oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
+julia > oct = PureP4est.OctantBWG(dim, level, 1, maximumlevel)
 OctantBWG{2, 4, Int64}
 l = 0
 xy = 0, 0
 ```
 The size of octants at a specific level can be computed by a simple operation
 ```julia
-julia > Ferrite.AMR._compute_size(#=b=# 3, #=l=# 0)
+julia > PureP4est._compute_size(#=b=# 3, #=l=# 0)
 8
 ```
 This computation is based on the relation $\text{size}=2^{b-l}$.
@@ -83,22 +118,22 @@ Construct all level 1 octants based on mortonid:
 ```julia
 # note the arguments are dim,level,mortonid,maximumlevel
 julia > dim = 2; level = 1; maximumlevel = 3
-julia > oct = Ferrite.AMR.OctantBWG(dim, level, 1, maximumlevel)
+julia > oct = PureP4est.OctantBWG(dim, level, 1, maximumlevel)
 OctantBWG{2, 4, Int64}
 l = 1
 xy = 0, 0
 
-julia > oct = Ferrite.AMR.OctantBWG(dim, level, 2, maximumlevel)
+julia > oct = PureP4est.OctantBWG(dim, level, 2, maximumlevel)
 OctantBWG{2, 4, Int64}
 l = 1
 xy = 4, 0
 
-julia > oct = Ferrite.AMR.OctantBWG(dim, level, 3, maximumlevel)
+julia > oct = PureP4est.OctantBWG(dim, level, 3, maximumlevel)
 OctantBWG{2, 4, Int64}
 l = 1
 xy = 0, 4
 
-julia > oct = Ferrite.AMR.OctantBWG(dim, level, 4, maximumlevel)
+julia > oct = PureP4est.OctantBWG(dim, level, 4, maximumlevel)
 OctantBWG{2, 4, Int64}
 l = 1
 xy = 4, 4
@@ -148,7 +183,7 @@ What we see above is just the `leafindex`, i.e. the index where you find this le
 Let's try to construct the lower right based on the morton index on level 1
 
 ```julia
-julia> o = Ferrite.AMR.OctantBWG(2,1,8,3)
+julia> o = PureP4est.OctantBWG(2,1,8,3)
 ERROR: AssertionError: m ≤ (one(T1) + one(T1)) ^ (dim * l)
 Stacktrace:
  [1] OctantBWG(dim::Int64, l::Int64, m::Int64, b::Int64)
@@ -161,7 +196,7 @@ The assertion expresses that it is not possible to construct a morton index 8 oc
 The morton index of the lower right cell is 2 on level 1.
 
 ```julia
-julia > o = Ferrite.AMR.OctantBWG(2, 1, 2, 3)
+julia > o = PureP4est.OctantBWG(2, 1, 2, 3)
 OctantBWG{2, 4, Int64}
 l = 1
 xy = 4, 0
@@ -172,12 +207,12 @@ xy = 4, 0
 There are multiple useful functions to compute information about an octant e.g. parent, children, etc.
 
 ```@docs
-Ferrite.AMR.isancestor
-Ferrite.AMR.morton
-Ferrite.AMR.children
-Ferrite.AMR.vertices
-Ferrite.AMR.edges
-Ferrite.AMR.faces
+PureP4est.isancestor
+PureP4est.morton
+PureP4est.children
+PureP4est.vertices
+PureP4est.edges
+PureP4est.faces
 ```
 
 ### Intraoctree operations
@@ -187,10 +222,10 @@ These operations are useful to collect unique entities within a single octree or
 [BWG2011](@citet) Algorithm 5, 6, and 7 describe the following intraoctree operations:
 
 ```@docs
-Ferrite.AMR.corner_neighbor
-Ferrite.AMR.edge_neighbor
-Ferrite.AMR.facet_neighbor
-Ferrite.AMR.possibleneighbors
+PureP4est.corner_neighbor
+PureP4est.edge_neighbor
+PureP4est.facet_neighbor
+PureP4est.possibleneighbors
 ```
 
 ### Interoctree operations
@@ -200,18 +235,18 @@ Thereby, one needs to account for topological connections between the octrees as
 [BWG2011](@citet) Algorithm 8, 10, and 12 explain the algorithms that are implemented in the following functions:
 
 ```@docs
-Ferrite.AMR.transform_corner
-Ferrite.AMR.transform_edge
-Ferrite.AMR.transform_facet
+PureP4est.transform_corner
+PureP4est.transform_edge
+PureP4est.transform_facet
 ```
 
 Note that, compared to the algorithms proposed in the paper, we flipped the input and output logic a bit.
 However, the original proposed versions are implemented as well in:
 
 ```@docs
-Ferrite.AMR.transform_corner_remote
-Ferrite.AMR.transform_edge_remote
-Ferrite.AMR.transform_facet_remote
+PureP4est.transform_corner_remote
+PureP4est.transform_edge_remote
+PureP4est.transform_facet_remote
 ```
 
 although they are currently only used in the test suite.
@@ -231,9 +266,9 @@ the uniform-refinement convenience wrapper and is linear for the same reason. Th
 single-octant primitives underlying all of these are `refine_octant!` and `coarsen_octant!`.
 
 ```@docs
-Ferrite.AMR.refine_octant!
-Ferrite.AMR.coarsen_octant!
-Ferrite.AMR._coarsen_all!
+PureP4est.refine_octant!
+PureP4est.coarsen_octant!
+PureP4est._coarsen_all!
 ```
 
 ### Balancing
@@ -241,15 +276,15 @@ Ferrite.AMR._coarsen_all!
 Before a forest can be materialised into a grid it must satisfy the **2:1 balance** condition:
 no two leaves sharing a face, edge or corner may differ by more than one refinement level. This
 is what guarantees that hanging nodes only ever appear at edge midpoints / face centers (see
-[Hanging nodes](@ref devdocs-hanging-nodes) below). [`balanceforest!`](@ref Ferrite.AMR.balanceforest!) enforces it,
+[Hanging nodes](@ref devdocs-hanging-nodes) below). [`balanceforest!`](@ref PureP4est.balanceforest!) enforces it,
 balancing each tree internally and propagating across tree boundaries for the leaves that touch
 them.
 
 ```@docs
-Ferrite.AMR._balance_leaf!
-Ferrite.AMR._touches_tree_boundary
-Ferrite.AMR.inside
-Ferrite.AMR._maximum_size
+PureP4est._balance_leaf!
+PureP4est._touches_tree_boundary
+PureP4est.inside
+PureP4est._maximum_size
 ```
 
 ## From a forest to a `NonConformingGrid`
@@ -258,7 +293,9 @@ The operations above manipulate the forest of octrees (refine, coarsen, balance,
 lookups). To actually solve a finite element problem we must turn that forest into a concrete
 grid — this is [`creategrid`](@ref Ferrite.AMR.creategrid), which produces a
 `NonConformingGrid`: an ordinary grid plus the *hanging-node constraints* (`conformity_info`)
-that make a conforming finite element field possible.
+that make a conforming finite element field possible. All the topological work is done by
+[`lnodes`](@ref PureP4est.lnodes) in PureP4est, which returns plain integer data
+([`LNodes`](@ref PureP4est.LNodes)); `creategrid` only adds geometry and Ferrite's types.
 
 !!! warning "`conformity_info` is subject to change"
     `conformity_info` currently stores hanging *vertices* and their master vertices — exactly
@@ -300,10 +337,10 @@ floating-point comparison appears anywhere:
 
 | Term | Meaning | Paper | Code |
 |:-----|:--------|:------|:-----|
-| **point** | *One topological entity* of the mesh — vertex, edge, face or volume — encoded as a (possibly degenerate) axis-aligned box: an anchor corner, a level, and per axis a flag whether the box extends along it. Two points are equal iff their encodings are equal. | §2.1 | [`IteratePoint`](@ref Ferrite.AMR.IteratePoint) |
-| **closure** | A box *including* its boundary faces, edges and corners. "Octant `o` touches point `c`" always means `c ⊂ closure(o)`. | §2.1 | [`_child_touches_point`](@ref Ferrite.AMR._child_touches_point) |
-| **support** of `c` | The octants **at `c`'s level** whose closure contains `c` — up to `2^(dim - dim(c))` boxes around it (fewer on the domain boundary): 1 for a volume, 2 across a face, 4 around a 3D edge, `2^dim` around a corner. These are the only octants that can decide what happens at `c`. | eq 2.11 | `sc.supp` in [`_iterate_interior!`](@ref Ferrite.AMR._iterate_interior!) |
-| **part** of `c` | What splitting the point once decomposes its **interior** into: the `3^dim(c)` points one level finer. | eq 2.7 | [`_foreach_partc`](@ref Ferrite.AMR._foreach_partc) |
+| **point** | *One topological entity* of the mesh — vertex, edge, face or volume — encoded as a (possibly degenerate) axis-aligned box: an anchor corner, a level, and per axis a flag whether the box extends along it. Two points are equal iff their encodings are equal. | §2.1 | [`IteratePoint`](@ref PureP4est.IteratePoint) |
+| **closure** | A box *including* its boundary faces, edges and corners. "Octant `o` touches point `c`" always means `c ⊂ closure(o)`. | §2.1 | [`_child_touches_point`](@ref PureP4est._child_touches_point) |
+| **support** of `c` | The octants **at `c`'s level** whose closure contains `c` — up to `2^(dim - dim(c))` boxes around it (fewer on the domain boundary): 1 for a volume, 2 across a face, 4 around a 3D edge, `2^dim` around a corner. These are the only octants that can decide what happens at `c`. | eq 2.11 | `sc.supp` in [`_iterate_interior!`](@ref PureP4est._iterate_interior!) |
+| **part** of `c` | What splitting the point once decomposes its **interior** into: the `3^dim(c)` points one level finer. | eq 2.7 | [`_foreach_partc`](@ref PureP4est._foreach_partc) |
 
 ```julia
 struct IteratePoint{dim}
@@ -372,13 +409,13 @@ exactly one level, so a recursion that descends through `part` reaches every mes
 **exactly once** — no deduplication, no lookup, identity by construction. The only
 exception is the root's own boundary, which has no parent split to produce it; its `3^dim`
 closure points are seeded explicitly
-([`_foreach_root_closure`](@ref Ferrite.AMR._foreach_root_closure), Alg 5.3 line 4).
+([`_foreach_root_closure`](@ref PureP4est._foreach_root_closure), Alg 5.3 line 4).
 
 ### The descent and the stop rule
 
 The heart of the materializer is the recursive traversal [`iterate_points`](@ref
-Ferrite.AMR.iterate_points) (`Iterate`, Alg 5.3, serial), which drives
-[`_iterate_interior!`](@ref Ferrite.AMR._iterate_interior!) (`Iterate_interior`, Alg 5.2)
+PureP4est.iterate_points) (`Iterate`, Alg 5.3, serial), which drives
+[`_iterate_interior!`](@ref PureP4est._iterate_interior!) (`Iterate_interior`, Alg 5.2)
 from every root-closure seed. Each recursion step carries a point `c` together with its
 support octants and, per support octant, the index range of the actual leaves below it in
 the tree's Morton-sorted `leaves` vector (the paper's `S` arrays). At every step the
@@ -386,20 +423,20 @@ recursion asks one question — **is some support octant itself a leaf?** (Alg 5
 
 - **No** — everything around `c` is refined further, so `c`'s current description is too
   coarse to be a mesh entity. *Descend*: split `c` into `part(c)`
-  ([`_foreach_partc`](@ref Ferrite.AMR._foreach_partc)), give each sub-point its support
+  ([`_foreach_partc`](@ref PureP4est._foreach_partc)), give each sub-point its support
   from the children of `c`'s supports (a combinatorial constant served by precomputed mask
   tables, `_part_mask`), and slice the leaf ranges with
-  [`split_bounds`](@ref Ferrite.AMR.split_bounds) — descendants of an octant are contiguous
+  [`split_bounds`](@ref PureP4est.split_bounds) — descendants of an octant are contiguous
   in Morton order, so this is index arithmetic, not search.
 - **Yes** — a leaf has no children, so the mesh has no finer structure touching `c` from
   that side: `c`, as described, *is* an entity of the final mesh. The point is
   **finalized**: the recursion stops, builds the *leaf support* `leaf_supp(c)` — each
   support octant that is a leaf enters as-is; for the refined ones, their children adjacent
   to `c` enter (one level down suffices under 2:1 balance; `B_∩^j`, Alg 5.2 line 14,
-  [`_child_touches_point`](@ref Ferrite.AMR._child_touches_point)) — and fires the callback
+  [`_child_touches_point`](@ref PureP4est._child_touches_point)) — and fires the callback
   `visit(c, leaf_supp)` for it, exactly once, ever. Corner points cannot be split and
   always finalize (Alg 5.2 lines 15–18; the leaf per support subtree is found by
-  [`_descend_to_corner`](@ref Ferrite.AMR._descend_to_corner)).
+  [`_descend_to_corner`](@ref PureP4est._descend_to_corner)).
 
 The visited set is exactly `PΩ` of §5.1: every leaf volume and every face/edge/corner
 *between* leaves. Two consequences deserve emphasis:
@@ -438,18 +475,18 @@ recursion still runs, being the spine of the traversal), and `skip_conforming` (
 callback for faces/edges whose supports are all equal-level leaves — conforming interfaces
 — for callbacks that only act on non-conforming ones; corners always fire). The whole
 descent is allocation-free: all per-depth state lives in one preallocated
-[`IterScratch`](@ref Ferrite.AMR.IterScratch), reused across the trees of the forest.
+[`IterScratch`](@ref PureP4est.IterScratch), reused across the trees of the forest.
 
 ```@docs
-Ferrite.AMR.IteratePoint
-Ferrite.AMR.iterate_points
-Ferrite.AMR._iterate_interior!
-Ferrite.AMR.IterScratch
-Ferrite.AMR._foreach_partc
-Ferrite.AMR._foreach_root_closure
-Ferrite.AMR._child_touches_point
-Ferrite.AMR._descend_to_corner
-Ferrite.AMR.split_bounds
+PureP4est.IteratePoint
+PureP4est.iterate_points
+PureP4est._iterate_interior!
+PureP4est.IterScratch
+PureP4est._foreach_partc
+PureP4est._foreach_root_closure
+PureP4est._child_touches_point
+PureP4est._descend_to_corner
+PureP4est.split_bounds
 ```
 
 ### The traversal types at a glance
@@ -459,10 +496,10 @@ is a window, one is the consumer:
 
 | Type | Role | Lifetime |
 |:-----|:-----|:---------|
-| [`IteratePoint`](@ref Ferrite.AMR.IteratePoint) | The *message*: describes the visited entity. | Created and discarded during the descent; never stored. |
-| [`IterScratch`](@ref Ferrite.AMR.IterScratch) | The *memory*: per-depth buffers of the recursion, so the traversal allocates nothing. Carries no meaning between traversals. | One per forest, reused for every tree. |
-| [`LeafSupport`](@ref Ferrite.AMR.LeafSupport) | The *window*: the leaves touching the visited entity **plus each leaf's index** in `tree.leaves` — the element index `j` of §6.4 ("`Iterate` provides the index"), which lets a callback address per-element data directly. Wraps the scratch's buffers. | Valid only during the callback call — copy what you retain. |
-| [`LnodesVisitor`](@ref Ferrite.AMR.LnodesVisitor) | The *consumer*: `creategrid`'s callback (`Lnodes_callback`, Alg 6.2) as a callable struct, so it can carry the output arrays it fills. | One per tree; its fields reference forest-wide outputs. |
+| [`IteratePoint`](@ref PureP4est.IteratePoint) | The *message*: describes the visited entity. | Created and discarded during the descent; never stored. |
+| [`IterScratch`](@ref PureP4est.IterScratch) | The *memory*: per-depth buffers of the recursion, so the traversal allocates nothing. Carries no meaning between traversals. | One per forest, reused for every tree. |
+| [`LeafSupport`](@ref PureP4est.LeafSupport) | The *window*: the leaves touching the visited entity **plus each leaf's index** in `tree.leaves` — the element index `j` of §6.4 ("`Iterate` provides the index"), which lets a callback address per-element data directly. Wraps the scratch's buffers. | Valid only during the callback call — copy what you retain. |
+| [`LnodesVisitor`](@ref PureP4est.LnodesVisitor) | The *consumer*: `lnodes`'s callback (`Lnodes_callback`, Alg 6.2) as a callable struct, so it can carry the output arrays it fills. | One per tree; its fields reference forest-wide outputs. |
 
 All four meet at the callback boundary of one per-tree traversal:
 
@@ -478,31 +515,36 @@ reference — is the subject of the pipeline below.
 
 ### The `creategrid` pipeline
 
-`creategrid` drives the iterator and assembles the grid in a few phases. The call graph:
+`creategrid` calls `lnodes`, which drives the iterator and numbers the nodes in a few phases,
+and then materializes the grid. The call graph:
 
 ```
-creategrid(forest)
+creategrid(forest)                            # Ferrite.AMR
 │
-├─ for each tree:  iterate_points(visitor, tree, sc;                  # IBWG2015 Alg 5.2/5.3
-│                                 mindim = 0, maxdim = dim-1,         #  = Alg 6.2 Lnodes
-│                                 skip_conforming = true)
-│      ├─ corner callback → _visit_corner!    # create node id, scatter into E[slot, element]
-│      ├─ face   callback → _visit_face!      # hanging face midpoint (2D) / center (3D)
-│      └─ edge   callback → _visit_edge3d!    # hanging edge midpoints (3D)
+├─ lnodes(forest)                             # PureP4est
+│  ├─ for each tree:  iterate_points(visitor, tree, sc;                  # IBWG2015 Alg 5.2/5.3
+│  │                               mindim = 0, maxdim = dim-1,         #  = Alg 6.2 Lnodes
+│  │                               skip_conforming = true)
+│  │    ├─ corner callback → _visit_corner!    # create node id, scatter into E[slot, element]
+│  │    ├─ face   callback → _visit_face!      # hanging face midpoint (2D) / center (3D)
+│  │    └─ edge   callback → _visit_edge3d!    # hanging edge midpoints (3D)
+│  │
+│  ├─ _iterate_interface_hanging!              # inter-tree hanging constraints (reads E)
+│  │    └─ _iter_interface!  (per shared tree face) → _emit_interface_face!
+│  │
+│  ├─ _merge_intertree_nodes!  # alias ids shared across tree boundaries (boundary tables)
+│  └─ _global_numbering!       # Alg 6.1: final dense ids in one sweep over E
 │
-├─ _iterate_interface_hanging!                # inter-tree hanging constraints (reads E)
-│      └─ _iter_interface!  (per shared tree face) → _emit_interface_face!
-│
-├─ _merge_intertree_nodes!    # alias ids shared across tree boundaries (boundary tables)
-├─ _global_numbering          # Alg 6.1: final dense ids in one sweep over E
+├─ _nodes_from_refs           # (tree, integer coordinate) → physical node coordinates
 ├─ _build_cells               # E columns → Quadrilateral / Hexahedron cells
 └─ reconstruct_facetsets / reconstruct_cellsets   # carry named boundaries / subdomains onto the refined grid
 ```
 
 1. **Numbering and hanging detection** happen inside the single per-tree `iterate_points` pass
-   (the `Lnodes_callback` of IBWG2015 Alg 6.2, [`LnodesVisitor`](@ref Ferrite.AMR.LnodesVisitor)).
+   (the `Lnodes_callback` of IBWG2015 Alg 6.2, [`LnodesVisitor`](@ref PureP4est.LnodesVisitor)).
    The *corner* callback creates the node at the visited point — a running provisional id, its
-   physical coordinate, and a boundary-table entry if it lies on the tree boundary — and scatters
+   `(tree, integer coordinate)` reference, and a boundary-table entry if it lies on the tree
+   boundary — and scatters
    the id into the element-node matrix `E` of every supporting leaf ("complete the entries in
    `Ep` that refer to `g`", §6.4). `E` is a `2^dim × ncells` integer matrix holding the node id
    of every element corner in z-order — connectivity and node numbering in one array, and the
@@ -511,9 +553,9 @@ creategrid(forest)
    genuine fine-leaf corners) and record its constraint as `(element, slot)` references into `E`,
    resolved after the traversal.
 2. **Inter-tree hanging** is collected by a cross-tree two-sided face descent
-   ([`_iter_interface!`](@ref Ferrite.AMR._iter_interface!)) seeded at every shared tree face —
+   ([`_iter_interface!`](@ref PureP4est._iter_interface!)) seeded at every shared tree face —
    the same idea as the intra-tree callbacks, but matching the two sides across a tree
-   boundary via [`transform_facet`](@ref Ferrite.AMR.transform_facet) (handling rotations).
+   boundary via [`transform_facet`](@ref PureP4est.transform_facet) (handling rotations).
 3. **Cross-tree identity.** The traversal is strictly per-tree, so a node on a shared tree
    boundary is visited once per incident tree and briefly holds one provisional id per tree.
    To merge the duplicates one lookup structure is unavoidable — "tree `k`, which id did you
@@ -522,41 +564,48 @@ creategrid(forest)
    (a component is `0` or `2^b`), it also appends `(key, id)` to that tree's boundary table,
    with the coordinate bit-packed into a single `UInt64` key (`_packcoord`) so comparisons
    are one machine word. Each table is sorted once after its tree's traversal;
-   [`_bnd_lookup`](@ref Ferrite.AMR._bnd_lookup) then answers queries by binary search.
-   [`_merge_intertree_nodes!`](@ref Ferrite.AMR._merge_intertree_nodes!) walks the shared
+   [`_bnd_lookup`](@ref PureP4est._bnd_lookup) then answers queries by binary search.
+   [`_merge_intertree_nodes!`](@ref PureP4est._merge_intertree_nodes!) walks the shared
    root vertices/faces/edges, maps coordinates into the neighbour tree's frame via
-   [`transform_facet`](@ref Ferrite.AMR.transform_facet)/`transform_corner`/`transform_edge`
+   [`transform_facet`](@ref PureP4est.transform_facet)/`transform_corner`/`transform_edge`
    (handling tree rotations), and records `alias[duplicate] = owner` (the lower tree index
    owns). A lookup miss is routine and meaningful: a hanging node exists as a vertex only on
    the refined side of an interface, so the coarse neighbour has no entry for it. Interior
    nodes — the overwhelming majority — never enter any table: `O(surface)` data, the only
    node-lookup structure of the materializer.
-4. **Global numbering, cells and constraints.** [`_global_numbering`](@ref
-   Ferrite.AMR._global_numbering) is the serial `Global_numbering` (Alg 6.1): one linear sweep
+4. **Global numbering and constraints.** [`_global_numbering!`](@ref
+   PureP4est._global_numbering!) is the serial `Global_numbering` (Alg 6.1): one linear sweep
    over `E` in (element, element-node) order assigns final dense ids by first encounter — with
    the ownership rule `owner(c) = min leaf supp(c)` (eq 6.2) this is the paper's
-   partition-independent numbering. [`_build_cells`](@ref Ferrite.AMR._build_cells) then reads
-   the cells straight off `E`, the constraint records are resolved against `E`, and
+   partition-independent numbering — and rewrites `E` to them in place. The constraint records
+   are resolved against `E`, which ends the PureP4est part.
+5. **Materialization** (Ferrite). The node coordinates are interpolated from the nodes'
+   `(tree, integer coordinate)` references (see [Physical coordinates](@ref) below),
+   [`_build_cells`](@ref Ferrite.AMR._build_cells) reads the cells straight off `E`,
    [`reconstruct_facetsets`](@ref Ferrite.AMR.reconstruct_facetsets) transfers the boundary sets
    and [`reconstruct_cellsets`](@ref Ferrite.AMR.reconstruct_cellsets) the cell sets (every leaf
    inherits its tree's set membership).
 
 ```@docs
-Ferrite.AMR.LeafSupport
-Ferrite.AMR.LnodesVisitor
-Ferrite.AMR._visit_corner!
-Ferrite.AMR._mixed_support
-Ferrite.AMR._global_numbering
-Ferrite.AMR._merge_intertree_nodes!
-Ferrite.AMR._bnd_lookup
+PureP4est.lnodes
+PureP4est.LNodes
+PureP4est.LeafSupport
+PureP4est.LnodesVisitor
+PureP4est._visit_corner!
+PureP4est._mixed_support
+PureP4est._global_numbering!
+PureP4est._merge_intertree_nodes!
+PureP4est._bnd_lookup
 Ferrite.AMR._build_cells
 Ferrite.AMR.reconstruct_facetsets
 Ferrite.AMR.reconstruct_cellsets
+PureP4est.foreach_root_facet_leaf
 ```
 
 ### Physical coordinates
 
-Node identity is purely integer; physical positions enter only here. Each macro element (tree) is
+Node identity is purely integer; physical positions enter only here, in Ferrite, from the
+`(tree, integer coordinate)` reference `lnodes` returns for every node. Each macro element (tree) is
 an isoparametric ``Q_1`` cell, so an octree coordinate is mapped to physical space by interpolating
 the tree's corner nodes with the bi-/trilinear Lagrange shape functions.
 
@@ -588,9 +637,9 @@ In 2D a face *is* an edge, so there is just the midpoint with its two masters. B
 points are exactly the points the iterator never visits (the stop rule halts at the coarse
 leaf; see [The descent and the stop rule](@ref) above), they are created by the *feature that
 owns them* — detected via the mixed-level leaf support
-([`_mixed_support`](@ref Ferrite.AMR._mixed_support)): a non-conforming **face point** creates
-its center, and a non-conforming **edge point** creates its midpoint ([`_visit_face!`](@ref Ferrite.AMR._visit_face!),
-[`_visit_edge3d!`](@ref Ferrite.AMR._visit_edge3d!)). Each hanging vertex belongs to exactly one
+([`_mixed_support`](@ref PureP4est._mixed_support)): a non-conforming **face point** creates
+its center, and a non-conforming **edge point** creates its midpoint ([`_visit_face!`](@ref PureP4est._visit_face!),
+[`_visit_edge3d!`](@ref PureP4est._visit_edge3d!)). Each hanging vertex belongs to exactly one
 such coarse feature (two octant edges cannot share their midpoints), and each feature is visited
 exactly once — even an edge shared by several non-conforming faces — so every hanging vertex is
 created exactly once, with its constraint recorded as `(element, slot)` references into `E` (a
@@ -598,13 +647,13 @@ master corner may not be numbered yet when the feature is visited; the reference
 after the traversal).
 
 ```@docs
-Ferrite.AMR._visit_face!
-Ferrite.AMR._visit_edge3d!
-Ferrite.AMR._iter_interface!
-Ferrite.AMR._emit_interface_face!
-Ferrite.AMR._iterate_interface_hanging!
-Ferrite.AMR.center
-Ferrite.AMR.contains_facet
+PureP4est._visit_face!
+PureP4est._visit_edge3d!
+PureP4est._iter_interface!
+PureP4est._emit_interface_face!
+PureP4est._iterate_interface_hanging!
+PureP4est.center
+PureP4est.contains_facet
 ```
 
 ### The facet skeleton
@@ -612,18 +661,20 @@ Ferrite.AMR.contains_facet
 Facet-jump error estimators and DG-style couplings need the *true* facet interfaces of the
 refined forest — including the coarse↔fine (hanging) and across-tree ones, which an
 `ExclusiveTopology` of the materialized grid cannot provide (it only knows the macro/root
-mesh). [`facetskeleton`](@ref) materializes them as pairs of `FacetIndex` into
-`creategrid`'s cell numbering: the intra-tree interfaces come from a face-only
-`iterate_points` traversal ([`FacetSkeletonVisitor`](@ref Ferrite.AMR.FacetSkeletonVisitor)),
+mesh). [`facetskeleton`](@ref PureP4est.facetskeleton) materializes them as pairs of
+`(cell, facet)` indices in `creategrid`'s cell numbering — wrapped in an index type of the
+caller's choice, `FacetIndex` for Ferrite's `facetskeleton(::ForestBWG)`: the intra-tree interfaces come from a face-only
+`iterate_points` traversal ([`FacetSkeletonVisitor`](@ref PureP4est.FacetSkeletonVisitor)),
 the inter-tree ones from a two-sided lock-step descent of each shared tree face
-([`_iter_interface_facets!`](@ref Ferrite.AMR._iter_interface_facets!)), mirroring
-[`_iter_interface!`](@ref Ferrite.AMR._iter_interface!) above.
+([`_iter_interface_facets!`](@ref PureP4est._iter_interface_facets!)), mirroring
+[`_iter_interface!`](@ref PureP4est._iter_interface!) above.
 
 ```@docs
-Ferrite.AMR.FacetSkeletonVisitor
-Ferrite.AMR._iter_interface_facets!
-Ferrite.AMR._emit_interface_facets!
-Ferrite.AMR._element_offsets
+PureP4est.facetskeleton
+PureP4est.FacetSkeletonVisitor
+PureP4est._iter_interface_facets!
+PureP4est._emit_interface_facets!
+PureP4est._element_offsets
 ```
 
 ### Conformity constraints

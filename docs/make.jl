@@ -14,6 +14,7 @@ using Documenter, DocumenterCitations, Ferrite, FerriteGmsh, FerriteMeshParser,
     SparseArrays, LinearAlgebra, Changelog, DocumenterCodeBlocks
 
 using BlockArrays
+import PureP4est # documented in the AMR developer docs
 const FerriteBlockArrays = Base.get_extension(Ferrite, :FerriteBlockArrays)
 
 const is_ci = haskey(ENV, "GITHUB_ACTIONS")
