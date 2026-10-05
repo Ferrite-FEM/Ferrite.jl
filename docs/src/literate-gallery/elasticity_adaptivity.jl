@@ -170,9 +170,10 @@ end
 # concentration at the re-entrant corner.
 function vonmises_stress(grid, dh, u, cv, C)
     σvM = zeros(getncells(grid))
+    ue = zeros(eltype(u), ndofs_per_cell(dh))
     for cell in CellIterator(dh)
         reinit!(cv, cell)
-        ue = u[celldofs(cell)]
+        ue .= @view u[celldofs(cell)]
         s = 0.0
         for qp in 1:getnquadpoints(cv)
             σ = C ⊡ function_symmetric_gradient(cv, qp, ue)
@@ -239,6 +240,15 @@ function estimate_error(forest, grid, dh, u, C)
 
     error_arr = zeros(nc)
 
+    ## Caches for the dofs of the interfaces and boundary facets, and buffers for the local
+    ## solution vectors. The boundary residual only needs the solution of a single cell, so
+    ## `ueA` can reuse the first half of `ue`.
+    ic = InterfaceCache(dh)
+    fc = FacetCache(dh)
+    ndofs_cell = ndofs_per_cell(dh)
+    ue = zeros(eltype(u), 2 * ndofs_cell)
+    ueA = @view ue[1:ndofs_cell]
+
     ## Facet diameter from the facet's node coordinates.
     function facet_diameter(fi::FacetIndex)
         fnodes = Ferrite.facets(cells[fi[1]])[fi[2]]
@@ -251,11 +261,16 @@ function estimate_error(forest, grid, dh, u, C)
     function add_jump!(fiA::FacetIndex, fiB::FacetIndex)
         cA, fA = fiA[1], fiA[2]
         cB, fB = fiB[1], fiB[2]
-        coordsA = getcoordinates(grid, cA)
-        coordsB = getcoordinates(grid, cB)
+        ## The interface cache provides the coordinates and dofs of the two cells
+        reinit!(ic, fiA, fiB)
+        coordsA = getcoordinates(ic.a)
+        coordsB = getcoordinates(ic.b)
+        ue .= @view u[interfacedofs(ic)]
+        ## Note that `reinit!(iv, ic)` can not be used here since it assumes that the two
+        ## facets coincide, which is not the case for hanging interfaces. Instead, the
+        ## transformation from the here facet to the there facet is given explicitly.
         trans = Ferrite.AffineInterfaceTransformation(cells[cA], coordsA, fA, cells[cB], coordsB, fB)
         reinit!(iv, cells[cA], coordsA, fA, cells[cB], coordsB, fB, trans)
-        ue = u[vcat(celldofs(dh, cA), celldofs(dh, cB))]
         hF = facet_diameter(fiA)
         s = 0.0
         for qp in 1:getnquadpoints(iv)
@@ -274,9 +289,10 @@ function estimate_error(forest, grid, dh, u, C)
     ## Boundary residual over the domain-boundary facet `fi` with prescribed traction `g`.
     function add_boundary!(fi::FacetIndex, g)
         cA, fA = fi[1], fi[2]
-        coordsA = getcoordinates(grid, cA)
+        reinit!(fc, fi)
+        coordsA = getcoordinates(fc)
         reinit!(fv, coordsA, fA)
-        ueA = u[celldofs(dh, cA)]
+        ueA .= @view u[celldofs(fc)]
         hF = facet_diameter(fi)
         s = 0.0
         for qp in 1:getnquadpoints(fv)

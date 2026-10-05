@@ -183,12 +183,13 @@ function doassemble!(
     nu = getnbasefunctions(cellvalues)
     re = zeros(nu)     # element residual vector
     ke = zeros(nu, nu) # element tangent matrix
+    ue = zeros(eltype(u), nu) # element solution vector
 
     for (i, cell) in enumerate(CellIterator(dh))
         fill!(ke, 0)
         fill!(re, 0)
         eldofs = celldofs(cell)
-        ue = u[eldofs]
+        ue .= @view u[eldofs]
         state = @view states[:, i]
         state_old = @view states_old[:, i]
         assemble_cell!(ke, re, cell, cellvalues, material, ue, state, state_old)

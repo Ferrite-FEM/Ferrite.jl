@@ -424,10 +424,11 @@ function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ, Ei, Em
     σ̄Ω = zero(SymmetricTensor{2, 2})
     Ω = 0.0 # Total volume
     inclusions = getcellset(dh.grid, "inclusions")
+    ue = zeros(eltype(u), ndofs_per_cell(dh))
     for cell in CellIterator(dh)
         E = cellid(cell) in inclusions ? Ei : Em
         reinit!(cellvalues, cell)
-        ue = u[celldofs(cell)]
+        ue .= @view u[celldofs(cell)]
         for q_point in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, q_point)
             εμ = function_symmetric_gradient(cellvalues, q_point, ue)

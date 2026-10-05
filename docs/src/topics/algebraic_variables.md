@@ -141,10 +141,11 @@ function assemble_volume!(assembler, dh, ch, cellvalues, σ̄values, a)
     range_σ = (n + 1):(n + nσ)                   # local placement of the σ̄ dofs
     Ke = zeros(eltype(a), n + nσ, n + nσ)
     fe = zeros(eltype(a), n + nσ)
+    ae = zeros(eltype(a), n + nσ)
 
     for cell in CellIterator(dh)
         copyto!(dofs, celldofs(cell)) # refresh the first n entries
-        ae = a[dofs]
+        ae .= @view a[dofs]
         fill!(Ke, 0)
         fill!(fe, 0)
         reinit!(cellvalues, cell)

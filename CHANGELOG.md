@@ -62,6 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - The boundary conditions topic guide has a new section on Robin boundary conditions,
    covering the weak form and how to assemble the contributions. ([#762], [#774], [#1534])
+ - The tutorials, how-tos and gallery examples now extract the element values without
+   allocating, using a preallocated element vector and `ue .= @view u[celldofs(cell)]`.
+   ([#341], [#1540])
 
 ## [v1.7.0] - 2026-08-31
 
@@ -1233,6 +1236,7 @@ poking into Ferrite internals:
 [v1.5.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.5.0
 [v1.6.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.6.0
 [v1.7.0]: https://github.com/Ferrite-FEM/Ferrite.jl/releases/tag/v1.7.0
+[#341]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/341
 [#352]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/352
 [#363]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/363
 [#378]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/378
@@ -1520,5 +1524,6 @@ poking into Ferrite internals:
 [#1522]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1522
 [#1534]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1534
 [#1538]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1538
+[#1540]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1540
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490

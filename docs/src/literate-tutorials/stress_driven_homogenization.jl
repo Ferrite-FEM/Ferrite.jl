@@ -334,9 +334,10 @@ function average_stress(a, dh, cv_u, Ei, Em, incl_cells)
     ε̄ = algebraic_value(dh, a, :εbar)
     σΩ = zero(SymmetricTensor{2, 2})
     vol = 0.0
+    ae = zeros(eltype(a), ndofs_per_cell(dh))
     for cell in CellIterator(dh)
         reinit!(cv_u, cell)
-        ae = a[celldofs(cell)]
+        ae .= @view a[celldofs(cell)]
         E = cellid(cell) in incl_cells ? Ei : Em
         for qp in 1:getnquadpoints(cv_u)
             dΩ = getdetJdV(cv_u, qp)
@@ -468,9 +469,10 @@ E_reuss = inv(v_incl * inv(Ei) + (1 - v_incl) * inv(Em))
 function von_mises_stress(a, dh, cv_u, Ei, Em, incl_cells, ν)
     ε̄ = algebraic_value(dh, a, :εbar)
     σvM = zeros(getncells(dh.grid))
+    ae = zeros(eltype(a), ndofs_per_cell(dh))
     for cell in CellIterator(dh)
         reinit!(cv_u, cell)
-        ae = a[celldofs(cell)]
+        ae .= @view a[celldofs(cell)]
         E = cellid(cell) in incl_cells ? Ei : Em
         vol = 0.0
         for qp in 1:getnquadpoints(cv_u)

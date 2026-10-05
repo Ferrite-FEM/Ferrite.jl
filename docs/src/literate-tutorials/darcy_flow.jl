@@ -299,9 +299,11 @@ function collect_qp_fluxes(dh, cv_q, a)
         [zero(Vec{2}) for _ in 1:getnquadpoints(cv_q)]
             for _ in 1:getncells(dh.grid)
     ]
+    range_q = dof_range(dh, :q)
+    aᵉ = zeros(eltype(a), length(range_q))
     for cell in CellIterator(dh)
         reinit!(cv_q, cell)
-        aᵉ = a[celldofs(cell)][dof_range(dh, :q)]
+        @views aᵉ .= a[celldofs(cell)[range_q]]
         for qp in 1:getnquadpoints(cv_q)
             qp_fluxes[cellid(cell)][qp] = function_value(cv_q, qp, aᵉ)
         end
@@ -331,9 +333,11 @@ end;
 # element, using [`function_divergence`](@ref):
 function cell_imbalances(dh, cv_q, a)
     imbalances = zeros(getncells(dh.grid))
+    range_q = dof_range(dh, :q)
+    aᵉ = zeros(eltype(a), length(range_q))
     for cell in CellIterator(dh)
         reinit!(cv_q, cell)
-        aᵉ = a[celldofs(cell)][dof_range(dh, :q)]
+        @views aᵉ .= a[celldofs(cell)[range_q]]
         for qp in 1:getnquadpoints(cv_q)
             imbalances[cellid(cell)] += function_divergence(cv_q, qp, aᵉ) * getdetJdV(cv_q, qp)
         end
@@ -350,9 +354,11 @@ maximum(abs, cell_imbalances(dh, cv_q, a))
 # through the impermeable top and bottom boundaries:
 function boundary_flux(dh, fv_q, facetset, a)
     Q = 0.0
+    range_q = dof_range(dh, :q)
+    aᵉ = zeros(eltype(a), length(range_q))
     for facet in FacetIterator(dh, facetset)
         reinit!(fv_q, facet)
-        aᵉ = a[celldofs(facet)][dof_range(dh, :q)]
+        @views aᵉ .= a[celldofs(facet)[range_q]]
         for qp in 1:getnquadpoints(fv_q)
             Q += (function_value(fv_q, qp, aᵉ) ⋅ getnormal(fv_q, qp)) * getdetJdV(fv_q, qp)
         end
@@ -419,9 +425,10 @@ function boundary_flux_primal(dh, grid, k, facetset, p)
     ip = Lagrange{RefTriangle, 1}()
     fv = FacetValues(FacetQuadratureRule{RefTriangle}(2), ip)
     Q = 0.0
+    pᵉ = zeros(eltype(p), ndofs_per_cell(dh))
     for facet in FacetIterator(dh, facetset)
         reinit!(fv, facet)
-        pᵉ = p[celldofs(facet)]
+        pᵉ .= @view p[celldofs(facet)]
         for qp in 1:getnquadpoints(fv)
             q_vec = -k[cellid(facet)] * function_gradient(fv, qp, pᵉ)
             Q += (q_vec ⋅ getnormal(fv, qp)) * getdetJdV(fv, qp)
@@ -464,10 +471,17 @@ using Printf
 function flux_jump_mixed(dh, a, topology)
     iv = InterfaceValues(FacetQuadratureRule{RefTriangle}(2), RaviartThomas{RefTriangle, 1}(), Lagrange{RefTriangle, 1}())
     range_q = dof_range(dh, :q)
+    nq = length(range_q)
+    aᵉ = zeros(eltype(a), 2nq)
     J = 0.0
     for ic in InterfaceIterator(dh, topology)
         reinit!(iv, ic)
-        aᵉ = vcat(a[celldofs(ic.a)][range_q], a[celldofs(ic.b)][range_q])
+        # TODO: With https://github.com/Ferrite-FEM/Ferrite.jl/pull/1492 the two lines  #src
+        # below can be replaced with `aᵉ .= @view a[interfacedofs(ic)]` (with           #src
+        # `aᵉ` of length `nstacked_interface_dofs(ic)`) and passing                     #src
+        # `dof_range(ic, :q)` to `function_value_jump`.                                 #src
+        @views aᵉ[1:nq] .= a[celldofs(ic.a)[range_q]]
+        @views aᵉ[(nq + 1):end] .= a[celldofs(ic.b)[range_q]]
         for qp in 1:getnquadpoints(iv)
             jump = function_value_jump(iv, qp, aᵉ) ⋅ getnormal(iv, qp)
             J += abs(jump) * getdetJdV(iv, qp)
@@ -478,10 +492,11 @@ end
 
 function flux_jump_primal(dh, p, k, topology)
     iv = InterfaceValues(FacetQuadratureRule{RefTriangle}(2), Lagrange{RefTriangle, 1}())
+    pᵉ = zeros(eltype(p), 2 * ndofs_per_cell(dh))
     J = 0.0
     for ic in InterfaceIterator(dh, topology)
         reinit!(iv, ic)
-        pᵉ = vcat(p[celldofs(ic.a)], p[celldofs(ic.b)])
+        pᵉ .= @view p[interfacedofs(ic)]
         for qp in 1:getnquadpoints(iv)
             n = getnormal(iv, qp)
             q_here = -k[cellid(ic.a)] * function_gradient(iv, qp, pᵉ; here = true)

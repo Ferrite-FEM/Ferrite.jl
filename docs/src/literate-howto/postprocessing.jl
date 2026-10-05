@@ -74,9 +74,12 @@ function compute_heat_fluxes(cellvalues::CellValues, dh::DofHandler, a::Abstract
     ## Allocate storage for the fluxes to store
     q = [Vec{2, T}[] for _ in 1:getncells(dh.grid)]
 
+    ## Allocate the local solution vector
+    aᵉ = zeros(T, ndofs_per_cell(dh))
+
     for cell in CellIterator(dh)
         q_cell = q[cellid(cell)]
-        aᵉ = a[celldofs(cell)]
+        aᵉ .= @view a[celldofs(cell)]
         reinit!(cellvalues, cell)
 
         for q_point in 1:nqp

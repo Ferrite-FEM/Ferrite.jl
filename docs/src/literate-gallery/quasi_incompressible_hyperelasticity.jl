@@ -182,11 +182,10 @@ end;
 # and then assembled over all the cells (elements)
 function calculate_volume_deformed_mesh(w, dh::DofHandler, cellvalues)
     evol::Float64 = 0.0
+    range_u = dof_range(dh, :u)
+    ue = zeros(eltype(w), length(range_u))
     for cell in CellIterator(dh)
-        global_dofs = celldofs(cell)
-        nu = getnbasefunctions(cellvalues.u)
-        global_dofs_u = global_dofs[1:nu]
-        ue = w[global_dofs_u]
+        @views ue .= w[celldofs(cell)[range_u]]
         δevol = calculate_element_volume(cell, cellvalues, ue)
         evol += δevol
     end
@@ -252,8 +251,10 @@ function assemble_element!(Ke, fe, cell, cellvalues, mp, ue, pe)
     return
 end;
 
-# The only thing that changes in the assembly of the global stiffness matrix is slicing the corresponding element
-# dofs for the displacement (see `global_dofsu`) and pressure (`global_dofsp`).
+# The only thing that changes in the assembly of the global stiffness matrix is that the
+# element routine takes the displacement (`ue`) and pressure (`pe`) parts of the element
+# vector separately. These are views into the element vector `we`, using the dof ranges of
+# the two fields, so they only need to be created once.
 function assemble_global!(
         K::SparseMatrixCSC, f, cellvalues::MultiFieldCellValues,
         dh::DofHandler, mp::NeoHooke, w
@@ -264,16 +265,16 @@ function assemble_global!(
     ## start_assemble resets K and f
     fe = BlockedArray(zeros(nu + np), [nu, np]) # local force vector
     ke = BlockedArray(zeros(nu + np, nu + np), [nu, np], [nu, np]) # local stiffness matrix
+    we = zeros(eltype(w), nu + np) # local solution vector
+    ue = @view we[dof_range(dh, :u)] # local displacement vector
+    pe = @view we[dof_range(dh, :p)] # local pressure vector
 
     assembler = start_assemble(K, f)
     ## Loop over all cells in the grid
     for cell in CellIterator(dh)
         global_dofs = celldofs(cell)
-        global_dofsu = global_dofs[1:nu] # first nu dofs are displacement
-        global_dofsp = global_dofs[(nu + 1):end] # last np dofs are pressure
         @assert size(global_dofs, 1) == nu + np # sanity check
-        ue = w[global_dofsu] # displacement dofs for the current cell
-        pe = w[global_dofsp] # pressure dofs for the current cell
+        we .= @view w[global_dofs] # this also updates the views ue and pe
         fill!(ke, 0.0)
         fill!(fe, 0.0)
         assemble_element!(ke, fe, cell, cellvalues, mp, ue, pe)
