@@ -151,9 +151,10 @@ end
 function estimate_error(grid, dh, u, cv, ip, qr)
     ## Step 1: Compute the raw flux σ_h = ∇u_h at each quadrature point.
     σ_gp = Vector{Vector{Vec{3, Float64}}}()
+    ue = zeros(eltype(u), ndofs_per_cell(dh))
     for cell in CellIterator(dh)
         reinit!(cv, cell)
-        ue = u[celldofs(cell)]
+        ue .= @view u[celldofs(cell)]
         σ_cell = Vec{3, Float64}[]
         for q_point in 1:getnquadpoints(cv)
             push!(σ_cell, function_gradient(cv, q_point, ue))
@@ -195,9 +196,10 @@ end
 # estimated error should stay close to the true error.
 function true_error(grid, dh, u, cv)
     error_arr = zeros(getncells(grid))
+    ue = zeros(eltype(u), ndofs_per_cell(dh))
     for (cellid, cell) in enumerate(CellIterator(dh))
         reinit!(cv, cell)
-        ue = u[celldofs(cell)]
+        ue .= @view u[celldofs(cell)]
         coords = getcoordinates(cell)
         for q_point in 1:getnquadpoints(cv)
             x = spatial_coordinate(cv, q_point, coords)
