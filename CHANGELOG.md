@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `∑ a[j] u[j] = b` between dofs without a designated constrained dof. `close!` picks the
    dof to eliminate, skipping already constrained dofs and preferring dofs that appear in
    few other constraints (to avoid fill-in); `prefer = dof` biases the choice. Useful for
-   e.g. mean value constraints combined with periodic boundary conditions.
+   e.g. mean value constraints combined with periodic boundary conditions. ([#1541])
  - New function `interfaceskeleton(topology, grid)` returning the *interfaces* of the
    grid (the interior facets, i.e. the subset of `facetskeleton` shared between two
    cells) as a `Vector` of facet pairs `(facet_here, facet_there)`. Like the facet
@@ -1637,6 +1637,7 @@ poking into Ferrite internals:
 [#1553]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1553
 [#1554]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1554
 [#1559]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1559
+[#1541]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1541
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
 [#1556]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1556
