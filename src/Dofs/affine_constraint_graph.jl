@@ -122,7 +122,7 @@ function _untangle_affine_constraints(
         throw(DimensionMismatch("expected one coefficient vector and constant per slave"))
     equation_index = zeros(Int, nvariables)
     for (i, d) in enumerate(slaves)
-        equation_index[d] == 0 || throw(ArgumentError("slave variable $d occurs more than once"))
+        @assert equation_index[d] == 0 "slave variable $d occurs more than once"
         equation_index[d] = i
     end
     adjacency = [Int[equation_index[d] for (d, _) in row if equation_index[d] != 0] for row in coefficients]
