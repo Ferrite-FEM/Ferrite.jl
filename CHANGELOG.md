@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+ - New cell type `QuadraticWedge` (18 nodes) with geometric interpolation
+   `Lagrange{RefPrism, 2}()`, including VTK export. Gmsh "Prism 18" elements can be
+   imported as `QuadraticWedge` with FerriteGmsh (see
+   [FerriteGmsh.jl#61](https://github.com/Ferrite-FEM/FerriteGmsh.jl/pull/61)). ([#1538])
  - New function `interfaceskeleton(topology, grid)` returning the *interfaces* of the
    grid (the interior facets, i.e. the subset of `facetskeleton` shared between two
    cells) as a `Vector` of facet pairs `(facet_here, facet_there)`. Like the facet
@@ -1515,5 +1519,6 @@ poking into Ferrite internals:
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1522]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1522
 [#1534]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1534
+[#1538]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1538
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
