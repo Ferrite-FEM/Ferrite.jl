@@ -72,6 +72,16 @@ Ferrite.reference_shape_hessians_gradients_and_values!
 Ferrite.shape_value_type(ip::Interpolation, ::Type{T}) where T<:Number
 ```
 
+### Tensor product structure
+Interpolations on hypercubes (lines, quadrilaterals, and hexahedra) are tensor products of
+1D interpolations. The following functions expose this structure, which can be used for
+e.g. sum-factorized operator evaluation (see the
+[matrix-free how-to](../howto/matrix_free.md)).
+```@docs
+Ferrite.tensor_product_interpolation
+Ferrite.tensor_product_indices
+```
+
 ## [How to implement a new interpolation](@id devdocs-howto_new-interpolation)
 !!! warning
     The API for implementing a new interpolation is not fully stable yet.
