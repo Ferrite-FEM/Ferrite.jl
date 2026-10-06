@@ -218,6 +218,7 @@ end
             dxdξ = gradient(spatial_coordinate_differentiable, ξ_rand) # Jacobian
             J = Ferrite.getjacobian(Ferrite.calculate_mapping(cv.geo_mapping, 1, cell_coords))
             @test dxdξ ≈ J
+            @test spatial_jacobian(cv, 1, cell_coords) == J
             for i in 1:getnbasefunctions(ip_fun)
                 dNdξ, N = gradient(z -> calculate_value_differentiable(z; i), ξ_rand, :all)
                 # Test that using FunctionValues{0} and FunctionValues{1} gives same mapped value
@@ -245,6 +246,41 @@ end
                 test_gradient(ip, cell)
             end
         end
+    end
+
+    @testset "spatial_jacobian" begin
+        ip_geo = Lagrange{RefQuadrilateral, 2}()
+        ip = Lagrange{RefQuadrilateral, 1}()
+        qr = QuadratureRule{RefQuadrilateral}(2)
+        x_ref = Ferrite.reference_coordinates(ip_geo)
+        x = [Vec{2}((2.0 + ξ[1] + ξ[2]^2 / 10, 3ξ[2] - ξ[1] / 5)) for ξ in x_ref]
+        J_ref = [gradient(ξ -> spatial_coordinate(ip_geo, ξ, x), ξ) for ξ in Ferrite.getpoints(qr)]
+        # All combinations of update flags, giving GeometryMapping{0}, {1}, and {2}
+        for (update_gradients, update_hessians, update_detJdV) in Iterators.product((false, true), (false, true), (false, true))
+            cv = CellValues(qr, ip, ip_geo; update_gradients, update_hessians, update_detJdV)
+            reinit!(cv, x)
+            for qp in 1:getnquadpoints(cv)
+                @test spatial_jacobian(cv, qp, x) ≈ J_ref[qp]
+                update_detJdV && @test det(spatial_jacobian(cv, qp, x)) * Ferrite.getweights(qr)[qp] ≈ getdetJdV(cv, qp)
+            end
+        end
+        cmv = MultiFieldCellValues(qr, (a = ip, b = ip^2), ip_geo)
+        reinit!(cmv, x)
+        for qp in 1:getnquadpoints(cmv)
+            @test spatial_jacobian(cmv, qp, x) ≈ J_ref[qp]
+        end
+        # Embedded element: 2D reference shape in 3D space
+        cv_emb = CellValues(qr, ip, ip_geo^3)
+        x_emb = [Vec{3}((xi[1], xi[2], xi[1] / 3)) for xi in x]
+        reinit!(cv_emb, x_emb)
+        J_emb = spatial_jacobian(cv_emb, 1, x_emb)
+        @test size(J_emb) == (3, 2)
+        @test J_emb ≈ gradient(ξ -> spatial_coordinate(ip_geo, ξ, x_emb), Ferrite.getpoints(qr)[1])
+        # Error paths
+        cv = CellValues(qr, ip, ip_geo)
+        @test_throws ArgumentError spatial_jacobian(cv, 1, x[1:4])
+        @test_throws ErrorException("quadrature point out of range") spatial_jacobian(cv, 0, x)
+        @test_throws ErrorException("quadrature point out of range") spatial_jacobian(cv, getnquadpoints(cv) + 1, x)
     end
 
     @testset "#265: error message for incompatible geometric interpolation" begin

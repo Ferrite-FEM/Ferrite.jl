@@ -33,6 +33,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 * [`function_symmetric_gradient`](@ref)
 * [`function_divergence`](@ref)
 * [`spatial_coordinate`](@ref)
+* [`spatial_jacobian`](@ref)
 """
 FacetValues
 

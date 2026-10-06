@@ -153,6 +153,28 @@ include(joinpath(@__DIR__, "test_utils.jl"))
         end
     end
 
+    @testset "spatial_jacobian" begin
+        ip_geo = Lagrange{RefTriangle, 2}()
+        fqr = FacetQuadratureRule{RefTriangle}(2)
+        x = [Vec{2}((1.0 + 2ξ[1] + ξ[2]^2 / 10, ξ[2] - ξ[1]^2 / 5)) for ξ in Ferrite.reference_coordinates(ip_geo)]
+        # update_gradients = false still gives a GeometryMapping{1} for FacetValues
+        for update_gradients in (false, true)
+            fv = FacetValues(fqr, Lagrange{RefTriangle, 1}(), ip_geo; update_gradients)
+            for facet in 1:nfacets(RefTriangle)
+                reinit!(fv, x, facet)
+                for (qp, ξ) in pairs(Ferrite.getpoints(fqr, facet))
+                    J = spatial_jacobian(fv, qp, x)
+                    @test J ≈ gradient(ξ -> spatial_coordinate(ip_geo, ξ, x), ξ)
+                    # The facet tangent is J ⋅ t_ref, which must be orthogonal to the normal
+                    xf = Ferrite.reference_facets(RefTriangle)[facet]
+                    t_ref = Ferrite.reference_coordinates(ip_geo)[xf[2]] - Ferrite.reference_coordinates(ip_geo)[xf[1]]
+                    @test abs((J ⋅ t_ref) ⋅ getnormal(fv, qp)) < 1.0e-12
+                end
+            end
+            @test_throws ErrorException("quadrature point out of range") spatial_jacobian(fv, getnquadpoints(fv) + 1, x)
+        end
+    end
+
     @testset "construction errors" begin
         @test_throws ArgumentError FacetValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}())
         @test_throws ArgumentError FacetValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefTriangle, 1}(), Lagrange{RefQuadrilateral, 1}())

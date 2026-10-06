@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+ - New function `spatial_jacobian(fe_v, q_point, x)` returning the Jacobian of the
+   geometric mapping, ``J = \partial \mathbf{x} / \partial \mathbf{\xi}``, in a
+   quadrature point of `CellValues`, `MultiFieldCellValues`, and `FacetValues`, given the
+   cell coordinates `x`. ([#1545])
  - New cell type `QuadraticWedge` (18 nodes) with geometric interpolation
    `Lagrange{RefPrism, 2}()`, including VTK export. Gmsh "Prism 18" elements can be
    imported as `QuadraticWedge` with FerriteGmsh (see
@@ -1525,5 +1529,6 @@ poking into Ferrite internals:
 [#1534]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1534
 [#1538]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1538
 [#1540]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1540
+[#1545]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1545
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
