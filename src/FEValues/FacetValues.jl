@@ -167,7 +167,7 @@ end
 end
 
 @inline function reinit_needs_cell(fv::FacetValues)
-    return any(map(fvals -> !isa(mapping_type(fvals), IdentityMapping), get_fun_values(fv)))
+    return any(map(reinit_needs_cell, get_fun_values(fv)))
 end
 
 function check_reinit_sdim_consistency(fv::FacetValues, ::AbstractVector{VT}) where {VT}
