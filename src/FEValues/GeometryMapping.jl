@@ -124,12 +124,16 @@ end
     return MappingValues(nothing, nothing)
 end
 
-@inline function calculate_mapping(geo_mapping::GeometryMapping{1}, q_point::Int, x::AbstractVector{<:Vec})
+@inline function calculate_jacobian(geo_mapping::GeometryMapping, q_point::Int, x::AbstractVector{<:Vec})
     J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
     @inbounds for j in 1:getngeobasefunctions(geo_mapping)
         J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
     end
-    return MappingValues(J, nothing)
+    return J
+end
+
+@inline function calculate_mapping(geo_mapping::GeometryMapping{1}, q_point::Int, x::AbstractVector{<:Vec})
+    return MappingValues(calculate_jacobian(geo_mapping, q_point, x), nothing)
 end
 
 @inline function calculate_mapping(geo_mapping::GeometryMapping{2}, q_point::Int, x::AbstractVector{<:Vec})

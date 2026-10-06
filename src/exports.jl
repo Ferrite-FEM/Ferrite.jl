@@ -50,6 +50,7 @@ export
     spatial_coordinate,
     getnormal,
     getdetJdV,
+    spatial_jacobian,
     shape_value_average,
     shape_value_jump,
     shape_gradient_average,

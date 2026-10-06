@@ -25,6 +25,7 @@ reinit!
 getnquadpoints
 getdetJdV
 spatial_coordinate
+spatial_jacobian
 geometric_value
 ```
 

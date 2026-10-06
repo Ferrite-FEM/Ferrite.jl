@@ -372,6 +372,34 @@ function spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVecto
 end
 
 """
+    spatial_jacobian(fe_v::AbstractValues, q_point::Int, x::AbstractVector)
+
+Compute the Jacobian of the geometric mapping, ``J = \\partial \\mathbf{x} / \\partial \\mathbf{\\xi}``,
+in a quadrature point. `x` contains the nodal coordinates of the cell.
+
+The Jacobian is computed, using the geometric interpolation, as
+``J = \\sum\\limits_{i = 1}^n \\mathbf{\\hat{x}}_i \\otimes \\frac{\\partial M_i}{\\partial \\mathbf{\\xi}}(\\mathbf{\\xi})``
+
+where ``\\xi`` is the coordinate of the given quadrature point `q_point` of the associated
+quadrature rule. The result is a second order tensor of size `sdim × rdim`, where `sdim`
+is the spatial dimension and `rdim` the dimension of the reference shape (these differ
+for embedded elements).
+"""
+function spatial_jacobian(fe_v::AbstractValues, q_point::Int, x::AbstractVector{<:Vec})
+    n_base_funcs = getngeobasefunctions(fe_v)
+    length(x) == n_base_funcs || throw_incompatible_coord_length(length(x), n_base_funcs)
+    @boundscheck checkquadpoint(fe_v, q_point)
+    return @inbounds _spatial_jacobian(get_geo_mapping(fe_v), fe_v, q_point, x)
+end
+@propagate_inbounds _spatial_jacobian(geo_mapping::GeometryMapping, _, q_point::Int, x::AbstractVector{<:Vec}) =
+    calculate_jacobian(geo_mapping, q_point, x)
+# The reference gradients are not precomputed when the geometric mapping has DiffOrder = 0
+@propagate_inbounds function _spatial_jacobian(geo_mapping::GeometryMapping{0}, fe_v::AbstractCellValues, q_point::Int, x::AbstractVector{<:Vec})
+    ξ = getpoints(get_quadrature_rule(fe_v))[q_point]
+    return getjacobian(calculate_mapping(geometric_interpolation(geo_mapping), ξ, x, Val(1)))
+end
+
+"""
     spatial_coordinate(ip::ScalarInterpolation, ξ::Vec, x::AbstractVector{<:Vec{sdim, T}})
 
 Compute the spatial coordinate in a given quadrature point. `x` contains the nodal coordinates of the cell.
