@@ -192,7 +192,7 @@ end
 end
 
 @inline function reinit_needs_cell(cv::CellValues)
-    return any(map(fv -> !isa(mapping_type(fv), IdentityMapping), get_fun_values(cv)))
+    return any(map(reinit_needs_cell, get_fun_values(cv)))
 end
 
 function check_reinit_sdim_consistency(cv::CellValues, ::AbstractVector{VT}) where {VT}
