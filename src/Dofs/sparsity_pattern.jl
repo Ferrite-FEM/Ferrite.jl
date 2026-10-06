@@ -354,7 +354,9 @@ function add_sparsity_entries!(
     keep_constrained || _check_keep_constrained_args(dh, ch)
     # Add all entries
     add_diagonal_entries!(sp)
-    _add_cell_entries!(sp, dh, ch, keep_constrained, _coupling_to_local_dof_coupling(dh, coupling))
+    couplings = _coupling_to_local_dof_coupling(dh, coupling)
+    _add_cell_entries!(sp, dh, ch, keep_constrained, couplings)
+    keep_constrained || _add_condensed_cell_entries!(sp, dh, ch, couplings)
     if interface_coupling !== nothing
         add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
     end
@@ -392,6 +394,10 @@ function add_sparsity_entries!(
         neighbor_cells = create_cell_to_neighbors(dh.grid, topology)
         interface_couplings = _interface_coupling_to_local_dof_couplings(dh, interface_coupling)
     end
+    # The condensed entries for keep_constrained = false do not depend on the other entries,
+    # so they are added first and merged by the counting build (through `oldbuffer`). This
+    # avoids growing the exactly presized rows of the build afterwards.
+    keep_constrained || _add_condensed_cell_entries!(sp, dh, ch, couplings)
     oldbuffer = isempty(sp.buffer.data) ? nothing : sp.buffer
     _build_pattern!(sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings; oldbuffer)
     return _add_post_cell_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
@@ -468,7 +474,9 @@ function add_cell_entries!(
     # TODO: Perhaps this can be done in the loop over SubDofHandlers instead.
     coupling = _coupling_to_local_dof_coupling(dh, coupling)
     keep_constrained || _check_keep_constrained_args(dh, ch)
-    return _add_cell_entries!(sp, dh, ch, keep_constrained, coupling)
+    _add_cell_entries!(sp, dh, ch, keep_constrained, coupling)
+    keep_constrained || _add_condensed_cell_entries!(sp, dh, ch, coupling)
+    return sp
 end
 
 # Argument checking for methods with `keep_constrained = false`
@@ -765,6 +773,66 @@ function _add_cell_entries!(
                     !keep_constrained && haskey(ch.dofmapping, col) && continue
                     # Insert col as a non zero index for this row
                     add_entry!(sp, row, col)
+                end
+            end
+        end
+    end
+    return sp
+end
+
+# With `keep_constrained = false` the entries of constrained dofs are not added to the
+# pattern, which means that `add_constraint_entries!` (which expands *existing* entries)
+# can not distribute them to the master dofs. Instead, for every cell with affinely
+# constrained dofs, map each (coupled) local entry `(i, j)` to the entries `(i′, j′)` where
+# `i′` (`j′`) is `i` (`j`) if it is not constrained, and the master dofs of `i` (`j`) if it
+# is affinely constrained. These are exactly the entries that local condensation (e.g.
+# `apply_assemble!`) writes to. Prescribed dofs, and prescribed master dofs, are dropped.
+function _add_condensed_cell_entries!(
+        sp::AbstractSparsityPattern, dh::DofHandler, ch::ConstraintHandler,
+        coupling::Union{Vector{<:AbstractMatrix{Bool}}, Nothing},
+    )
+    # Mark the dofs that are affinely constrained (i.e. have master dofs)
+    isaffine = falses(ndofs(dh))
+    for (d, idx) in ch.dofmapping
+        coeffs = ch.dofcoefficients[idx]
+        (coeffs === nothing || isempty(coeffs) || d > ndofs(dh)) && continue
+        isaffine[d] = true
+    end
+    any(isaffine) || return sp
+    # The unconstrained dofs that `dof` is mapped to by the constraints
+    function mapped_dofs!(out::Vector{Int}, dof::Int)
+        empty!(out)
+        idx = get(ch.dofmapping, dof, 0)
+        if idx == 0
+            push!(out, dof)
+        else
+            coeffs = ch.dofcoefficients[idx]
+            coeffs === nothing && return out
+            for (m, _) in coeffs
+                haskey(ch.dofmapping, m) || push!(out, m)
+            end
+        end
+        return out
+    end
+    rows, cols = Int[], Int[]
+    cc = CellCache(dh, UpdateFlags(nodes = false, coords = false, dofs = true))
+    for (sdhi, sdh) in pairs(dh.subdofhandlers)
+        coupling === nothing || (coupling_sdh = coupling[sdhi])
+        for cell_id in sdh.cellset
+            reinit!(cc, cell_id)
+            dofs = celldofs(cc)
+            any(d -> d <= ndofs(dh) && isaffine[d], dofs) || continue
+            for (i, row) in pairs(dofs)
+                mapped_dofs!(rows, row)
+                isempty(rows) && continue
+                for (j, col) in pairs(dofs)
+                    coupling === nothing || coupling_sdh[i, j] || continue
+                    # Entries between unconstrained dofs are already in the pattern
+                    (isaffine[row] || isaffine[col]) || continue
+                    mapped_dofs!(cols, col)
+                    for r in rows, c in cols
+                        add_entry!(sp, r, c)
+                    end
                 end
             end
         end

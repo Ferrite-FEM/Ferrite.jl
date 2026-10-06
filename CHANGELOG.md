@@ -51,6 +51,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - L2 projection supports complex scalar and tensor data.
  - `ArrayOfVectorViews` validates offsets before constructing unchecked views.
  - `write_cell_data` supports cell-wise `SymmetricTensor` data. ([#768], [#1374], [#1375])
+ - Sparsity patterns created with `keep_constrained = false` now include the entries that
+   local condensation (e.g. `apply_assemble!`) writes to for affine constraints whose
+   master dofs are in other cells, e.g. periodic boundary conditions. Previously this
+   resulted in a `SparsityError`. ([#1470], [#1546])
 
 ### Performance
 
@@ -1518,6 +1522,7 @@ poking into Ferrite internals:
 [#1465]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1465
 [#1466]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1466
 [#1468]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1468
+[#1470]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1470
 [#1474]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1474
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
@@ -1525,5 +1530,6 @@ poking into Ferrite internals:
 [#1534]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1534
 [#1538]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1538
 [#1540]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1540
+[#1546]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1546
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
