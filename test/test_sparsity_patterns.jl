@@ -358,6 +358,48 @@ end
     @test K_topo == allocate_matrix(dh)
 end
 
+@testset "add_constraint_entries! reference" begin
+    # Compare against a direct implementation of the definition: every stored entry (i, j)
+    # is distributed through the constraint coefficients of i and/or j. Constrained dofs are
+    # skipped for keep_constrained = false.
+    function reference_constraint_entries(sp, ch, keep_constrained)
+        coeffs(d) = Ferrite.coefficients_for_dof(ch.dofmapping, ch.dofcoefficients, d)
+        skip(d) = !keep_constrained && haskey(ch.dofmapping, d)
+        entries = Set((r, c) for r in 1:Ferrite.getnrows(sp) for c in Ferrite.eachrow(sp, r))
+        new = Set{Tuple{Int, Int}}()
+        for (r, c) in entries
+            rc, cc = coeffs(r), coeffs(c)
+            rows = rc === nothing ? (skip(r) ? Int[] : [r]) : [r′ for (r′, _) in rc if !skip(r′)]
+            cols = cc === nothing ? (skip(c) ? Int[] : [c]) : [c′ for (c′, _) in cc if !skip(c′)]
+            # Entries between unconstrained dofs are already stored
+            (rc === nothing && cc === nothing) && continue
+            for r′ in rows, c′ in cols
+                push!(new, (r′, c′))
+            end
+        end
+        return union(entries, new)
+    end
+    grid = generate_grid(Quadrilateral, (4, 4))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 2}())
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid, "left", "right")))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "bottom"), x -> 0.0))
+    # An affine constraint with multiple masters, one of them prescribed
+    d1, d2, d3 = celldofs(dh, 6)[1:3]
+    bottom_dof = celldofs(dh, 1)[1]
+    add!(ch, AffineConstraint(d1, [d2 => 2.0, d3 => -1.0, bottom_dof => 0.5], 1.0))
+    close!(ch)
+    for keep_constrained in (true, false), P in (SparsityPattern, TestPattern)
+        nd = ndofs(dh)
+        sp = add_cell_entries!(P(nd, nd), dh, ch; keep_constrained)
+        reference = reference_constraint_entries(sp, ch, keep_constrained)
+        add_constraint_entries!(sp, ch; keep_constrained)
+        @test Set((r, c) for r in 1:nd for c in Ferrite.eachrow(sp, r)) == reference
+    end
+end
+
 @testset "SparsityPattern counting build" begin
     function fsp_test_create_dh(CT)
         RS = getrefshape(CT)
