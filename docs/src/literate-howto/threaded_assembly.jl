@@ -188,6 +188,12 @@ nothing # hide
 # slightly more convenient when using task local values since they can be defined with the
 # `@local` macro.
 #
+# Since the parallel loop is nested inside of the loop over the colors, task local values
+# created with `@local` directly would be recreated for every color. To avoid this we
+# create the scratch data for all tasks once, before the loop over the colors, and then
+# use `@local` together with `@task_index` to give each task its own instance. `@task_index`
+# is the index of the task, i.e. an integer in `1:ntasks`.
+#
 # !!! note "Schedulers and load balancing"
 #     OhMyThreads provides a number of different
 #     [schedulers](https://juliafolds2.github.io/OhMyThreads.jl/stable/refs/api/#Schedulers).
@@ -201,15 +207,18 @@ nothing # hide
 #     they experience plastic deformation and we need to solve a local problem) we might
 #     benefit from load balancing. The `DynamicScheduler` can be used also for load
 #     balancing by specifying `nchunks` or `chunksize`. However, the `DynamicScheduler`
-#     will always spawn `nchunks` tasks which can become costly since we are allocating
-#     scratch data for every task. To limit the number of tasks, while allowing for more
-#     than `ntasks` chunks, we can use the `GreedyScheduler` *with chunking*. For example,
+#     will always spawn one task per chunk (`nchunks` and `ntasks` are aliases for the
+#     `DynamicScheduler`), which can become costly since we are allocating scratch data for
+#     every task. Note also that `@task_index` then goes up to the number of chunks, so the
+#     scratch data must be created for that many tasks. To limit the number of tasks, while
+#     allowing for more than `ntasks` chunks, we can use the `GreedyScheduler` *with
+#     chunking*, for which `@task_index` is always an integer in `1:ntasks`. For example,
 #     `scheduler = OhMyThreads.GreedyScheduler(; ntasks = ntasks, nchunks = 10 * ntasks)`
 #     will split the work into `10 * ntasks` chunks and spawn `ntasks` tasks to process
 #     them. Refer to the [OhMyThreads
 #     documentation](https://juliafolds2.github.io/OhMyThreads.jl/stable/) for details.
 
-using OhMyThreads, TaskLocalValues
+using OhMyThreads
 
 function assemble_global!(
         K::SparseMatrixCSC, f::Vector, dh::DofHandler, colors,
@@ -226,6 +235,15 @@ function assemble_global!(
     n = ndofs_per_cell(dh)
     Ke = zeros(n, n)
     fe = zeros(n)
+    ## Scratch data for each task, created once and reused for all colors
+    scratches = map(1:ntasks) do _
+        return (;
+            cell_cache = task_local_copy(cell_cache),
+            cellvalues = task_local_copy(cellvalues),
+            Ke = task_local_copy(Ke), fe = task_local_copy(fe),
+            assembler = task_local_copy(assembler),
+        )
+    end
     ## Loop over the colors
     for color in colors
         ## Dynamic scheduler spawning `ntasks` tasks where each task will process a chunk of
@@ -235,14 +253,10 @@ function assemble_global!(
         OhMyThreads.@tasks for cellidx in color
             ## Tell the @tasks loop to use the scheduler defined above
             @set scheduler = scheduler
-            ## Task local scratch data, created once for each task
-            @local begin
-                cell_cache = task_local_copy(cell_cache)
-                cellvalues = task_local_copy(cellvalues)
-                Ke = task_local_copy(Ke)
-                fe = task_local_copy(fe)
-                assembler = task_local_copy(assembler)
-            end
+            ## Obtain the scratch data for this task and unpack it. Note that `local` is
+            ## required since the variables shadow variables outside of the loop.
+            @local scratch = scratches[@task_index]
+            local (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
             ## Reinitialize the cell cache and then the cellvalues
             reinit!(cell_cache, cellidx)
             reinit!(cellvalues, cell_cache)
@@ -261,32 +275,27 @@ nothing # hide
 # !!! details "OhMyThreads functional API: OhMyThreads.tforeach"
 #     The `OhMyThreads.@tasks` block above corresponds to a call to `OhMyThreads.tforeach`.
 #     Using the functional API directly would look like below. The main difference is that
-#     we need to manually create a `TaskLocalValue` for the scratch data.
+#     the function is wrapped in `OhMyThreads.WithTaskIndex` to obtain the task index as
+#     the first argument.
 #     ```julia
-#     # using TaskLocalValues
-#     scratches = TaskLocalValue() do
-#         return (;
-#             cell_cache = task_local_copy(cell_cache),
-#             cellvalues = task_local_copy(cellvalues),
-#             Ke = task_local_copy(Ke), fe = task_local_copy(fe),
-#             assembler = task_local_copy(assembler),
-#         )
-#     end
-#     OhMyThreads.tforeach(color; scheduler) do cellidx
-#         # Obtain the task local scratch data and unpack it. Note that `local` is
-#         # required here: without it the assignment would overwrite the variables with the
-#         # same names outside of the closure, which are shared by all tasks.
-#         local (; cell_cache, cellvalues, Ke, fe, assembler) = scratches[]
-#         # Reinitialize the cell cache and then the cellvalues
-#         reinit!(cell_cache, cellidx)
-#         reinit!(cellvalues, cell_cache)
-#         fill!(Ke, 0)
-#         fill!(fe, 0)
-#         # Compute the local contribution of the cell
-#         assemble_cell!(Ke, fe, cellvalues, C, b)
-#         # Assemble local contribution
-#         assemble!(assembler, celldofs(cell_cache), Ke, fe)
-#     end
+#     OhMyThreads.tforeach(
+#         OhMyThreads.WithTaskIndex() do taskindex, cellidx
+#             # Obtain the scratch data for this task and unpack it. Note that `local` is
+#             # required here: without it the assignment would overwrite the variables with
+#             # the same names outside of the closure, which are shared by all tasks.
+#             local (; cell_cache, cellvalues, Ke, fe, assembler) = scratches[taskindex]
+#             # Reinitialize the cell cache and then the cellvalues
+#             reinit!(cell_cache, cellidx)
+#             reinit!(cellvalues, cell_cache)
+#             fill!(Ke, 0)
+#             fill!(fe, 0)
+#             # Compute the local contribution of the cell
+#             assemble_cell!(Ke, fe, cellvalues, C, b)
+#             # Assemble local contribution
+#             assemble!(assembler, celldofs(cell_cache), Ke, fe)
+#         end,
+#         color; scheduler
+#     )
 #     ```
 
 # ### [Assembly without coloring: Atomic accumulation](@id howto-threaded-assembly-atomic)
@@ -315,9 +324,9 @@ nothing # hide
 #
 # Note that each task still needs its own assembler (the assembler wraps buffers that are
 # used during `assemble!`). Calling `task_local_copy` on an atomic assembler returns a new
-# atomic assembler, so the task local data can be created just like before. The global
-# assembly routine is like before, but with an atomic assembler and a single loop over all
-# cells:
+# atomic assembler. The global assembly routine is like before, but with an atomic
+# assembler and a single loop over all cells. Since there is no outer loop over colors the
+# task local data can be created directly with `@local` and `task_local_copy`:
 
 function assemble_global_atomic!(
         K::SparseMatrixCSC, f::Vector, dh::DofHandler,
