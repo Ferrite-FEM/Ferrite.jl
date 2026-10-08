@@ -24,7 +24,7 @@ typeof_d2Ndξ2(::Type{T}, ::VectorInterpolation{vdim}, ::VectorizedInterpolation
 Create a `FunctionValues <: AbstractValues` object containing the shape values and derivatives for both the
 reference cell (precalculated) and the real cell (updated in `reinit!`). Derivatives with respect to the
 spatial coordinates, ``\\mathbf{x}``, are stored up to order `DiffOrder_x`, and derivatives with respect to
-the local-frame coordinates, ``\\mathbf{s}``, (see [`shape_local_gradient`](@ref)) are stored up to order
+the local frame coordinates, ``\\mathbf{s}``, (see [`shape_local_gradient`](@ref)) are stored up to order
 `DiffOrder_s` (defaults to 0).
 The user should normally not create `FunctionValues`, these are typically only created from the constructors
 of `AbstractCellValues` and `AbstractFacetValues`. However, the user will interact with `fv::FunctionValues`
@@ -80,7 +80,7 @@ struct FunctionValues{DiffOrder_x, DiffOrder_s, IP, Nx_t, Nξ_t, dNdx_t, dNdξ_t
         )
     end
 end
-#For backwards-compatibility:
+# For backwards compatibility:
 function FunctionValues{DiffOrder_x}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder_x, T}
     return FunctionValues{DiffOrder_x, 0}(T, ip, qr, ip_geo)
 end

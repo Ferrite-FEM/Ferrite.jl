@@ -136,7 +136,7 @@ in quadrature point `q_point`.
 """
 function getjacobian(cv::AbstractValues, q_point::Int)
     jacobians = getjacobians(cv)
-    jacobians === nothing && throw(ArgumentError("The jacobians are not saved in $(nameof(typeof(cv))), use `update_jacobians = true`"))
+    jacobians === nothing && throw(ArgumentError("The jacobians are not stored in $(nameof(typeof(cv))). Use `update_jacobians = true` when constructing it."))
     return jacobians[q_point]
 end
 

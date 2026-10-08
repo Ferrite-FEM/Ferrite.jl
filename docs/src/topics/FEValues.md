@@ -101,13 +101,13 @@ Second order gradients of the shape functions are computed as
     \end{align*}
     ```
 
-#### Local frame derivatives in identity mapping
-Ferrite can also handle gradients of coordiantes in different frames. This is useful for some element formulations, 
-e.g. shells, plates, and beams, where it is more natural to work with derivatives wrt. coordinates in a local orthonormal 
-frame attached to the element, rather than w.r.t. the global coordinates, $\boldsymbol{x}$. 
+#### Local frame derivatives for identity mapping
+Ferrite can also compute derivatives wrt. coordinates in different frames. This is useful for some element formulations,
+e.g. shells, plates, and beams, where it is more natural to work with derivatives wrt. coordinates in a local orthonormal
+frame attached to the element, rather than wrt. the global coordinates, $\boldsymbol{x}$.
 
 **The local frame.** In each quadrature point, $\boldsymbol{x}_q = \boldsymbol{x}(\boldsymbol{\xi}_q)$,
-we can assign a local frame: $\boldsymbol{E} = [\boldsymbol{e}_1, \dots, \boldsymbol{e}_{r_\mathrm{dim}}]$ ($s_\mathrm{dim} \times r_\mathrm{dim}$),
+we can assign a local frame: $\boldsymbol{E} = [\boldsymbol{e}_1, \dots, \boldsymbol{e}_{r_\mathrm{dim}}]$ ($s_\mathrm{dim} \times r_\mathrm{dim}$).
 Currently, the local frame is obtained via Gram-Schmidt orthonormalization of the columns,
 $\boldsymbol{j}_r = \partial \boldsymbol{x} / \partial \xi_r$, of the jacobian:
 ```math
@@ -163,8 +163,8 @@ $\mathrm{d} N / \mathrm{d}\boldsymbol{s} = \mathrm{grad}(N) \cdot \boldsymbol{E}
     enter the local derivatives, and the local hessian is the hessian wrt. the Cartesian coordinates in the
     tangent space at $\boldsymbol{x}_q$. For curved embedded elements (e.g. curved shells), only the tangential part,
     $\boldsymbol{E}^\mathrm{T} \cdot \boldsymbol{\mathcal{H}}$, of the geometric hessian enters, while the curvature of the element
-    (the normal part of $\boldsymbol{\mathcal{H}}$) does not. 
- 
+    (the normal part of $\boldsymbol{\mathcal{H}}$) does not.
+
 !!! details "Derivation"
     In index notation, with $a, b, c$ denoting local coordinate indices, $r, t$ reference coordinate indices,
     and $i$ spatial coordinate indices, the mapping from reference to local coordinates and its derivatives are
@@ -192,7 +192,7 @@ $\mathrm{d} N / \mathrm{d}\boldsymbol{s} = \mathrm{grad}(N) \cdot \boldsymbol{E}
         = \frac{\mathrm{d}^2 N}{\mathrm{d} s_a \mathrm{d} s_b} B_{ar} B_{bt} + \frac{\mathrm{d} N}{\mathrm{d} s_c} \mathcal{H}_{s,crt}
     \end{align*}
     ```
-    Multiplying with $B^{-1}_{ra} B^{-1}_{tb}$ and solving for the local hessian gives
+    Multiplying by $B^{-1}_{ra} B^{-1}_{tb}$ and solving for the local hessian gives
     ```math
     \begin{align*}
         \frac{\mathrm{d}^2 N}{\mathrm{d} s_a \mathrm{d} s_b}

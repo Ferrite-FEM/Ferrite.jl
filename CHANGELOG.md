@@ -36,8 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    when passing `update_local_gradients = true` and `update_local_hessians = true` to
    `CellValues`, `MultiFieldCellValues`, and `FacetValues`, and are accessed with the new
    functions `shape_local_gradient`, `shape_local_hessian`, `function_local_gradient`, and
-   `function_local_hessian`. This is supported also for embedded elements.
-   New keyword argument `update_jacobians = true` to `CellValues`, `MultiFieldCellValues`,
+   `function_local_hessian`. This is also supported for embedded elements.
+ - New keyword argument `update_jacobians = true` to `CellValues`, `MultiFieldCellValues`,
    and `FacetValues` for storing the jacobian of the geometric mapping in each quadrature
    point, accessed with `Ferrite.getjacobian(fe_values, q_point)`. Nothing is stored by default.
 
