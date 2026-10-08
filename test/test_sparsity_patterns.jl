@@ -404,10 +404,12 @@ end
     # Coupling and keep_constrained are handled during the counting build (masked/filtered
     # candidate enumeration);
     # compare against the generic path for the same arguments.
-    for CT in (Quadrilateral, Tetrahedron)
+    for CT in (Quadrilateral, Tetrahedron), periodic in (false, true)
         dh = fsp_test_create_dh(CT)
         ch = ConstraintHandler(dh)
         add!(ch, Dirichlet(:a, getfacetset(dh.grid, "left"), x -> 0))
+        # Affine constraints with master dofs in other cells (#1470)
+        periodic && add!(ch, PeriodicDirichlet(:b, collect_periodic_facets(dh.grid, "bottom", "top")))
         close!(ch)
         for kwargs in (
                 (; coupling = [true true; false true]),
@@ -418,6 +420,13 @@ end
             sp_fast = add_sparsity_entries!(init_sparsity_pattern(dh), dh, ch; kwargs...)
             sp_gen = fsp_test_build_generic(dh, ch; kwargs...)
             compare_matrices(allocate_matrix(sp_fast), allocate_matrix(sp_gen))
+            # Same pattern when built from the individual pieces
+            keep_constrained = get(kwargs, :keep_constrained, true)
+            sp_pieces = init_sparsity_pattern(dh)
+            Ferrite.add_diagonal_entries!(sp_pieces)
+            add_cell_entries!(sp_pieces, dh, ch; kwargs...)
+            add_constraint_entries!(sp_pieces, ch; keep_constrained)
+            compare_matrices(allocate_matrix(sp_fast), allocate_matrix(sp_pieces))
         end
     end
     # Full masks are normalized away before the build but must still be validated

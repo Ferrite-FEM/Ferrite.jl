@@ -1862,6 +1862,83 @@ end
     @test K ≈ Kc ≈ Kfull
 end # testset
 
+@testset "keep_constrained = false with affine constraints" begin
+    # Regression test for https://github.com/Ferrite-FEM/Ferrite.jl/issues/1470: the
+    # entries that local condensation writes to for master dofs in other cells must be in
+    # the pattern also when the constrained dofs are eliminated from it.
+    function assemble_poisson(dh, ch, cv; keep_constrained)
+        K = allocate_matrix(dh, ch; keep_constrained)
+        f = zeros(ndofs(dh))
+        assembler = start_assemble(K, f)
+        n = ndofs_per_cell(dh)
+        Ke = zeros(n, n)
+        fe = zeros(n)
+        for cell in CellIterator(dh)
+            reinit!(cv, cell)
+            fill!(Ke, 0)
+            fill!(fe, 0)
+            for qp in 1:getnquadpoints(cv)
+                dΩ = getdetJdV(cv, qp)
+                for i in 1:n
+                    fe[i] += shape_value(cv, qp, i) * dΩ
+                    for j in 1:n
+                        Ke[i, j] += shape_gradient(cv, qp, i) ⋅ shape_gradient(cv, qp, j) * dΩ
+                    end
+                end
+            end
+            apply_assemble!(assembler, ch, celldofs(cell), Ke, fe)
+        end
+        return K, f
+    end
+    function compare_keep_constrained(dh, ch, cv)
+        K, f = assemble_poisson(dh, ch, cv; keep_constrained = true)
+        Kc, fc = assemble_poisson(dh, ch, cv; keep_constrained = false)
+        free = setdiff(1:ndofs(dh), ch.prescribed_dofs)
+        @test Kc[free, free] ≈ K[free, free]
+        @test fc[free] ≈ f[free]
+        # Rows and columns of constrained dofs only store the diagonal
+        for d in ch.prescribed_dofs
+            @test Base.isstored(Kc, d, d)
+            @test all(i -> i == d || !Base.isstored(Kc, i, d), 1:ndofs(dh))
+            @test all(j -> j == d || !Base.isstored(Kc, d, j), 1:ndofs(dh))
+        end
+        # Same solution
+        u = K \ f
+        apply!(u, ch)
+        uc = Kc \ fc
+        apply!(uc, ch)
+        @test uc ≈ u
+        return
+    end
+
+    # 1D: periodic-style constraint between the two boundary dofs, which are not in the
+    # same cell, and a Dirichlet condition on an interior dof
+    grid = generate_grid(Line, (3,))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefLine, 1}())
+    close!(dh)
+    slave = only(setdiff(celldofs(dh, 1), celldofs(dh, 2)))
+    master = only(setdiff(celldofs(dh, 3), celldofs(dh, 2)))
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint(slave, [master => 1.0], 0.0))
+    add!(ch, Dirichlet(:u, Set([2]), x -> 0.0))
+    close!(ch)
+    compare_keep_constrained(dh, ch, CellValues(QuadratureRule{RefLine}(2), Lagrange{RefLine, 1}()))
+
+    # 2D: periodic boundary conditions
+    grid = generate_grid(Quadrilateral, (4, 4))
+    for ip in (Lagrange{RefQuadrilateral, 1}(), Lagrange{RefQuadrilateral, 2}())
+        dh = DofHandler(grid)
+        add!(dh, :u, ip)
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid, "left", "right")))
+        add!(ch, Dirichlet(:u, getfacetset(grid, "bottom"), x -> 0.0))
+        close!(ch)
+        compare_keep_constrained(dh, ch, CellValues(QuadratureRule{RefQuadrilateral}(3), ip))
+    end
+end
+
 @testset "apply!(::Symmetric, ...)" begin
     # Specifically this test that values below the diagonal of K2::Symmetric aren't touched
     # and that the missing values are instead taken from above the diagonal.
