@@ -471,6 +471,38 @@ end
             compare_matrices(allocate_matrix(sp_fast), allocate_matrix(sp_pieces))
         end
     end
+    # Algebraic coupling entries are added before the counting build (and merged by it), and
+    # the generic path adds them after the cell entries; both must give the same pattern.
+    let grid = generate_grid(Quadrilateral, (4, 4))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefQuadrilateral, 2}()^2)
+        add!(dh, :p, Lagrange{RefQuadrilateral, 1}())
+        add!(dh, :λ, AlgebraicVariable{Vec{2}}())
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid, "left", "right"), [1, 2]))
+        add!(ch, Dirichlet(:p, getfacetset(grid, "bottom"), x -> 0.0))
+        close!(ch)
+        algebraic_couplings = (
+            CellCoupling(1:8; algebraic_coupling = ((:u, :λ), (:λ, :λ))),
+            FacetCoupling(getfacetset(grid, "top"); algebraic_coupling = ((:p, :λ),)),
+        )
+        nd = ndofs(dh)
+        for keep_constrained in (true, false), coupling in (nothing, [true true; false true]), seed in (false, true)
+            # Optionally start from a pattern with an existing entry (merged by the build)
+            function init()
+                sp = SparsityPattern(nd, nd)
+                seed && Ferrite.add_entry!(sp, 1, nd)
+                return sp
+            end
+            sp_fast = add_sparsity_entries!(init(), dh, ch; keep_constrained, coupling, algebraic_couplings)
+            sp_gen = Base.@invoke add_sparsity_entries!(
+                init()::Ferrite.AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing};
+                keep_constrained, coupling, algebraic_couplings
+            )
+            compare_matrices(allocate_matrix(sp_fast), allocate_matrix(sp_gen))
+        end
+    end
     # Full masks are normalized away before the build but must still be validated
     # (dh has 2 fields, 3 components, 22 dofs/cell, so trues(4, 4) matches nothing)
     let dh = fsp_test_create_dh(Quadrilateral)

@@ -64,6 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Creating sparsity patterns and matrices with affine constraints (e.g. periodic boundary
    conditions), i.e. `allocate_matrix(dh, ch)`, `add_sparsity_entries!(sp, dh, ch)` and
    `add_constraint_entries!`, is faster. ([#1547])
+ - Creating sparsity patterns and matrices with `algebraic_couplings`, i.e.
+   `allocate_matrix(dh; algebraic_couplings)` and `add_sparsity_entries!`, is faster and
+   uses less memory. ([#1548])
 
 ### Documentation
 
@@ -1535,5 +1538,6 @@ poking into Ferrite internals:
 [#1540]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1540
 [#1546]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1546
 [#1547]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1547
+[#1548]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1548
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490

@@ -360,15 +360,18 @@ function add_sparsity_entries!(
     if interface_coupling !== nothing
         add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
     end
-    return _add_post_cell_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
+    _add_algebraic_coupling_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
+    # The constraint entries depend on all other entries and must be added last
+    ch !== nothing && add_constraint_entries!(sp, ch; keep_constrained)
+    return sp
 end
 
 # Specialized method for the concrete SparsityPattern.
 # This builds the pattern in bulk: cell entries (including the diagonal, respecting
 # `coupling` and `keep_constrained`), interface entries (interface_coupling), and any
 # pre-existing entries are exactly counted, the buffer is presized in one allocation, and
-# rows are filled with a marker-dedup append. Only the coupling descriptor entries and the
-# constraint entries layer on afterwards through add_entry!.
+# rows are filled with a marker-dedup append. Only the constraint entries layer on afterwards
+# through add_entry!.
 function add_sparsity_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
         keep_constrained::Bool = true,
@@ -394,23 +397,15 @@ function add_sparsity_entries!(
         neighbor_cells = create_cell_to_neighbors(dh.grid, topology)
         interface_couplings = _interface_coupling_to_local_dof_couplings(dh, interface_coupling)
     end
-    # The condensed entries for keep_constrained = false do not depend on the other entries,
-    # so they are added first and merged by the counting build (through `oldbuffer`). This
-    # avoids growing the exactly presized rows of the build afterwards.
+    # The algebraic coupling entries and the condensed entries for keep_constrained = false do
+    # not depend on the other entries, so they are added first and merged by the counting
+    # build (through `oldbuffer`). This avoids growing the exactly presized rows of the build
+    # afterwards.
+    _add_algebraic_coupling_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
     keep_constrained || _add_condensed_cell_entries!(sp, dh, ch, couplings)
     oldbuffer = isempty(sp.buffer.data) ? nothing : sp.buffer
     _build_pattern!(sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings; oldbuffer)
-    return _add_post_cell_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
-end
-
-# Layers applied after the cell entries, shared by the add_sparsity_entries! methods.
-# Coupling descriptor entries must be added before the constraint entries since constraint
-# expansion depends on all pre-existing structural entries.
-function _add_post_cell_entries!(
-        sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
-        @nospecialize(algebraic_couplings), keep_constrained::Bool,
-    )
-    _add_algebraic_coupling_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
+    # The constraint entries depend on all other entries and must be added last
     ch !== nothing && add_constraint_entries!(sp, ch; keep_constrained)
     return sp
 end
