@@ -22,6 +22,8 @@ function adapt_structure(d, fv::Ferrite.FunctionValues)
         adapt(d, fv.dNdξ),
         adapt(d, fv.d2Ndx2),
         adapt(d, fv.d2Ndξ2),
+        adapt(d, fv.dNds),
+        adapt(d, fv.d2Nds2),
     )
 end
 

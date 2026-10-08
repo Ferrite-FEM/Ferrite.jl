@@ -29,7 +29,13 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 **Keyword arguments:** The following keyword arguments are experimental and may change in future minor releases
 * `update_gradients`: Specifies if the gradients of the shape functions should be updated (default true)
 * `update_hessians`: Specifies if the hessians of the shape functions should be updated (default false)
+* `update_local_gradients`: Specifies if the gradients of the shape functions wrt. the local frame coordinates
+  should be updated (default false), see [`shape_local_gradient`](@ref)
+* `update_local_hessians`: Specifies if the hessians of the shape functions wrt. the local frame coordinates
+  should be updated (default false), see [`shape_local_hessian`](@ref)
 * `update_detJdV`: Specifies if the volume associated with each quadrature point should be updated (default true)
+* `update_jacobians`: Specifies if the jacobian of the geometric mapping should be stored in each quadrature point
+  (default false), see [`Ferrite.getjacobian`](@ref)
 
 **Common methods:**
 
@@ -54,24 +60,33 @@ function default_geometric_interpolation(::Interpolation{shape}) where {dim, sha
     return VectorizedInterpolation{dim}(Lagrange{shape, 1}())
 end
 
-struct CellValues{FV, GM, QR, detT} <: AbstractCellValues
+struct CellValues{FV, GM, QR, detT, JT} <: AbstractCellValues
     fun_values::FV # FunctionValues
     geo_mapping::GM # GeometryMapping
     qr::QR         # QuadratureRule
-    # CellValues are only functional for `detT <: AbstractVector{<:Number}`.
+    # CellValues are only functional for `detT <: AbstractVector{<:Number}` and `JT <: AbstractVector{<:AbstractTensor}`.
     # However, e.g. for GPU support, we allow AbstractMatrix{<:Number} to be passed, allowing this type to be used as a struct-of-arrays (SoA) type.
     # See `soa_utils.jl` for the SoA transformation infrastructure.
     detJdV::detT   # AbstractVector{<:Number} or Nothing
+    J::JT          # AbstractVector{<:AbstractTensor{2}} or Nothing
 end
+CellValues(fun_values, geo_mapping, qr, detJdV) = CellValues(fun_values, geo_mapping, qr, detJdV, nothing)
+
 function CellValues(
-        ::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation,
-        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}
-    ) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
+        ::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}},
+        ::ValuesUpdateFlags{FunDiffOrder_x, FunDiffOrder_s, GeoDiffOrder, DetJdV, StoreJacobian}
+    ) where {T, sdim, rdim, FunDiffOrder_x, FunDiffOrder_s, GeoDiffOrder, DetJdV, StoreJacobian}
 
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
-    fun_values = FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo)
+    fun_values = FunctionValues{FunDiffOrder_x, FunDiffOrder_s}(T, ip_fun, qr, ip_geo)
     detJdV = DetJdV ? fill(T(NaN), length(getweights(qr))) : nothing
-    return CellValues(fun_values, geo_mapping, qr, detJdV)
+    J = if StoreJacobian
+        jacobian_t = otimes_returntype(Vec{sdim, T}, Vec{rdim, T})
+        fill(zero(jacobian_t) * T(NaN), length(getweights(qr)))
+    else
+        nothing
+    end
+    return CellValues(fun_values, geo_mapping, qr, detJdV, J)
 end
 
 CellValues(qr::QuadratureRule, ip::Interpolation, args...; kwargs...) = CellValues(Float64, qr, ip, args...; kwargs...)
@@ -85,7 +100,7 @@ end
 function task_local_copy(cv::CellValues)
     return CellValues(
         task_local_copy(cv.fun_values), task_local_copy(cv.geo_mapping),
-        task_local_copy(cv.qr), task_local_copy(cv.detJdV)
+        task_local_copy(cv.qr), task_local_copy(cv.detJdV), task_local_copy(cv.J)
     )
 end
 
@@ -93,6 +108,7 @@ end
 get_geo_mapping(cv::CellValues) = cv.geo_mapping
 
 getdetJdVs(cv::CellValues) = cv.detJdV
+getjacobians(cv::CellValues) = cv.J
 
 # Accessors for function values
 get_fun_values(cv::CellValues) = cv.fun_values
@@ -102,10 +118,27 @@ function_difforder(cv::CellValues) = function_difforder(cv.fun_values)
 shape_value_type(cv::CellValues) = shape_value_type(cv.fun_values)
 shape_gradient_type(cv::CellValues) = shape_gradient_type(cv.fun_values)
 shape_hessian_type(cv::CellValues) = shape_hessian_type(cv.fun_values)
+function_local_difforder(cv::CellValues) = function_local_difforder(cv.fun_values)
+shape_local_gradient_type(cv::CellValues) = shape_local_gradient_type(cv.fun_values)
+shape_local_hessian_type(cv::CellValues) = shape_local_hessian_type(cv.fun_values)
 
 @propagate_inbounds shape_value(cv::CellValues, q_point::Int, i::Int) = shape_value(cv.fun_values, q_point, i)
 @propagate_inbounds shape_gradient(cv::CellValues, q_point::Int, i::Int) = shape_gradient(cv.fun_values, q_point, i)
 @propagate_inbounds shape_hessian(cv::CellValues, q_point::Int, i::Int) = shape_hessian(cv.fun_values, q_point, i)
+@propagate_inbounds shape_local_gradient(cv::CellValues, q_point::Int, i::Int) = shape_local_gradient(cv.fun_values, q_point, i)
+@propagate_inbounds shape_local_hessian(cv::CellValues, q_point::Int, i::Int) = shape_local_hessian(cv.fun_values, q_point, i)
+
+"""
+    getjacobian(fe_v::AbstractValues, q_point::Int)
+
+Return the jacobian of the geometric mapping, ``\\mathbf{J} = \\partial \\mathbf{x} / \\partial \\boldsymbol{\\xi}``,
+in quadrature point `q_point`.
+"""
+function getjacobian(cv::AbstractValues, q_point::Int)
+    jacobians = getjacobians(cv)
+    jacobians === nothing && throw(ArgumentError("The jacobians are not stored in $(nameof(typeof(cv))). Use `update_jacobians = true` when constructing it."))
+    return jacobians[q_point]
+end
 
 # Access quadrature rule values
 get_quadrature_rule(cv::CellValues) = cv.qr
@@ -114,6 +147,11 @@ get_quadrature_rule(cv::CellValues) = cv.qr
     detJ = calculate_detJ(getjacobian(mapping))
     detJ > 0.0 || throw_detJ_not_pos(detJ)
     @inbounds detJvec[q_point] = detJ * w
+    return
+end
+@inline function _update_jacobian!(jacobians, q_point::Int, mapping)
+    jacobians === nothing && return
+    jacobians[q_point] = getjacobian(mapping)
     return
 end
 @inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
@@ -137,6 +175,7 @@ function reinit!(cv::AbstractCellValues, cell::Union{AbstractCell, Nothing}, x::
     @inbounds for (q_point, w) in enumerate(getweights(get_quadrature_rule(cv)))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         _update_detJdV!(getdetJdVs(cv), q_point, w, mapping)
+        _update_jacobian!(getjacobians(cv), q_point, mapping)
         apply_mapping!(fun_values, q_point, mapping, cell)
     end
     return nothing
@@ -182,7 +221,13 @@ single function interpolation as their `FunctionValues` are aliased.
 **Keyword arguments:** The following keyword arguments are experimental and may change in future minor releases
 * `update_gradients`: Specifies if the gradients of the shape functions should be updated (default true)
 * `update_hessians`: Specifies if the hessians of the shape functions should be updated (default false)
+* `update_local_gradients`: Specifies if the gradients of the shape functions wrt. the local frame coordinates
+  should be updated (default false), see [`shape_local_gradient`](@ref)
+* `update_local_hessians`: Specifies if the hessians of the shape functions wrt. the local frame coordinates
+  should be updated (default false), see [`shape_local_hessian`](@ref)
 * `update_detJdV`: Specifies if the volume associated with each quadrature point should be updated (default true)
+* `update_jacobians`: Specifies if the jacobian of the geometric mapping should be stored in each quadrature point
+  (default false), see [`Ferrite.getjacobian`](@ref)
 
 **Examples**
 
@@ -229,25 +274,35 @@ Applicable to e.g., `cmv.u` above
 """
 MultiFieldCellValues
 
-struct MultiFieldCellValues{FVS, GM, QR, detT, FVT} <: AbstractCellValues
+struct MultiFieldCellValues{FVS, GM, QR, detT, FVT, JT} <: AbstractCellValues
     fun_values_nt::FVS      # FunctionValues collected in a named tuple (not necessarily unique)
     fun_values::FVT         # FunctionValues collected in a tuple (each unique)
     geo_mapping::GM         # GeometryMapping
     qr::QR                  # QuadratureRule
     detJdV::detT            # AbstractVector{<:Number} or Nothing
+    J::JT                   # AbstractVector{<:AbstractTensor{2}} or Nothing
+end
+function MultiFieldCellValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV)
+    return MultiFieldCellValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV, nothing)
 end
 
 function MultiFieldCellValues(
-        ::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation,
-        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, UpdateDetJdV}
-    ) where {T, FunDiffOrder, GeoDiffOrder, UpdateDetJdV}
+        ::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}},
+        ::ValuesUpdateFlags{FunDiffOrder_x, FunDiffOrder_s, GeoDiffOrder, UpdateDetJdV, StoreJacobian}
+    ) where {T, sdim, rdim, FunDiffOrder_x, FunDiffOrder_s, GeoDiffOrder, UpdateDetJdV, StoreJacobian}
 
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     unique_ips = unique(values(ip_funs)) # Not type-stable, but ok for advanced users this should be constructed outside...
-    fun_values = tuple((FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...)
+    fun_values = tuple((FunctionValues{FunDiffOrder_x, FunDiffOrder_s}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...)
     fun_values_nt = NamedTuple((key => fun_values[findfirst(unique_ip -> ip == unique_ip, unique_ips)] for (key, ip) in pairs(ip_funs)))
     detJdV = UpdateDetJdV ? fill(T(NaN), length(getweights(qr))) : nothing
-    return MultiFieldCellValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV)
+    J = if StoreJacobian
+        jacobian_t = otimes_returntype(Vec{sdim, T}, Vec{rdim, T})
+        fill(zero(jacobian_t) * T(NaN), length(getweights(qr)))
+    else
+        nothing
+    end
+    return MultiFieldCellValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV, J)
 end
 
 MultiFieldCellValues(qr::QuadratureRule, ip_funs::NamedTuple, args...; kwargs...) = MultiFieldCellValues(Float64, qr, ip_funs, args...; kwargs...)
@@ -262,12 +317,13 @@ function task_local_copy(cv::CMV) where {CMV <: MultiFieldCellValues}
     fun_values = map(task_local_copy, get_fun_values(cv))
     # Preserve aliasing between fields with equal interpolations
     fun_values_nt = NamedTuple((key => fun_values[findfirst(fv -> fv === named_fv, get_fun_values(cv))] for (key, named_fv) in pairs(getfield(cv, :fun_values_nt))))
-    return CMV(fun_values_nt, fun_values, task_local_copy(get_geo_mapping(cv)), task_local_copy(get_quadrature_rule(cv)), task_local_copy(getdetJdVs(cv)))
+    return CMV(fun_values_nt, fun_values, task_local_copy(get_geo_mapping(cv)), task_local_copy(get_quadrature_rule(cv)), task_local_copy(getdetJdVs(cv)), task_local_copy(getjacobians(cv)))
 end
 
 # Access geometry values
 get_geo_mapping(cv::MultiFieldCellValues) = getfield(cv, :geo_mapping)
 getdetJdVs(cv::MultiFieldCellValues) = getfield(cv, :detJdV)
+getjacobians(cv::MultiFieldCellValues) = getfield(cv, :J)
 
 get_fun_values(cv::MultiFieldCellValues) = getfield(cv, :fun_values)
 @inline Base.getproperty(cv::MultiFieldCellValues, key::Symbol) = getproperty(getfield(cv, :fun_values_nt), key)
@@ -323,14 +379,14 @@ function getnbasefunctions(cv::MultiFieldCellValues)
     throw(ArgumentError("getnbasefunctions isn't applicable to cv::MultiFieldCellValues. Use on `FunctionValues` for the specific field, e.g. getnbasefunctions(cv.$k)"))
 end
 
-for f in (:shape_value, :shape_gradient, :shape_symmetric_gradient, :shape_divergence)
+for f in (:shape_value, :shape_gradient, :shape_symmetric_gradient, :shape_divergence, :shape_local_gradient, :shape_local_hessian)
     @eval function $f(cv::MultiFieldCellValues, ::Int, ::Int)
         k = first(propertynames(cv)) # Pick the first function values to use in example
         fun = $f                       # Make the function name available to use in the error message
         throw(ArgumentError("$fun isn't applicable to cv::MultiFieldCellValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv.$k, q_point, shapenr)"))
     end
 end
-for f in (:function_value, :function_gradient, :function_symmetric_gradient, :function_divergence)
+for f in (:function_value, :function_gradient, :function_symmetric_gradient, :function_divergence, :function_local_gradient, :function_local_hessian)
     @eval function $f(cv::MultiFieldCellValues, ::Int, ::AbstractVector, args...)
         k = first(propertynames(cv)) # Pick the first function values to use in example
         fun = $f                       # Make the function name available to use in the error message

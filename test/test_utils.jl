@@ -355,6 +355,18 @@ function function_value_from_physical_coord(interpolation::Interpolation, cell_c
     return u
 end
 
+# Value, gradient, and hessian wrt. the local frame coordinates s = Eᵀ⋅(x - x_q), where the frame E is
+# frozen at the point x_q (see `Ferrite.shape_local_gradient`). Since ∑ᵢ Mᵢ(ξ) = 1, s(ξ) = ∑ᵢ Mᵢ(ξ) yᵢ is the
+# isoparametric map of the projected nodes yᵢ = Eᵀ⋅(xᵢ - x_q), and the inverse mapping s -> ξ can be found with
+# `function_value_from_physical_coord`, also for embedded elements (no distance search needed).
+# Note: The interpolation `interpolation` is also used as geometric interpolation.
+function local_frame_function_derivatives(interpolation::Interpolation, cell_coordinates, x_q::Vec, J, ue)
+    E = Ferrite.gram_schmidt_frame(J)
+    rdim = Ferrite.getrefdim(interpolation)
+    projected_coordinates = [E' ⋅ (x - x_q) for x in cell_coordinates]
+    return Tensors.hessian(s -> function_value_from_physical_coord(interpolation, projected_coordinates, s, ue), zero(Vec{rdim, Float64}), :all)
+end
+
 # Insert different cell(s) into a grid with a single cell type.
 # This is useful for testing properties on mixed grids.
 

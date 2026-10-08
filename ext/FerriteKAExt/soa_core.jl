@@ -17,6 +17,7 @@ function as_structure_of_arrays(d, N, cv::CellValues)
         as_structure_of_arrays(d, N, cv.geo_mapping),
         adapt(d, cv.qr),
         zeros_shared(d, cv.detJdV, N),
+        zeros_shared(d, cv.J, N),
     )
 end
 
@@ -30,6 +31,8 @@ function as_structure_of_arrays(d, N, fv::Ferrite.FunctionValues)
         adapt(d, fv.dNdξ),
         zeros_shared(d, fv.d2Ndx2, N),
         adapt(d, fv.d2Ndξ2),
+        zeros_shared(d, fv.dNds, N),
+        zeros_shared(d, fv.d2Nds2, N),
     )
 end
 
