@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+ - New `AffineConstraint(entries, b)` constructor for an equation `∑ a[j] u[j] = b`
+   between dofs without a designated constrained dof. `close!` picks the dof to eliminate,
+   skipping already constrained dofs and preferring dofs that appear in few other
+   constraints (to avoid fill-in); `prefer = dof` biases the choice. Useful for e.g. mean
+   value constraints combined with periodic boundary conditions. ([#1541])
  - New cell type `QuadraticWedge` (18 nodes) with geometric interpolation
    `Lagrange{RefPrism, 2}()`, including VTK export. Gmsh "Prism 18" elements can be
    imported as `QuadraticWedge` with FerriteGmsh (see
@@ -1537,6 +1542,7 @@ poking into Ferrite internals:
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1522]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1522
 [#1534]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1534
+[#1541]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1541
 [#1538]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1538
 [#1540]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1540
 [#1546]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1546

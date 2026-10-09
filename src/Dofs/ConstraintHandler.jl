@@ -136,16 +136,39 @@ end
 const DofCoefficients{Tv, Ti} = Vector{Pair{Ti, Tv}}
 """
     AffineConstraint(constrained_dof::Integer, entries::Vector{Pair{Ti, Tv}}, b::Tv) where {Ti, Tv}
+    AffineConstraint(entries::Vector{Pair{Ti, Tv}}, b::Tv; prefer = nothing) where {Ti, Tv}
 
-Define an affine/linear constraint to constrain one degree of freedom, `u[i]`,
-such that `u[i] = ∑(u[j] * a[j]) + b`,
-where `i=constrained_dof` and each element in `entries` are `j => a[j]`.
-Here `Tv` refers to the value type and `Ti` to the index type.
+Define an affine constraint between degrees of freedom, where each element in `entries` is
+`j => a[j]`. Here `Tv` refers to the value type and `Ti` to the index type.
+
+With `constrained_dof = i`, `u[i]` is constrained such that `u[i] = ∑(u[j] * a[j]) + b`.
+
+Without `constrained_dof`, the constraint is the equation `∑(u[j] * a[j]) = b` and
+[`close!`](@ref) picks one of the dofs in `entries` to eliminate, skipping dofs that are
+already constrained (e.g. by `Dirichlet`, `PeriodicDirichlet` or another
+`AffineConstraint`) and preferring dofs that appear in few other constraints. With
+`prefer = j` dof `j` is eliminated if it is a valid choice, otherwise the automatic choice
+is used. Typical uses are constraints without a natural constrained dof, such as fixing
+the mean value or integral of a field.
+
+Note that `entries` are on opposite sides of the equation in the two forms, e.g.
+`AffineConstraint(1, [2 => 2.0], 1.0)` (`u[1] = 2u[2] + 1`) is equivalent to
+`AffineConstraint([1 => 1.0, 2 => -2.0], 1.0)` (`u[1] - 2u[2] = 1`).
 """
 struct AffineConstraint{Tv, Ti}
-    constrained_dof::Ti
+    constrained_dof::Union{Nothing, Ti} # nothing: chosen in close!
     entries::DofCoefficients{Tv, Ti} # masterdofs::Ti and factors::Tv
     b::Tv # inhomogeneity
+    prefer::Union{Nothing, Ti}
+end
+function AffineConstraint{Tv, Ti}(constrained_dof::Integer, entries::Vector{<:Pair}, b::Number) where {Tv, Ti}
+    return AffineConstraint{Tv, Ti}(constrained_dof, entries, b, nothing)
+end
+function AffineConstraint(constrained_dof::Integer, entries::Vector{Pair{Ti, Tv}}, b::Number) where {Ti, Tv}
+    return AffineConstraint{promote_type(Tv, typeof(b)), Ti}(constrained_dof, entries, b)
+end
+function AffineConstraint(entries::Vector{Pair{Ti, Tv}}, b::Number; prefer::Union{Nothing, Integer} = nothing) where {Ti, Tv}
+    return AffineConstraint{promote_type(Tv, typeof(b)), Ti}(nothing, entries, b, prefer)
 end
 
 """
@@ -167,6 +190,8 @@ mutable struct ConstraintHandler{DH <: AbstractDofHandler, Tv, Ti}
     const dofcoefficients::Vector{Union{Nothing, DofCoefficients{Tv, Ti}}}
     # global dof -> index into dofs and inhomogeneities and dofcoefficients
     const dofmapping::Dict{Ti, Ti}
+    # Affine constraints without a designated constrained dof, eliminated in `close!`
+    const unpivoted_constraints::Vector{AffineConstraint{Tv, Ti}}
     const isconstrained::BitVector # Fast check if dof is constrained or not
     const bcvalues::Vector{BCValues{Tv, Ti}}
     const dh::DH
@@ -179,7 +204,7 @@ function ConstraintHandler(::Type{Tv}, ::Type{Ti}, dh::AbstractDofHandler) where
     @assert isclosed(dh)
     return ConstraintHandler(
         Dirichlet[], ProjectedDirichlet[], Ti[], Ti[], Tv[], Union{Nothing, Tv}[],
-        Union{Nothing, DofCoefficients{Tv, Ti}}[], Dict{Ti, Ti}(), BitVector(), BCValues{Tv, Ti}[], dh, false,
+        Union{Nothing, DofCoefficients{Tv, Ti}}[], Dict{Ti, Ti}(), AffineConstraint{Tv, Ti}[], BitVector(), BCValues{Tv, Ti}[], dh, false,
     )
 end
 
@@ -302,6 +327,7 @@ Close and finalize the `ConstraintHandler`.
 """
 function close!(ch::ConstraintHandler)
     @assert(!isclosed(ch))
+    _eliminate_unpivoted_constraints!(ch)
     @assert(allunique(ch.prescribed_dofs))
 
     I = sortperm(ch.prescribed_dofs)
@@ -353,13 +379,84 @@ end
 """
     add!(ch::ConstraintHandler, ac::AffineConstraint)
 
-Add the `AffineConstraint` to the `ConstraintHandler`.
+Add the `AffineConstraint` to the `ConstraintHandler`. For a constraint without a
+`constrained_dof` the dof to eliminate is chosen in [`close!`](@ref).
 """
 function add!(ch::ConstraintHandler, ac::AffineConstraint)
+    if ac.constrained_dof === nothing
+        _add_unpivoted!(ch, ac)
+        return ch
+    end
     # TODO: Would be nice to pass nothing if ac.entries is empty, but then we lose the fact
     #       that this constraint is an AffineConstraint which is currently needed in update!
     #       in order to not update inhomogeneities for affine constraints
     add_prescribed_dof!(ch, ac.constrained_dof, ac.b, #=isempty(ac.entries) ? nothing : =# ac.entries)
+    return ch
+end
+
+function _add_unpivoted!(ch::ConstraintHandler{<:Any, Tv, Ti}, ac::AffineConstraint) where {Tv, Ti}
+    @assert(!isclosed(ch))
+    # Merge duplicate dofs and drop zero coefficients
+    entries = DofCoefficients{Tv, Ti}()
+    for (d, a) in sort(ac.entries; by = first)
+        @assert(1 ≤ d ≤ ndofs(ch.dh))
+        if !isempty(entries) && first(last(entries)) == d
+            entries[end] = d => last(last(entries)) + a
+        else
+            push!(entries, d => a)
+        end
+    end
+    filter!(e -> !iszero(last(e)), entries)
+    push!(ch.unpivoted_constraints, AffineConstraint{Tv, Ti}(nothing, entries, ac.b, ac.prefer))
+    return ch
+end
+
+# Turn each `AffineConstraint` without a constrained dof into a regular one by choosing one
+# of its dofs as the constrained dof (pivot). Pivots are distinct from all other constrained
+# dofs since they are registered in `ch.dofmapping` as they are picked. The resulting
+# constraints can be tangled, which is resolved by the untangling in `close!`.
+function _eliminate_unpivoted_constraints!(ch::ConstraintHandler{<:Any, Tv, Ti}) where {Tv, Ti}
+    lcs = ch.unpivoted_constraints
+    isempty(lcs) && return ch
+    # Number of constraints referencing each dof. Pivoting on a dof referenced by many
+    # constraints (e.g. a periodic master) would spread the constraint to all of them.
+    count = zeros(Int, ndofs(ch.dh))
+    for lc in lcs, (d, _) in lc.entries
+        count[d] += 1
+    end
+    for coeffs in ch.dofcoefficients
+        coeffs === nothing && continue
+        for (d, _) in coeffs
+            count[d] += 1
+        end
+    end
+    # Short rows first, so that long rows (e.g. mean value constraints) pick among the rest
+    for k in sort(eachindex(lcs); by = k -> (length(lcs[k].entries), k))
+        (; entries, b, prefer) = lcs[k]
+        if isempty(entries)
+            iszero(b) || throw(ArgumentError("AffineConstraint without a constrained dof (number $k in order of addition) is inconsistent: 0 = $b"))
+            continue
+        end
+        # Prefer coefficients that are not small relative to the row (threshold pivoting),
+        # then dofs referenced by few constraints
+        amax = maximum(e -> abs(last(e)), entries)
+        cost((d, a)) = (abs(a) < amax / 10, count[d])
+        isfree((d, _)) = !haskey(ch.dofmapping, d)
+        ip = prefer === nothing ? nothing : findfirst(e -> first(e) == prefer, entries)
+        if ip === nothing || !isfree(entries[ip]) || first(cost(entries[ip]))
+            ip = 0
+            for (i, e) in pairs(entries)
+                isfree(e) || continue
+                if ip == 0 || cost(e) < cost(entries[ip])
+                    ip = i
+                end
+            end
+            ip == 0 && throw(ArgumentError("AffineConstraint without a constrained dof (number $k in order of addition) has no dof left to eliminate: all its dofs are already constrained"))
+        end
+        p, ap = entries[ip]
+        coeffs = DofCoefficients{Tv, Ti}([d => -a / ap for (d, a) in entries if d != p])
+        add_prescribed_dof!(ch, p, b / ap, coeffs)
+    end
     return ch
 end
 

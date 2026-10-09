@@ -90,7 +90,7 @@
 # and a third equation ``\delta\lambda \int_{\Gamma} p\ \mathrm{d}\Gamma = 0`` so that we
 # can solve for ``\lambda``. However, since we in this case are not interested in computing
 # ``\lambda``, and since the constraint is linear, we can directly embed this constraint
-# using an `AffineConstraint` in Ferrite. Both alternatives are implemented in this
+# using an [`AffineConstraint`](@ref) in Ferrite. Both alternatives are implemented in this
 # tutorial: the main program uses the `AffineConstraint`, and the
 # [last section](@ref stokes-multiplier) shows the Lagrange multiplier variant, where
 # ``\lambda`` is added as an *algebraic variable*.
@@ -275,25 +275,20 @@ end
 # deserves some attention.
 #
 # Let's first discuss the assembly of the constraint matrix ``\underline{\underline{C}}``
-# and how to create an `AffineConstraint` from it. This is done in the
+# and how to create an [`AffineConstraint`](@ref) from it. This is done in the
 # `setup_mean_constraint` function below. Assembling this is not so different from standard
 # assembly in Ferrite: we loop over all the facets, loop over the quadrature points, and loop
 # over the shape functions. Note that since there is only one constraint the matrix will
 # only have one row.
-# After assembling `C` we construct an `AffineConstraint` from it. We select the constrained
-# dof to be the one with the highest weight (just to avoid selecting one with 0 or a very
-# small weight), then move the remaining to the right hand side. As an example, consider the
+# After assembling `C` we construct an `AffineConstraint` from it. As an example, consider the
 # case where the constraint equation ``\underline{\underline{C}}_p\ \underline{a}_p`` is
 # ```math
 # w_{10} p_{10} + w_{23} p_{23} + w_{154} p_{154} = 0
 # ```
 # i.e. dofs 10, 23, and 154, are the ones located on the boundary (all other dofs naturally
-# gives 0 contribution). If ``w_{23}`` is the largest weight, then we select ``p_{23}`` to
-# be the constrained one, and thus reorder the constraint to the form
-# ```math
-# p_{23} = -\frac{w_{10}}{w_{23}} p_{10} -\frac{w_{154}}{w_{23}} p_{154} + 0,
-# ```
-# which is the form the `AffineConstraint` constructor expects.
+# gives 0 contribution). Since no constrained dof is given, the `AffineConstraint` stores
+# this equation as is, and when the `ConstraintHandler` is closed one of the dofs is
+# selected to be expressed in terms of the others, e.g. ``p_{23} = -\frac{w_{10}}{w_{23}} p_{10} -\frac{w_{154}}{w_{23}} p_{154}``.
 #
 # !!! note
 #     If all nodes along the boundary are equidistant all the weights would be the same. In
@@ -335,15 +330,7 @@ function setup_mean_constraint(dh, fvp)
     C, _ = finish_assemble(assembler)
     ## Create an AffineConstraint from the C-matrix
     _, J, V = findnz(C)
-    _, constrained_dof_idx = findmax(abs2, V)
-    constrained_dof = J[constrained_dof_idx]
-    V ./= V[constrained_dof_idx]
-    mean_value_constraint = AffineConstraint(
-        constrained_dof,
-        Pair{Int, Float64}[J[i] => -V[i] for i in 1:length(J) if J[i] != constrained_dof],
-        0.0,
-    )
-    return mean_value_constraint
+    return AffineConstraint(J .=> V, 0.0)
 end
 #md nothing #hide
 
