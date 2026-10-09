@@ -1,6 +1,6 @@
 # Imports for parallel (isolated) test execution:
 using LinearAlgebra
-import SHA
+include("vtk_test_utils.jl")
 import Ferrite: getrefdim
 
 @testset "complex L2 projection" begin
@@ -453,14 +453,21 @@ function test_export(; subset::Bool)
             write_projection(vtk, p, p_tens, "p_tens")
             write_projection(vtk, p, p_stens, "p_stens")
         end
-        # The following test may fail due to floating point inaccuracies
-        # These could occur due to e.g. changes in system architecture.
-        if Sys.islinux() && Sys.ARCH === :x86_64
-            @test bytes2hex(open(SHA.sha1, fname * ".vtu", "r")) == (
-                subset ? "b3fef3de9f38ca9ddd92f2f67a1606d07ca56d67" :
-                    "bc2ec8f648f9b8bccccf172c1fc48bf03340329b"
-            )
-        end
+        data = read_vtk(fname * ".vtu")
+        test_vtk_grid(data, grid)
+        @test keys(data.point_data) == Set(["p_scalar", "p_vec", "p_tens", "p_stens"])
+        # The nodes outside of the projection domain are NaN
+        @test isapprox(data.point_data["p_scalar"], evaluate_at_grid_nodes(p, p_scalar); nans = true)
+        # The padded component is also NaN outside of the projection domain
+        p_vec_nodes = vtk_values(evaluate_at_grid_nodes(p, p_vec))
+        p_vec_nodes[3, isnan.(p_vec_nodes[1, :])] .= NaN
+        @test isapprox(data.point_data["p_vec"], p_vec_nodes; nans = true)
+        @test isapprox(data.point_data["p_tens"], vtk_values(evaluate_at_grid_nodes(p, p_tens)); nans = true)
+        @test isapprox(data.point_data["p_stens"], vtk_values(evaluate_at_grid_nodes(p, p_stens)); nans = true)
+        @test data.component_names["p_scalar"] === nothing
+        @test data.component_names["p_vec"] == ["x", "y", "z"]
+        @test data.component_names["p_tens"] == ["xx", "yy", "xy", "yx"]
+        @test data.component_names["p_stens"] == ["xx", "yy", "xy"]
     end
 
     return

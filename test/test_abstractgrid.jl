@@ -1,5 +1,5 @@
 # Imports for parallel (isolated) test execution:
-import SHA
+include("vtk_test_utils.jl")
 using SparseArrays
 
 @testset "AbstractGrid" begin
@@ -99,16 +99,16 @@ using SparseArrays
 
     @testset "IO interface" begin
         # Generate files
-        gridfilename = "smallgrid"
-        refgridfilename = "refgrid"
+        tmp = mktempdir()
+        gridfilename = joinpath(tmp, "smallgrid")
+        refgridfilename = joinpath(tmp, "refgrid")
         VTKGridFile(gridfilename, subtype_grid) do vtk::VTKGridFile
         end
         VTKGridFile(refgridfilename, reference_grid) do vtk::VTKGridFile
         end
         # Check if the output is the same
-        @test bytes2hex(open(SHA.sha1, gridfilename * ".vtu")) == bytes2hex(open(SHA.sha1, refgridfilename * ".vtu"))
-        # Cleanup
-        rm(gridfilename * ".vtu")
-        rm(refgridfilename * ".vtu")
+        data = read_vtk(refgridfilename * ".vtu")
+        test_vtk_grid(data, reference_grid)
+        @test isequal(read_vtk(gridfilename * ".vtu"), data)
     end
 end
