@@ -67,6 +67,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Creating sparsity patterns and matrices with `algebraic_couplings`, i.e.
    `allocate_matrix(dh; algebraic_couplings)` and `add_sparsity_entries!`, is faster and
    uses less memory. ([#1548])
+ - Creating VTK files (`VTKGridFile` and `VTKHDFGridFile`) is faster and allocates less
+   memory. ([#1107], [#1549])
 
 ### Documentation
 
@@ -1448,6 +1450,7 @@ poking into Ferrite internals:
 [#1083]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1083
 [#1089]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1089
 [#1096]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1096
+[#1107]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1107
 [#1122]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1122
 [#1132]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1132
 [#1146]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1146
@@ -1539,5 +1542,6 @@ poking into Ferrite internals:
 [#1546]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1546
 [#1547]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1547
 [#1548]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1548
+[#1549]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1549
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490

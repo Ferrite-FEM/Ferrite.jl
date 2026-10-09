@@ -95,51 +95,85 @@ cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
 cell_to_vtkcell(::Type{QuadraticWedge}) = VTKCellTypes.VTK_BIQUADRATIC_QUADRATIC_WEDGE
 cell_to_vtkcell(::Type{Pyramid}) = VTKCellTypes.VTK_PYRAMID
 
-nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
-nodes_to_vtkorder(cell::Pyramid) = cell.nodes[[1, 2, 4, 3, 5]]
-nodes_to_vtkorder(cell::QuadraticWedge) = cell.nodes[
-    [
-        1, 2, 3, 4, 5, 6, # vertices
-        7, 10, 8, 13, 15, 14, 9, 11, 12, # edges
-        16, 18, 17, # faces
-    ],
+# Permutations from the Ferrite node order to the VTK node order, for the cells where they differ
+const VTK_PYRAMID_ORDER = [1, 2, 4, 3, 5]
+const VTK_QUADRATIC_WEDGE_ORDER = [
+    1, 2, 3, 4, 5, 6, # vertices
+    7, 10, 8, 13, 15, 14, 9, 11, 12, # edges
+    16, 18, 17, # faces
 ]
-nodes_to_vtkorder(cell::QuadraticHexahedron) = [
-    cell.nodes[1], # faces
-    cell.nodes[2],
-    cell.nodes[3],
-    cell.nodes[4],
-    cell.nodes[5],
-    cell.nodes[6],
-    cell.nodes[7],
-    cell.nodes[8],
-    cell.nodes[9], # edges
-    cell.nodes[10],
-    cell.nodes[11],
-    cell.nodes[12],
-    cell.nodes[13],
-    cell.nodes[14],
-    cell.nodes[15],
-    cell.nodes[16],
-    cell.nodes[17],
-    cell.nodes[18],
-    cell.nodes[19],
-    cell.nodes[20],
-    cell.nodes[25], # faces
-    cell.nodes[23],
-    cell.nodes[22],
-    cell.nodes[24],
-    cell.nodes[21],
-    cell.nodes[26],
-    cell.nodes[27], # interior
+const VTK_QUADRATIC_HEXAHEDRON_ORDER = [
+    1, 2, 3, 4, 5, 6, 7, 8, # vertices
+    9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, # edges
+    25, 23, 22, 24, 21, 26, # faces
+    27, # interior
 ]
+# The permutation for `cell`, or `nothing` if the node orders are the same. This is internal to
+# Ferrite; cell types defined outside of Ferrite give their VTK node order by overloading
+# `nodes_to_vtkorder` instead.
+vtk_node_order(::AbstractCell) = nothing
+vtk_node_order(::Pyramid) = VTK_PYRAMID_ORDER
+vtk_node_order(::QuadraticWedge) = VTK_QUADRATIC_WEDGE_ORDER
+vtk_node_order(::QuadraticHexahedron) = VTK_QUADRATIC_HEXAHEDRON_ORDER
+
+# The node numbers of `cell` in VTK order. Downstream packages overload this to give the VTK
+# node order of their own cell types.
+# TODO: Deprecate in favor of `nodes_to_vtkorder!` once downstream packages have moved to it
+# (which requires them to bump their Ferrite compat).
+function nodes_to_vtkorder(cell::AbstractCell)
+    nodes = collect(get_node_ids(cell))
+    order = vtk_node_order(cell)
+    return order === nothing ? nodes : nodes[order]
+end
+
+# The cell types defined in Ferrite, which append their nodes without allocating
+const FerriteCell = Union{
+    Line, QuadraticLine,
+    Triangle, QuadraticTriangle, Quadrilateral, QuadraticQuadrilateral, SerendipityQuadraticQuadrilateral,
+    Tetrahedron, QuadraticTetrahedron, Hexahedron, QuadraticHexahedron, SerendipityQuadraticHexahedron,
+    Wedge, QuadraticWedge, Pyramid,
+}
+
+# Append the node numbers of `cell`, in VTK order, to `connectivity`. Other cell types fall back
+# to `nodes_to_vtkorder`.
+function nodes_to_vtkorder!(connectivity::Vector{Int}, cell::FerriteCell)
+    nodes = get_node_ids(cell)
+    order = vtk_node_order(cell)
+    @assert order === nothing || length(order) == length(nodes)
+    for i in eachindex(nodes)
+        push!(connectivity, order === nothing ? nodes[i] : nodes[order[i]])
+    end
+    return connectivity
+end
+nodes_to_vtkorder!(connectivity::Vector{Int}, cell::AbstractCell) = append!(connectivity, nodes_to_vtkorder(cell))
+
+const VTKMeshCell = WriteVTK.MeshCell{VTKCellTypes.VTKCellType, SubArray{Int, 1, Vector{Int}, Tuple{UnitRange{Int}}, true}}
+
+# Append the node numbers of `cell`, in VTK order, to `connectivity`, and the VTK cell, which
+# refers to a view of these node numbers, to `vtk_cells`.
+function push_vtk_cell!(vtk_cells::Vector{VTKMeshCell}, connectivity::Vector{Int}, cell::AbstractCell)
+    offset = length(connectivity)
+    nodes_to_vtkorder!(connectivity, cell)
+    vtk_nodes = view(connectivity, (offset + 1):length(connectivity))
+    push!(vtk_cells, WriteVTK.MeshCell(cell_to_vtkcell(typeof(cell)), vtk_nodes))
+    return
+end
+
+# Create the WriteVTK cells for `cells`. The node numbers of all cells, in VTK order, are
+# stored in a single vector and each cell refers to a view of it. This gives a concrete element
+# type, also for mixed cell types, without allocating a vector for each cell.
+function create_vtk_cells(cells)
+    # The type assert keeps the sum concrete for mixed cell types
+    connectivity = sizehint!(Int[], sum(cell -> nnodes(cell)::Int, cells))
+    vtk_cells = sizehint!(VTKMeshCell[], length(cells))
+    for cell in cells
+        push_vtk_cell!(vtk_cells, connectivity, cell) # function barrier
+    end
+    return vtk_cells
+end
 
 function create_vtk_griddata(grid::AbstractGrid{sdim}) where {sdim}
-    cls = WriteVTK.MeshCell[]
-    for cell in getcells(grid)
-        celltype = cell_to_vtkcell(typeof(cell))
-        push!(cls, WriteVTK.MeshCell(celltype, nodes_to_vtkorder(cell)))
-    end
+    cls = create_vtk_cells(getcells(grid))
     T = get_coordinate_eltype(grid)
     nodes_flat = reinterpret(T, getnodes(grid))
     coords = reshape(nodes_flat, (sdim, getnnodes(grid)))
@@ -404,28 +438,26 @@ end
 # A discontinuous vtk grid data duplicates nodes such that each vtk node only belongs to
 # a single cell. `cellnodes[i]` give the indices of these nodes for cell `i`.
 function create_discontinuous_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C, T}
-    cls = Vector{WriteVTK.MeshCell}(undef, getncells(grid))
     cellnodes = Vector{UnitRange{Int}}(undef, getncells(grid))
     ncoords = sum(nnodes, getcells(grid))
     coords = zeros(T, dim, ncoords)
     node_mapping = zeros(Int, ncoords)
     icoord = 0
     for cell in CellIterator(grid)
-        CT = getcelltype(grid, cellid(cell))
-        vtk_celltype = cell_to_vtkcell(CT)
         cell_coords = getcoordinates(cell)
         n = length(cell_coords)
         cellnodes[cellid(cell)] = (1:n) .+ icoord
-        let icoord = icoord
-            vtk_cellnodes = nodes_to_vtkorder(CT((ntuple(i -> i + icoord, n))))
-            cls[cellid(cell)] = WriteVTK.MeshCell(vtk_celltype, vtk_cellnodes)
-        end
         for (x, node_idx) in zip(cell_coords, getnodes(cell))
             icoord += 1
             coords[:, icoord] = x
             node_mapping[icoord] = node_idx
         end
     end
+    # The cells with nodes renumbered to the duplicated vtk nodes
+    vtk_cells = map(getcells(grid), cellnodes) do cell, nodes
+        return typeof(cell)(ntuple(i -> first(nodes) + i - 1, length(cell.nodes)))
+    end
+    cls = create_vtk_cells(vtk_cells)
     return coords, cls, cellnodes, node_mapping
 end
 

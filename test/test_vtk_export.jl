@@ -1,7 +1,81 @@
 # Imports for parallel (isolated) test execution:
 import SHA
 
+# Cell types defined outside of Ferrite, as in downstream packages, with and without a custom
+# VTK node order
+struct VTKTestCell <: Ferrite.AbstractCell{RefQuadrilateral}
+    nodes::NTuple{4, Int}
+end
+Ferrite.cell_to_vtkcell(::Type{VTKTestCell}) = Ferrite.VTKCellTypes.VTK_QUAD
+Ferrite.nodes_to_vtkorder(cell::VTKTestCell) = [cell.nodes[1], cell.nodes[2], cell.nodes[4], cell.nodes[3]]
+struct VTKTestCellDefaultOrder <: Ferrite.AbstractCell{RefQuadrilateral}
+    nodes::NTuple{4, Int}
+end
+Ferrite.cell_to_vtkcell(::Type{VTKTestCellDefaultOrder}) = Ferrite.VTKCellTypes.VTK_QUAD
+
 @testset "VTKGridFile" begin #TODO: Move all vtk tests here
+    @testset "VTK cells" begin
+        # The node order of the VTK cells (cf. nodes_to_vtkorder)
+        vtkorder = Dict(
+            Pyramid => [1, 2, 4, 3, 5],
+            QuadraticWedge => [1, 2, 3, 4, 5, 6, 7, 10, 8, 13, 15, 14, 9, 11, 12, 16, 18, 17],
+            QuadraticHexahedron => [1:20; 25; 23; 22; 24; 21; 26; 27],
+        )
+        connectivity(c) = collect(Int, c.connectivity)
+        function expected(cell)
+            nodes = collect(cell.nodes)
+            return nodes[get(vtkorder, typeof(cell), eachindex(nodes))]
+        end
+        # A single cell type
+        for (CT, n) in ((Quadrilateral, 4), (Pyramid, 5), (QuadraticWedge, 18), (QuadraticHexahedron, 27))
+            cells = [CT(ntuple(i -> 100k + i, n)) for k in 1:3]
+            cls = Ferrite.create_vtk_cells(cells)
+            @test isconcretetype(eltype(cls))
+            @test all(c -> c.ctype == Ferrite.cell_to_vtkcell(CT), cls)
+            @test map(connectivity, cls) == map(expected, cells)
+        end
+        # Mixed cell types
+        cells = Ferrite.AbstractCell[Quadrilateral((1, 2, 3, 4)), Triangle((2, 5, 3)), Pyramid((1, 2, 3, 4, 5))]
+        cls = Ferrite.create_vtk_cells(cells)
+        @test isconcretetype(eltype(cls))
+        @test map(c -> c.ctype, cls) == map(c -> Ferrite.cell_to_vtkcell(typeof(c)), cells)
+        @test map(connectivity, cls) == map(expected, cells)
+        # Full grid data, also for discontinuous export, on a mixed grid
+        nodes = [Node((0.0, 0.0)), Node((1.0, 0.0)), Node((1.0, 1.0)), Node((0.0, 1.0)), Node((2.0, 0.0))]
+        grid = Grid(Union{Quadrilateral, Triangle}[Quadrilateral((1, 2, 3, 4)), Triangle((2, 5, 3))], nodes)
+        coords, cls = Ferrite.create_vtk_griddata(grid)
+        @test isconcretetype(eltype(cls))
+        @test map(connectivity, cls) == [[1, 2, 3, 4], [2, 5, 3]]
+        coords, cls, cellnodes, node_mapping = Ferrite.create_discontinuous_vtk_griddata(grid)
+        @test isconcretetype(eltype(cls))
+        @test map(connectivity, cls) == [[1, 2, 3, 4], [5, 6, 7]]
+        @test node_mapping == [1, 2, 3, 4, 2, 5, 3]
+        # Discontinuous export of a single cell type with reordered nodes
+        grid = generate_grid(Pyramid, (1, 1, 1))
+        coords, cls, cellnodes, node_mapping = Ferrite.create_discontinuous_vtk_griddata(grid)
+        @test isconcretetype(eltype(cls))
+        @test map(connectivity, cls) == [collect(r)[vtkorder[Pyramid]] for r in cellnodes]
+        # The cells can be given as a tuple
+        cells = (Quadrilateral((1, 2, 3, 4)), Pyramid((1, 2, 3, 4, 5)))
+        @test map(connectivity, Ferrite.create_vtk_cells(cells)) == map(expected, collect(cells))
+        # nodes_to_vtkorder gives the VTK node order of a single cell
+        @test Ferrite.nodes_to_vtkorder(Pyramid((1, 2, 3, 4, 5))) == [1, 2, 4, 3, 5]
+        @test Ferrite.nodes_to_vtkorder(Quadrilateral((1, 2, 3, 4))) == [1, 2, 3, 4]
+        # All cell types of Ferrite that can be exported use the non-allocating path
+        for m in methods(Ferrite.cell_to_vtkcell)
+            m.module === Ferrite || continue
+            @test m.sig.parameters[2].parameters[1] <: Ferrite.FerriteCell
+        end
+        # Cell types defined outside of Ferrite use nodes_to_vtkorder
+        cells = Ferrite.AbstractCell[VTKTestCell((1, 2, 3, 4)), VTKTestCellDefaultOrder((1, 2, 3, 4)), Quadrilateral((1, 2, 3, 4))]
+        cls = Ferrite.create_vtk_cells(cells)
+        @test isconcretetype(eltype(cls))
+        @test map(connectivity, cls) == [[1, 2, 4, 3], [1, 2, 3, 4], [1, 2, 3, 4]]
+        grid = Grid([VTKTestCell((1, 2, 3, 4))], [Node((0.0, 0.0)), Node((1.0, 0.0)), Node((0.0, 1.0)), Node((1.0, 1.0))])
+        coords, cls, cellnodes, node_mapping = Ferrite.create_discontinuous_vtk_griddata(grid)
+        @test map(connectivity, cls) == [[1, 2, 4, 3]]
+    end
+
     @testset "show(::VTKGridFile)" begin
         mktempdir() do tmp
             grid = generate_grid(Quadrilateral, (2, 2))
