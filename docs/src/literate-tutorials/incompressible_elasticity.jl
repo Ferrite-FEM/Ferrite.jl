@@ -172,17 +172,17 @@ function create_cook_grid(nx, ny)
     return grid
 end;
 
-# Next we define a function to set up our `MultiFieldCellValues` and `FacetValues`.
-# For this coupled problem, using `MultiFieldCellValues` allows us to use the same
-# quadrature rule and geometric interpolation for both the `:u` and `:p`
+# Next we define a function to set up our `CellValues` and `FacetValues`.
+# For this coupled problem, using a single `CellValues` for both fields allows us to use
+# the same quadrature rule and geometric interpolation for the `:u` and `:p`
 # fields, which is more efficient and convenient.
 function create_values(interpolation_u, interpolation_p)
     ## Quadrature rules
     qr = QuadratureRule{RefTriangle}(3)
     facet_qr = FacetQuadratureRule{RefTriangle}(3)
 
-    ## MultiFieldCellValues, for both fields
-    cellvalues = MultiFieldCellValues(qr, (u = interpolation_u, p = interpolation_p))
+    ## CellValues for both fields
+    cellvalues = CellValues(qr, (u = interpolation_u, p = interpolation_p))
 
     ## FacetValues (only for the displacement, u)
     facetvalues_u = FacetValues(facet_qr, interpolation_u)
@@ -224,7 +224,7 @@ end
 
 # Next, we assemble the stiffness matrix and load vector.
 function doassemble(
-        cellvalues::MultiFieldCellValues, facetvalues_u::FacetValues,
+        cellvalues::CellValues, facetvalues_u::FacetValues,
         grid::Grid, dh::DofHandler, mp::LinearElasticity
     )
     K = allocate_matrix(dh)
@@ -346,7 +346,7 @@ end;
 # this formulation. Therefore we expand the strain to a 3D tensor, and then compute the (3D)
 # stress tensor.
 
-function compute_stresses(cellvalues::MultiFieldCellValues, dh::DofHandler, mp::LinearElasticity, a::Vector)
+function compute_stresses(cellvalues::CellValues, dh::DofHandler, mp::LinearElasticity, a::Vector)
     ae = zeros(ndofs_per_cell(dh)) # local solution vector
     u_range = dof_range(dh, :u)    # local range of dofs corresponding to u
     p_range = dof_range(dh, :p)    # local range of dofs corresponding to p

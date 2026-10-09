@@ -46,6 +46,10 @@ mapping type must be specified.
 Ferrite.mapping_type
 Ferrite.get_direction
 ```
+Custom mappings that do not need the cell in `reinit!` should overload
+```@docs
+Ferrite.reinit_needs_cell
+```
 
 #### Interpolations that cannot be constructed from their type
 For interpolations, `ip`, for which `ip == typeof(ip)()` is false (or doesn't work), the following must be implemented manually
