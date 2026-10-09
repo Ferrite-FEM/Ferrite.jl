@@ -45,6 +45,9 @@ The type parameters are `ValuesUpdateFlags{FunDiffOrder_x, FunDiffOrder_s, GeoDi
 * `GeoDiffOrder` is the order of the derivatives of the geometric mapping required to calculate the above
 * `DetJdV` specifies if the integration weights `detJdV` should be stored
 * `StoreJacobian` specifies if the jacobian of the geometric mapping should be stored in each quadrature point
+  (`update_jacobians`). This is also required for the local frame derivatives, see [`reinit_local_frame!`](@ref),
+  and is therefore always true if `FunDiffOrder_s > 0`. If `FunDiffOrder_s = 2`, the hessian of the geometric mapping
+  is also stored.
 """
 function ValuesUpdateFlags(
         ip_fun::Union{Interpolation, NamedTuple};
@@ -67,7 +70,8 @@ function ValuesUpdateFlags(
     FunDiffOrder_s = update_local_hessians ? 2 : (update_local_gradients ? 1 : 0)
     FunDiffOrder = max(FunDiffOrder_x, FunDiffOrder_s)
     GeoDiffOrder = max(_required_geo_diff_order(ip_fun, FunDiffOrder), update_detJdV, update_jacobians)
-    return ValuesUpdateFlags{FunDiffOrder_x, FunDiffOrder_s, GeoDiffOrder, update_detJdV, update_jacobians}()
+    StoreJacobian = update_jacobians || FunDiffOrder_s > 0
+    return ValuesUpdateFlags{FunDiffOrder_x, FunDiffOrder_s, GeoDiffOrder, update_detJdV, StoreJacobian}()
 end
 _required_geo_diff_order(ip_fun::Interpolation, fun_diff_order::Int) = required_geo_diff_order(mapping_type(ip_fun), fun_diff_order)
 function _required_geo_diff_order(ip_funs::NamedTuple, fun_diff_order::Int) # For MultiFieldCellValues
@@ -84,8 +88,44 @@ Update the `CellValues`, `MultiFieldCellValues`, or `FacetValues` object for a c
 facet with cell coordinates `x`.
 The derivatives of the shape functions, and the new integration weights are computed.
 For interpolations with non-identity mappings, the current `cell` is also required.
+Derivatives wrt. local frame coordinates are not updated by `reinit!`, see [`reinit_local_frame!`](@ref).
 """
 reinit!
+
+"""
+    reinit_local_frame!(fe_v::AbstractValues, frames::AbstractVector)
+
+Update the derivatives of the shape functions wrt. the local frame coordinates, ``\\mathbf{s}``,
+(see [`shape_local_gradient`](@ref) and [`shape_local_hessian`](@ref)) given the local frame,
+``\\mathbf{E} = \\texttt{frames[q\\_point]}``, in each quadrature point. This must be called after
+[`reinit!`](@ref), since the stored jacobian (and hessian) of the geometric mapping is used.
+Requires `update_local_gradients = true` or `update_local_hessians = true` when creating `fe_v`.
+
+Each frame must have the same size as the jacobian, ``\\mathbf{J} = \\partial \\mathbf{x} / \\partial \\boldsymbol{\\xi}``,
+(`sdim × rdim`), have orthonormal columns, ``\\mathbf{E}^\\mathrm{T} \\cdot \\mathbf{E} = \\mathbf{I}``, and span the
+same space as the columns of ``\\mathbf{J}``, such that ``\\mathbf{E}^\\mathrm{T} \\cdot \\mathbf{J}`` is invertible.
+A typical choice is the frame obtained by Gram-Schmidt orthonormalization of the jacobian:
+```julia
+reinit!(cv, x)
+frames = Ferrite.gram_schmidt_frame.(Ferrite.getjacobians(cv))
+reinit_local_frame!(cv, frames)
+```
+"""
+function reinit_local_frame!(fe_v::AbstractValues, frames::AbstractVector)
+    jacobians = getjacobians(fe_v)
+    hessians = getfield(fe_v, :H) # Only stored (and required) for local hessians
+    n_qpoints = getnquadpoints(fe_v)
+    length(frames) == n_qpoints || throw(ArgumentError("expected $n_qpoints frames (one per quadrature point), got $(length(frames))"))
+    fun_values = get_fun_values(fe_v)
+    for q_point in 1:n_qpoints
+        @inbounds apply_local_frame!(fun_values, q_point, _local_mapping_values(jacobians, hessians, q_point), frames[q_point])
+    end
+    return nothing
+end
+
+# The hessians are only stored when the local hessians are updated
+@propagate_inbounds _local_mapping_values(jacobians, ::Nothing, q_point::Int) = MappingValues(jacobians[q_point], nothing)
+@propagate_inbounds _local_mapping_values(jacobians, hessians, q_point::Int) = MappingValues(jacobians[q_point], hessians[q_point])
 
 """
     getnquadpoints(fe_v::AbstractValues)
@@ -150,11 +190,12 @@ shape_gradient(fe_v::AbstractValues, q_point::Int, base_function::Int)
 Return the gradient of shape function `base_function` wrt. the local frame coordinates, ``\\mathbf{s}``,
 evaluated in quadrature point `q_point`. Requires `update_local_gradients = true` (or
 `update_local_hessians = true`) when creating `fe_v`, and is only supported for interpolations with identity mapping.
+The local derivatives are updated by [`reinit_local_frame!`](@ref) (not by [`reinit!`](@ref)).
 
-The local frame, ``\\mathbf{E}``, is obtained by Gram-Schmidt orthonormalization of the columns
-of the jacobian, ``\\mathbf{J} = \\partial \\mathbf{x} / \\partial \\boldsymbol{\\xi}``, in the quadrature point.
-Hence, its first basis vector is aligned with ``\\partial \\mathbf{x} / \\partial \\xi_1``, and for embedded
-elements (e.g. shells) the frame spans the tangent space of the element. The local coordinates are defined as
+The local frame, ``\\mathbf{E}``, in each quadrature point is given by the user to [`reinit_local_frame!`](@ref),
+and has orthonormal columns that span the same space as the columns of the jacobian,
+``\\mathbf{J} = \\partial \\mathbf{x} / \\partial \\boldsymbol{\\xi}``, i.e. the tangent space for embedded
+elements (e.g. shells). A typical choice is [`Ferrite.gram_schmidt_frame`](@ref). The local coordinates are defined as
 ``\\mathbf{s} = \\mathbf{E}^\\mathrm{T} \\cdot (\\mathbf{x} - \\mathbf{x}_q)``, with ``\\mathbf{E}`` frozen
 at the quadrature point, ``\\mathbf{x}_q``, and the local gradient is
 ``\\mathbf{\\nabla}_s N = \\partial N / \\partial \\boldsymbol{\\xi} \\cdot \\mathbf{B}^{-1}``,

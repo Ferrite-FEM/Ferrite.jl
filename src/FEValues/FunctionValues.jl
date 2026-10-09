@@ -229,17 +229,15 @@ end
 # Apply mapping
 # =============
 @inline function apply_mapping!(funvals::FunctionValues, q_point::Int, args...)
-    _apply_mapping!(funvals, mapping_type(funvals), q_point, args...)
-    _apply_mapping_local_frame!(funvals, mapping_type(funvals), q_point, args...)
-    return nothing
+    return apply_mapping!(funvals, mapping_type(funvals), q_point, args...)
 end
 
 # Identity mapping
-@inline function _apply_mapping!(::FunctionValues{0}, ::IdentityMapping, ::Int, mapping_values, args...)
+@inline function apply_mapping!(::FunctionValues{0}, ::IdentityMapping, ::Int, mapping_values, args...)
     return nothing
 end
 
-@inline function _apply_mapping!(funvals::FunctionValues{1}, ::IdentityMapping, q_point::Int, mapping_values, args...)
+@inline function apply_mapping!(funvals::FunctionValues{1}, ::IdentityMapping, q_point::Int, mapping_values, args...)
     Jinv = calculate_Jinv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
         funvals.dNdx[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Jinv
@@ -247,11 +245,11 @@ end
     return nothing
 end
 
-@inline function _apply_mapping!(funvals::FunctionValues{2}, ::IdentityMapping, q_point::Int, mapping_values, args...)
+@inline function apply_mapping!(funvals::FunctionValues{2}, ::IdentityMapping, q_point::Int, mapping_values, args...)
     Jinv = calculate_Jinv(getjacobian(mapping_values))
 
     sdim, rdim = size(Jinv)
-    (rdim != sdim) && error("_apply_mapping! for second order gradients and embedded elements not implemented")
+    (rdim != sdim) && error("apply_mapping! for second order gradients and embedded elements not implemented")
 
     H = gethessian(mapping_values)
     is_vector_valued = first(funvals.Nx) isa Vec
@@ -276,6 +274,11 @@ end
 Return the orthonormal local frame, `E`, obtained by Gram-Schmidt orthonormalization of the columns
 of the jacobian `J = ∂x/∂ξ` (size `sdim × rdim`). `E` has the same size as `J`, and its columns span
 the same (tangent) space as the columns of `J`. The first column of `E` is aligned with the first column of `J`.
+This is a typical choice of frame for [`reinit_local_frame!`](@ref):
+```julia
+reinit!(cv, x)
+reinit_local_frame!(cv, Ferrite.gram_schmidt_frame.(Ferrite.getjacobians(cv)))
+```
 """
 @inline gram_schmidt_frame(J::Tensor{2, dim}) where {dim} = _gram_schmidt_frame(Tensor{2, dim}, J, Val(dim))
 @inline gram_schmidt_frame(J::MixedTensor2{sdim, rdim}) where {sdim, rdim} = _gram_schmidt_frame(MixedTensor2{sdim, rdim}, J, Val(rdim))
@@ -299,24 +302,22 @@ end
     return TT((e1..., e2..., e3...))
 end
 
-@inline function _apply_mapping_local_frame!(::FunctionValues{<:Any, 0}, ::Any, ::Int, mapping_values, args...)
-    return nothing
+# Local frame derivatives, see `reinit_local_frame!`
+@inline function apply_local_frame!(::FunctionValues{<:Any, 0}, ::Int, ::MappingValues, ::Any)
+    throw(ArgumentError("Local frame derivatives are not updated. Use `update_local_gradients = true` or `update_local_hessians = true` when constructing the values object."))
 end
 
-@inline function _apply_mapping_local_frame!(funvals::FunctionValues{<:Any, 1}, ::IdentityMapping, q_point::Int, mapping_values, args...)
-    J = getjacobian(mapping_values)
-    E = gram_schmidt_frame(J)
-    Binv = inv(E' ⋅ J)
+@inline function apply_local_frame!(funvals::FunctionValues{<:Any, 1}, q_point::Int, mapping_values::MappingValues, E::AbstractTensor{2})
+    Binv = inv(E' ⋅ getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
         funvals.dNds[j, q_point] = funvals.dNdξ[j, q_point] ⋅ Binv
     end
     return nothing
 end
 
-@inline function _apply_mapping_local_frame!(funvals::FunctionValues{<:Any, 2}, ::IdentityMapping, q_point::Int, mapping_values, args...)
+@inline function apply_local_frame!(funvals::FunctionValues{<:Any, 2}, q_point::Int, mapping_values::MappingValues, E::AbstractTensor{2})
     J = getjacobian(mapping_values)
     H = gethessian(mapping_values)
-    E = gram_schmidt_frame(J)
     Binv = inv(E' ⋅ J)
     Hs = E' ⋅ H
     is_vector_valued = first(funvals.Nx) isa Vec
@@ -335,7 +336,7 @@ end
 end
 
 # Covariant Piola Mapping
-@inline function _apply_mapping!(funvals::FunctionValues{0}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
+@inline function apply_mapping!(funvals::FunctionValues{0}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
     Jinv = inv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
         d = get_direction(funvals.ip, j, cell)
@@ -345,7 +346,7 @@ end
     return nothing
 end
 
-@inline function _apply_mapping!(funvals::FunctionValues{1}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
+@inline function apply_mapping!(funvals::FunctionValues{1}, ::CovariantPiolaMapping, q_point::Int, mapping_values, cell)
     H = gethessian(mapping_values)
     Jinv = inv(getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)
@@ -359,7 +360,7 @@ end
 end
 
 # Contravariant Piola Mapping
-@inline function _apply_mapping!(funvals::FunctionValues{0}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
+@inline function apply_mapping!(funvals::FunctionValues{0}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
     J = getjacobian(mapping_values)
     detJ = det(J)
     @inbounds for j in 1:getnbasefunctions(funvals)
@@ -370,7 +371,7 @@ end
     return nothing
 end
 
-@inline function _apply_mapping!(funvals::FunctionValues{1}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
+@inline function apply_mapping!(funvals::FunctionValues{1}, ::ContravariantPiolaMapping, q_point::Int, mapping_values, cell)
     H = gethessian(mapping_values)
     J = getjacobian(mapping_values)
     Jinv = inv(J)

@@ -24,7 +24,7 @@ values of nodal functions, gradients and divergences of nodal functions etc. on 
 * `update_local_hessians`: Specifies if the hessians of the shape functions wrt. the local frame coordinates
   should be updated (default false), see [`shape_local_hessian`](@ref)
 * `update_jacobians`: Specifies if the jacobian of the geometric mapping should be stored in each quadrature point
-  (default false), see [`Ferrite.getjacobian`](@ref)
+  (default false), see [`Ferrite.getjacobians`](@ref). Always stored if `update_local_gradients` or `update_local_hessians` is true.
 
 **Common methods:**
 
@@ -53,7 +53,7 @@ with equal interpolations share the same `FunctionValues`.
 """
 FacetValues
 
-mutable struct FacetValues{NT, FV, GM, FQR, detT, nT, V_FV <: AbstractVector{FV}, V_GM <: AbstractVector{GM}, JT} <: AbstractFacetValues
+mutable struct FacetValues{NT, FV, GM, FQR, detT, nT, V_FV <: AbstractVector{FV}, V_GM <: AbstractVector{GM}, JT, HT} <: AbstractFacetValues
     const fun_values_nt::NT # NamedTuple mapping field names to Val-indices into the fun_values tuples, or Nothing (single-field mode)
     const fun_values::V_FV  # AbstractVector{<:Tuple}, one tuple of unique FunctionValues per facet
     const geo_mapping::V_GM # AbstractVector{GeometryMapping}
@@ -64,10 +64,11 @@ mutable struct FacetValues{NT, FV, GM, FQR, detT, nT, V_FV <: AbstractVector{FV}
     const detJdV::detT      # AbstractVector{<:Number}
     const normals::nT       # AbstractVector{<:Vec}
     current_facet::Int
-    const J::JT             # AbstractVector{<:AbstractTensor{2}} or Nothing
+    const J::JT             # AbstractVector{<:AbstractTensor{2}} or Nothing, jacobians of the geometric mapping
+    const H::HT             # AbstractVector{<:AbstractTensor{3}} or Nothing, hessians of the geometric mapping (only for local hessians)
 end
 FacetValues(fun_values_nt, fun_values, geo_mapping, fqr, detJdV, normals, current_facet) =
-    FacetValues(fun_values_nt, fun_values, geo_mapping, fqr, detJdV, normals, current_facet, nothing)
+    FacetValues(fun_values_nt, fun_values, geo_mapping, fqr, detJdV, normals, current_facet, nothing, nothing)
 
 const SingleFieldFacetValues = FacetValues{Nothing}
 const MultiFieldFacetValues = FacetValues{<:NamedTuple}
@@ -84,13 +85,9 @@ function FacetValues(
     # detJdV always calculated, since we needed to calculate the jacobian anyways for the normal.
     detJdV = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
-    J = if StoreJacobian
-        jacobian_t = otimes_returntype(Vec{sdim, T}, Vec{rdim, T})
-        fill(zero(jacobian_t) * T(NaN), max_nquadpoints)
-    else
-        nothing
-    end
-    return FacetValues(nothing, fun_values, geo_mapping, fqr, detJdV, normals, 1, J)
+    J = StoreJacobian ? allocate_jacobians(T, Val(sdim), Val(rdim), max_nquadpoints) : nothing
+    H = FunDiffOrder_s >= 2 ? allocate_hessians(T, Val(sdim), Val(rdim), max_nquadpoints) : nothing
+    return FacetValues(nothing, fun_values, geo_mapping, fqr, detJdV, normals, 1, J, H)
 end
 
 function FacetValues(
@@ -105,13 +102,9 @@ function FacetValues(
     max_nquadpoints = maximum(qr -> length(getweights(qr)), fqr.facet_rules)
     detJdV = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
-    J = if StoreJacobian
-        jacobian_t = otimes_returntype(Vec{sdim, T}, Vec{rdim, T})
-        fill(zero(jacobian_t) * T(NaN), max_nquadpoints)
-    else
-        nothing
-    end
-    return FacetValues(fun_values_nt, fun_values, geo_mapping, fqr, detJdV, normals, 1, J)
+    J = StoreJacobian ? allocate_jacobians(T, Val(sdim), Val(rdim), max_nquadpoints) : nothing
+    H = FunDiffOrder_s >= 2 ? allocate_hessians(T, Val(sdim), Val(rdim), max_nquadpoints) : nothing
+    return FacetValues(fun_values_nt, fun_values, geo_mapping, fqr, detJdV, normals, 1, J, H)
 end
 
 FacetValues(qr::FacetQuadratureRule, ip::Union{Interpolation, NamedTuple}, args...; kwargs...) = FacetValues(Float64, qr, ip, args...; kwargs...)
@@ -127,14 +120,24 @@ function task_local_copy(fv::FacetValues)
         getfield(fv, :fun_values_nt), task_local_copy(getfield(fv, :fun_values)),
         task_local_copy(getfield(fv, :geo_mapping)), task_local_copy(getfield(fv, :fqr)),
         task_local_copy(getfield(fv, :detJdV)), task_local_copy(getfield(fv, :normals)),
-        getcurrentfacet(fv), task_local_copy(getjacobians(fv))
+        getcurrentfacet(fv), task_local_copy(getfield(fv, :J)), task_local_copy(getfield(fv, :H))
     )
 end
 
 getngeobasefunctions(fv::FacetValues) = getngeobasefunctions(get_geo_mapping(fv))
 getnquadpoints(fv::FacetValues) = @inbounds getnquadpoints(getfield(fv, :fqr), getcurrentfacet(fv))
 @propagate_inbounds getdetJdV(fv::FacetValues, q_point) = getfield(fv, :detJdV)[q_point]
-getjacobians(fv::FacetValues) = getfield(fv, :J)
+# The storage is sized for the facet with the most quadrature points, see `getjacobians(::CellValues)`
+function getjacobians(fv::FacetValues)
+    jacobians = getfield(fv, :J)
+    jacobians === nothing && throw_jacobians_not_stored(fv)
+    return view(jacobians, 1:getnquadpoints(fv))
+end
+function gethessians(fv::FacetValues)
+    hessians = getfield(fv, :H)
+    hessians === nothing && throw_hessians_not_stored(fv)
+    return view(hessians, 1:getnquadpoints(fv))
+end
 
 geometric_interpolation(fv::FacetValues) = geometric_interpolation(get_geo_mapping(fv))
 
@@ -227,7 +230,8 @@ function reinit!(fv::FacetValues, cell::Union{AbstractCell, Nothing}, x::Abstrac
         detJ > 0.0 || throw_detJ_not_pos(detJ)
         @inbounds detJdV[q_point] = detJ * w
         @inbounds normals[q_point] = weight_norm / norm(weight_norm)
-        _update_jacobian!(getjacobians(fv), q_point, mapping)
+        _update_jacobian!(getfield(fv, :J), q_point, mapping)
+        _update_hessian!(getfield(fv, :H), q_point, mapping)
         apply_mapping!(fun_values, q_point, mapping, cell)
     end
     return

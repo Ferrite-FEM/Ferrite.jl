@@ -107,7 +107,14 @@ frame attached to the element, rather than wrt. the global coordinates, $\boldsy
 
 **The local frame.** In each quadrature point, $\boldsymbol{x}_q = \boldsymbol{x}(\boldsymbol{\xi}_q)$,
 we can assign a local frame: $\boldsymbol{E} = [\boldsymbol{e}_1, \dots, \boldsymbol{e}_{r_\mathrm{dim}}]$ ($s_\mathrm{dim} \times r_\mathrm{dim}$).
-Currently, the local frame is obtained via Gram-Schmidt orthonormalization of the columns,
+The frame is given by the user with [`reinit_local_frame!`](@ref) after calling [`reinit!`](@ref), and must have orthonormal columns,
+$\boldsymbol{E}^\mathrm{T} \cdot \boldsymbol{E} = \boldsymbol{I}$, that span the same space as the columns of the jacobian, $\boldsymbol{J}$:
+```julia
+reinit!(cv, x)                                      # Update the jacobians (and hessians) of the geometric mapping
+frames = Ferrite.gram_schmidt_frame.(Ferrite.getjacobians(cv))
+reinit_local_frame!(cv, frames)                     # Update the local frame derivatives
+```
+A typical choice, given by [`Ferrite.gram_schmidt_frame`](@ref), is the Gram-Schmidt orthonormalization of the columns,
 $\boldsymbol{j}_r = \partial \boldsymbol{x} / \partial \xi_r$, of the jacobian:
 ```math
 \begin{align*}
@@ -116,8 +123,7 @@ $\boldsymbol{j}_r = \partial \boldsymbol{x} / \partial \xi_r$, of the jacobian:
     \boldsymbol{e}_3 = \frac{\boldsymbol{j}_3 - (\boldsymbol{e}_1 \cdot \boldsymbol{j}_3)\boldsymbol{e}_1 - (\boldsymbol{e}_2 \cdot \boldsymbol{j}_3)\boldsymbol{e}_2}{\Vert \cdots \Vert}
 \end{align*}
 ```
-Hence, $\boldsymbol{e}_1$ is aligned with the $\xi_1$-direction of the element, and
-$\boldsymbol{E}^\mathrm{T} \cdot \boldsymbol{E} = \boldsymbol{I}$. The frame spans the same space as the columns of $\boldsymbol{J}$,
+Hence, $\boldsymbol{e}_1$ is aligned with the $\xi_1$-direction of the element. In general, the frame spans the same space as the columns of $\boldsymbol{J}$,
 i.e. the tangent space for embedded elements, and for non-embedded elements $\boldsymbol{E}$ is a rotation.
 
 **The local coordinates.** The frame is *frozen* at the quadrature point, and the local coordinates are

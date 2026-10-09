@@ -171,14 +171,17 @@ end
         x = [xi + 0.1 * rand(typeof(xi)) for xi in Ferrite.reference_coordinates(ip)]
         fv = FacetValues(fqr, ip, ip)
         @test fv.J === nothing
+        @test fv.H === nothing
         fv_s = FacetValues(fqr, ip, ip; update_local_gradients = true, update_local_hessians = true, update_jacobians = true)
         ue = rand(getnbasefunctions(ip))
         for facet in 1:nfacets(fv_s)
             reinit!(fv, x, facet)
-            reinit!(fv_s, x, facet)
-            @test_throws ArgumentError Ferrite.getjacobian(fv, 1)
+            reinit_gram_schmidt!(fv_s, x, facet)
+            @test_throws ArgumentError Ferrite.getjacobians(fv)
+            @test length(Ferrite.getjacobians(fv_s)) == getnquadpoints(fv_s)
+            @test length(Ferrite.gethessians(fv_s)) == getnquadpoints(fv_s)
             for i in 1:getnquadpoints(fv_s)
-                J = Ferrite.getjacobian(fv_s, i)
+                J = Ferrite.getjacobians(fv_s)[i]
                 @test J ≈ Ferrite.getjacobian(Ferrite.calculate_mapping(Ferrite.get_geo_mapping(fv_s), i, x))
                 E = Ferrite.gram_schmidt_frame(J)
                 @test function_local_gradient(fv_s, i, ue) ≈ function_gradient(fv, i, ue) ⋅ E

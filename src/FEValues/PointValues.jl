@@ -33,7 +33,7 @@ function PointValues(cv::SingleFieldCellValues)
     update_hessians = Val(function_difforder(cv) ≥ 2)
     update_local_gradients = Val(function_local_difforder(cv) ≥ 1)
     update_local_hessians = Val(function_local_difforder(cv) ≥ 2)
-    update_jacobians = Val(getjacobians(cv) !== nothing)
+    update_jacobians = Val(getfield(cv, :J) !== nothing)
     return PointValues(T, ip_fun, ip_geo; update_gradients, update_hessians, update_local_gradients, update_local_hessians, update_jacobians)
 end
 function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip); kwargs...)
@@ -62,6 +62,8 @@ shape_local_gradient_type(pv::PointValues) = shape_local_gradient_type(pv.cv)
 shape_local_hessian_type(pv::PointValues) = shape_local_hessian_type(pv.cv)
 @propagate_inbounds shape_local_hessian(pv::PointValues, qp::Int, i::Int) = shape_local_hessian(pv.cv, qp, i)
 getjacobians(pv::PointValues) = getjacobians(pv.cv)
+gethessians(pv::PointValues) = gethessians(pv.cv)
+@propagate_inbounds getjacobian(pv::PointValues, qp::Int) = getjacobian(pv.cv, qp)
 getnquadpoints(pv::PointValues) = 1
 
 # PointValues can default to quadrature point 1
@@ -98,6 +100,8 @@ function reinit!(
     reinit!(pv.cv, cell, x)
     return nothing
 end
+
+reinit_local_frame!(pv::PointValues, frames::AbstractVector) = reinit_local_frame!(pv.cv, frames)
 
 function Base.show(io::IO, d::MIME"text/plain", cv::PointValues)
     println(io, "PointValues containing a")

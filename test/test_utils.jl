@@ -360,6 +360,13 @@ end
 # isoparametric map of the projected nodes yᵢ = Eᵀ⋅(xᵢ - x_q), and the inverse mapping s -> ξ can be found with
 # `function_value_from_physical_coord`, also for embedded elements (no distance search needed).
 # Note: The interpolation `interpolation` is also used as geometric interpolation.
+# `reinit!` followed by `reinit_local_frame!` with the Gram-Schmidt frame of the jacobian in each quadrature point
+function reinit_gram_schmidt!(fe_v, args...)
+    reinit!(fe_v, args...)
+    reinit_local_frame!(fe_v, Ferrite.gram_schmidt_frame.(Ferrite.getjacobians(fe_v)))
+    return fe_v
+end
+
 function local_frame_function_derivatives(interpolation::Interpolation, cell_coordinates, x_q::Vec, J, ue)
     E = Ferrite.gram_schmidt_frame(J)
     rdim = Ferrite.getrefdim(interpolation)
