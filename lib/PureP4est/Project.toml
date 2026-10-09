@@ -1,0 +1,14 @@
+name = "PureP4est"
+uuid = "1d1c2c9a-f64a-4c09-8465-780881add6b2"
+version = "0.1.0"
+authors = ["Maximilian Köhler", "Kristoffer Carlsson", "Ferrite.jl contributors"]
+
+[compat]
+Test = "1"
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

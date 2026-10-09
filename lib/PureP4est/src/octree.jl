@@ -2,10 +2,11 @@
 # ([BWG2011](@cite)). An `OctantBWG` is a box in a tree's integer coordinate system, an
 # `OctreeBWG` the Morton-sorted leaf list of one macro element. Everything here is local to a
 # single tree — inter-tree connectivity, refinement/coarsening of a whole forest, balancing and
-# grid materialization live in `forest.jl`.
+# node numbering live in `forest.jl`.
 #
 # The lookup tables at the bottom encode the p4est reference numbering (Section 2.1 of the
-# paper); the `*_perm`/`*_inv` ones translate between the p4est and Ferrite orderings.
+# paper); the `*_perm`/`*_inv` ones translate between the p4est (z-order) and the
+# counter-clockwise (VTK) orderings.
 
 const ncorners_face3D = 4
 const ncorners_face2D = 2
@@ -31,7 +32,7 @@ end
     return b
 end
 
-struct OctantBWG{dim, N, T <: Integer} <: Ferrite.AbstractCell{Ferrite.RefHypercube{dim}}
+struct OctantBWG{dim, N, T <: Integer}
     #Refinement level
     l::T
     #x,y,z \in {0,...,2^b} where (0 ≤ l ≤ b)
@@ -211,7 +212,7 @@ Further, each edge consists of two three-dimensional integer coordinates.
 """
 edges(octant::OctantBWG{3}, b::Integer) = ntuple(i -> edge(octant, i, b), Val(12))
 
-struct OctreeBWG{dim, N, T <: Integer} <: Ferrite.AbstractCell{Ferrite.RefHypercube{dim}}
+struct OctreeBWG{dim, N, T <: Integer}
     leaves::Vector{OctantBWG{dim, N, T}}
     #maximum refinement level
     b::T
@@ -229,14 +230,14 @@ Internal, octree-level refinement primitive; the user-facing entry point is
 [`refine!`](@ref)`(forest, cellids)`.
 
 Replace the leaf `pivot_octant` in `octree.leaves` by its `2^dim`
-[`children`](@ref Ferrite.AMR.children), spliced in z-order into the parent's slot so the
+[`children`](@ref children), spliced in z-order into the parent's slot so the
 Morton order of `leaves` is preserved. A no-op if `pivot_octant` is already at the tree's
 maximum level `octree.b`.
 
 `pivot_octant` is located with a `searchsortedfirst` binary search, which requires
 `octree.leaves` to be Morton-sorted (the `Base.isless` total order) — the standard
 invariant for a BWG octree. A single call is `O(n)` because of the in-place `insert!`;
-to refine many leaves at once prefer [`refine_all!`](@ref Ferrite.AMR.refine_all!) or the
+to refine many leaves at once prefer [`refine_all!`](@ref refine_all!) or the
 `refine!(forest, cellids)` vector method, which rebuild the leaf list in one linear pass
 instead of `n` shifts.
 """
@@ -266,9 +267,9 @@ Internal, octree-level coarsening primitive; the user-facing entry point is
 Replace the `2^dim`-sibling family that `o` belongs to with their common `parent` in the
 tree's Morton-sorted `leaves`. `o` is snapped back to the family's first sibling (via its
 `child_id`/morton), the parent is written in its slot, and the remaining `2^dim - 1`
-siblings are deleted — the inverse of [`refine_octant!`](@ref Ferrite.AMR.refine_octant!).
+siblings are deleted — the inverse of [`refine_octant!`](@ref refine_octant!).
 Assumes the whole family is present and at the same level (e.g. after
-[`balanceforest!`](@ref Ferrite.AMR.balanceforest!)).
+[`balanceforest!`](@ref balanceforest!)).
 """
 function coarsen_octant!(octree::OctreeBWG{dim, N, T}, o::OctantBWG{dim, N, T}) where {dim, N, T <: Integer}
     _two = T(2)
@@ -288,8 +289,6 @@ end
 
 OctreeBWG{3, 8}(nodes::NTuple, b = DEFAULT_MAXLEVEL[3]) = OctreeBWG{3, 8, Int64}([zero(OctantBWG{3, 8})], Int64(_check_maxlevel(3, b)), nodes)
 OctreeBWG{2, 4}(nodes::NTuple, b = DEFAULT_MAXLEVEL[2]) = OctreeBWG{2, 4, Int64}([zero(OctantBWG{2, 4})], Int64(_check_maxlevel(2, b)), nodes)
-OctreeBWG(cell::Quadrilateral, b = DEFAULT_MAXLEVEL[2]) = OctreeBWG{2, 4}(cell.nodes, b)
-OctreeBWG(cell::Hexahedron, b = DEFAULT_MAXLEVEL[3]) = OctreeBWG{3, 8}(cell.nodes, b)
 
 Base.length(tree::OctreeBWG) = length(tree.leaves)
 Base.eltype(::Type{OctreeBWG{dim, N, T}}) where {dim, N, T} = T
@@ -677,8 +676,8 @@ function facet_neighbor(octant::OctantBWG{2, N, T}, f::T, b::T = DEFAULT_MAXLEVE
 end
 facet_neighbor(o::OctantBWG{dim, N, T1}, f::T2, b::T3) where {dim, N, T1 <: Integer, T2 <: Integer, T3 <: Integer} = facet_neighbor(o, T1(f), T1(b))
 
-reference_faces_bwg(::Type{Ferrite.RefHypercube{2}}) = ((1, 3), (2, 4), (1, 2), (3, 4))
-reference_faces_bwg(::Type{Ferrite.RefHypercube{3}}) = ((1, 3, 5, 7), (2, 4, 6, 8), (1, 2, 5, 6), (3, 4, 7, 8), (1, 2, 3, 4), (5, 6, 7, 8)) # p4est consistent ordering
+reference_faces_bwg(::Val{2}) = ((1, 3), (2, 4), (1, 2), (3, 4))
+reference_faces_bwg(::Val{3}) = ((1, 3, 5, 7), (2, 4, 6, 8), (1, 2, 5, 6), (3, 4, 7, 8), (1, 2, 3, 4), (5, 6, 7, 8)) # p4est consistent ordering
 
 """
     edge_neighbor(octant::OctantBWG, e::Integer, b::Integer)
@@ -800,7 +799,7 @@ end
 ##### OCTANT LOOK UP TABLES ######
 # All indices in these tables are in p4est/BWG numbering (one-based), see Section 2 and
 # Tables 1-3 of [BWG2011]. The `*_perm`/`*_inv` tables at the end translate between the
-# p4est and Ferrite orderings.
+# p4est (z-order) and the counter-clockwise (VTK) orderings.
 
 # Edge -> the two faces containing that edge: 𝒮[e, :] ("S" in Section 2.1 of [BWG2011]).
 const 𝒮 = [
@@ -902,7 +901,7 @@ const 𝒱₃_inv = [
     2  4  6
 ]
 
-# Face indices permutation from p4est idx to Ferrite idx
+# Face indices permutation from p4est idx to counter-clockwise (VTK) idx
 const 𝒱₂_perm = [
     4
     2
@@ -910,7 +909,7 @@ const 𝒱₂_perm = [
     3
 ]
 
-# Face indices permutation from Ferrite idx to p4est idx
+# Face indices permutation from counter-clockwise (VTK) idx to p4est idx
 const 𝒱₂_perm_inv = [
     3
     2
@@ -918,7 +917,7 @@ const 𝒱₂_perm_inv = [
     1
 ]
 
-# Face indices permutation from p4est idx to Ferrite idx (3D)
+# Face indices permutation from p4est idx to counter-clockwise (VTK) idx (3D)
 const 𝒱₃_perm = [
     5
     3
@@ -928,7 +927,7 @@ const 𝒱₃_perm = [
     6
 ]
 
-# Face indices permutation from Ferrite idx to p4est idx (3D)
+# Face indices permutation from counter-clockwise (VTK) idx to p4est idx (3D)
 const 𝒱₃_perm_inv = [
     5
     3
@@ -938,7 +937,7 @@ const 𝒱₃_perm_inv = [
     6
 ]
 
-# edge indices permutation from p4est idx to Ferrite idx
+# edge indices permutation from p4est idx to counter-clockwise (VTK) idx
 const edge_perm = [
     1
     3
@@ -954,7 +953,7 @@ const edge_perm = [
     11
 ]
 
-# edge indices permutation from Ferrite idx to p4est idx
+# edge indices permutation from counter-clockwise (VTK) idx to p4est idx
 const edge_perm_inv = [
     1
     6
@@ -1002,7 +1001,7 @@ const 𝒫 = [
     4  3  2  1
 ]
 
-# Node indices permutation from p4est idx to Ferrite idx
+# Node indices permutation from p4est idx to counter-clockwise (VTK) idx
 const node_map₂ = [
     1,
     2,
@@ -1010,7 +1009,7 @@ const node_map₂ = [
     3,
 ]
 
-# Node indices permutation from Ferrite idx to p4est idx
+# Node indices permutation from counter-clockwise (VTK) idx to p4est idx
 const node_map₂_inv = [
     1,
     2,

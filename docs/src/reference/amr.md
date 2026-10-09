@@ -12,7 +12,9 @@ DocTestSetup = :(using Ferrite)
 The adaptive mesh refinement (AMR) functionality is built on a forest of octrees, following
 the algorithms of `p4est`. For a conceptual introduction see the [AMR topic
 guide](../topics/amr.md); for the internals see the [AMR developer
-documentation](../devdocs/AMR.md).
+documentation](../devdocs/AMR.md). The forest itself is implemented in the Ferrite-independent
+package `PureP4est` (in `lib/PureP4est` of the Ferrite repository); `refine!`, `coarsen!`,
+`balanceforest!` etc. are its functions, re-exported by Ferrite.
 
 ## Forest
 

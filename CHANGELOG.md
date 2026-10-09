@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+ - The forest-of-octrees core of the (experimental) adaptive mesh refinement now lives in the
+   new Ferrite-independent package `PureP4est`, developed in this repository under
+   `lib/PureP4est`. Ferrite keeps `ForestBWG`, `creategrid`, `facetskeleton(::ForestBWG)` and
+   `ConformityConstraint` as the translation layer and re-exports `refine!`, `refine_all!`,
+   `coarsen!`, `refine_and_coarsen!` and `balanceforest!`. `ForestBWG` is now a
+   `PureP4est.AbstractForest` instead of an `AbstractGrid`: `getncells`, `getcells`,
+   `getnodes`, `getnnodes`, `getspatialdim` and the cell/node/facet/vertex set getters still
+   work on it, other `AbstractGrid` functions such as `getcelltype` and `getneighborhood` do
+   not (the coarse topology is `PureP4est.connectivity(forest)`). Internals formerly reached
+   as `Ferrite.AMR.<name>` are now `PureP4est.<name>`. ([#1542])
+
 ### Added
 
  - New cell type `QuadraticWedge` (18 nodes) with geometric interpolation
@@ -1545,3 +1558,4 @@ poking into Ferrite internals:
 [#1549]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1549
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
+[#1542]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1542

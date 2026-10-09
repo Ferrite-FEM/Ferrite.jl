@@ -23,6 +23,7 @@ docs/src/assets/ref-*.svg
 /test/coverage/Manifest.toml
 /test/GPU/Manifest.toml
 /benchmark/Manifest.toml
+/lib/PureP4est/Manifest.toml
 
 LocalPreferences.toml
 docs/LocalPreferences.toml
