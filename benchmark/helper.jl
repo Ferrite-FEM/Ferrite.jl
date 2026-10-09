@@ -408,6 +408,37 @@ end
 # Constraints
 #----------------------------------------------------------------------#
 
+# Disjoint chains or rings, with one distinct free master per block when requested.
+# Chains use u_i = u_{i+1} + 1 and end at their free master. Rings use
+# u_i = 0.5 u_{i+1} + u_master + 1 (or omit u_master), including the wraparound.
+# All inputs and outputs have O(n) coefficients, including many independent rings.
+function setup_constraint_graph(n::Int; block_size::Int = n, cyclic::Bool = false, masters::Bool = true)
+    @assert block_size >= 2 && n % block_size == 0
+    @assert cyclic || masters
+    nblocks = n ÷ block_size
+    nmasters = masters ? nblocks : 0
+    dh = DofHandler(generate_grid(Line, (n + nmasters - 1,)))
+    add!(dh, :u, Lagrange{RefLine, 1}())
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    for block in 1:nblocks
+        first_dof = (block - 1) * block_size + 1
+        last_dof = block * block_size
+        master = n + block
+        for i in first_dof:last_dof
+            entries = Pair{Int, Float64}[]
+            if cyclic
+                push!(entries, (i == last_dof ? first_dof : i + 1) => 0.5)
+                masters && push!(entries, master => 1.0)
+            else
+                push!(entries, (i == last_dof ? master : i + 1) => 1.0)
+            end
+            add!(ch, AffineConstraint(i, entries, 1.0))
+        end
+    end
+    return ch
+end
+
 function setup_affine_constraint!(acs::Vector{AffineConstraint}, dofs::Vector{Int}, dofmapping::Dict{Int, Int}, inhomogeneity::Real = 0.0)
     V = ones(length(dofs))
     # Pick a dof for master dof and ensure it is not already prescribed

@@ -139,6 +139,7 @@ include("Dofs/apply_analytical.jl")
 include("Dofs/sparsity_pattern.jl")
 include("Dofs/block_sparsity_pattern.jl")
 include("Dofs/DofRenumbering.jl")
+include("Dofs/affine_constraint_graph.jl")
 include("Dofs/untangling_affine_constraints.jl")
 
 include("iterators.jl")
