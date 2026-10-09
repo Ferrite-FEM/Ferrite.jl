@@ -1,6 +1,6 @@
 # Imports for parallel (isolated) test execution:
 using OrderedCollections
-import SHA
+include("vtk_test_utils.jl")
 
 # Some helper functions
 function get_cellset(cell_type, cells)
@@ -371,7 +371,7 @@ function test_2_element_heat_eq()
     # dbc on top and bottom boundary
     @test u == [0.0, 0.5, 0.5, 0.0, 0.0, 0.0]
 
-    gridfilename = "mixed_grid"
+    gridfilename = joinpath(mktempdir(), "mixed_grid")
     addcellset!(grid, "cell-1", [1])
     addcellset!(grid, "cell-2", [2])
     VTKGridFile(gridfilename, grid) do vtk
@@ -380,8 +380,11 @@ function test_2_element_heat_eq()
         write_solution(vtk, dh, u)
         # Ferrite.write_constraints(vtk, ch)  #FIXME
     end
-    sha = bytes2hex(open(SHA.sha1, gridfilename * ".vtu"))
-    @test sha in ("e96732c000b0b385db7444f002461468b60b3b2c", "7b26edc27b5e59a2f60907374cd5a5790cc37a6a")
+    data = read_vtk(gridfilename * ".vtu")
+    test_vtk_grid(data, grid)
+    @test data.cell_data == Dict("cell-1" => [1, 0], "cell-2" => [0, 1])
+    # The nodes are numbered row by row, so the middle nodes are 2 and 5
+    @test data.point_data == Dict("u" => [0.0, 0.5, 0.0, 0.0, 0.5, 0.0])
     return
 end
 
@@ -693,13 +696,19 @@ function test_vtk_export()
     add!(sdh_tri, :u, ip_tri)
     close!(dh)
     u = collect(Float64, 1:ndofs(dh))
-    filename = "mixed_2d_grid"
+    filename = joinpath(mktempdir(), "mixed_2d_grid")
     VTKGridFile(filename, dh) do vtk
         write_solution(vtk, dh, u)
     end
-    sha = bytes2hex(open(SHA.sha1, filename * ".vtu"))
-    @test sha == "339ab8a8a613c2f38af684cccd695ae816671607"
-    return rm(filename * ".vtu") # clean up
+    data = read_vtk(filename * ".vtu")
+    test_vtk_grid(data, grid)
+    # The value of each node is the number of its dof
+    expected_u = zeros(getnnodes(grid))
+    for cell in 1:getncells(grid)
+        expected_u[collect(getcells(grid, cell).nodes)] = celldofs(dh, cell)
+    end
+    @test data.point_data == Dict("u" => expected_u)
+    return
 end
 
 function test_celliterator_on_true_subdomain_smoketest()

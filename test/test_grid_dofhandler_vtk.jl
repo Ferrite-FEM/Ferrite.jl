@@ -1,16 +1,7 @@
 # Imports for parallel (isolated) test execution:
 using LinearAlgebra
 using WriteVTK
-import SHA
-
-# to test vtk-files
-OVERWRITE_CHECKSUMS = false
-checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
-if OVERWRITE_CHECKSUMS
-    csio = open(checksums_file, "w")
-else
-    csio = open(checksums_file, "r")
-end
+include("vtk_test_utils.jl")
 
 @testset "Grid, DofHandler, vtk" begin
     @testset "$celltype" for (celltype, dim) in (
@@ -28,8 +19,8 @@ end
         )
 
         # create test grid, do some operations on it and then test
-        # the resulting sha1 of the stored vtk file
-        # after manually checking the exported vtk
+        # the content of the stored vtk file
+        tmp = mktempdir()
         nels = ntuple(x -> 5, dim)
         right = Vec{dim, Float64}(ntuple(x -> 1.5, dim))
         left = -right
@@ -44,7 +35,7 @@ end
         addfacetset!(grid, "right-facetset", getfacetset(grid, "right"))
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
-        gridfilename = "grid-$(repr(celltype))"
+        gridfilename = joinpath(tmp, "grid-$(repr(celltype))")
         VTKGridFile(gridfilename, grid) do vtk::VTKGridFile
             @test Ferrite.write_cellset(vtk, grid, "cell-1") === vtk
             @test Ferrite.write_cellset(vtk, grid, "middle-cells") === vtk
@@ -52,14 +43,18 @@ end
             @test Ferrite.write_facetset(vtk, grid, "right") === vtk
         end
 
-        # test the sha of the file
-        sha = bytes2hex(open(SHA.sha1, gridfilename * ".vtu"))
-        if OVERWRITE_CHECKSUMS
-            write(csio, sha, "\n")
-        else
-            @test sha in split(chomp(readline(csio)))
-            rm(gridfilename * ".vtu")
-        end
+        # test the content of the file
+        data = read_vtk(gridfilename * ".vtu")
+        test_vtk_grid(data, grid)
+        xs = get_node_coordinate.(getnodes(grid))
+        on_left = [x[1] ≈ 2left[1] for x in xs]
+        on_right = [x[1] ≈ 2right[1] for x in xs]
+        @test keys(data.cell_data) == Set(["cell-1", "middle-cells"])
+        @test data.cell_data["cell-1"] == [i == 1 for i in 1:getncells(grid)]
+        @test data.cell_data["middle-cells"] == [all(n -> norm(xs[n]) < radius, cell.nodes) for cell in getcells(grid)]
+        @test keys(data.point_data) == Set(["middle-nodes", "right"])
+        @test data.point_data["middle-nodes"] == [norm(x) < radius for x in xs]
+        @test data.point_data["right"] == on_right
 
         # Create a DofHandler, add some things, write to file and
         # then check the resulting sha
@@ -85,20 +80,30 @@ end
         apply_analytical!(u, dofhandler, :displacement, x -> -2x)
         apply!(u, ch)
 
-        dofhandlerfilename = "dofhandler-$(repr(celltype))"
+        dofhandlerfilename = joinpath(tmp, "dofhandler-$(repr(celltype))")
         VTKGridFile(dofhandlerfilename, grid) do vtk::VTKGridFile
             @test Ferrite.write_constraints(vtk, ch) === vtk
             @test write_solution(vtk, dofhandler, u) === vtk
         end
 
-        # test the sha of the file
-        sha = bytes2hex(open(SHA.sha1, dofhandlerfilename * ".vtu"))
-        if OVERWRITE_CHECKSUMS
-            write(csio, sha, "\n")
-        else
-            @test sha in split(chomp(readline(csio)))
-            rm(dofhandlerfilename * ".vtu")
+        # test the content of the file
+        data = read_vtk(dofhandlerfilename * ".vtu")
+        test_vtk_grid(data, grid)
+        @test isempty(data.cell_data)
+        @test keys(data.point_data) == Set(["temperature", "displacement", "temperature_bc", "displacement_bc"])
+        # The Dirichlet conditions override the analytical values on the boundaries
+        temperature = [r ? 1.0 : l ? 4.0 : 2x[1] for (x, l, r) in zip(xs, on_left, on_right)]
+        displacement = [l ? Vec{dim}(d -> d) : -2x for (x, l) in zip(xs, on_left)]
+        @test data.point_data["temperature"] ≈ temperature
+        @test data.point_data["displacement"] ≈ vtk_values(displacement)
+        # write_constraints only marks the vertices of the constrained facets
+        is_vertex = falses(getnnodes(grid))
+        for cell in getcells(grid)
+            is_vertex[collect(Ferrite.vertices(cell))] .= true
         end
+        @test data.point_data["temperature_bc"] == (on_left .| on_right) .& is_vertex
+        left_vertices = on_left .& is_vertex
+        @test data.point_data["displacement_bc"] == (dim == 1 ? left_vertices : repeat(left_vertices', dim))
 
         minv, maxv = Ferrite.bounding_box(grid)
         @test minv ≈ 2left
@@ -113,16 +118,8 @@ end
 
 end # of testset
 
-close(csio)
-
 @testset "vtk tensor export" begin
-    # open files
-    checksums_file_tensors = joinpath(dirname(@__FILE__), "checksums2.sha1")
-    if OVERWRITE_CHECKSUMS
-        csio = open(checksums_file_tensors, "w")
-    else
-        csio = open(checksums_file_tensors, "r")
-    end
+    tmp = mktempdir()
 
     # 3D grid
     grid = generate_grid(Hexahedron, (1, 1, 1))
@@ -131,7 +128,7 @@ close(csio)
     tensor_data = [Tensor{2, 3}(ntuple(i -> i, 9)) for j in 1.0:8.0]
     vector_data = [Vec{3}(ntuple(i -> i, 3)) for j in 1:8]
 
-    filename_3d = "test_vtk_3d"
+    filename_3d = joinpath(tmp, "test_vtk_3d")
     VTKGridFile(filename_3d, grid) do vtk::VTKGridFile
         @test write_node_data(vtk, sym_tensor_data, "symmetric tensor") === vtk
         @test write_node_data(vtk, tensor_data, "tensor") === vtk
@@ -146,7 +143,7 @@ close(csio)
     tensor_data_1D = [SymmetricTensor{2, 1}(ntuple(i -> i, 1)) for j in 1.0:4.0]
     vector_data = [Vec{2}(ntuple(i -> i, 2)) for j in 1:4]
 
-    filename_2d = "test_vtk_2d"
+    filename_2d = joinpath(tmp, "test_vtk_2d")
     VTKGridFile(filename_2d, grid) do vtk::VTKGridFile
         @test write_node_data(vtk, sym_tensor_data, "symmetric tensor") === vtk
         @test write_node_data(vtk, tensor_data, "tensor") === vtk
@@ -154,19 +151,30 @@ close(csio)
         @test write_node_data(vtk, vector_data, "vector") === vtk
     end
 
-    # test the shas of the files
-    files = [filename_3d, filename_2d]
-    for filename in files
-        sha = bytes2hex(open(SHA.sha1, filename * ".vtu"))
-        if OVERWRITE_CHECKSUMS
-            write(csio, sha, "\n")
-        else
-            @test sha in split(chomp(readline(csio)))
-            rm(filename * ".vtu")
-        end
-    end
+    # test the content of the files, the tensors are written in Voigt order:
+    # [11, 22, 33, 23, 13, 12, 32, 31, 21]
+    data = read_vtk(filename_3d * ".vtu")
+    @test keys(data.point_data) == Set(["symmetric tensor", "tensor", "vector"])
+    # SymmetricTensor{2, 3}((1, ..., 6)) has the components (11, 21, 31, 22, 32, 33) = (1, ..., 6)
+    @test data.point_data["symmetric tensor"] == repeat([1, 4, 6, 5, 3, 2], 1, 8)
+    @test data.component_names["symmetric tensor"] == ["xx", "yy", "zz", "yz", "xz", "xy"]
+    # Tensor{2, 3}((1, ..., 9)) is column major
+    @test data.point_data["tensor"] == repeat([1, 5, 9, 8, 7, 4, 6, 3, 2], 1, 8)
+    @test data.component_names["tensor"] == ["xx", "yy", "zz", "yz", "xz", "xy", "zy", "zx", "yx"]
+    @test data.point_data["vector"] == repeat([1, 2, 3], 1, 8)
+    @test data.component_names["vector"] == ["x", "y", "z"]
 
-    close(csio)
+    data = read_vtk(filename_2d * ".vtu")
+    @test keys(data.point_data) == Set(["symmetric tensor", "tensor", "tensor_1d", "vector"])
+    @test data.point_data["symmetric tensor"] == repeat([1, 3, 2], 1, 4)
+    @test data.component_names["symmetric tensor"] == ["xx", "yy", "xy"]
+    @test data.point_data["tensor"] == repeat([1, 4, 3, 2], 1, 4)
+    @test data.component_names["tensor"] == ["xx", "yy", "xy", "yx"]
+    @test data.point_data["tensor_1d"] == ones(4)
+    @test data.component_names["tensor_1d"] == ["xx"]
+    # 2D vectors are padded with zeros
+    @test data.point_data["vector"] == repeat([1, 2, 0], 1, 4)
+    @test data.component_names["vector"] == ["x", "y", "z"]
 end
 
 @testset "Grid utils" begin

@@ -18,6 +18,7 @@ testsuite = find_tests(TESTDIR)
 # Drop files that are discovered but are not standalone test files to run here:
 for name in (
         "test_utils",       # shared helpers, `include`d by the tests that need them
+        "vtk_test_utils",   # shared helpers for reading back VTK files
         "interpolation_test_utils",           # shared helpers for the test_interpolations* files
         "integration/convergence_test_utils", # shared helpers for the integration convergence tests
         "GPU/runtests",                    # GPU tests, run separately
