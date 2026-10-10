@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Time Dependent Problems · Ferrite.jl</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">Ferrite.jl</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../manual/fe_intro/">Introduction to FEM</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../manual/assembly/">Assembly</a></li><li><a class="tocitem" href="../../manual/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../manual/grid/">Grid</a></li><li><a class="tocitem" href="../../manual/export/">Export</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../heat_equation/">Heat Equation</a></li><li><a class="tocitem" href="../l2_projection/">L2-projection</a></li><li><a class="tocitem" href="../helmholtz/">Helmholtz equation</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible Elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../threaded_assembly/">Threaded Assembly</a></li><li><a class="tocitem" href="../plasticity/">von Mises plasticity</a></li><li class="is-active"><a class="tocitem" href>Time Dependent Problems</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Commented-Program"><span>Commented Program</span></a></li><li><a class="tocitem" href="#transient_heat_equation-plain-program"><span>Plain Program</span></a></li></ul></li><li><a class="tocitem" href="../landau/">Ginzburg-Landau model energy minimization</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">DofHandler</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid</a></li><li><a class="tocitem" href="../../reference/export/">Export</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Time Dependent Problems</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Time Dependent Problems</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate/transient_heat_equation.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Time-Dependent-Problems"><a class="docs-heading-anchor" href="#Time-Dependent-Problems">Time Dependent Problems</a><a id="Time-Dependent-Problems-1"></a><a class="docs-heading-anchor-permalink" href="#Time-Dependent-Problems" title="Permalink"></a></h1><p><img src="../transient_heat.gif" alt/></p><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/v0.3.0/examples/transient_heat_equation.ipynb"><code>transient_heat_equation.ipynb</code></a></p></div></div><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>In this example we extend the heat equation by a time dependent term, i.e.</p><p class="math-container">\[ \frac{\partial u}{\partial t}-\nabla \cdot (k \nabla u) = f  \quad x \in \Omega,\]</p><p>where <span>$u$</span> is the unknown temperature field, <span>$k$</span> the heat conductivity, <span>$f$</span> the heat source and <span>$\Omega$</span> the domain. For simplicity we set <span>$f = 1$</span> and <span>$k = 1$</span>. We define homogeneous Dirichlet boundary conditions along the left and right edge of the domain.</p><p class="math-container">\[u(x,t) = 0 \quad x \in \partial \Omega_1,\]</p><p>where <span>$\partial \Omega_1$</span> denotes the left and right boundary of <span>$\Omega$</span>.</p><p>Further, we define heterogeneous Dirichlet boundary conditions at the top and bottom edge <span>$\partial \Omega_2$</span>. We choose a linearly increasing function <span>$a(t)$</span> that describes the temperature at this boundary</p><p class="math-container">\[u(x,t) = a(t) \quad x \in \partial \Omega_2.\]</p><p>The semidiscrete weak form is given by</p><p class="math-container">\[\int_{\Omega}\frac{\partial u}{\partial t}\cdot v \ d\Omega + \int_{\Omega} \nabla v \cdot \nabla u \ d\Omega = \int_{\Omega} v \ d\Omega,\]</p><p>where <span>$v$</span> is a suitable test function. Now, we still need to discretize the time derivative. An implicit Euler scheme is applied, which yields:</p><p class="math-container">\[\int_{\Omega}u_{n+1}\cdot v \ d\Omega + \Delta t\int_{\Omega} \nabla v \cdot \nabla u_{n+1} \ d\Omega = \Delta t\int_{\Omega} v \ d\Omega + \int_{\Omega} u_{n}\cdot v \ d\Omega.\]</p><p>If we assemble the discrete operators, we get the following algebraic system:</p><p class="math-container">\[\mathbf{M} \mathbf{u}_{n+1} + Δt \mathbf{K} \mathbf{u}_{n+1} = Δt \mathbf{f} + \mathbf{M} \mathbf{u}_{n}\]</p><p>In this example we apply the boundary conditions to the assembled discrete operators (mass matrix <span>$\mathbf{M}$</span> and stiffnes matrix <span>$\mathbf{K}$</span>) only once. We utilize the fact that in finite element computations Dirichlet conditions can be applied by zero out rows and columns that correspond to a prescribed dof in the system matrix (<span>$\mathbf{A} = Δt \mathbf{K} + \mathbf{M}$</span>) and setting the value of the right-hand side vector to the value of the Dirichlet condition. Thus, we only need to apply in every time step the Dirichlet condition to the right-hand side of the problem.</p><h2 id="Commented-Program"><a class="docs-heading-anchor" href="#Commented-Program">Commented Program</a><a id="Commented-Program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-Program" title="Permalink"></a></h2><p>Now we solve the problem in Ferrite. What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="../heat_equation/#heat_equation-plain-program">section</a>.</p><p>First we load Ferrite, and some other packages we need.</p><pre><code class="language-julia">using Ferrite, SparseArrays</code></pre><p>We create the same grid as in the heat equation example.</p><pre><code class="language-julia">grid = generate_grid(Quadrilateral, (100, 100));</code></pre><h3 id="Trial-and-test-functions"><a class="docs-heading-anchor" href="#Trial-and-test-functions">Trial and test functions</a><a id="Trial-and-test-functions-1"></a><a class="docs-heading-anchor-permalink" href="#Trial-and-test-functions" title="Permalink"></a></h3><p>Again, we define the structs that are responsible for the <code>shape_value</code> and <code>shape_gradient</code> evaluation.</p><pre><code class="language-julia">dim = 2
+ip = Lagrange{dim, RefCube, 1}()
+qr = QuadratureRule{dim, RefCube}(2)
+cellvalues = CellScalarValues(qr, ip);</code></pre><h3 id="Degrees-of-freedom"><a class="docs-heading-anchor" href="#Degrees-of-freedom">Degrees of freedom</a><a id="Degrees-of-freedom-1"></a><a class="docs-heading-anchor-permalink" href="#Degrees-of-freedom" title="Permalink"></a></h3><p>After this, we can define the <code>DofHandler</code> and distribute the DOFs of the problem.</p><pre><code class="language-julia">dh = DofHandler(grid)
+push!(dh, :u, 1)
+close!(dh);</code></pre><p>By means of the <code>DofHandler</code> we can allocate the needed <code>SparseMatrixCSC</code>. <code>M</code> refers here to the so called mass matrix, which always occurs in time related terms, i.e.</p><p class="math-container">\[M_{ij} = \int_{\Omega} u_i \cdot v_j \ d\Omega,\]</p><p>where <span>$u_i$</span> and <span>$v_j$</span> are trial and test functions, respectively.</p><pre><code class="language-julia">K = create_sparsity_pattern(dh);
+M = create_sparsity_pattern(dh);</code></pre><p>We also preallocate the right hand side</p><pre><code class="language-julia">f = zeros(ndofs(dh));</code></pre><h3 id="Boundary-conditions"><a class="docs-heading-anchor" href="#Boundary-conditions">Boundary conditions</a><a id="Boundary-conditions-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-conditions" title="Permalink"></a></h3><p>In order to define the time dependent problem, we need some end time <code>T</code> and something that describes the linearly increasing Dirichlet boundary condition on <span>$\partial \Omega_2$</span>.</p><pre><code class="language-julia">max_temp = 100
+Δt = 1
+T = 200
+ch = ConstraintHandler(dh);</code></pre><p>Here, we define the boundary condition related to <span>$\partial \Omega_1$</span>.</p><pre><code class="language-julia">∂Ω₁ = union(getfaceset.((grid, ), [&quot;left&quot;, &quot;right&quot;])...)
+dbc = Dirichlet(:u, ∂Ω₁, (x, t) -&gt; 0)
+add!(ch, dbc);</code></pre><p>While the next code block corresponds to the linearly increasing temperature description on <span>$\partial \Omega_2$</span>.</p><pre><code class="language-julia">∂Ω₂ = union(getfaceset.((grid, ), [&quot;top&quot;, &quot;bottom&quot;])...)
+dbc = Dirichlet(:u, ∂Ω₂, (x, t) -&gt; t*(max_temp/T))
+add!(ch, dbc)
+close!(ch)
+update!(ch, 0.0);</code></pre><h3 id="Assembling-the-linear-system"><a class="docs-heading-anchor" href="#Assembling-the-linear-system">Assembling the linear system</a><a id="Assembling-the-linear-system-1"></a><a class="docs-heading-anchor-permalink" href="#Assembling-the-linear-system" title="Permalink"></a></h3><p>As in the heat equation example we define a <code>doassemble!</code> function that assembles the diffusion parts of the equation:</p><pre><code class="language-julia">function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellScalarValues{dim}, dh::DofHandler) where {dim}
+
+    n_basefuncs = getnbasefunctions(cellvalues)
+    Ke = zeros(n_basefuncs, n_basefuncs)
+    fe = zeros(n_basefuncs)
+
+    assembler = start_assemble(K, f)
+
+    @inbounds for cell in CellIterator(dh)
+
+        fill!(Ke, 0)
+        fill!(fe, 0)
+
+        reinit!(cellvalues, cell)
+
+        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+
+            for i in 1:n_basefuncs
+                v  = shape_value(cellvalues, q_point, i)
+                ∇v = shape_gradient(cellvalues, q_point, i)
+                fe[i] += v * dΩ
+                for j in 1:n_basefuncs
+                    ∇u = shape_gradient(cellvalues, q_point, j)
+                    Ke[i, j] += (∇v ⋅ ∇u) * dΩ
+                end
+            end
+        end
+
+        assemble!(assembler, celldofs(cell), fe, Ke)
+    end
+    return K, f
+end</code></pre><p>In addition to the diffusive part, we also need a function that assembles the mass matrix <code>M</code>.</p><pre><code class="language-julia">function doassemble_M!(M::SparseMatrixCSC, cellvalues::CellScalarValues{dim}, dh::DofHandler) where {dim}
+
+    n_basefuncs = getnbasefunctions(cellvalues)
+    Me = zeros(n_basefuncs, n_basefuncs)
+
+    assembler = start_assemble(M)
+
+    @inbounds for cell in CellIterator(dh)
+
+        fill!(Me, 0)
+
+        reinit!(cellvalues, cell)
+
+        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+
+            for i in 1:n_basefuncs
+                v  = shape_value(cellvalues, q_point, i)
+                for j in 1:n_basefuncs
+                    u = shape_value(cellvalues, q_point, j)
+                    Me[i, j] += (v ⋅ u) * dΩ
+                end
+            end
+        end
+
+        assemble!(assembler, celldofs(cell), Me)
+    end
+    return M
+end</code></pre><h3 id="Solution-of-the-system"><a class="docs-heading-anchor" href="#Solution-of-the-system">Solution of the system</a><a id="Solution-of-the-system-1"></a><a class="docs-heading-anchor-permalink" href="#Solution-of-the-system" title="Permalink"></a></h3><p>We first assemble all parts in the prior allocated <code>SparseMatrixCSC</code>.</p><pre><code class="language-julia">K, f = doassemble_K!(K, f, cellvalues, dh)
+M = doassemble_M!(M, cellvalues, dh)
+A = (Δt .* K) + M;</code></pre><p>Now, we need to save all boundary condition related values of the unaltered system matrix <code>A</code>, which is done by <code>get_rhs_data</code>. The function returns a <code>RHSData</code> struct, which contains all needed informations to apply the boundary conditions solely on the right-hand-side vector of the problem.</p><pre><code class="language-julia">rhsdata = get_rhs_data(ch, A);</code></pre><p>We set the initial time step, denoted by uₙ,  to <span>$\mathbf{0}$</span>.</p><pre><code class="language-julia">uₙ = zeros(length(f));</code></pre><p>Here, we apply <strong>once</strong> the boundary conditions to the system matrix <code>A</code>.</p><pre><code class="language-julia">apply!(A, ch);</code></pre><p>To store the solution, we initialize a <code>paraview_collection</code> (.pvd) file.</p><pre><code class="language-julia">pvd = paraview_collection(&quot;transient-heat.pvd&quot;);</code></pre><p>At this point everything is set up and we can finally approach the time loop.</p><pre><code class="language-julia">for t in 0:Δt:T
+    #First of all, we need to update the Dirichlet boundary condition values.
+    update!(ch, t)
+
+    #Secondly, we compute the right-hand-side of the problem.
+    b = Δt .* f .+ M * uₙ
+    #Then, we can apply the boundary conditions of the current time step.
+    apply_rhs!(rhsdata, b, ch)
+
+    #Finally, we can solve the time step and save the solution afterwards.
+    u = A \ b;
+
+    vtk_grid(&quot;transient-heat-$t&quot;, dh) do vtk
+        vtk_point_data(vtk, dh, u)
+        vtk_save(vtk)
+        pvd[t] = vtk
+    end
+   #At the end of the time loop, we set the previous solution to the current one and go to the next time step.
+   uₙ .= u
+end</code></pre><p>In order to use the .pvd file we need to store it to the disk, which is done by:</p><pre><code class="language-julia">vtk_save(pvd);</code></pre><h2 id="transient_heat_equation-plain-program"><a class="docs-heading-anchor" href="#transient_heat_equation-plain-program">Plain Program</a><a id="transient_heat_equation-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#transient_heat_equation-plain-program" title="Permalink"></a></h2><p>Below follows a version of the program without any comments. The file is also available here: <a href="../transient_heat_equation.jl">transient<em>heat</em>equation.jl</a></p><pre><code class="language-julia">using Ferrite, SparseArrays
+
+grid = generate_grid(Quadrilateral, (100, 100));
+
+dim = 2
+ip = Lagrange{dim, RefCube, 1}()
+qr = QuadratureRule{dim, RefCube}(2)
+cellvalues = CellScalarValues(qr, ip);
+
+dh = DofHandler(grid)
+push!(dh, :u, 1)
+close!(dh);
+
+K = create_sparsity_pattern(dh);
+M = create_sparsity_pattern(dh);
+
+f = zeros(ndofs(dh));
+
+max_temp = 100
+Δt = 1
+T = 200
+ch = ConstraintHandler(dh);
+
+∂Ω₁ = union(getfaceset.((grid, ), [&quot;left&quot;, &quot;right&quot;])...)
+dbc = Dirichlet(:u, ∂Ω₁, (x, t) -&gt; 0)
+add!(ch, dbc);
+
+∂Ω₂ = union(getfaceset.((grid, ), [&quot;top&quot;, &quot;bottom&quot;])...)
+dbc = Dirichlet(:u, ∂Ω₂, (x, t) -&gt; t*(max_temp/T))
+add!(ch, dbc)
+close!(ch)
+update!(ch, 0.0);
+
+function doassemble_K!(K::SparseMatrixCSC, f::Vector, cellvalues::CellScalarValues{dim}, dh::DofHandler) where {dim}
+
+    n_basefuncs = getnbasefunctions(cellvalues)
+    Ke = zeros(n_basefuncs, n_basefuncs)
+    fe = zeros(n_basefuncs)
+
+    assembler = start_assemble(K, f)
+
+    @inbounds for cell in CellIterator(dh)
+
+        fill!(Ke, 0)
+        fill!(fe, 0)
+
+        reinit!(cellvalues, cell)
+
+        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+
+            for i in 1:n_basefuncs
+                v  = shape_value(cellvalues, q_point, i)
+                ∇v = shape_gradient(cellvalues, q_point, i)
+                fe[i] += v * dΩ
+                for j in 1:n_basefuncs
+                    ∇u = shape_gradient(cellvalues, q_point, j)
+                    Ke[i, j] += (∇v ⋅ ∇u) * dΩ
+                end
+            end
+        end
+
+        assemble!(assembler, celldofs(cell), fe, Ke)
+    end
+    return K, f
+end
+
+function doassemble_M!(M::SparseMatrixCSC, cellvalues::CellScalarValues{dim}, dh::DofHandler) where {dim}
+
+    n_basefuncs = getnbasefunctions(cellvalues)
+    Me = zeros(n_basefuncs, n_basefuncs)
+
+    assembler = start_assemble(M)
+
+    @inbounds for cell in CellIterator(dh)
+
+        fill!(Me, 0)
+
+        reinit!(cellvalues, cell)
+
+        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+
+            for i in 1:n_basefuncs
+                v  = shape_value(cellvalues, q_point, i)
+                for j in 1:n_basefuncs
+                    u = shape_value(cellvalues, q_point, j)
+                    Me[i, j] += (v ⋅ u) * dΩ
+                end
+            end
+        end
+
+        assemble!(assembler, celldofs(cell), Me)
+    end
+    return M
+end
+
+K, f = doassemble_K!(K, f, cellvalues, dh)
+M = doassemble_M!(M, cellvalues, dh)
+A = (Δt .* K) + M;
+
+rhsdata = get_rhs_data(ch, A);
+
+uₙ = zeros(length(f));
+
+apply!(A, ch);
+
+pvd = paraview_collection(&quot;transient-heat.pvd&quot;);
+
+for t in 0:Δt:T
+    #First of all, we need to update the Dirichlet boundary condition values.
+    update!(ch, t)
+
+    #Secondly, we compute the right-hand-side of the problem.
+    b = Δt .* f .+ M * uₙ
+    #Then, we can apply the boundary conditions of the current time step.
+    apply_rhs!(rhsdata, b, ch)
+
+    #Finally, we can solve the time step and save the solution afterwards.
+    u = A \ b;
+
+    vtk_grid(&quot;transient-heat-$t&quot;, dh) do vtk
+        vtk_point_data(vtk, dh, u)
+        vtk_save(vtk)
+        pvd[t] = vtk
+    end
+   #At the end of the time loop, we set the previous solution to the current one and go to the next time step.
+   uₙ .= u
+end
+
+vtk_save(pvd);
+
+# This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../plasticity/">« von Mises plasticity</a><a class="docs-footer-nextpage" href="../landau/">Ginzburg-Landau model energy minimization »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 25 March 2021 14:58">Thursday 25 March 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

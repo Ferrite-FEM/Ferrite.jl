@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Helmholtz equation · Ferrite.jl</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">Ferrite.jl</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../manual/fe_intro/">Introduction to FEM</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../manual/assembly/">Assembly</a></li><li><a class="tocitem" href="../../manual/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../manual/grid/">Grid</a></li><li><a class="tocitem" href="../../manual/export/">Export</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../heat_equation/">Heat Equation</a></li><li><a class="tocitem" href="../l2_projection/">L2-projection</a></li><li class="is-active"><a class="tocitem" href>Helmholtz equation</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible Elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../threaded_assembly/">Threaded Assembly</a></li><li><a class="tocitem" href="../plasticity/">von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Time Dependent Problems</a></li><li><a class="tocitem" href="../landau/">Ginzburg-Landau model energy minimization</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">DofHandler</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid</a></li><li><a class="tocitem" href="../../reference/export/">Export</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Helmholtz equation</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Helmholtz equation</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate/helmholtz.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Helmholtz-equation"><a class="docs-heading-anchor" href="#Helmholtz-equation">Helmholtz equation</a><a id="Helmholtz-equation-1"></a><a class="docs-heading-anchor-permalink" href="#Helmholtz-equation" title="Permalink"></a></h1><p>In this example, we want to solve a (variant of) of the <a href="https://en.wikipedia.org/wiki/Helmholtz_equation">Helmholtz equation</a>. The example is inspired by an <a href="https://www.dealii.org/8.4.1/doxygen/deal.II/step_7.html">dealii step_7</a> on the standard square.</p><p class="math-container">\[ - \Delta u + u = f\]</p><p>With boundary conditions given by</p><p class="math-container">\[u = g_1 \quad x \in \Gamma_1\]</p><p>and</p><p class="math-container">\[n \cdot \nabla u = g_2 \quad x \in \Gamma_2\]</p><p>Here Γ₁ is the union of the top and the right boundary of the square, while Γ₂ is the union of the bottom and the left boundary.</p><p><img src="../helmholtz.png" alt/></p><p>We will use the following weak formulation:</p><p class="math-container">\[\int \nabla δu \cdot \nabla u d\Omega
++ \int δu \cdot u d\Omega
+- \int δu \cdot f d\Omega
++ \int δu \cdot (n \cdot \nabla u - g_2) d\Gamma_2\]</p><p>where <span>$δu$</span> is a suitable test function that satisfies:</p><p class="math-container">\[δu = 0 \quad x \in \Gamma_1\]</p><p>and <span>$u$</span> is a suitable function that satisfies:</p><p class="math-container">\[u = g_1 \quad x \in \Gamma_1\]</p><p>The example highlights the following interesting features:</p><ul><li>There are two kinds of boundary conditions, &quot;Dirichlet&quot; and &quot;Von Neumann&quot;</li><li>The example contains boundary integrals</li><li>The Dirichlet condition is imposed strongly and the Von Neumann condition is imposed weakly.</li></ul><pre><code class="language-julia">using Ferrite
+using Tensors
+using SparseArrays
+using LinearAlgebra
+
+const ∇ = Tensors.gradient
+const Δ = Tensors.hessian;
+
+grid = generate_grid(Quadrilateral, (150, 150))
+
+dim = 2
+ip = Lagrange{dim, RefCube, 1}()
+qr = QuadratureRule{dim, RefCube}(2)
+qr_face = QuadratureRule{dim-1, RefCube}(2)
+cellvalues = CellScalarValues(qr, ip);
+facevalues = FaceScalarValues(qr_face, ip);
+
+dh = DofHandler(grid)
+push!(dh, :u, 1)
+close!(dh)</code></pre><pre class="documenter-example-output">DofHandler
+  Fields:
+    :u, interpolation: Lagrange{2,RefCube,1}(), dim: 1
+  Dofs per cell: 4
+  Total dofs: 22801</pre><p>We will set things up, so that a known analytic solution is approximately reproduced. This is a good testing strategy for PDE codes and known as the method of manufactured solutions.</p><pre><code class="language-julia">function u_ana(x::Vec{2, T}) where {T}
+    xs = (Vec{2}((-0.5,  0.5)),
+          Vec{2}((-0.5, -0.5)),
+          Vec{2}(( 0.5,  -0.5)))
+    σ = 1/8
+    s = zero(eltype(x))
+    for i in 1:3
+        s += exp(- norm(x - xs[i])^2 / σ^2)
+    end
+    return max(1e-15 * one(T), s) # Denormals, be gone
+end;
+
+dbcs = ConstraintHandler(dh)</code></pre><pre class="documenter-example-output">ConstraintHandler:
+  Not closed!</pre><p>The (strong) Dirichlet boundary condition can be handled automatically by the Ferrite library.</p><pre><code class="language-julia">dbc = Dirichlet(:u, union(getfaceset(grid, &quot;top&quot;), getfaceset(grid, &quot;right&quot;)), (x,t) -&gt; u_ana(x))
+add!(dbcs, dbc)
+close!(dbcs)
+update!(dbcs, 0.0)
+
+K = create_sparsity_pattern(dh);
+
+function doassemble(cellvalues::CellScalarValues{dim}, facevalues::FaceScalarValues{dim},
+                         K::SparseMatrixCSC, dh::DofHandler) where {dim}
+    b = 1.0
+    f = zeros(ndofs(dh))
+    assembler = start_assemble(K, f)
+
+    n_basefuncs = getnbasefunctions(cellvalues)
+    global_dofs = zeros(Int, ndofs_per_cell(dh))
+
+    fe = zeros(n_basefuncs) # Local force vector
+    Ke = zeros(n_basefuncs, n_basefuncs) # Local stiffness mastrix
+
+    @inbounds for (cellcount, cell) in enumerate(CellIterator(dh))
+        fill!(Ke, 0)
+        fill!(fe, 0)
+        coords = getcoordinates(cell)
+
+        reinit!(cellvalues, cell)</code></pre><p>First we derive the non boundary part of the variation problem from the destined solution <code>u_ana</code></p><p class="math-container">\[\int \nabla δu \cdot \nabla u d\Omega
++ \int δu \cdot u d\Omega
+- \int δu \cdot f d\Omega\]</p><pre><code class="language-julia">        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+            coords_qp = spatial_coordinate(cellvalues, q_point, coords)
+            f_true = -LinearAlgebra.tr(hessian(u_ana, coords_qp)) + u_ana(coords_qp)
+            for i in 1:n_basefuncs
+                δu = shape_value(cellvalues, q_point, i)
+                ∇δu = shape_gradient(cellvalues, q_point, i)
+                fe[i] += (δu * f_true) * dΩ
+                for j in 1:n_basefuncs
+                    u = shape_value(cellvalues, q_point, j)
+                    ∇u = shape_gradient(cellvalues, q_point, j)
+                    Ke[i, j] += (∇δu ⋅ ∇u + δu * u) * dΩ
+                end
+            end
+        end</code></pre><p>Now we manually add the von Neumann boundary terms</p><p class="math-container">\[\int δu \cdot (n \cdot \nabla u - g_2) d\Gamma_2\]</p><pre><code class="language-julia">        for face in 1:nfaces(cell)
+            if onboundary(cell, face) &amp;&amp;
+                   ((cellcount, face) ∈ getfaceset(grid, &quot;left&quot;) ||
+                    (cellcount, face) ∈ getfaceset(grid, &quot;bottom&quot;))
+                reinit!(facevalues, cell, face)
+                for q_point in 1:getnquadpoints(facevalues)
+                    coords_qp = spatial_coordinate(facevalues, q_point, coords)
+                    n = getnormal(facevalues, q_point)
+                    g = gradient(u_ana, coords_qp) ⋅ n
+                    dΓ = getdetJdV(facevalues, q_point)
+                    for i in 1:n_basefuncs
+                        δu = shape_value(facevalues, q_point, i)
+                        fe[i] += -(δu * g) * dΓ
+                        for j in 1:n_basefuncs
+                            ∇u = shape_gradient(cellvalues, q_point, j)
+                            Ke[i, j] += (δu * ∇u ⋅ n) * dΓ
+                        end
+                    end
+                end
+            end
+        end
+
+        celldofs!(global_dofs, cell)
+        assemble!(assembler, global_dofs, fe, Ke)
+    end
+    return K, f
+end;
+
+K, f = doassemble(cellvalues, facevalues, K, dh);
+apply!(K, f, dbcs)
+u = Symmetric(K) \ f;
+
+vtkfile = vtk_grid(&quot;helmholtz&quot;, dh)
+vtk_point_data(vtkfile, dh, u)
+vtk_save(vtkfile)
+println(&quot;Helmholtz successful&quot;)</code></pre><pre class="documenter-example-output">Helmholtz successful</pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../l2_projection/">« L2-projection</a><a class="docs-footer-nextpage" href="../incompressible_elasticity/">Incompressible Elasticity »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 25 March 2021 14:58">Thursday 25 March 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
