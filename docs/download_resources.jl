@@ -36,7 +36,7 @@ fetch_assets(
                 "incompressible_elasticity_pressure",
                 "hyperelasticity", "plasticity", "computational_homogenization",
                 "stress_driven_homogenization",
-                "stokes-flow", "dg_heat_equation", "linear_shell",
+                "stokes-flow", "dg_heat_equation", "linear_shell", "drilling_shell",
                 "linear_elasticity_stress", "elastodynamics_modes", "darcy_flow",
             ], ".png"
         ),

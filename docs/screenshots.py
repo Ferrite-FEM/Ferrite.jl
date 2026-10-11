@@ -527,6 +527,23 @@ def scene_linear_shell():
     finish(view, "linear_shell", azimuth=30, elevation=65, zoom=1.0)
 
 
+# --- drilling_shell: Scordelis-Lo roof coloured by displacement magnitude
+@scene("drilling_shell")
+def scene_drilling_shell():
+    view = new_view()
+    r = OpenDataFile(datadir + "/drilling_shell.vtu")
+    w = warp(r, "u", 10.0)
+    d = surface(w, view)
+    d.Ambient = 0.25  # lift the headlight-only shading, which reads too dark
+    colorbar(d, view, ("POINTS", "u"), title="$\\vert u \\vert$")
+    # the cylinder axis is along y: look obliquely from above with z up, so the roof reads as a roof
+    # with the sagging free edges in front (finish() then only reframes the scene)
+    view.CameraFocalPoint = [0.0, 25.0, 20.0]
+    view.CameraPosition = [70.0, -45.0, 75.0]
+    view.CameraViewUp = [0.0, 0.0, 1.0]
+    finish(view, "drilling_shell", azimuth=0, elevation=0, zoom=0.95)
+
+
 # --- heat_adaptivity: AMR iterations, cube cut open at the ring feature
 @scene("heat_adaptivity")
 def scene_heat_adaptivity():
