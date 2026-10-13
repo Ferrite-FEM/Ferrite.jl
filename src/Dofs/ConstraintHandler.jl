@@ -73,6 +73,16 @@ The quadrature rule is automatically created, but the default order, `qr_order =
 (may be refined in future releases),
 where `ip_order` is the order of the interpolation, can be overridden if desired.
 
+The value that `f` should return depends on the conformity of the interpolation:
+ - ``H(\mathrm{div})``: the normal flux, ``\boldsymbol{q} \cdot \boldsymbol{n}``, as a scalar.
+ - ``H(\mathrm{curl})``: the tangential trace, ``\boldsymbol{q} \times \boldsymbol{n}``, as a
+   `Vec{3}`. This applies also in 2D, where only the third component is nonzero (the cross
+   product of two `Vec{2}`s is a `Vec{3}`).
+
+Unlike [`Dirichlet`](@ref), `ProjectedDirichlet` can only be applied to sets of
+[`FacetIndex`](@ref), and always prescribes the full normal or tangential trace, i.e. there
+is no `components` argument.
+
 # H(div) interpolations
 For H(div), we want to prescribe the normal flux, ``q_\mathrm{n} = f(\boldsymbol{x}, t, \boldsymbol{n})``.
 To that end, we want to find the degree of freedom values, ``a_j^f``, associated
@@ -130,6 +140,9 @@ mutable struct ProjectedDirichlet
     facet_dofs::Union{Nothing, ArrayOfVectorViews{Int, 1}}
 end
 function ProjectedDirichlet(field_name::Symbol, facets::AbstractVecOrSet, f::Function; qr_order = -1)
+    if !all(x -> x isa FacetIndex, facets)
+        throw(ArgumentError("ProjectedDirichlet requires a set of FacetIndex, but got a set with element type $(eltype(facets))"))
+    end
     return ProjectedDirichlet(f, convert_to_orderedset(facets), field_name, qr_order, nothing, nothing)
 end
 
@@ -176,7 +189,7 @@ end
 ConstraintHandler(dh::AbstractDofHandler) = ConstraintHandler(Float64, dh)
 ConstraintHandler(::Type{Tv}, dh::AbstractDofHandler) where {Tv} = ConstraintHandler(Tv, Int, dh)
 function ConstraintHandler(::Type{Tv}, ::Type{Ti}, dh::AbstractDofHandler) where {Tv <: Number, Ti <: Integer}
-    @assert isclosed(dh)
+    isclosed(dh) || throw(ArgumentError("the DofHandler must be closed before creating a ConstraintHandler, call close!(dh) first"))
     return ConstraintHandler(
         Dirichlet[], ProjectedDirichlet[], Ti[], Ti[], Tv[], Union{Nothing, Tv}[],
         Union{Nothing, DofCoefficients{Tv, Ti}}[], Dict{Ti, Ti}(), BitVector(), BCValues{Tv, Ti}[], dh, false,
@@ -295,13 +308,20 @@ function _set_freedofs!(free_dofs::Vector{<:Integer}, isconstrained::BitVector, 
     return free_dofs
 end
 
+function _check_not_closed(ch::ConstraintHandler)
+    if isclosed(ch)
+        throw(ArgumentError("the ConstraintHandler is already closed, all constraints must be added before calling close!"))
+    end
+    return
+end
+
 """
     close!(ch::ConstraintHandler)
 
 Close and finalize the `ConstraintHandler`.
 """
 function close!(ch::ConstraintHandler)
-    @assert(!isclosed(ch))
+    _check_not_closed(ch)
     @assert(allunique(ch.prescribed_dofs))
 
     I = sortperm(ch.prescribed_dofs)
@@ -371,7 +391,7 @@ This function checks if the `constrained_dof` is already constrained, and overri
 constraint if true.
 """
 function add_prescribed_dof!(ch::ConstraintHandler, constrained_dof::Integer, inhomogeneity, dofcoefficients = nothing)
-    @assert(!isclosed(ch))
+    _check_not_closed(ch)
     @assert(constrained_dof ≤ ndofs(ch.dh))
     i = get(ch.dofmapping, constrained_dof, 0)
     if i != 0
@@ -401,7 +421,11 @@ function _add!(ch::ConstraintHandler, dbc::Dirichlet, bcfacets::AbstractVecOrSet
     # loop over all the faces in the set and add the global dofs to `constrained_dofs`
     constrained_dofs = Int[]
     cc = CellCache(ch.dh, UpdateFlags(; nodes = false, coords = false, dofs = true))
+    nentities = length(local_facet_dofs_offset) - 1
     for (cellidx, facetidx) in bcfacets
+        if !(1 <= facetidx <= nentities)
+            throw(ArgumentError("$(Index)($(cellidx), $(facetidx)), in the set passed to Dirichlet for field :$(dbc.field_name), is out of range: the cell has $(nentities) such entities"))
+        end
         reinit!(cc, cellidx)
         r = local_facet_dofs_offset[facetidx]:(local_facet_dofs_offset[facetidx + 1] - 1)
         append!(constrained_dofs, cc.dofs[local_facet_dofs[r]]) # TODO: for-loop over r and simply push! to ch.prescribed_dofs
@@ -493,20 +517,41 @@ compute the inhomogeneities.
 Note that this is called implicitly in `close!(::ConstraintHandler)`.
 """
 function update!(ch::ConstraintHandler, time::Real = 0.0)
-    @assert ch.closed
+    isclosed(ch) || throw(ArgumentError("the ConstraintHandler must be closed before calling update!, call close!(ch) first"))
     for (i, dbc) in pairs(ch.dbcs)
         # If the BC function only accept one argument, i.e. f(x), we create a wrapper
         # g(x, t) = f(x) that discards the second parameter so that _update! can always call
         # the function with two arguments internally.
         wrapper_f = hasmethod(dbc.f, Tuple{get_coordinate_type(get_grid(ch.dh)), typeof(time)}) ? dbc.f : (x, _) -> dbc.f(x)
         # Function barrier
-        _update!(
-            ch.inhomogeneities, wrapper_f, dbc.facets, dbc.local_facet_dofs, dbc.local_facet_dofs_offset,
-            dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time
-        )
+        try
+            _update!(
+                ch.inhomogeneities, wrapper_f, dbc.facets, dbc.local_facet_dofs, dbc.local_facet_dofs_offset,
+                dbc.components, ch.dh, ch.bcvalues[i], ch.dofmapping, ch.dofcoefficients, time, dbc.field_name
+            )
+        catch e
+            e isa MethodError && e.f === dbc.f || rethrow()
+            throw(
+                ArgumentError(
+                    "the function passed to Dirichlet for field :$(dbc.field_name) must have the signature f(x) or f(x, t) " *
+                        "(coordinate and time), but it can not be called with arguments of type $(typeof(e.args))"
+                )
+            )
+        end
     end
     for bc in ch.projbcs
-        _update_projected_dbc!(ch.inhomogeneities, bc.f, bc.facets, bc.fv, bc.facet_dofs, ch.dh, ch.dofmapping, ch.dofcoefficients, time)
+        try
+            _update_projected_dbc!(ch.inhomogeneities, bc.f, bc.facets, bc.fv, bc.facet_dofs, ch.dh, ch.dofmapping, ch.dofcoefficients, time)
+        catch e
+            e isa MethodError && e.f === bc.f || rethrow()
+            throw(
+                ArgumentError(
+                    "the function passed to ProjectedDirichlet for field :$(bc.field_name) must have the signature f(x, t, n) " *
+                        "(coordinate, time, and facet normal), unlike for Dirichlet which takes f(x) or f(x, t), " *
+                        "but it can not be called with arguments of type $(typeof(e.args))"
+                )
+            )
+        end
     end
     # Compute effective inhomogeneity for affine constraints with prescribed dofs in the
     # RHS. For example, in u2 = w3 * u3 + w4 * u4 + b2 we allow e.g. u3 to be prescribed by
@@ -530,11 +575,21 @@ function update!(ch::ConstraintHandler, time::Real = 0.0)
     return nothing
 end
 
+@noinline function _throw_dirichlet_length_mismatch(field_name, bc_value, components, x)
+    throw(
+        ArgumentError(
+            "the function passed to Dirichlet for field :$(field_name) returned $(length(bc_value)) value(s) at x = $(x), " *
+                "but $(length(components)) component(s) are prescribed (components = $(components)): return a scalar when " *
+                "prescribing a single component, and otherwise one value per prescribed component"
+        )
+    )
+end
+
 # for facets, vertices, faces and edges
 function _update!(
         inhomogeneities::Vector{T}, f::Function, boundary_entities::AbstractVecOrSet{<:BoundaryIndex}, local_facet_dofs::Vector{<:Integer}, local_facet_dofs_offset::Vector{<:Integer},
         components::Vector{<:Integer}, dh::AbstractDofHandler, boundaryvalues::BCValues,
-        dofmapping::Dict{<:Integer, <:Integer}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, time::Real
+        dofmapping::Dict{<:Integer, <:Integer}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, time::Real, field_name::Symbol
     ) where {T, Ti}
 
     cc = CellCache(dh, UpdateFlags(; nodes = false, coords = true, dofs = true))
@@ -550,7 +605,7 @@ function _update!(
         for location in 1:getnquadpoints(boundaryvalues)
             x = spatial_coordinate(boundaryvalues, location, cc.coords)
             bc_value = f(x, time)
-            @assert length(bc_value) == length(components)
+            length(bc_value) == length(components) || _throw_dirichlet_length_mismatch(field_name, bc_value, components, x)
 
             for i in 1:length(components)
                 # find the global dof
@@ -574,13 +629,13 @@ end
 function _update!(
         inhomogeneities::Vector{T}, f::Function, ::AbstractVecOrSet{<:Integer}, nodeidxs::Vector{<:Integer}, globaldofs::Vector{<:Integer},
         components::Vector{<:Integer}, dh::AbstractDofHandler, facetvalues::BCValues,
-        dofmapping::Dict{<:Integer, <:Integer}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, time::Real
+        dofmapping::Dict{<:Integer, <:Integer}, dofcoefficients::Vector{Union{Nothing, DofCoefficients{T, Ti}}}, time::Real, field_name::Symbol
     ) where {T, Ti}
     counter = 1
     for nodenumber in nodeidxs
         x = get_node_coordinate(get_grid(dh), nodenumber)
         bc_value = f(x, time)
-        @assert length(bc_value) == length(components)
+        length(bc_value) == length(components) || _throw_dirichlet_length_mismatch(field_name, bc_value, components, x)
         for v in bc_value
             globaldof = globaldofs[counter]
             counter += 1
@@ -1182,6 +1237,8 @@ Add a `Dirichlet` boundary condition to the `ConstraintHandler`.
 """
 function add!(ch::ConstraintHandler{<:Any, Tv, Ti}, dbc::Dirichlet) where {Tv, Ti}
     _check_not_algebraic_variable(ch.dh, dbc.field_name, "`Dirichlet` (constrain the dofs from `algebraic_dofs(dh, :$(dbc.field_name))` directly, e.g. with an `AffineConstraint`)")
+    _check_not_closed(ch)
+    _check_bc_field_and_set(ch.dh, dbc.field_name, dbc.facets, "Dirichlet")
     # Duplicate the Dirichlet constraint for every SubDofHandler
     dbc_added = false
     for sdh in ch.dh.subdofhandlers
@@ -1199,6 +1256,22 @@ function add!(ch::ConstraintHandler{<:Any, Tv, Ti}, dbc::Dirichlet) where {Tv, T
         if interpolation isa VectorizedInterpolation
             interpolation = interpolation.ip
         end
+        # Dirichlet evaluates the function at the dof locations so the dofs must be point values
+        if conformity(interpolation) isa Union{HdivConformity, HcurlConformity}
+            throw(
+                ArgumentError(
+                    "Dirichlet is not supported for $(interpolation) (field :$(dbc.field_name)) since the dofs are not point values, " *
+                        "use ProjectedDirichlet to prescribe the normal (H(div)) or tangential (H(curl)) trace"
+                )
+            )
+        elseif !applicable(reference_coordinates, interpolation)
+            throw(
+                ArgumentError(
+                    "Dirichlet requires an interpolation where the dofs are point values (`reference_coordinates`), which " *
+                        "$(interpolation) (field :$(dbc.field_name)) does not provide, impose the condition weakly or with AffineConstraints"
+                )
+            )
+        end
         getorder(interpolation) == 0 && error("No dof prescribed for order 0 interpolations")
         # Set up components to prescribe (empty input means prescribe all components)
         components = isempty(dbc.components) ? collect(Int, 1:n_comp) : dbc.components
@@ -1210,6 +1283,13 @@ function add!(ch::ConstraintHandler{<:Any, Tv, Ti}, dbc::Dirichlet) where {Tv, T
         if EntityType <: Integer
             # BCValues are just dummy for nodesets so set to FacetIndex
             EntityType = FacetIndex
+        elseif all(isempty, dirichlet_boundarydof_indices(EntityType)(interpolation))
+            throw(
+                ArgumentError(
+                    "$(interpolation) (field :$(dbc.field_name)) has no dofs on the boundary entities " *
+                        "($(EntityType)) so there is nothing for Dirichlet to prescribe, impose the condition weakly instead"
+                )
+            )
         end
         CT = getcelltype(sdh) # Same celltype enforced in SubDofHandler constructor
         bcvalues = BCValues(Tv, Ti, interpolation, geometric_interpolation(CT), EntityType)
@@ -1221,8 +1301,20 @@ function add!(ch::ConstraintHandler{<:Any, Tv, Ti}, dbc::Dirichlet) where {Tv, T
         )
         dbc_added = true
     end
-    dbc_added || error("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's DofHandler")
+    dbc_added || _throw_bc_no_overlap(dbc.field_name, "Dirichlet")
     return ch
+end
+
+# Common input checks for Dirichlet and ProjectedDirichlet
+function _check_bc_field_and_set(dh::AbstractDofHandler, field_name::Symbol, set, bc_name::String)
+    if !(field_name in getfieldnames(dh))
+        throw(ArgumentError("field :$(field_name), passed to $(bc_name), not found in the DofHandler (existing fields: $(getfieldnames(dh)))"))
+    end
+    isempty(set) && throw(ArgumentError("the set passed to $(bc_name) for field :$(field_name) is empty"))
+    return
+end
+function _throw_bc_no_overlap(field_name::Symbol, bc_name::String)
+    throw(ArgumentError("the set passed to $(bc_name) for field :$(field_name) does not overlap with any cell where the field is defined"))
 end
 
 # Return the intersection of the SubDofHandler set and the Dirichlet BC set
@@ -2151,6 +2243,8 @@ _default_bc_qr_order(::Interpolation{<:Any, order}) where {order} = 2 * order
 
 function add!(ch::ConstraintHandler, bc::ProjectedDirichlet)
     _check_not_algebraic_variable(ch.dh, bc.field_name, "`ProjectedDirichlet` (constrain the dofs from `algebraic_dofs(dh, :$(bc.field_name))` directly, e.g. with an `AffineConstraint`)")
+    _check_not_closed(ch)
+    _check_bc_field_and_set(ch.dh, bc.field_name, bc.facets, "ProjectedDirichlet")
     # Duplicate the Dirichlet constraint for every SubDofHandler
     dbc_added = false
     for sdh in ch.dh.subdofhandlers
@@ -2177,7 +2271,7 @@ function add!(ch::ConstraintHandler, bc::ProjectedDirichlet)
 
         dbc_added = true
     end
-    dbc_added || error("No overlap between bc::ProjectedDirichlet and fields in the ConstraintHandler's DofHandler")
+    dbc_added || _throw_bc_no_overlap(bc.field_name, "ProjectedDirichlet")
     return ch
 end
 
@@ -2274,12 +2368,17 @@ function integrate_projected_dbc!(Kᶠ, fᶠ, bc_fun::F, fv, shape_nrs, cell_coo
     return integrate_projected_dbc!(conformity(fv), Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
 end
 
+@noinline function _throw_projected_dbc_return(space, expected, value)
+    throw(ArgumentError("for $(space) interpolations the function passed to ProjectedDirichlet must return $(expected), but it returned a $(typeof(value))"))
+end
+
 function integrate_projected_dbc!(::HdivConformity, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
     for q_point in 1:getnquadpoints(fv)
         dΓ = getdetJdV(fv, q_point)
         n = getnormal(fv, q_point)
         x = spatial_coordinate(fv, q_point, cell_coords)
         qn = bc_fun(x, time, n)
+        qn isa Number || _throw_projected_dbc_return("H(div)", "the normal flux, q ⋅ n, as a scalar", qn)
         for (i, I) in enumerate(shape_nrs)
             δN_dot_n = shape_value(fv, q_point, I) ⋅ n
             fᶠ[i] += qn * δN_dot_n * dΓ
@@ -2301,6 +2400,7 @@ function integrate_projected_dbc!(::HcurlConformity, Kᶠ, fᶠ, bc_fun, fv, sha
         n = getnormal(fv, q_point)
         x = spatial_coordinate(fv, q_point, cell_coords)
         qt = bc_fun(x, time, n)
+        qt isa Vec{3} || _throw_projected_dbc_return("H(curl)", "the tangential trace, q × n, as a Vec{3} (also in 2D, where only the third component is nonzero)", qt)
         for (i, I) in enumerate(shape_nrs)
             δN_cross_n = shape_value(fv, q_point, I) × n
             fᶠ[i] += (δN_cross_n ⋅ qt) * dΓ

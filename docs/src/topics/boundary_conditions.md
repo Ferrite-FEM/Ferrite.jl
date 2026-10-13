@@ -14,6 +14,10 @@ they are most commonly applied to [facets](@ref "Reference shapes"). Each facet 
 by a [`FacetIndex`](@ref).
 When adding boundary conditions to points instead, vertices are preferred over nodes.
 
+Which boundary conditions are imposed on the degrees of freedom, and which enter the weak
+form as boundary integrals, depends on the interpolation. This is summarized for all
+interpolations in [Boundary conditions and function spaces](@ref).
+
 ```@contents
 Pages = ["boundary_conditions.md"]
 Depth = 2:2
@@ -128,7 +132,12 @@ While normal `Dirichlet` boundary conditions assume the existence of such nodal 
 Ferrite provides the `ProjectedDirichlet`, which instead finds the degree of freedom values that
 minimizes the L2-distance between the prescribed function, ``f(\boldsymbol{x},t,\boldsymbol{n})``,
 and the finite element interpolation space, cf. [Bartels2004:ProjectedDirichlet](@cite).
-Although standard interpolations are not currently supported,
+Note that the function takes the facet normal as a third argument, and that it should return
+the scalar normal flux, ``\boldsymbol{q} \cdot \boldsymbol{n}``, for ``H(\mathrm{div})``
+interpolations, and the tangential trace, ``\boldsymbol{q} \times \boldsymbol{n}``, as a
+`Vec{3}` (also in 2D) for ``H(\mathrm{curl})`` interpolations.
+Although standard interpolations are not currently supported
+(see [Boundary conditions and function spaces](@ref) for which interpolations are),
 the figure below illustrates well the difference between applying a standard `Dirichlet` condition and a
 `ProjectedDirichlet` condition when the prescribed function cannot be described by the chosen FE-interpolation.
 
@@ -545,6 +554,294 @@ nothing # hide
     ch = ConstraintHandler(dofhandler); add!(ch, pdbc); close!(ch); update!(ch, 0.0) # hide
     nothing # hide
     ```
+
+## Boundary conditions and function spaces
+
+Which boundary conditions can be imposed, and how, depends on two things. The
+first is the PDE and its weak form: integrating by parts produces a boundary
+term, and that term decides which conditions are natural. The second is the
+interpolation: its DOFs decide what the `ConstraintHandler` can prescribe.
+Every interpolation in Ferrite has a conformity, `Ferrite.conformity(ip)`,
+which is one of `H1Conformity`, `HcurlConformity`, `HdivConformity` or
+`L2Conformity`. This section is organized by conformity. Each subsection ends
+with a list of all interpolations in that class, both Ferrite's own and those
+in the extension package [FerriteInterpolations.jl](https://github.com/Ferrite-FEM/FerriteInterpolations.jl) (marked *FI*), together with the reference
+shapes and orders they are implemented for.
+
+A useful rule of thumb:
+
+* An **essential** condition prescribes the part of the field that is
+  continuous between cells. That is the full value for ``H^1``, the tangential
+  component for ``H(\mathrm{curl})`` and the normal component for
+  ``H(\mathrm{div})``. These conditions are imposed on the DOFs, using
+  [`Dirichlet`](@ref) or [`ProjectedDirichlet`](@ref).
+* A **natural** condition prescribes the quantity in the boundary term of the
+  weak form. That is the flux ``\boldsymbol{n}\cdot k\nabla u`` for ``H^1``,
+  ``\boldsymbol{n}\times(\alpha\nabla\times\boldsymbol{E})`` for
+  ``H(\mathrm{curl})`` and ``\alpha\nabla\cdot\boldsymbol{q}`` for
+  ``H(\mathrm{div})``. These conditions are added to the right-hand side with
+  `FacetValues` (see [Neumann boundary conditions](@ref)), and they are the
+  same for every interpolation.
+* A **Robin** condition combines the two, for example
+  ``\boldsymbol{n}\cdot k\nabla u + \gamma u = g``. It is always natural: it
+  adds a boundary mass term ``\int_\Gamma \gamma\, u\, \delta u`` to the
+  stiffness matrix and ``\int_\Gamma g\,\delta u`` to the right-hand side.
+* An **``L^2``** space has no inter-element continuity, so it has no
+  essential conditions. Conditions on the field value are imposed *weakly*.
+
+| Conformity | Ferrite interpolations | *FI* interpolations | Essential (DOFs) | Natural (boundary integral) | Ferrite constraint |
+|:-----------|:-----------------------|:--------------------|:-----------------|:----------------------------|:-------------------|
+| ``H^1`` | `Lagrange`, `Serendipity`, `BubbleEnrichedLagrange`, and their vectorized versions | `ConformingCrouzeixRaviart`, `Radau`, `Transition`; `Bubble` (zero on the boundary); `Bernstein` (non-nodal) | ``u`` | ``\boldsymbol{n}\cdot k\nabla u`` | `Dirichlet`, `PeriodicDirichlet` (`Lagrange` only) |
+| ``H(\mathrm{curl})`` | `Nedelec` | `NedelecSecondKind`, `TrimmedSerendipityCurl`, `TNTCurl` | ``\boldsymbol{E}\times\boldsymbol{n}`` | ``\boldsymbol{n}\times(\alpha\nabla\times\boldsymbol{E})`` | `ProjectedDirichlet` (2D only) |
+| ``H(\mathrm{div})`` | `RaviartThomas`, `BrezziDouglasMarini` | `BDM`, `BrezziDouglasFortinMarini`, `TrimmedSerendipityDiv`, `TNTDiv` | ``\boldsymbol{q}\cdot\boldsymbol{n}`` | ``\alpha\nabla\cdot\boldsymbol{q}`` | `ProjectedDirichlet` |
+| ``L^2``, nonconforming | `CrouzeixRaviart`, `RannacherTurek` | `CrouzeixFalk`, `FortinSoulie` | ``u`` at the facet points where the space is continuous (midpoints or Gauss points) | ``\boldsymbol{n}\cdot k\nabla u`` | `Dirichlet` |
+| ``L^2``, discontinuous | `DiscontinuousLagrange` | `DPC`, `GaussLegendre`, `Taylor`, `EnrichedGalerkin` | none | everything, including ``u`` (weakly) | none, or `Dirichlet` for `DiscontinuousLagrange` (see below) |
+
+### ``H^1``: `Lagrange`, `Serendipity`, `BubbleEnrichedLagrange`
+
+Model problem: ``-\nabla\cdot(k\nabla u) = f``. Integrating by parts gives
+
+```math
+\int_\Omega k\nabla u\cdot\nabla\delta u \,\mathrm{d}\Omega
+= \int_\Omega f\,\delta u \,\mathrm{d}\Omega
++ \int_{\Gamma_\mathrm{N}} \underbrace{\boldsymbol{n}\cdot k\nabla u}_{g_\mathrm{N}}\,\delta u \,\mathrm{d}\Gamma,
+\qquad \delta u = 0 \text{ on } \Gamma_\mathrm{D}.
+```
+
+* **Dirichlet** ``u = g_\mathrm{D}`` is essential. The DOFs of these
+  interpolations are point values at the nodes, so `Dirichlet` evaluates
+  ``g_\mathrm{D}`` at the nodes on the boundary facets. On each facet the trace
+  is the *interpolant* of the data, so it is exact whenever ``g_\mathrm{D}`` lies
+  in the trace space. Vector fields (`ip^dim`) can be constrained one
+  component at a time with the `components` argument, which allows, for
+  example, symmetry or roller conditions on axis-aligned boundaries. A
+  condition on the normal component of a vector field on a curved or inclined
+  boundary is not of this form. It needs an [`AffineConstraint`](@ref) that
+  couples the components, or a weak (penalty or Nitsche) condition.
+* **Neumann** ``\boldsymbol{n}\cdot k\nabla u = g_\mathrm{N}`` and **Robin**
+  conditions are natural.
+* **Periodic** conditions are essential and use [`PeriodicDirichlet`](@ref).
+  The facet DOFs must be matched across the periodic boundary, which is
+  currently implemented for `Lagrange` only.
+* The bubbles of `BubbleEnrichedLagrange` vanish on the boundary, so they never
+  take part in a boundary condition.
+
+**Interpolations in this class.** `Dirichlet` sets the nodal values, and the
+condition holds on the whole boundary facet (as the facet interpolant of the
+data):
+
+* `Lagrange`: every reference shape (`RefLine`, `RefTriangle`,
+  `RefQuadrilateral`, `RefTetrahedron`, `RefHexahedron`, `RefPrism`,
+  `RefPyramid`). `PeriodicDirichlet` is supported.
+* `Serendipity`: `RefQuadrilateral` and `RefHexahedron`, order 2.
+* `BubbleEnrichedLagrange`: `RefTriangle`, order 1. The bubble DOF is never
+  constrained.
+* `ConformingCrouzeixRaviart` (*FI*): `RefTriangle`, orders 2 to 4. The
+  interior bubble DOFs are never constrained.
+* `Radau` (*FI*): `RefLine`, order 2.
+* `Transition` (*FI*): `RefTriangle`, order 2 with order 1 or 2 per edge. On
+  an order-1 edge the trace is the linear interpolant of the data.
+* Vectorized versions of all of the above (`ip^dim`). `components` selects
+  which components to constrain.
+
+Also ``H^1``-conforming, but needing special treatment:
+
+* `Bubble` (*FI*): `RefLine` orders 2 and 3, `RefTriangle` orders 3 and 4,
+  `RefTetrahedron` order 4. It vanishes on the boundary, so it is
+  homogeneous by construction and there is nothing to constrain. It is
+  normally used as an enrichment of another field.
+* `Bernstein` (*FI*): `RefLine` and `RefTriangle` orders 1 to 3,
+  `RefTetrahedron` orders 1 and 2. The DOFs are Bernstein coefficients, not
+  point values, so `Dirichlet` does not apply. The only exception is the
+  vertex coefficients, which do equal point values. Impose the condition
+  weakly, or with `AffineConstraint`s that set the boundary coefficients of
+  the data (see [Interpolations without nodal DOFs](@ref)).
+
+### ``H(\mathrm{curl})``: `Nedelec`
+
+Model problem: ``\nabla\times(\alpha\nabla\times\boldsymbol{E}) + \beta\boldsymbol{E} = \boldsymbol{f}``.
+Using
+``\int_\Omega \nabla\times\boldsymbol{A}\cdot\boldsymbol{v} = \int_\Omega\boldsymbol{A}\cdot\nabla\times\boldsymbol{v} + \int_\Gamma(\boldsymbol{n}\times\boldsymbol{A})\cdot\boldsymbol{v}``,
+
+```math
+\int_\Omega \alpha\,\nabla\times\boldsymbol{E}\cdot\nabla\times\delta\boldsymbol{E}
++ \beta\,\boldsymbol{E}\cdot\delta\boldsymbol{E} \,\mathrm{d}\Omega
+= \int_\Omega \boldsymbol{f}\cdot\delta\boldsymbol{E} \,\mathrm{d}\Omega
+- \int_{\Gamma_\mathrm{N}} \underbrace{\boldsymbol{n}\times(\alpha\nabla\times\boldsymbol{E})}_{\boldsymbol{g}_\mathrm{N}}\cdot\delta\boldsymbol{E} \,\mathrm{d}\Gamma,
+\qquad \boldsymbol{n}\times\delta\boldsymbol{E} = \boldsymbol{0} \text{ on } \Gamma_\mathrm{D}.
+```
+
+* **Tangential Dirichlet** ``\boldsymbol{E}\times\boldsymbol{n} = \boldsymbol{g}_\mathrm{D}``
+  (for example a perfect electric conductor) is essential. The DOFs are moments
+  of the tangential component on edges and faces, not point values, so
+  `Dirichlet` does not apply (it throws an error). Use `ProjectedDirichlet`,
+  which computes the facet ``L^2`` projection of the data onto the tangential
+  trace space (currently 2D only). The data function `f(x, t, n)` must return
+  ``\boldsymbol{E}\times\boldsymbol{n}`` as a `Vec{3}`, also in 2D, where
+  only the third component is nonzero. This is because `×` on two `Vec{2}`s
+  returns a `Vec{3}`. The
+  *normal* component of ``\boldsymbol{E}`` cannot be prescribed: the space
+  does not control it on the boundary.
+* **Natural**: ``\boldsymbol{n}\times(\alpha\nabla\times\boldsymbol{E})``, for
+  example a given tangential magnetic field. Only the tangential part of the
+  test function contributes to this term.
+
+**Interpolations in this class.** `ProjectedDirichlet` sets the tangential
+trace, and the condition holds on the whole boundary facet for data in the
+tangential trace space:
+
+* `Nedelec` (first kind): `RefTriangle` orders 1 and 2, `RefQuadrilateral`
+  order 1. `RefTetrahedron` and `RefHexahedron` (order 1) exist, but
+  `ProjectedDirichlet` currently throws "not implemented for 3D H(curl)
+  conformity"; there, impose the condition weakly or with `AffineConstraint`s.
+* `NedelecSecondKind` (*FI*): `RefTriangle`, orders 1 and 2.
+* `TrimmedSerendipityCurl` (*FI*): `RefQuadrilateral`, order 1.
+* `TNTCurl` (*FI*): `RefQuadrilateral`, order 1.
+
+### ``H(\mathrm{div})``: `RaviartThomas`, `BrezziDouglasMarini`
+
+Model problem: ``-\nabla(\alpha\nabla\cdot\boldsymbol{q}) + \beta\boldsymbol{q} = \boldsymbol{f}``:
+
+```math
+\int_\Omega \alpha\,\nabla\cdot\boldsymbol{q}\,\nabla\cdot\delta\boldsymbol{q}
++ \beta\,\boldsymbol{q}\cdot\delta\boldsymbol{q} \,\mathrm{d}\Omega
+= \int_\Omega \boldsymbol{f}\cdot\delta\boldsymbol{q} \,\mathrm{d}\Omega
++ \int_{\Gamma_\mathrm{N}} \underbrace{\alpha\nabla\cdot\boldsymbol{q}}_{g_\mathrm{N}}\,\delta\boldsymbol{q}\cdot\boldsymbol{n} \,\mathrm{d}\Gamma,
+\qquad \delta\boldsymbol{q}\cdot\boldsymbol{n} = 0 \text{ on } \Gamma_\mathrm{D}.
+```
+
+* **Normal flux** ``\boldsymbol{q}\cdot\boldsymbol{n} = g_\mathrm{D}`` is
+  essential and uses `ProjectedDirichlet`, which projects onto the normal
+  trace space. The data function `f(x, t, n)` must return the scalar
+  ``\boldsymbol{q}\cdot\boldsymbol{n}``. The tangential component cannot be
+  prescribed.
+* **Natural**: ``\alpha\nabla\cdot\boldsymbol{q}``.
+
+!!! tip "Mixed formulations swap essential and natural"
+    In the mixed form of the Poisson problem, the flux
+    ``\boldsymbol{q} = -k\nabla u`` is approximated in ``H(\mathrm{div})``
+    (for example with `RaviartThomas`) and ``u`` in ``L^2`` (for example with
+    `DiscontinuousLagrange`):
+    ```math
+    \int_\Omega k^{-1}\boldsymbol{q}\cdot\delta\boldsymbol{q} - u\,\nabla\cdot\delta\boldsymbol{q} \,\mathrm{d}\Omega
+    = -\int_{\Gamma_\mathrm{D}} g_\mathrm{D}\,\delta\boldsymbol{q}\cdot\boldsymbol{n} \,\mathrm{d}\Gamma,
+    \qquad
+    \int_\Omega \nabla\cdot\boldsymbol{q}\,\delta u \,\mathrm{d}\Omega = \int_\Omega f\,\delta u \,\mathrm{d}\Omega.
+    ```
+    The roles are now reversed. The **Dirichlet** condition ``u = g_\mathrm{D}``
+    is *natural*: it is a boundary integral, and nothing is constrained. The
+    **Neumann** condition ``\boldsymbol{q}\cdot\boldsymbol{n} = g_\mathrm{N}`` is
+    *essential* and uses `ProjectedDirichlet` on the flux field. Whether a
+    condition is essential therefore depends on the formulation, not only on
+    the physics. A pure Neumann problem leaves ``u`` determined only up to a
+    constant, in both the primal and the mixed form.
+
+**Interpolations in this class.** `ProjectedDirichlet` sets the normal trace,
+and the condition holds on the whole boundary facet for data in the normal
+trace space:
+
+* `RaviartThomas`: `RefTriangle` orders 1 and 2; `RefQuadrilateral`,
+  `RefTetrahedron` and `RefHexahedron` order 1.
+* `BrezziDouglasMarini`: `RefTriangle`, order 1.
+* `BDM` (*FI*): `RefTriangle`, order 2 (Brezzi–Douglas–Marini; order 1 is
+  Ferrite's `BrezziDouglasMarini`).
+* `BrezziDouglasFortinMarini` (*FI*): `RefTriangle`, orders 1 and 2.
+* `TrimmedSerendipityDiv` (*FI*): `RefQuadrilateral`, order 1.
+* `TNTDiv` (*FI*): `RefQuadrilateral`, order 1.
+
+### Nonconforming: `CrouzeixRaviart`, `RannacherTurek`, and similar
+
+The global space is continuous only at the facet DOFs: the facet midpoints for
+`CrouzeixRaviart` of order 1 and for Ferrite's `RannacherTurek`. The facet
+midpoint value equals the facet mean for linear functions. A Dirichlet
+condition is therefore imposed in the same sense, and `Dirichlet` sets the
+boundary facet DOFs to ``g_\mathrm{D}`` evaluated at the midpoints. The
+discrete trace does **not** equal ``g_\mathrm{D}`` along the whole facet, even
+for linear data in the `RannacherTurek` case. This is consistent with the
+method and does not reduce the convergence order. Neumann and Robin conditions
+are natural, as for ``H^1``. The integral uses the (broken) gradient of the
+cell the facet belongs to.
+
+Higher-order nonconforming elements follow the same pattern, except that the
+global space is continuous at the **Gauss–Legendre points** of the facets
+instead of at the midpoints. The condition then holds at those points.
+
+**Interpolations in this class.** `Dirichlet` sets the facet DOFs, and the
+condition holds at the points where the global space is continuous:
+
+* `CrouzeixRaviart`: `RefTriangle` and `RefTetrahedron`, order 1. The
+  condition holds at the facet midpoints (equivalently, in the facet mean).
+* `RannacherTurek`: `RefQuadrilateral` and `RefHexahedron`, order 1 (the
+  midpoint variant). The condition holds at the facet midpoints.
+* `CrouzeixFalk` (*FI*): `RefTriangle`, order 3. The edge DOFs sit at the
+  three Gauss–Legendre points of each edge, so the condition holds at those
+  points.
+* `FortinSoulie` (*FI*): `RefTriangle`, order 2. `Dirichlet` acts on the
+  vertex and midpoint DOFs. The cell's neutral function does not vanish on
+  the boundary, so the trace equals the data only at the two Gauss–Legendre
+  points of each boundary edge. The global basis has one linear dependency
+  (Fortin and Soulie, Proposition 1). It involves every vertex DOF, so any
+  Dirichlet condition removes it, but with pure Neumann conditions the
+  system needs a rank-tolerant solver (for example sparse QR).
+
+### ``L^2``: `DiscontinuousLagrange` and other discontinuous spaces
+
+There is no inter-element continuity, so in a DG method *all* conditions,
+including conditions on ``u`` itself, are normally imposed weakly through the
+boundary terms of the numerical flux. For the symmetric interior penalty
+method this means adding boundary facet terms
+
+```math
+-\int_{\Gamma_\mathrm{D}} (k\nabla u\cdot\boldsymbol{n})\,\delta u
++ (k\nabla\delta u\cdot\boldsymbol{n})\,(u - g_\mathrm{D})
+- \frac{\sigma}{h}\,(u - g_\mathrm{D})\,\delta u \,\mathrm{d}\Gamma
+```
+
+(Nitsche's method) to the weak form. See the [DG heat equation
+tutorial](@ref tutorial-dg-heat-equation). Neumann and Robin conditions are
+natural, as for ``H^1``.
+
+`Dirichlet` can still be applied to a `DiscontinuousLagrange` field of order
+``\geq 1`` (at order 0 there are no DOFs on the facets). It constrains the DOFs located on the boundary facets of the
+boundary cells, which imposes the condition strongly on those cells. When it
+is used, the corresponding Nitsche terms must be left out on that part of the
+boundary. `ProjectedDirichlet` is not available for ``L^2`` (or ``H^1``)
+conformity.
+
+**Interpolations in this class.** Impose conditions on ``u`` weakly (with
+Nitsche or SIPG terms); Neumann and Robin conditions are natural:
+
+* `DiscontinuousLagrange`: every reference shape. For order ``\geq 1``,
+  `Dirichlet` can also be used, as described above.
+* `DPC` (*FI*): `RefQuadrilateral` orders 1 to 3, `RefHexahedron` orders 1
+  and 2 (full ``P_k`` on cubes). All DOFs are interior, so `Dirichlet` has
+  nothing to constrain and throws an error. At order 1, convergence is sensitive to the
+  interior penalty parameter: a large ``\sigma`` gives a long pre-asymptotic
+  phase with reduced rates.
+* `GaussLegendre` (*FI*): `RefLine`, `RefQuadrilateral` and `RefHexahedron`,
+  any order. Its nodes are interior points, so `Dirichlet` has nothing to
+  constrain and throws an error.
+* `Taylor` (*FI*): `RefLine` and `RefTriangle`, orders 1 and 2 (modal, with
+  `TaylorMapping`). Its DOFs are not point values.
+* `EnrichedGalerkin` (*FI*): every shape and order of the underlying
+  `Lagrange` element, plus one constant per cell. It is formally ``L^2``, but
+  the Lagrange part is continuous. The per-cell constant is nonzero on the
+  boundary, so constraining the Lagrange DOFs does not fix the trace; impose
+  the condition weakly as for DG. On interior facets, the jump terms only see
+  the per-cell constants.
+
+### Interpolations without nodal DOFs
+
+`Dirichlet` evaluates the data at `reference_coordinates(ip)`, so it requires
+DOFs that are point values. For interpolations whose DOFs are moments or
+modal coefficients (the ``H(\mathrm{curl})`` and ``H(\mathrm{div})`` elements,
+and `Bernstein`, `Taylor` and other modal bases from extension packages),
+the options are:
+
+1. `ProjectedDirichlet`, for ``H(\mathrm{curl})`` and ``H(\mathrm{div})``.
+2. An [`AffineConstraint`](@ref) per boundary DOF, with the coefficients
+   computed by the user, for example from a facet ``L^2`` projection.
+3. Weak imposition (penalty or Nitsche), which works for any interpolation.
 
 ## Initial conditions
 

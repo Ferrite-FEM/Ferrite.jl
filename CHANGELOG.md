@@ -55,6 +55,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    local condensation (e.g. `apply_assemble!`) writes to for affine constraints whose
    master dofs are in other cells, e.g. periodic boundary conditions. Previously this
    resulted in a `SparsityError`. ([#1470], [#1546])
+ - Common mistakes when using `Dirichlet` and `ProjectedDirichlet` now throw an
+   `ArgumentError` that describes the problem instead of an `AssertionError` or a
+   `MethodError` from the internals. This includes a function with the wrong signature or
+   the wrong number or type of return values, a misspelled field name, an empty set,
+   `Dirichlet` on H(div) and H(curl) interpolations (use `ProjectedDirichlet`),
+   `ProjectedDirichlet` on anything but a facet set, and adding constraints to a closed
+   `ConstraintHandler`. `Dirichlet` now also throws, instead of silently prescribing
+   nothing, if the interpolation has no dofs on the given boundary entities. ([#1551])
 
 ### Performance
 
@@ -74,6 +82,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - The boundary conditions topic guide has a new section on Robin boundary conditions,
    covering the weak form and how to assemble the contributions. ([#762], [#774], [#1534])
+ - The boundary conditions topic guide has a new section, "Boundary conditions and
+   function spaces", describing for each interpolation which boundary conditions are
+   essential and natural and how to impose them. The `ProjectedDirichlet` docstring now
+   documents what the function should return. ([#1551])
  - The tutorials, how-tos and gallery examples now extract the element values without
    allocating, using a preallocated element vector and `ue .= @view u[celldofs(cell)]`.
    ([#341], [#1540])
@@ -1543,5 +1555,6 @@ poking into Ferrite internals:
 [#1547]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1547
 [#1548]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1548
 [#1549]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1549
+[#1551]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1551
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
