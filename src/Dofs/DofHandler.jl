@@ -912,8 +912,10 @@ dofs on 2D cells that have not opted in to the lattice assumption are pushed in 
 order (such dofs are not necessarily placed on a lattice, e.g. for
 `RaviartThomas{RefTriangle, 2}`).
 
-The permutation assumes that the interior dofs are placed on a regular lattice, in the
-enumeration order specified by [`facedof_interior_indices`](@ref). An interpolation must opt
+The permutation assumes that the interior dofs are placed on a (topological) lattice, in the
+enumeration order specified by [`facedof_interior_indices`](@ref), with node positions that
+are invariant under the symmetries of the face (e.g. the equispaced lattice, or the GLL
+nodes of `Lagrange`, which are warped lattice points). An interpolation must opt
 in to this assumption via [`interior_facedofs_on_lattice`](@ref); otherwise distributing more
 than one dof on a shared 3D face errors. For a triangular face
 with vertices ``(v_1, v_2, v_3)`` the interior dofs make up a smaller triangular lattice,
@@ -921,7 +923,7 @@ which is traversed row by row, where rows are lines of constant barycentric ``v_
 starting with the row closest to the edge ``(v_3, v_1)``, and each row is traversed with
 increasing barycentric ``v_1``-weight (i.e. starting from the point closest to ``v_3``).
 This matches the interior node ordering of `Lagrange{RefTriangle, order}`. For a
-quadrilateral face the interior dofs make up a regular grid which is traversed row by row,
+quadrilateral face the interior dofs make up a tensor-product grid which is traversed row by row,
 where rows are lines of constant local ``v_1 \\to v_4`` coordinate, starting with the row
 closest to the edge ``(v_1, v_2)``, and each row is traversed in the direction
 ``v_1 \\to v_2``. This matches the interior node ordering of
