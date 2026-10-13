@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    arrays. See the [howto on multithreaded
    assembly](https://ferrite-fem.github.io/Ferrite.jl/dev/howto/threaded_assembly/) for
    example usage. ([#1070])
+ - `ProjectedDirichlet` now supports zero-valued conditions for 3D H(curl) interpolations
+   (e.g. `Nedelec{RefTetrahedron, 1}`), by passing `Returns(zero(Vec{3}))` as the
+   function. ([#1232])
 
 ### Deprecated
 
@@ -1472,6 +1475,7 @@ poking into Ferrite internals:
 [#1224]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1224
 [#1226]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1226
 [#1228]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1228
+[#1232]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1232
 [#1235]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1235
 [#1238]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1238
 [#1251]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1251

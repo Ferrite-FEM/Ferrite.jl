@@ -119,6 +119,10 @@ which after inserting the FE-approximations yields the linear equation system,
 = \underbrace{\int_{\Gamma^f} \left[\delta\boldsymbol{N}^f_i \times \boldsymbol{n}^f\right]\cdot \boldsymbol{f}(\boldsymbol{x}, t, \boldsymbol{n})\ \mathrm{d}\Gamma}_{f^f_i}
 ```
 determining the coefficients to be prescribed, ``a_j^f``
+
+!!! note "3D H(curl) interpolations"
+    In 3D, only zero-valued conditions, ``\boldsymbol{q}_\mathrm{t} = \boldsymbol{0}``, are
+    currently supported, and the function must then be given as `Returns(zero(Vec{3}))`.
 """
 mutable struct ProjectedDirichlet
     const f::Function
@@ -2293,9 +2297,10 @@ function integrate_projected_dbc!(::HdivConformity, Kᶠ, fᶠ, bc_fun, fv, shap
 end
 
 function integrate_projected_dbc!(::HcurlConformity, Kᶠ, fᶠ, bc_fun, fv, shape_nrs, cell_coords, time)
-	if (getrefdim(function_interpolation(fv)) == 3) && !(bc_fun isa Returns && norm(bc_fun()) == 0)
-		@warn "ProjectedDirichlet for zero-dirichlet will work with bc_fun=Returns(zero(Vec{D}))."
-		throw(ArgumentError("ProjectedDirichlet is not implemented for 3D H(curl) conformity"))
+    if getrefdim(function_interpolation(fv)) == 3 && !(bc_fun isa Returns && iszero(bc_fun()))
+        # Neighboring facets share edge dofs in 3D, and the facet-wise projections give
+        # in general different values for these. A zero-valued condition is unaffected.
+        throw(ArgumentError("Non-zero-valued ProjectedDirichlet is not implemented for 3D H(curl) conformity. A zero-valued condition is supported by passing `Returns(zero(Vec{3}))` as the function."))
     end
     for q_point in 1:getnquadpoints(fv)
         dΓ = getdetJdV(fv, q_point)
