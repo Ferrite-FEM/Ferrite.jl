@@ -69,6 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    uses less memory. ([#1548])
  - Creating VTK files (`VTKGridFile` and `VTKHDFGridFile`) is faster and allocates less
    memory. ([#1107], [#1549])
+ - `project` with an `L2Projector` is faster (2–5× for typical meshes) and allocates
+   much less memory. ([#1553])
 
 ### Documentation
 
@@ -1543,5 +1545,6 @@ poking into Ferrite internals:
 [#1547]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1547
 [#1548]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1548
 [#1549]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1549
+[#1553]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1553
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
