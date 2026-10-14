@@ -589,3 +589,128 @@ end
         end
     end
 end
+
+# Projection onto a function space with only cell-local dofs (e.g. DiscontinuousLagrange)
+# decouples into independent cell-local problems, see `close!(::L2Projector)`.
+@testset "Cell-local L2 projection" begin
+    # Cellwise discontinuous polynomial of degree `order`
+    cellfun(cellid, x, order) = cellid * (1 + x[1] - 2x[2])^order
+    function qp_data_for(grid, sets_and_cvs, order)
+        data = [Float64[] for _ in 1:getncells(grid)]
+        for (set, cv) in sets_and_cvs, cellid in set
+            coords = getcoordinates(grid, cellid)
+            reinit!(cv, coords)
+            data[cellid] = [cellfun(cellid, spatial_coordinate(cv, qp, coords), order) for qp in 1:getnquadpoints(cv)]
+        end
+        return data
+    end
+    # Check that the projected field reproduces the cellwise data exactly
+    function check_exact(proj, projected, order)
+        for sdh in proj.dh.subdofhandlers
+            ip = only(sdh.field_interpolations)
+            RefShape = getrefshape(ip)
+            cv = CellValues(QuadratureRule{RefShape}(3), ip, geometric_interpolation(getcelltype(sdh)))
+            for cell in CellIterator(sdh)
+                reinit!(cv, cell)
+                ue = projected[celldofs(cell)]
+                for qp in 1:getnquadpoints(cv)
+                    x = spatial_coordinate(cv, qp, getcoordinates(cell))
+                    @test function_value(cv, qp, ue) ≈ cellfun(cellid(cell), x, order) atol = 1.0e-10
+                end
+            end
+        end
+        return
+    end
+    # Reference solution from the global (sparse) projection
+    function project_global(proj, data, qrs_rhs)
+        M = cholesky(Ferrite._assemble_L2_matrix(proj.dh, nothing, proj.qrs_lhs))
+        proj_global = L2Projector(M, proj.dh, nothing, proj.qrs_lhs, proj.qrs_rhs)
+        return Ferrite._project(proj_global, data, qrs_rhs)
+    end
+
+    @testset "detection of cell-local dofs" begin
+        grid = generate_grid(Triangle, (3, 3))
+        for (ip, islocal) in (
+                (Lagrange{RefTriangle, 1}(), false),
+                (CrouzeixRaviart{RefTriangle, 1}(), false), # L2Conformity, but shared facet dofs
+                (DiscontinuousLagrange{RefTriangle, 0}(), true),
+                (DiscontinuousLagrange{RefTriangle, 1}(), true),
+                (DiscontinuousLagrange{RefTriangle, 2}(), true),
+            )
+            dh = close!(add!(DofHandler(grid), :u, ip))
+            @test Ferrite._has_only_cell_local_dofs(dh) == islocal
+            proj = L2Projector(ip, grid; qr_lhs = QuadratureRule{RefTriangle}(4))
+            @test (proj.M_cholesky isa Ferrite.CellLocalMassInverse) == islocal
+        end
+    end
+
+    @testset "$CellType, order $order" for CellType in (Triangle, Quadrilateral, Tetrahedron, Hexahedron), order in (0, 1, 2)
+        dim = getrefdim(CellType)
+        RefShape = getrefshape(CellType)
+        grid = generate_grid(CellType, ntuple(_ -> 2, dim))
+        ip = DiscontinuousLagrange{RefShape, order}()
+        qr_rhs = QuadratureRule{RefShape}(2order + 1)
+        proj = L2Projector(ip, grid)
+        @test proj.M_cholesky isa Ferrite.CellLocalMassInverse
+        cv = CellValues(qr_rhs, Lagrange{RefShape, 1}())
+        data = qp_data_for(grid, ((1:getncells(grid), cv),), order)
+        projected = project(proj, data, qr_rhs)
+        @test projected ≈ project_global(proj, data, [qr_rhs])
+        # Order 0 is the cell average, which is not exact for the non-constant data
+        order > 0 && check_exact(proj, projected, order)
+    end
+
+    @testset "mixed grid" begin
+        grid, quadset_left, triaset, quadset_right = make_mixedgrid_l2_tests()
+        quadset = union(Set(quadset_left), quadset_right)
+        order = 2
+        qr_quad, qr_tria = QuadratureRule{RefQuadrilateral}(5), QuadratureRule{RefTriangle}(5)
+        proj = L2Projector(grid)
+        add!(proj, quadset, DiscontinuousLagrange{RefQuadrilateral, order}(); qr_rhs = qr_quad)
+        add!(proj, triaset, DiscontinuousLagrange{RefTriangle, order}(); qr_rhs = qr_tria)
+        close!(proj)
+        @test proj.M_cholesky isa Ferrite.CellLocalMassInverse
+        cv_quad = CellValues(qr_quad, Lagrange{RefQuadrilateral, 1}())
+        cv_tria = CellValues(qr_tria, Lagrange{RefTriangle, 1}())
+        data = qp_data_for(grid, ((quadset, cv_quad), (triaset, cv_tria)), order)
+        projected = project(proj, data)
+        @test projected ≈ project_global(proj, data, [qr_quad, qr_tria])
+        check_exact(proj, projected, order)
+    end
+
+    @testset "non-conforming grid" begin
+        grid = generate_grid(Quadrilateral, (2, 2))
+        forest = ForestBWG(grid, 3)
+        Ferrite.refine!(forest, [1])
+        Ferrite.balanceforest!(forest)
+        ncgrid = Ferrite.creategrid(forest)
+        @test !isempty(ncgrid.conformity_info)
+        ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
+        qr = QuadratureRule{RefQuadrilateral}(3)
+        proj = L2Projector(ip, ncgrid)
+        # No hanging node constraints needed for cell-local dofs
+        @test proj.ch === nothing
+        @test proj.M_cholesky isa Ferrite.CellLocalMassInverse
+        data = qp_data_for(ncgrid, ((1:getncells(ncgrid), CellValues(qr, Lagrange{RefQuadrilateral, 1}())),), 1)
+        check_exact(proj, project(proj, data, qr), 1)
+    end
+
+    @testset "complex and tensor data" begin
+        grid = generate_grid(Quadrilateral, (2, 2))
+        ip = DiscontinuousLagrange{RefQuadrilateral, 1}()
+        qr = QuadratureRule{RefQuadrilateral}(2)
+        proj = L2Projector(ip, grid)
+        for T in (Float32, ComplexF64), value_shape in (identity, z -> Vec((z, 2z)), z -> SymmetricTensor{2, 2}((z, 2z, 3z)))
+            data = [[value_shape(T(cellid * qp)) for qp in 1:getnquadpoints(qr)] for cellid in 1:getncells(grid)]
+            projected = project(proj, data, qr)
+            @test eltype(projected) == typeof(value_shape(T(1)))
+            @test all(collect(a) ≈ collect(b) for (a, b) in zip(projected, project_global(proj, data, [qr])))
+        end
+    end
+
+    @testset "error path with bad qr_lhs" begin
+        grid = generate_grid(Quadrilateral, (2, 2))
+        ip = DiscontinuousLagrange{RefQuadrilateral, 2}()
+        @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs = QuadratureRule{RefQuadrilateral}(1))
+    end
+end

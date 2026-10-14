@@ -21,6 +21,12 @@ let g = SUITE["postprocessing"]["L2Projector"]
     qp_data = [[rand(SymmetricTensor{2, 2}) for _ in 1:getnquadpoints(qr)] for _ in 1:getncells(grid)]
     g["project tensor data (Triangle 30×30)"] = @benchmarkable project($proj, $qp_data) evals = 1
 
+    # Discontinuous interpolation: the projection is computed cell-by-cell
+    ip_dg = DiscontinuousLagrange{RefTriangle, 1}()
+    g["build DG (Triangle 30×30)"] = @benchmarkable $build_projector($grid, $ip_dg, $qr) evals = 1
+    proj_dg = build_projector(grid, ip_dg, qr)
+    g["project tensor data DG (Triangle 30×30)"] = @benchmarkable project($proj_dg, $qp_data) evals = 1
+
     # Isolate RHS assembly from the solve to track allocations in the cell scatter.
     sdh = only(proj.dh.subdofhandlers)
     cv = CellValues(qr, ip; update_gradients = false)

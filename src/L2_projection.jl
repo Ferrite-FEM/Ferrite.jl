@@ -1,7 +1,19 @@
 abstract type AbstractProjector end
 
+# Inverse of the block diagonal mass matrix for a `DofHandler` without dofs shared between
+# cells. The (dense) inverses of the cell mass matrices are stored as one `n × n × ncells`
+# array per subdofhandler, in the order of the cells in the subdofhandler. Explicit inverses
+# are used, instead of Cholesky factors, since the cell matrices are small and well
+# conditioned and applying them is much cheaper than many tiny triangular solves.
+struct CellLocalMassInverse{T}
+    dh::DofHandler
+    inverses::Vector{Array{T, 3}}
+end
+
+Base.eltype(::Type{CellLocalMassInverse{T}}) where {T} = T
+
 mutable struct L2Projector <: AbstractProjector
-    M_cholesky::Union{Nothing, SparseArrays.CHOLMOD.Factor{Float64, Int}}
+    M_cholesky::Union{Nothing, SparseArrays.CHOLMOD.Factor{Float64, Int}, CellLocalMassInverse{Float64}}
     const dh::DofHandler
     ch::Union{ConstraintHandler, Nothing}
     const qrs_lhs::Vector{<:QuadratureRule}
@@ -131,9 +143,19 @@ end
 
 Close `proj` which assembles and calculates the left-hand-side of the projection equation, before doing a Cholesky factorization
 of the mass-matrix. For `NonConformingGrid`s, a [`ConformityConstraint`](@ref) is automatically added to ensure continuity across hanging nodes.
+
+If no degree of freedom is shared between cells (e.g. for `DiscontinuousLagrange`), the mass
+matrix is block diagonal and the projection decouples into independent cell-local problems.
+In this case only the (dense) cell mass matrices are factorized and no global system is
+assembled.
 """
 function close!(proj::L2Projector)
     close!(proj.dh)
+    if _has_only_cell_local_dofs(proj.dh)
+        # No hanging node constraints are needed since no dofs are shared between cells
+        proj.M_cholesky = _factorize_local_L2_matrices(proj.dh, proj.qrs_lhs)
+        return proj
+    end
     grid = get_grid(proj.dh)
     if grid isa NonConformingGrid
         ch = ConstraintHandler(proj.dh)
@@ -159,6 +181,8 @@ end
 function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
     return QuadratureRule{shape}(4)
 end
+_mass_qr(::DiscontinuousLagrange{shape, 0}) where {shape <: AbstractRefShape} = QuadratureRule{shape}(1)
+_mass_qr(::DiscontinuousLagrange{shape, order}) where {shape <: AbstractRefShape, order} = _mass_qr(Lagrange{shape, order}())
 _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
 function _assemble_L2_matrix(dh::DofHandler, ch::Union{Nothing, ConstraintHandler}, qrs_lhs::Vector{<:QuadratureRule})
@@ -176,40 +200,107 @@ function _assemble_L2_matrix(dh::DofHandler, ch::Union{Nothing, ConstraintHandle
     return M
 end
 
-function _assemble_L2_matrix!(assembler, cellvalues::CellValues, sdh::SubDofHandler)
+# Compute the cell mass matrix ∭( v ⋅ u )dΩ for the `cellvalues` reinitialized on a cell
+function _cell_mass_matrix!(Me::AbstractMatrix, cellvalues::CellValues)
+    n = getnbasefunctions(cellvalues)
+    fill!(Me, 0)
+    for q_point in 1:getnquadpoints(cellvalues)
+        dΩ = getdetJdV(cellvalues, q_point)
+        for j in 1:n
+            v = shape_value(cellvalues, q_point, j)
+            for i in 1:j
+                u = shape_value(cellvalues, q_point, i)
+                Me[i, j] += v ⋅ u * dΩ
+            end
+        end
+    end
+    # Symmetrize to lower triangle
+    for j in 1:n, i in (j + 1):n
+        Me[i, j] = Me[j, i]
+    end
+    return Me
+end
 
+function _assemble_L2_matrix!(assembler, cellvalues::CellValues, sdh::SubDofHandler)
     n = getnbasefunctions(cellvalues)
     Me = zeros(n, n)
-
-    function symmetrize_to_lower!(K::Matrix)
-        for i in 1:size(K, 1)
-            for j in (i + 1):size(K, 1)
-                K[j, i] = K[i, j]
-            end
-        end
-        return
-    end
-
     ## Assemble contributions from each cell
     for cell in CellIterator(sdh)
-        fill!(Me, 0)
         reinit!(cellvalues, cell)
-
-        ## ∭( v ⋅ u )dΩ
-        for q_point in 1:getnquadpoints(cellvalues)
-            dΩ = getdetJdV(cellvalues, q_point)
-            for j in 1:n
-                v = shape_value(cellvalues, q_point, j)
-                for i in 1:j
-                    u = shape_value(cellvalues, q_point, i)
-                    Me[i, j] += v ⋅ u * dΩ
-                end
-            end
-        end
-        symmetrize_to_lower!(Me)
+        _cell_mass_matrix!(Me, cellvalues)
         assemble!(assembler, celldofs(cell), Me)
     end
     return assembler
+end
+
+# Return `true` if no dof is shared between cells. Since the dofs of a single cell are
+# unique, this holds iff the number of cell-dof incidences equals the number of dofs. Note
+# that this is a property of the dof distribution and not of the interpolation's conformity:
+# e.g. `CrouzeixRaviart` is `L2Conformity` but its facet dofs are shared between cells.
+function _has_only_cell_local_dofs(dh::DofHandler)
+    nincidences = sum(sdh -> ndofs_per_cell(sdh) * length(sdh.cellset), dh.subdofhandlers; init = 0)
+    return nincidences == ndofs(dh)
+end
+
+function _factorize_local_L2_matrices(dh::DofHandler, qrs_lhs::Vector{<:QuadratureRule})
+    inverses = Array{Float64, 3}[]
+    for (sdh, qr_lhs) in zip(dh.subdofhandlers, qrs_lhs)
+        ip_fun = only(sdh.field_interpolations)
+        ip_geo = geometric_interpolation(getcelltype(sdh))
+        cv = CellValues(qr_lhs, ip_fun, ip_geo; update_gradients = false)
+        n = getnbasefunctions(cv)
+        Minvs = zeros(n, n, length(sdh.cellset))
+        _invert_local_L2_matrices!(Minvs, cv, sdh)
+        push!(inverses, Minvs)
+    end
+    return CellLocalMassInverse(dh, inverses)
+end
+
+function _invert_local_L2_matrices!(Minvs::Array{<:Any, 3}, cellvalues::CellValues, sdh::SubDofHandler)
+    n = size(Minvs, 1)
+    for (k, cell) in enumerate(CellIterator(sdh))
+        reinit!(cellvalues, cell)
+        Me = _cell_mass_matrix!(view(Minvs, :, :, k), cellvalues)
+        # In-place inversion via the Cholesky factorization
+        _, info = LAPACK.potrf!('U', Me)
+        info == 0 || throw(PosDefException(info))
+        LAPACK.potri!('U', Me)
+        for j in 1:n, i in (j + 1):n
+            Me[i, j] = Me[j, i]
+        end
+    end
+    return Minvs
+end
+
+function Base.:\(F::CellLocalMassInverse, f::AbstractMatrix)
+    u = zeros(promote_type(eltype(F), eltype(f)), size(f))
+    for (sdh, Minvs) in zip(F.dh.subdofhandlers, F.inverses)
+        _apply_local_inverses!(u, Minvs, sdh, f)
+    end
+    return u
+end
+
+function _apply_local_inverses!(u::AbstractMatrix, Minvs::Array{<:Any, 3}, sdh::SubDofHandler, f::AbstractMatrix)
+    n = size(Minvs, 1)
+    dofs = zeros(Int, n)
+    ue = zeros(eltype(u), n)
+    for (k, cellid) in enumerate(sdh.cellset)
+        celldofs!(dofs, sdh.dh, cellid)
+        for c in axes(f, 2)
+            # ue = Minv * fe, accumulated column-wise for contiguous access of Minv
+            fill!(ue, 0)
+            @inbounds for j in 1:n
+                fj = f[dofs[j], c]
+                for i in 1:n
+                    ue[i] += Minvs[i, j, k] * fj
+                end
+            end
+            @inbounds for i in 1:n
+                u[dofs[i], c] = ue[i]
+            end
+        end
+    end
+    return u
 end
 
 """
@@ -312,7 +403,7 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
         end
     end
 
-    M_cholesky = proj.M_cholesky::SparseArrays.CHOLMOD.Factor{Float64, Int}
+    M_cholesky = proj.M_cholesky::Union{SparseArrays.CHOLMOD.Factor{Float64, Int}, CellLocalMassInverse{Float64}}
     projected_vals = M_cholesky \ f
 
     if proj.ch !== nothing
