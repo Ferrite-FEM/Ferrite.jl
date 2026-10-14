@@ -39,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    local matrix (`r.here`/`r.there` for the two sides), also across `SubDofHandler`s, and
    can be passed directly to `function_value` etc. Both also accept a `DofHandler` with a
    single `SubDofHandler`, for use outside the interface loop. ([#1433], [#1556])
+ - `L2Projector` gains a `solver` keyword argument. The new `L2CGSolver` stores only the
+   (upper triangle of the) mass matrix and solves the projection with
+   Jacobi-preconditioned conjugate gradients, instead of storing a Cholesky
+   factorization. This uses much less memory for large 3D meshes (e.g. 16 MB instead of
+   1 GB for 69k quadratic tetrahedron dofs) and makes `close!` faster, at the cost of an
+   iterative solve in each `project` call. The default, `L2CholeskySolver`, keeps the
+   previous behavior. ([#XXXX])
 
 ### Deprecated
 
@@ -81,6 +88,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    local condensation (e.g. `apply_assemble!`) writes to for affine constraints whose
    master dofs are in other cells, e.g. periodic boundary conditions. Previously this
    resulted in a `SparsityError`. ([#1470], [#1546])
+ - The default left-hand-side quadrature rule of `L2Projector` for `Lagrange`
+   interpolations on prisms and pyramids now has enough points to make the mass matrix
+   positive definite. Previously, `close!` could throw a `PosDefException` for e.g.
+   `Wedge` grids. ([#XXXX])
 
 ### Performance
 
@@ -97,6 +108,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    memory. ([#1107], [#1549])
  - `project` with an `L2Projector` is faster (2–5× for typical meshes) and allocates
    much less memory. ([#1553])
+ - `close!` for an `L2Projector` on conforming grids assembles and stores only the upper
+   triangle of the mass matrix, reducing its memory use. ([#XXXX])
 
 ### Documentation
 
@@ -1576,6 +1589,7 @@ poking into Ferrite internals:
 [#1548]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1548
 [#1549]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1549
 [#1553]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1553
+[#XXXX]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/XXXX
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
 [#1556]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1556
