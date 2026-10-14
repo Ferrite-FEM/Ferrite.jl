@@ -5,7 +5,8 @@
 #
 # *Figure 1*: von Mises stress in an RVE with 5 stiff inclusions embedded in a softer matrix
 # material that is loaded in shear. The problem is solved by using homogeneous Dirichlet
-# boundary conditions (left) and (strong) periodic boundary conditions (right).
+# boundary conditions (left), (strong) periodic boundary conditions (middle), and Neumann
+# boundary conditions (right).
 #
 #-
 #md # !!! tip

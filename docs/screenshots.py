@@ -451,30 +451,38 @@ def scene_stokes_flow():
 
 
 # --- computational_homogenization: von Mises stress on the deformed RVE,
-# comparing Dirichlet (left) and periodic (right) boundary conditions for the
-# shear load case, on one shared colour scale (matching the Figure 1 caption)
+# comparing Dirichlet (left), periodic (middle) and Neumann (right) boundary
+# conditions for the shear load case, on one shared colour scale (matching the
+# Figure 1 caption)
 @scene("computational_homogenization")
 def scene_computational_homogenization():
     view = new_view()
     r = OpenDataFile(datadir + "/homogenization.vtu")
-    left = surface(warp(r, "u_dirichlet_3", 0.3), view, edges=False)
-    ColorBy(left, ("POINTS", "σvM_dirichlet_3"))
-    lut_d = GetColorTransferFunction("σvM_dirichlet_3")
-    lut_d.ApplyPreset("Cool to Warm", True)
+    r.UpdatePipeline()  # bounds/ranges are only valid once the data is read
     b = r.GetDataInformation().GetBounds()
-    shifted = Transform(Input=warp(r, "u_periodic_3", 0.3))
-    shifted.Transform.Translate = [(b[1] - b[0]) * 1.35, 0.0, 0.0]
-    right = surface(shifted, view, edges=False)
-    lut_p = colorbar(right, view, ("POINTS", "σvM_periodic_3"),
-                     title="von Mises [Pa]", horizontal=True,
-                     labels=[2.0e10, 4.0e10, 6.0e10])
     pd = r.GetDataInformation().GetPointDataInformation()
-    hi = max(pd.GetArrayInformation("σvM_dirichlet_3").GetComponentRange(0)[1],
-             pd.GetArrayInformation("σvM_periodic_3").GetComponentRange(0)[1])
-    lut_d.RescaleTransferFunction(0.0, hi)
-    lut_p.RescaleTransferFunction(0.0, hi)
-    finish(view, "computational_homogenization", twod=True, zoom=1.25,
-           res=[1600, 950], pan_y=-0.12)
+    cases = ["dirichlet", "periodic", "neumann"]
+    luts = []
+    for i, case in enumerate(cases):
+        shifted = Transform(Input=warp(r, "u_%s_3" % case, 0.3))
+        shifted.Transform.Translate = [(b[1] - b[0]) * 1.35 * i, 0.0, 0.0]
+        d = surface(shifted, view, edges=False)
+        array = ("POINTS", "σvM_%s_3" % case)
+        if i == len(cases) - 1:
+            # one (shared) scalar bar, attached to the last panel
+            luts.append(colorbar(d, view, array, title="von Mises [Pa]",
+                                 horizontal=True, labels=[2.0e10, 4.0e10, 6.0e10]))
+        else:
+            ColorBy(d, array)
+            lut = GetColorTransferFunction(array[1])
+            lut.ApplyPreset("Cool to Warm", True)
+            luts.append(lut)
+    hi = max(pd.GetArrayInformation("σvM_%s_3" % case).GetComponentRange(0)[1]
+             for case in cases)
+    for lut in luts:
+        lut.RescaleTransferFunction(0.0, hi)
+    finish(view, "computational_homogenization", twod=True, zoom=1.7,
+           res=[2400, 950], pan_y=-0.12)
 
 
 # --- stress_driven_homogenization: von Mises stress on the RVE deformed by
