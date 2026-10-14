@@ -117,7 +117,7 @@ end
         dbc = Dirichlet(s, Γ, (x, t) -> 0, [1, 2])
         @test_throws ErrorException("components [1, 2] not within range of field :$s (1 dimension(s))") add!(ch, dbc)
         dbc = Dirichlet(:p, Γ, (x, t) -> 0)
-        @test_throws ErrorException("No overlap between dbc::Dirichlet and fields in the ConstraintHandler's DofHandler") add!(ch, dbc)
+        @test_throws ArgumentError("field :p, passed to Dirichlet, not found in the DofHandler (existing fields: [:s, :v, :z, :sd, :vd])") add!(ch, dbc)
         ## Vector
         dbc = Dirichlet(v, Γ, (x, t) -> 0)
         add!(ch, dbc)
@@ -165,6 +165,71 @@ end
     @test_throws ErrorException("components [2, 3] not within range of field :v (2 dimension(s))") add!(ConstraintHandler(dh), pdbc)
     pdbc = PeriodicDirichlet(:v, face_map, rand(2, 2), [2, 3])
     @test_throws ErrorException("components [2, 3] not within range of field :v (2 dimension(s))") add!(ConstraintHandler(dh), pdbc)
+end
+
+@testset "error messages for incorrect input" begin
+    grid = generate_grid(Triangle, (2, 2))
+    Γ = getfacetset(grid, "left")
+    setup_dh(ip) = close!(add!(DofHandler(grid), :u, ip))
+    dh_s = setup_dh(Lagrange{RefTriangle, 1}())
+    dh_v = setup_dh(Lagrange{RefTriangle, 1}()^2)
+    dh_cr = setup_dh(CrouzeixRaviart{RefTriangle, 1}())
+    dh_rt = setup_dh(RaviartThomas{RefTriangle, 1}())
+    dh_ne = setup_dh(Nedelec{RefTriangle, 1}())
+    setup_ch(dh, bc) = close!(add!(ConstraintHandler(dh), bc))
+
+    # ConstraintHandler life cycle
+    @test_throws "the DofHandler must be closed" ConstraintHandler(add!(DofHandler(grid), :u, Lagrange{RefTriangle, 1}()))
+    ch = ConstraintHandler(dh_s)
+    add!(ch, Dirichlet(:u, Γ, x -> 0.0))
+    @test_throws "the ConstraintHandler must be closed before calling update!" update!(ch, 0.0)
+    close!(ch)
+    @test_throws "the ConstraintHandler is already closed" close!(ch)
+    @test_throws "the ConstraintHandler is already closed" add!(ch, Dirichlet(:u, Γ, x -> 0.0))
+    @test_throws "the ConstraintHandler is already closed" add!(ch, AffineConstraint(1, [2 => 1.0], 0.0))
+    @test length(ch.dbcs) == 1
+
+    # Dirichlet: field and set
+    @test_throws "field :w, passed to Dirichlet, not found in the DofHandler (existing fields: [:u])" setup_ch(dh_s, Dirichlet(:w, Γ, x -> 0.0))
+    @test_throws "the set passed to Dirichlet for field :u is empty" setup_ch(dh_s, Dirichlet(:u, Set{FacetIndex}(), x -> 0.0))
+    @test_throws "does not overlap with any cell where the field is defined" setup_ch(dh_s, Dirichlet(:u, Set([FacetIndex(99, 1)]), x -> 0.0))
+    @test_throws "FacetIndex(1, 9), in the set passed to Dirichlet for field :u, is out of range" setup_ch(dh_s, Dirichlet(:u, Set([FacetIndex(1, 9)]), x -> 0.0))
+    # Dirichlet: interpolations
+    for dh in (dh_rt, dh_ne), set in (Γ, Set([1, 2]))
+        @test_throws "use ProjectedDirichlet" setup_ch(dh, Dirichlet(:u, set, x -> zero(x)))
+    end
+    @test_throws "has no dofs on the boundary entities (VertexIndex)" setup_ch(dh_cr, Dirichlet(:u, Set([VertexIndex(1, 1)]), x -> 0.0))
+    @test length(setup_ch(dh_cr, Dirichlet(:u, Γ, x -> 0.0)).prescribed_dofs) == 2
+    # Dirichlet: function signature and return value
+    @test_throws "must have the signature f(x) or f(x, t)" setup_ch(dh_s, Dirichlet(:u, Γ, (x, t, n) -> 0.0))
+    @test_throws "must have the signature f(x) or f(x, t)" setup_ch(dh_s, Dirichlet(:u, Set([1, 2]), (x, t, n) -> 0.0))
+    for set in (Γ, Set([1, 2]))
+        @test_throws ["returned 2 value(s) at x = [", "], but 1 component(s) are prescribed (components = [1])"] setup_ch(dh_s, Dirichlet(:u, set, x -> Vec(0.0, 0.0)))
+        @test_throws ["returned 1 value(s) at x = [", "], but 2 component(s) are prescribed (components = [1, 2])"] setup_ch(dh_v, Dirichlet(:u, set, x -> 0.0))
+        @test_throws ["returned 2 value(s) at x = [", "], but 1 component(s) are prescribed (components = [2])"] setup_ch(dh_v, Dirichlet(:u, set, x -> [1.0, 2.0], [2]))
+    end
+    # Errors thrown inside the user function are not modified
+    @test_throws DomainError setup_ch(dh_s, Dirichlet(:u, Γ, x -> sqrt(-1.0)))
+    @test_throws MethodError setup_ch(dh_s, Dirichlet(:u, Γ, x -> x + 1))
+
+    # ProjectedDirichlet: field and set
+    @test_throws "ProjectedDirichlet requires a set of FacetIndex, but got a set with element type $(Int)" ProjectedDirichlet(:u, Set([1, 2]), (x, t, n) -> 1.0)
+    @test_throws "ProjectedDirichlet requires a set of FacetIndex, but got a set with element type VertexIndex" ProjectedDirichlet(:u, [VertexIndex(1, 1)], (x, t, n) -> 1.0)
+    @test ProjectedDirichlet(:u, Any[FacetIndex(1, 1)], (x, t, n) -> 1.0).facets == Ferrite.OrderedSet([FacetIndex(1, 1)])
+    @test_throws "field :w, passed to ProjectedDirichlet, not found in the DofHandler (existing fields: [:u])" setup_ch(dh_rt, ProjectedDirichlet(:w, Γ, (x, t, n) -> 1.0))
+    @test_throws "the set passed to ProjectedDirichlet for field :u is empty" setup_ch(dh_rt, ProjectedDirichlet(:u, Set{FacetIndex}(), (x, t, n) -> 1.0))
+    @test_throws "does not overlap with any cell where the field is defined" setup_ch(dh_rt, ProjectedDirichlet(:u, Set([FacetIndex(99, 1)]), (x, t, n) -> 1.0))
+    # ProjectedDirichlet: function signature and return value
+    for f in (x -> 1.0, (x, t) -> 1.0)
+        @test_throws "must have the signature f(x, t, n)" setup_ch(dh_rt, ProjectedDirichlet(:u, Γ, f))
+    end
+    @test_throws "must return the normal flux, q ⋅ n, as a scalar, but it returned a Vec{2, Float64}" setup_ch(dh_rt, ProjectedDirichlet(:u, Γ, (x, t, n) -> Vec(1.0, 0.0)))
+    for (f, T) in (((x, t, n) -> 1.0, Float64), ((x, t, n) -> Vec(1.0, 0.0), Vec{2, Float64}))
+        @test_throws "must return the tangential trace, q × n, as a Vec{3} (also in 2D, where only the third component is nonzero), but it returned a $(T)" setup_ch(dh_ne, ProjectedDirichlet(:u, Γ, f))
+    end
+    @test length(setup_ch(dh_rt, ProjectedDirichlet(:u, Γ, (x, t, n) -> 1.0)).prescribed_dofs) == 2
+    @test length(setup_ch(dh_ne, ProjectedDirichlet(:u, Γ, (x, t, n) -> Vec(0.0, 0.0, 1.0))).prescribed_dofs) == 2
+    @test_throws DomainError setup_ch(dh_rt, ProjectedDirichlet(:u, Γ, (x, t, n) -> sqrt(-1.0)))
 end
 
 @testset "node bc" begin
