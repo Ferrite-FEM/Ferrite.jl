@@ -1,11 +1,11 @@
 abstract type AbstractProjector end
 
 mutable struct L2Projector <: AbstractProjector
-    M_cholesky #::SuiteSparse.CHOLMOD.Factor{Float64}
-    dh::DofHandler
+    M_cholesky::Union{Nothing, SparseArrays.CHOLMOD.Factor{Float64, Int}}
+    const dh::DofHandler
     ch::Union{ConstraintHandler, Nothing}
-    qrs_lhs::Vector{<:QuadratureRule}
-    qrs_rhs::Vector{<:QuadratureRule}
+    const qrs_lhs::Vector{<:QuadratureRule}
+    const qrs_rhs::Vector{<:QuadratureRule}
 end
 isclosed(proj::L2Projector) = isclosed(proj.dh)
 
@@ -292,11 +292,11 @@ function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDic
 
     M = T <: AbstractTensor ? Tensors.n_components(Tensors.get_base(T)) : 1
 
-    return _project(proj, qrs_rhs, vars, M, T)::Vector{T}
+    return _project(proj, qrs_rhs, vars, Val(M), T)::Vector{T}
 end
 
-function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Union{AbstractVector, AbstractDict}, M::Integer, ::Type{T}) where {T}
-    f = zeros(promote_type(eltype(proj.M_cholesky), eltype(T)), ndofs(proj.dh), M)
+function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Union{AbstractVector, AbstractDict}, ::Val{M}, ::Type{T}) where {M, T}
+    f = zeros(promote_type(Float64, eltype(T)), ndofs(proj.dh), M)
     for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
         ip_fun = only(sdh.field_interpolations)
         ip_geo = geometric_interpolation(getcelltype(sdh))
@@ -312,7 +312,8 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
         end
     end
 
-    projected_vals = proj.M_cholesky \ f
+    M_cholesky = proj.M_cholesky::SparseArrays.CHOLMOD.Factor{Float64, Int}
+    projected_vals = M_cholesky \ f
 
     if proj.ch !== nothing
         # Compute the values of the hanging (slave) dofs from their masters
@@ -322,7 +323,7 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
     end
 
     # Recast to original input type
-    make_T(vals) = T <: AbstractTensor ? T(Tuple(vals)) : vals[1]
+    make_T(vals) = T <: AbstractTensor ? T(ntuple(i -> vals[i], Val(M))) : vals[1]
     return T[make_T(x) for x in Base.eachrow(projected_vals)]
 end
 
