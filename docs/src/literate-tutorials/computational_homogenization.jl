@@ -3,7 +3,8 @@
 # ![](computational_homogenization-light.png)
 # ![](computational_homogenization-dark.png)
 #
-# *Figure 1*: von Mises stress in an RVE with 5 stiff inclusions embedded in a softer matrix
+# [[*Figure 1*](@ref tutorial-computational-homogenization-figure-1)](@id tutorial-computational-homogenization-figure-1):
+# von Mises stress in an RVE with 5 stiff inclusions embedded in a softer matrix
 # material that is loaded in shear. The problem is solved by using homogeneous Dirichlet
 # boundary conditions (left), (strong) periodic boundary conditions (middle), and Neumann
 # boundary conditions (right).
@@ -19,7 +20,7 @@
 # In this example we will solve the Representative Volume Element (RVE) problem for
 # computational homogenization of linear elasticity and compute the effective/homogenized
 # stiffness of an RVE with 5 stiff circular inclusions embedded in a softer matrix material
-# (see Figure 1).
+# (see [Figure 1](@ref tutorial-computational-homogenization-figure-1)).
 #
 # It is possible to obtain upper and lower bounds on the stiffness analytically, see for
 # example [Rule of mixtures](https://en.wikipedia.org/wiki/Rule_of_mixtures). An upper
@@ -511,7 +512,7 @@ Ei = 10 * Em;
 # we want to solve the system 3 times, once for each macroscopic strain component, we
 # assemble 3 right-hand-sides.
 
-function assemble_kuu!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ)
+function assemble_kuu!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandler, εᴹ, Ei, Em)
 
     n_basefuncs = getnbasefunctions(cellvalues)
     ndpc = ndofs_per_cell(dh)
@@ -519,10 +520,11 @@ function assemble_kuu!(cellvalues::CellValues, K::SparseMatrixCSC, dh::DofHandle
     fe = zeros(ndpc, length(εᴹ))
     f = zeros(ndofs(dh), length(εᴹ))
     assembler = start_assemble(K)
+    inclusions = getcellset(dh.grid, "inclusions")
 
     for cell in CellIterator(dh)
 
-        E = cellid(cell) in getcellset(dh.grid, "inclusions") ? Ei : Em
+        E = cellid(cell) in inclusions ? Ei : Em
         reinit!(cellvalues, cell)
         fill!(Ke, 0)
         fill!(fe, 0)
@@ -608,9 +610,9 @@ end;
 # We can now assemble the system. The assembly function modifies the matrix in-place, but
 # return the right hand side(s) which we collect in another named tuple.
 
-f_dirichlet = assemble_kuu!(cellvalues, K.dirichlet, dofhandlers.dirichlet, εᴹ)
-f_periodic = assemble_kuu!(cellvalues, K.periodic, dofhandlers.periodic, εᴹ)
-f_neumann = assemble_kuu!(cellvalues, K.neumann, dofhandlers.neumann, εᴹ)
+f_dirichlet = assemble_kuu!(cellvalues, K.dirichlet, dofhandlers.dirichlet, εᴹ, Ei, Em)
+f_periodic = assemble_kuu!(cellvalues, K.periodic, dofhandlers.periodic, εᴹ, Ei, Em)
+f_neumann = assemble_kuu!(cellvalues, K.neumann, dofhandlers.neumann, εᴹ, Ei, Em)
 assemble_kuσ!(cellvalues, algebraic_values, K.neumann, dofhandlers.neumann)
 
 rhs = (
@@ -678,7 +680,7 @@ end
 # ``\bar{\boldsymbol{\sigma}}`` in the RVE. We define a function that does this, and also
 # returns the von Mises stress in every quadrature point for visualization.
 
-function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ)
+function compute_stress(cellvalues::CellValues, dh::DofHandler, u, εᴹ, Ei, Em)
     σvM_qpdata = zeros(getnquadpoints(cellvalues), getncells(dh.grid))
     σ̄Ω = zero(SymmetricTensor{2, 2})
     Ω = 0.0 # Total volume
@@ -717,21 +719,21 @@ end;
 projector = L2Projector(ip, grid)
 
 for i in 1:3
-    σ_qp, σ̄_i = compute_stress(cellvalues, dofhandlers.dirichlet, u.dirichlet[i], εᴹ[i])
+    σ_qp, σ̄_i = compute_stress(cellvalues, dofhandlers.dirichlet, u.dirichlet[i], εᴹ[i], Ei, Em)
     proj = project(projector, σ_qp, qr)
     push!(σ.dirichlet, proj)
     push!(σ̄.dirichlet, σ̄_i)
 end
 
 for i in 1:3
-    σ_qp, σ̄_i = compute_stress(cellvalues, dofhandlers.periodic, u.periodic[i], εᴹ[i])
+    σ_qp, σ̄_i = compute_stress(cellvalues, dofhandlers.periodic, u.periodic[i], εᴹ[i], Ei, Em)
     proj = project(projector, σ_qp, qr)
     push!(σ.periodic, proj)
     push!(σ̄.periodic, σ̄_i)
 end
 
 for i in 1:3
-    σ_qp, σ̄_i = compute_stress(cellvalues, dofhandlers.neumann, u.neumann[i], εᴹ[i])
+    σ_qp, σ̄_i = compute_stress(cellvalues, dofhandlers.neumann, u.neumann[i], εᴹ[i], Ei, Em)
     proj = project(projector, σ_qp, qr)
     push!(σ.neumann, proj)
     push!(σ̄.neumann, σ̄_i)
@@ -796,9 +798,10 @@ end
 function matrix_volume_fraction(grid, cellvalues)
     V = 0.0 # Total volume
     Vm = 0.0 # Volume of the matrix
+    inclusions = getcellset(grid, "inclusions")
     for c in CellIterator(grid)
         reinit!(cellvalues, c)
-        is_matrix = !(cellid(c) in getcellset(grid, "inclusions"))
+        is_matrix = !(cellid(c) in inclusions)
         for qp in 1:getnquadpoints(cellvalues)
             dΩ = getdetJdV(cellvalues, qp)
             V += dΩ
@@ -850,6 +853,7 @@ function homogenize_test(u::Matrix, dh, cv, E_incl, E_mat)                     #
     ĒΩ = zero(SymmetricTensor{4, 2})                                           #src
     Ω = 0.0                                                                    #src
     ue = zeros(ndofs_per_cell(dh), 3)                                          #src
+    inclusions = getcellset(dh.grid, "inclusions")                             #src
     for cell in CellIterator(dh)                                               #src
         reinit!(cv, cell)                                                      #src
         for (localdof, globaldof) in enumerate(celldofs(cell))                 #src
@@ -857,7 +861,7 @@ function homogenize_test(u::Matrix, dh, cv, E_incl, E_mat)                     #
                 ue[localdof, i] = u[globaldof, i]                              #src
             end                                                                #src
         end                                                                    #src
-        E = cellid(cell) in getcellset(dh.grid, "inclusions") ? E_incl : E_mat #src
+        E = cellid(cell) in inclusions ? E_incl : E_mat                        #src
         for qp in 1:getnquadpoints(cv)                                         #src
             dΩ = getdetJdV(cv, qp)                                             #src
             Ω += dΩ                                                            #src
