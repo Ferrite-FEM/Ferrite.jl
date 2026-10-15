@@ -183,16 +183,17 @@ function getnormal(iv::InterfaceValues, qp::Int; here::Bool = true)
 end
 
 """
-    function_value(iv::InterfaceValues, q_point::Int, u; here::Bool)
-    function_value(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there; here::Bool)
+    function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool)
+    function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange; here::Bool)
 
 Compute the value of the function in quadrature point `q_point` on the "here" (`here=true`)
-or "there" (`here=false`) side of the interface. `u_here` and `u_there` are the values of
-the degrees of freedom for the respective element.
+or "there" (`here=false`) side of the interface.
 
-`u` is a vector of scalar values for the degrees of freedom.
-This function can be used with a single `u` vector containing the dofs of both elements of the interface or
-two vectors (`u_here` and `u_there`) which contain the dofs of each cell of the interface respectively.
+`u` is a vector of scalar dof values in the *stacked* interface layout (cf.
+[`interfacedofs`](@ref)): the dof values of the here cell followed by the dof values of
+the there cell. In the first form `u` holds the values for all dofs of both cells; in the
+second form the [`InterfaceDofRange`](@ref) `r` (from [`interface_dof_range`](@ref))
+selects one field's dofs within `u`.
 
 `here` determines which element to use for calculating function value.
 `true` uses the value on the first element's side of the interface, while `false` uses the value on the second element's side.
@@ -206,12 +207,15 @@ function_value(::InterfaceValues, ::Int, args...; kwargs...)
 
 
 """
-    function_gradient(iv::InterfaceValues, q_point::Int, u; here::Bool)
-    function_gradient(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there; here::Bool)
+    function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool)
+    function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange; here::Bool)
 
-Compute the gradient of the function in a quadrature point. `u` is a vector of scalar values for the degrees of freedom.
-This function can be used with a single `u` vector containing the dofs of both elements of the interface or
-two vectors (`u_here` and `u_there`) which contain the dofs of each cell of the interface respectively.
+Compute the gradient of the function in a quadrature point. `u` is a vector of scalar dof
+values in the *stacked* interface layout (cf. [`interfacedofs`](@ref)): the dof values of
+the here cell followed by the dof values of the there cell. In the first form `u` holds
+the values for all dofs of both cells; in the second form the
+[`InterfaceDofRange`](@ref) `r` (from [`interface_dof_range`](@ref)) selects one field's
+dofs within `u`.
 
 `here` determines which element to use for calculating function value.
 `true` uses the value on the first element's side of the interface, while `false` uses the value on the second element's side.
@@ -304,16 +308,16 @@ for (func, f_, is_avg) in (
 end
 
 """
-    function_value_average(iv::InterfaceValues, q_point::Int, u)
-    function_value_average(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
+    function_value_average(iv::InterfaceValues, q_point::Int, u::AbstractVector)
+    function_value_average(iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange)
 
 Compute the average of the function value at the quadrature point on the interface.
 """
 function function_value_average end
 
 """
-    function_value_jump(iv::InterfaceValues, q_point::Int, u)
-    function_value_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
+    function_value_jump(iv::InterfaceValues, q_point::Int, u::AbstractVector)
+    function_value_jump(iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange)
 
 Compute the jump of the function value at the quadrature point over the interface along the default normal direction.
 
@@ -324,16 +328,16 @@ multiply by minus the outward facing normal to the first element's side of the i
 function function_value_jump end
 
 """
-    function_gradient_average(iv::InterfaceValues, q_point::Int, u)
-    function_gradient_average(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
+    function_gradient_average(iv::InterfaceValues, q_point::Int, u::AbstractVector)
+    function_gradient_average(iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange)
 
 Compute the average of the function gradient at the quadrature point on the interface.
 """
 function function_gradient_average end
 
 """
-    function_gradient_jump(iv::InterfaceValues, q_point::Int, u)
-    function_gradient_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
+    function_gradient_jump(iv::InterfaceValues, q_point::Int, u::AbstractVector)
+    function_gradient_jump(iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange)
 
 Compute the jump of the function gradient at the quadrature point over the interface along the default normal direction.
 
@@ -342,6 +346,32 @@ This function uses the definition ``\\llbracket \\vec{v} \\rrbracket=\\vec{v}^\\
 multiply by minus the outward facing normal to the first element's side of the interface (which is the default normal for [`getnormal`](@ref) with [`InterfaceValues`](@ref)).
 """
 function function_gradient_jump end
+
+"""
+    InterfaceDofRange
+
+Positions of a field's dofs in the stacked interface layout.
+
+Returned by [`interface_dof_range`](@ref), as an `AbstractVector{Int}`. Index `i` runs over
+the field's basis functions in the [`InterfaceValues`](@ref) ordering (here side first,
+then there side); the value is the corresponding row/column of the stacked local matrix.
+
+The `function_value`/`function_gradient` evaluation methods (and their `_average`/`_jump`
+variants) accept an `InterfaceDofRange` directly. The two sides are also available as
+contiguous ranges through the fields `r.here` and `r.there` (the latter shifted to point
+into the stacked layout).
+"""
+struct InterfaceDofRange <: AbstractVector{Int}
+    here::UnitRange{Int}    # the field's block in celldofs(a)
+    there::UnitRange{Int}   # the field's block in celldofs(b), shifted by ndofs_per_cell(a)
+end
+Base.size(r::InterfaceDofRange) = (length(r.here) + length(r.there),)
+Base.IndexStyle(::Type{InterfaceDofRange}) = IndexLinear()
+@inline function Base.getindex(r::InterfaceDofRange, i::Int)
+    @boundscheck checkbounds(r, i)
+    nh = length(r.here)
+    return i <= nh ? @inbounds(r.here[i]) : @inbounds(r.there[i - nh])
+end
 
 for func in (:function_value, :function_gradient, :function_symmetric_gradient)
     @eval begin
@@ -359,17 +389,15 @@ for func in (:function_value, :function_gradient, :function_symmetric_gradient)
             end
         end
         function $(func)(
-                iv::InterfaceValues, q_point::Int,
-                u::AbstractVector,
-                dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int};
+                iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange;
                 here::Bool
             )
-            @boundscheck checkbounds(u, dof_range_here)
-            @boundscheck checkbounds(u, dof_range_there)
+            @boundscheck checkbounds(u, r.here)
+            @boundscheck checkbounds(u, r.there)
             if here
-                return $(func)(iv.here, q_point, u, dof_range_here)
+                return $(func)(iv.here, q_point, u, r.here)
             else # there
-                return $(func)(iv.there, q_point, u, dof_range_there)
+                return $(func)(iv.there, q_point, u, r.there)
             end
         end
     end
@@ -390,13 +418,9 @@ for (func, f_, is_avg) in (
             f_there = $(f_)(iv.there, qp, u, dof_range_there)
             return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
-        function $(func)(
-                iv::InterfaceValues, qp::Int,
-                u::AbstractVector,
-                dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int},
-            )
-            f_here = $(f_)(iv.here, qp, u, dof_range_here)
-            f_there = $(f_)(iv.there, qp, u, dof_range_there)
+        function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector, r::InterfaceDofRange)
+            f_here = $(f_)(iv.here, qp, u, r.here)
+            f_there = $(f_)(iv.there, qp, u, r.there)
             return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
     end

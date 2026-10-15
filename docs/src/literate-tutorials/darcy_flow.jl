@@ -470,20 +470,15 @@ using Printf
 # [Discontinuous Galerkin tutorial](@ref tutorial-dg-heat-equation):
 function flux_jump_mixed(dh, a, topology)
     iv = InterfaceValues(FacetQuadratureRule{RefTriangle}(2), RaviartThomas{RefTriangle, 1}(), Lagrange{RefTriangle, 1}())
-    range_q = dof_range(dh, :q)
-    nq = length(range_q)
-    aᵉ = zeros(eltype(a), 2nq)
+    ## Positions of the q dofs in the stacked interface layout [celldofs(a); celldofs(b)]
+    range_q = interface_dof_range(dh, :q)
+    aᵉ = zeros(eltype(a), ndofs_per_interface(dh))
     J = 0.0
     for ic in InterfaceIterator(dh, topology)
         reinit!(iv, ic)
-        # TODO: With https://github.com/Ferrite-FEM/Ferrite.jl/pull/1492 the two lines  #src
-        # below can be replaced with `aᵉ .= @view a[interfacedofs(ic)]` (with           #src
-        # `aᵉ` of length `nstacked_interface_dofs(ic)`) and passing                     #src
-        # `dof_range(ic, :q)` to `function_value_jump`.                                 #src
-        @views aᵉ[1:nq] .= a[celldofs(ic.a)[range_q]]
-        @views aᵉ[(nq + 1):end] .= a[celldofs(ic.b)[range_q]]
+        aᵉ .= @view a[interfacedofs(ic)]
         for qp in 1:getnquadpoints(iv)
-            jump = function_value_jump(iv, qp, aᵉ) ⋅ getnormal(iv, qp)
+            jump = function_value_jump(iv, qp, aᵉ, range_q) ⋅ getnormal(iv, qp)
             J += abs(jump) * getdetJdV(iv, qp)
         end
     end
