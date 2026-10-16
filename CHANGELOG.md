@@ -20,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    materialized skeleton, and gains methods taking an explicit subset of it,
    `InterfaceIterator(grid_or_dh, set)`, analogous to passing a cellset to
    `CellIterator`. ([#1522])
+ - `create_coloring` can now also color boundary facets and interfaces, for
+   multithreading assembly loops over facets (`FacetIterator`) and interfaces
+   (`InterfaceIterator`, e.g. interface terms in DG methods). The kind of loop is
+   determined by the element type of the set passed: cells (`Int`, e.g. a cellset, as
+   before), facets (`FacetIndex`, e.g. a facetset), or interfaces
+   (`NTuple{2, FacetIndex}`, e.g. `interfaceskeleton` or a subset of it). The returned
+   colors partition the set such that concurrent assembly of the items within one color
+   is safe. The new keyword argument `cells_share_dofs` can be set to `false` when no dofs
+   are shared between cells (e.g. for `DiscontinuousLagrange` discretizations), in
+   which case two items conflict only if they write to the same cell, resulting in very
+   few colors (and a single color for cells). See the updated
+   [multithreaded assembly how-to](https://ferrite-fem.github.io/Ferrite.jl/dev/howto/threaded_assembly/)
+   for usage. ([#1518])
  - New function `task_local_copy` for duplicating data structures such that they can be
    used concurrently from multiple tasks, e.g. for multithreaded assembly. Only data that
    is modified during assembly (internal buffers) is duplicated, while e.g. the global
@@ -1542,6 +1555,7 @@ poking into Ferrite internals:
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1522]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1522
+[#1518]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1518
 [#1534]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1534
 [#1538]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1538
 [#1540]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1540
