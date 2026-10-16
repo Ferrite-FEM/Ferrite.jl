@@ -1593,6 +1593,117 @@ end # testset
 
 end # testset
 
+@testset "AffineConstraint without constrained dof" begin
+    grid = generate_grid(Line, (8,))
+    dh = DofHandler(grid); add!(dh, :u, Lagrange{RefLine, 1}()); close!(dh)
+
+    # Same as an AffineConstraint when the eliminated dof is preferred
+    ch1 = ConstraintHandler(dh)
+    add!(ch1, AffineConstraint(1, [2 => 2.0, 3 => 1.0], 1.0)); close!(ch1)
+    ch2 = ConstraintHandler(dh)
+    add!(ch2, AffineConstraint([1 => 1.0, 2 => -2.0, 3 => -1.0], 1.0; prefer = 1)); close!(ch2)
+    @test ch1.prescribed_dofs == ch2.prescribed_dofs
+    @test ch1.dofcoefficients == ch2.dofcoefficients
+    @test ch1.inhomogeneities == ch2.inhomogeneities
+
+    # Already constrained dofs are skipped, also when preferred
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:u, getfacetset(grid, "left"), x -> 2.0))
+    add!(ch, AffineConstraint([1 => 1.0, 2 => 1.0, 3 => 1.0], 6.0; prefer = 1))
+    close!(ch)
+    @test 1 in ch.prescribed_dofs && length(ch.prescribed_dofs) == 2
+    u = zeros(ndofs(dh)); u[2] = 1.5; apply!(u, ch)
+    @test u[1] ≈ 2 && u[1] + u[2] + u[3] ≈ 6
+
+    # Short rows first: u1 = 0 is eliminated before u1 + u2 = 0
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint([1 => 1.0, 2 => 1.0], 1.0))
+    add!(ch, AffineConstraint([1 => 2.0], 1.0))
+    close!(ch)
+    @test ch.prescribed_dofs == [1, 2]
+    u = zeros(ndofs(dh)); apply!(u, ch)
+    @test u[1:2] ≈ [0.5, 0.5]
+
+    # Cyclic pivots are untangled: u1 + u2 = 1, u1 - u2 = 0
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint([1 => 1.0, 2 => 1.0], 1.0))
+    add!(ch, AffineConstraint([1 => 1.0, 2 => -1.0], 0.0))
+    close!(ch)
+    u = zeros(ndofs(dh)); apply!(u, ch)
+    @test u[1:2] ≈ [0.5, 0.5]
+
+    # Duplicates merged, zeros dropped, threshold pivoting
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint([4 => 1.0, 5 => 1.0e-3, 4 => 1.0, 6 => 0.0], 2.0))
+    @test ch.unpivoted_constraints[1].entries == [4 => 2.0, 5 => 1.0e-3]
+    close!(ch)
+    @test ch.prescribed_dofs == [4]
+
+    # Redundant / inconsistent / no free dof
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint([1 => 1.0, 1 => -1.0], 0.0)); close!(ch)
+    @test isempty(ch.prescribed_dofs)
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint([1 => 1.0, 1 => -1.0], 1.0))
+    @test_throws ArgumentError close!(ch)
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:u, getfacetset(grid, "left"), x -> 0.0))
+    add!(ch, AffineConstraint(2, [3 => 1.0], 0.0))
+    add!(ch, AffineConstraint([1 => 1.0, 2 => 1.0], 1.0))
+    @test_throws ArgumentError close!(ch)
+end
+
+@testset "AffineConstraint without constrained dof: zero mean on periodic Poisson" begin
+    grid = generate_grid(Quadrilateral, (8, 8))
+    ip = Lagrange{RefQuadrilateral, 1}()
+    dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
+    cv = CellValues(QuadratureRule{RefQuadrilateral}(2), ip)
+    function doassemble(K)
+        f = zeros(ndofs(dh)); w = zeros(ndofs(dh))
+        assembler = start_assemble(K, f)
+        ke = zeros(4, 4); fe = zeros(4)
+        for cell in CellIterator(dh)
+            reinit!(cv, cell)
+            fill!(ke, 0); fill!(fe, 0)
+            for qp in 1:getnquadpoints(cv)
+                dΩ = getdetJdV(cv, qp)
+                x = spatial_coordinate(cv, qp, getcoordinates(cell))
+                for i in 1:4
+                    δu = shape_value(cv, qp, i)
+                    fe[i] += sinpi(x[1]) * cospi(x[2]) * δu * dΩ
+                    w[celldofs(cell)[i]] += δu * dΩ
+                    for j in 1:4
+                        ke[i, j] += shape_gradient(cv, qp, i) ⋅ shape_gradient(cv, qp, j) * dΩ
+                    end
+                end
+            end
+            assemble!(assembler, celldofs(cell), ke, fe)
+        end
+        return K, f, w
+    end
+    _, _, w = doassemble(allocate_matrix(dh))
+    ch = ConstraintHandler(dh)
+    add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid)))
+    # ∫ u dΩ = 0, i.e. w ⋅ u = 0 with w_i = ∫ N_i dΩ
+    add!(ch, AffineConstraint([i => w[i] for i in 1:ndofs(dh)], 0.0))
+    close!(ch)
+    K, f, _ = doassemble(allocate_matrix(dh, ch))
+    K0 = copy(K); f0 = copy(f)
+    apply!(K, f, ch)
+    u = K \ f
+    apply!(u, ch)
+    @test abs(w ⋅ u) < 1.0e-12
+    # Periodic constraints are untouched (single master each) and only one dense row added
+    lens = sort(length.(ch.dofcoefficients))
+    @test lens[end] == length(ch.free_dofs) && all(==(1), lens[1:(end - 1)])
+    # The eliminated dof is not periodic
+    @test count(!isnothing, ch.dofcoefficients) == length(ch.prescribed_dofs)
+    # Weak form holds for constraint-satisfying test functions: C' (K u - f) = 0
+    C, _ = Ferrite.create_constraint_matrix(ch)
+    @test norm(C' * (K0 * u - f0)) < 1.0e-10
+    @test norm(u) > 0.01
+end
+
 @testset "local application of bc" begin
     grid = generate_grid(Quadrilateral, (5, 5))
     dh = DofHandler(grid)
