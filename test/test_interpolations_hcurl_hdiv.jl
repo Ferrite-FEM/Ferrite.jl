@@ -472,9 +472,44 @@ using Ferrite: reference_shape_value
         dh_L2, _ = _setup_dh_fv_for_bc_test(DiscontinuousLagrange{RefTriangle, 1}()^2; nel = 1, qr_order = 1)
         dh_Hcurl_3d, _ = _setup_dh_fv_for_bc_test(Nedelec{RefTetrahedron, 1}(); nel = 1, qr_order = 1)
         for dh in (dh_H1, dh_L2, dh_Hcurl_3d)
-            dbc = ProjectedDirichlet(:u, Set([FacetIndex(1, 1)]), Returns(zero(Vec{2})))
-            ch = add!(ConstraintHandler(dh), dbc)
-            @test_throws "ProjectedDirichlet is not implemented for" close!(ch)
+            dim = Ferrite.getspatialdim(dh.grid) # dim = sdim = vdim for these cases
+            # Zero-valued functions that are not `Returns` are also not supported for 3D H(curl)
+            for f_bc in (Returns(ones(Vec{dim})), (x, t, n) -> zero(Vec{dim}))
+                dbc = ProjectedDirichlet(:u, Set([FacetIndex(1, 1)]), f_bc)
+                ch = add!(ConstraintHandler(dh), dbc)
+                @test_throws "ProjectedDirichlet is not implemented for" close!(ch)
+            end
+        end
+    end
+
+    @testset "Zero-valued ProjectedDirichlet for 3D H(curl)" begin
+        for ip in (Nedelec{RefTetrahedron, 1}(), Nedelec{RefHexahedron, 1}())
+            dh, (fv,) = _setup_dh_fv_for_bc_test(ip; nel = 2)
+            grid = dh.grid
+            # Neighboring boundaries, whose facets share edge dofs
+            facetset = union(getfacetset(grid, "left"), getfacetset(grid, "bottom"))
+            ch = close!(add!(ConstraintHandler(dh), ProjectedDirichlet(:u, facetset, Returns(zero(Vec{3})))))
+            facetdofs = Set{Int}()
+            for (cellidx, facetidx) in facetset
+                dofs = celldofs(dh, cellidx)
+                union!(facetdofs, (dofs[i] for i in Ferrite.dirichlet_facetdof_indices(ip)[facetidx]))
+            end
+            @test Set(ch.prescribed_dofs) == facetdofs
+            a = rand(ndofs(dh))
+            apply!(a, ch)
+            @test all(iszero, a[ch.prescribed_dofs])
+            @test all(!iszero, a[ch.free_dofs])
+            for (cellidx, facetidx) in facetset
+                cell_coords = getcoordinates(grid, cellidx)
+                reinit!(fv, getcells(grid, cellidx), cell_coords, facetidx)
+                ae = a[celldofs(dh, cellidx)]
+                for q_point in 1:getnquadpoints(fv)
+                    u = function_value(fv, q_point, ae)
+                    @test norm(u × getnormal(fv, q_point)) < 1.0e-12
+                    # Check that the test is not trivial
+                    @test norm(u) > 1.0e-3
+                end
+            end
         end
     end
 
