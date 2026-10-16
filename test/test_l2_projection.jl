@@ -630,6 +630,23 @@ end
         end
     end
 
+    @testset "Prism polynomial reproduction" begin
+        grid = generate_grid(Wedge, (1, 1, 1))
+        qr = QuadratureRule{RefPrism}(8)
+        for order in (1, 2)
+            ip = Lagrange{RefPrism, order}()
+            # This tensor-product polynomial belongs to the prism interpolation space.
+            polynomial(x) = x[1]^order * x[3]^order
+            data = qp_data(polynomial, grid, qr, ip)
+            for solver in (L2CholeskySolver(), L2CGSolver())
+                proj = L2Projector(ip, grid; solver)
+                expected = zeros(ndofs(proj.dh))
+                apply_analytical!(expected, proj.dh, :_, polynomial)
+                @test project(proj, data, qr) ≈ expected rtol = 1.0e-9
+            end
+        end
+    end
+
     # CG warns when it does not converge
     grid = generate_grid(Quadrilateral, (4, 4))
     ip = Lagrange{RefQuadrilateral, 1}()

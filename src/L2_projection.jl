@@ -217,11 +217,12 @@ end
 function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
     return QuadratureRule{shape}(4)
 end
-# The prism and pyramid rules with order + 1 have too few points to make the mass matrix
-# positive definite
+# Prism basis functions are tensor products of degree-order triangle and line
+# polynomials, so their products have total degree 4order.
 function _mass_qr(::Lagrange{RefPrism, order}) where {order}
-    return QuadratureRule{RefPrism}(2order + 2)
+    return QuadratureRule{RefPrism}(4order)
 end
+# Pyramid rules with order + 1 have too few points to make the mass matrix positive definite.
 function _mass_qr(::Lagrange{RefPyramid, order}) where {order}
     return QuadratureRule{RefPyramid}(2order + 1)
 end
