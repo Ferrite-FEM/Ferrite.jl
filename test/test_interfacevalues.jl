@@ -502,3 +502,31 @@ end # of testset
     Ferrite.AMR.refine_octant!(forest.cells[1], forest.cells[1].leaves[1])
     check_interfacevalues(forest, RefHexahedron)
 end
+
+@testset "InterfaceValues with multiple fields" begin
+    grid = generate_grid(Quadrilateral, (2, 2))
+    fqr = FacetQuadratureRule{RefQuadrilateral}(2)
+    ipu = Lagrange{RefQuadrilateral, 2}()^2
+    ipp = Lagrange{RefQuadrilateral, 1}()
+    iv = InterfaceValues(FacetValues(fqr, (u = ipu, p = ipp, T = ipp)))
+    ivu = InterfaceValues(fqr, ipu)
+    ivp = InterfaceValues(fqr, ipp)
+    for ic in InterfaceIterator(grid)
+        reinit!.((iv, ivu, ivp), (ic,))
+        coords_here, coords_there = getcoordinates(ic)
+        for qp in 1:getnquadpoints(iv)
+            @test spatial_coordinate(iv.here, qp, coords_here) ≈ spatial_coordinate(iv.there, qp, coords_there)
+            @test getnormal(iv.here, qp) ≈ -getnormal(iv.there, qp)
+            for side in (:here, :there)
+                fv = getproperty(iv, side)
+                @test fv.p === fv.T
+                for (values, reference) in ((fv.u, getproperty(ivu, side)), (fv.p, getproperty(ivp, side)))
+                    for i in 1:getnbasefunctions(values)
+                        @test shape_value(values, qp, i) ≈ shape_value(reference, qp, i)
+                        @test shape_gradient(values, qp, i) ≈ shape_gradient(reference, qp, i)
+                    end
+                end
+            end
+        end
+    end
+end
