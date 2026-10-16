@@ -36,14 +36,16 @@ view_from_shared(a::AbstractArray{<:Any, 3}, i::Integer) = view(a, i, :, :)
 # Extract the i-th worker's local slice from batched device data
 function get_substruct(cv::CellValues, i)
     fv = get_substruct(cv.fun_values, i)
-    return CellValues(fv, cv.geo_mapping, cv.qr, view_from_shared(cv.detJdV, i))
+    return CellValues(fv, cv.geo_mapping, cv.qr, view_from_shared(cv.detJdV, i), view_from_shared(cv.J, i))
 end
 
 function get_substruct(fv::FunctionValues, i)
     Nx = fv.Nξ === fv.Nx ? fv.Nx : view_from_shared(fv.Nx, i)
     dNdx = view_from_shared(fv.dNdx, i)
     d2Ndx2 = view_from_shared(fv.d2Ndx2, i)
-    return FunctionValues(fv.ip, Nx, fv.Nξ, dNdx, fv.dNdξ, d2Ndx2, fv.d2Ndξ2)
+    dNds = view_from_shared(fv.dNds, i)
+    d2Nds2 = view_from_shared(fv.d2Nds2, i)
+    return FunctionValues(fv.ip, Nx, fv.Nξ, dNdx, fv.dNdξ, d2Ndx2, fv.d2Ndξ2, dNds, d2Nds2)
 end
 
 function get_substruct(cc::CellCache, i)

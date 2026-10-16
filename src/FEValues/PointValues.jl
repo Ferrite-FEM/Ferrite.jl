@@ -31,7 +31,10 @@ function PointValues(cv::CellValues)
     ip_geo = geometric_interpolation(cv)
     update_gradients = Val(function_difforder(cv) ≥ 1)
     update_hessians = Val(function_difforder(cv) ≥ 2)
-    return PointValues(T, ip_fun, ip_geo; update_gradients, update_hessians)
+    update_local_gradients = Val(function_local_difforder(cv) ≥ 1)
+    update_local_hessians = Val(function_local_difforder(cv) ≥ 2)
+    update_jacobians = Val(getjacobians(cv) !== nothing)
+    return PointValues(T, ip_fun, ip_geo; update_gradients, update_hessians, update_local_gradients, update_local_hessians, update_jacobians)
 end
 function PointValues(ip::Interpolation, ipg::Interpolation = default_geometric_interpolation(ip); kwargs...)
     return PointValues(Float64, ip, ipg; kwargs...)
@@ -54,6 +57,11 @@ shape_value_type(pv::PointValues) = shape_value_type(pv.cv)
 @propagate_inbounds shape_value(pv::PointValues, qp::Int, i::Int) = shape_value(pv.cv, qp, i)
 shape_gradient_type(pv::PointValues) = shape_gradient_type(pv.cv)
 @propagate_inbounds shape_gradient(pv::PointValues, qp::Int, i::Int) = shape_gradient(pv.cv, qp, i)
+shape_local_gradient_type(pv::PointValues) = shape_local_gradient_type(pv.cv)
+@propagate_inbounds shape_local_gradient(pv::PointValues, qp::Int, i::Int) = shape_local_gradient(pv.cv, qp, i)
+shape_local_hessian_type(pv::PointValues) = shape_local_hessian_type(pv.cv)
+@propagate_inbounds shape_local_hessian(pv::PointValues, qp::Int, i::Int) = shape_local_hessian(pv.cv, qp, i)
+getjacobians(pv::PointValues) = getjacobians(pv.cv)
 getnquadpoints(pv::PointValues) = 1
 
 # PointValues can default to quadrature point 1
@@ -63,6 +71,10 @@ function_gradient(pv::PointValues, u::AbstractVector, args...) =
     function_gradient(pv, 1, u, args...)
 function_symmetric_gradient(pv::PointValues, u::AbstractVector, args...) =
     function_symmetric_gradient(pv, 1, u, args...)
+function_local_gradient(pv::PointValues, u::AbstractVector, args...) =
+    function_local_gradient(pv, 1, u, args...)
+function_local_hessian(pv::PointValues, u::AbstractVector, args...) =
+    function_local_hessian(pv, 1, u, args...)
 
 # reinit! on PointValues must first update N and dNdξ for the new "quadrature point"
 # and then call the regular reinit! for the wrapped CellValues to update dNdx

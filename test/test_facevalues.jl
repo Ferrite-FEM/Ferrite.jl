@@ -153,6 +153,31 @@ include(joinpath(@__DIR__, "test_utils.jl"))
         end
     end
 
+    @testset "Local frame derivatives and stored jacobians" begin
+        ip = Lagrange{RefQuadrilateral, 2}()
+        fqr = FacetQuadratureRule{RefQuadrilateral}(2)
+        x = [xi + 0.1 * rand(typeof(xi)) for xi in Ferrite.reference_coordinates(ip)]
+        fv = FacetValues(fqr, ip, ip)
+        @test fv.J === nothing
+        fv_s = FacetValues(fqr, ip, ip; update_local_gradients = true, update_local_hessians = true, update_jacobians = true)
+        ue = rand(getnbasefunctions(ip))
+        for facet in 1:nfacets(fv_s)
+            reinit!(fv, x, facet)
+            reinit!(fv_s, x, facet)
+            @test_throws ArgumentError Ferrite.getjacobian(fv, 1)
+            for i in 1:getnquadpoints(fv_s)
+                J = Ferrite.getjacobian(fv_s, i)
+                @test J ≈ Ferrite.getjacobian(Ferrite.calculate_mapping(Ferrite.get_geo_mapping(fv_s), i, x))
+                E = Ferrite.gram_schmidt_frame(J)
+                @test function_local_gradient(fv_s, i, ue) ≈ function_gradient(fv, i, ue) ⋅ E
+                for j in 1:getnbasefunctions(fv_s)
+                    @test shape_local_gradient(fv_s, i, j) ≈ shape_gradient(fv, i, j) ⋅ E
+                end
+                @test function_local_hessian(fv_s, i, ue) isa Tensor{2, 2}
+            end
+        end
+    end
+
     @testset "construction errors" begin
         @test_throws ArgumentError FacetValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}())
         @test_throws ArgumentError FacetValues(FacetQuadratureRule{RefTriangle}(1), Lagrange{RefTriangle, 1}(), Lagrange{RefQuadrilateral, 1}())
