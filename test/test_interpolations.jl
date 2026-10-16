@@ -96,8 +96,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                 if k == dof
                     @test N_dof ≈ 1.0
                 else
-                    factor = interpolation isa Lagrange{RefQuadrilateral, 3} ? 200 : 4
-                    @test N_dof ≈ 0.0 atol = factor * eps(typeof(N_dof))
+                    @test N_dof ≈ 0.0 atol = 4 * eps(typeof(N_dof))
                 end
             end
         end
@@ -180,7 +179,10 @@ using Ferrite: reference_shape_value, reference_shape_gradient
         # increasing barycentric v2-weight (triangles) or v1 → v4 coordinate
         # (quadrilaterals), and within rows increasing barycentric v1-weight (triangles) or
         # v1 → v2 coordinate (quadrilaterals). Check that the reference coordinates of the
-        # interior face dofs follow this enumeration.
+        # interior face dofs follow this enumeration. The nodes of higher order Lagrange
+        # interpolations are GLL-warped lattice points, so each dof is checked to be the
+        # interior face node closest to its equispaced lattice point.
+        closest_dof(coords, fdofs, x) = fdofs[argmin([norm(coords[d] - x) for d in fdofs])]
         for ip in (
                 Lagrange{RefTriangle, 4}(), Lagrange{RefTriangle, 5}(),
                 Lagrange{RefQuadrilateral, 3}(),
@@ -203,7 +205,7 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                         t3 = q - t1 - t2
                         x = ((t1 + 1) * vx[face[1]] + (t2 + 1) * vx[face[2]] + (t3 + 1) * vx[face[3]]) / order
                         k += 1
-                        @test coords[fdofs[k]] ≈ x
+                        @test closest_dof(coords, fdofs, x) == fdofs[k]
                     end
                 else # length(face) == 4
                     # Lattice point (i, j) is located at the bilinear face coordinates
@@ -215,9 +217,69 @@ using Ferrite: reference_shape_value, reference_shape_gradient
                         x = (1 - u) * (1 - v) * vx[face[1]] + u * (1 - v) * vx[face[2]] +
                             u * v * vx[face[3]] + (1 - u) * v * vx[face[4]]
                         k += 1
-                        @test coords[fdofs[k]] ≈ x
+                        @test closest_dof(coords, fdofs, x) == fdofs[k]
                     end
                 end
+            end
+        end
+    end
+
+    @testset "GLL node placement" begin
+        GQ = Ferrite.GaussQuadrature
+        for order in 1:5
+            @test collect(Ferrite._gll_points(Val(order), Float64)) ≈ sort(GQ.legendre(Float64, order + 1, GQ.both)[1])
+        end
+        for ip in (
+                Lagrange{RefQuadrilateral, 3}(), Lagrange{RefHexahedron, 3}(),
+                Lagrange{RefTriangle, 3}(), Lagrange{RefTriangle, 4}(), Lagrange{RefTriangle, 5}(),
+                Lagrange{RefTetrahedron, 3}(), Lagrange{RefTetrahedron, 4}(),
+            )
+            refshape = Ferrite.getrefshape(ip)
+            order = Ferrite.getorder(ip)
+            gll01 = (sort(GQ.legendre(Float64, order + 1, GQ.both)[1]) .+ 1) ./ 2
+            coords = Ferrite.reference_coordinates(ip)
+            @test coords == Ferrite.reference_coordinates(DiscontinuousLagrange{refshape, order}())
+            # The edge nodes are the 1D GLL points, in the direction of the edge
+            for edofs in Ferrite.edgedof_indices(ip)
+                xa, xb = coords[edofs[1]], coords[edofs[2]]
+                for (k, d) in pairs(edofs[3:end])
+                    @test coords[d] ≈ xa + gll01[k + 1] * (xb - xa)
+                end
+            end
+            vx = Ferrite.reference_coordinates(Lagrange{refshape, 1}())
+            if refshape <: Ferrite.RefHypercube
+                # Tensor product of the 1D GLL points
+                gll = 2 .* gll01 .- 1
+                @test all(x -> all(xi -> any(g -> g ≈ xi, gll), x), coords)
+            else
+                # The node set is invariant under all permutations of the vertices
+                λ(x) = [Ferrite.reference_shape_value(Lagrange{refshape, 1}(), x, t) for t in eachindex(vx)]
+                nv = length(vx)
+                for perm in Iterators.product(ntuple(_ -> 1:nv, nv)...)
+                    allunique(perm) || continue
+                    for x in coords
+                        y = sum(λ(x)[t] * vx[perm[t]] for t in 1:nv)
+                        @test minimum(z -> norm(z - y), coords) < 1.0e-14
+                    end
+                end
+            end
+        end
+        # Regression test against the GLL-warped interior nodes of Basix
+        # (basix.create_element(P, triangle, order, LagrangeVariant.gll_warped).points)
+        for (order, nodes) in (
+                4 => [(0.22422438821533716, 0.22422438821533716), (0.5515512235693256, 0.22422438821533716), (0.22422438821533716, 0.5515512235693256)],
+                5 => [
+                    (0.15789121448141114, 0.15789121448141114), (0.4142052527467742, 0.1715894945064517),
+                    (0.6842175710371778, 0.15789121448141114), (0.1715894945064517, 0.4142052527467742),
+                    (0.4142052527467742, 0.4142052527467742), (0.15789121448141114, 0.6842175710371778),
+                ],
+            )
+            ip = Lagrange{RefTriangle, order}()
+            coords = Ferrite.reference_coordinates(ip)
+            interior = [coords[d] for d in only(Ferrite.facedof_interior_indices(ip))]
+            @test length(interior) == length(nodes)
+            for node in nodes
+                @test minimum(x -> norm(x - Vec{2}(node)), interior) < 1.0e-14
             end
         end
     end
