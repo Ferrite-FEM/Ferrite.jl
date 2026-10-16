@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    local matrix (`r.here`/`r.there` for the two sides), also across `SubDofHandler`s, and
    can be passed directly to `function_value` etc. Both also accept a `DofHandler` with a
    single `SubDofHandler`, for use outside the interface loop. ([#1433], [#1556])
+ - Interface assembly now supports fields with dofs shared between the two cells of an
+   interface (e.g. continuous interpolations). Condense the stacked local system onto the
+   unique dofs with the new `condense_duplicates!` (scratch storage in the new
+   `CondensationBuffer`) and assemble the result with `assemble!`. ([#1433], [#1492])
 
 ### Deprecated
 
@@ -61,7 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    lower-triangle storage before modifying the system. Constraint application also
    rejects unsupported lower-triangle CSC storage.
  - Constraint matrices correctly account for affine constraints with prescribed masters.
- - CSC and CSR assembly correctly accumulate repeated interface dofs.
+ - Sparse matrix assembly now consistently rejects dof vectors with repeated entries,
+   pointing at `condense_duplicates!` (previously the result depended on the sparsity
+   pattern). ([#1492])
  - Fixed the single-argument `InterfaceValues(facetvalues)` constructor.
  - L2 projection supports complex scalar and tensor data.
  - `ArrayOfVectorViews` validates offsets before constructing unchecked views.
@@ -1565,4 +1571,5 @@ poking into Ferrite internals:
 [#1553]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1553
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
+[#1492]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1492
 [#1556]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1556

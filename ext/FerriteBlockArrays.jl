@@ -129,6 +129,8 @@ function Ferrite.assemble!(assembler::BlockAssembler, dofs::AbstractVector{<:Int
     @boundscheck fe === nothing || checkbounds(f, dofs)
 
     sorteddofs, permutation = Ferrite._sortdofs_for_assembly!(assembler.permutation, assembler.sorteddofs, dofs)
+    # Repeated dofs are rejected, as for the other assemblers (see `assemble!`)
+    Ferrite._has_repeated_dofs(sorteddofs) && Ferrite._repeated_dofs_error()
     nblocks = split_into_blocks!(sorteddofs, blockstops, K)
 
     # Assemble matrix entries. Each block scatters the part of `ke` that belongs to it
