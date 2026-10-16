@@ -187,10 +187,10 @@ interface. The cache is updated for a new cell by calling `reinit!(cache, facet_
  - `ndofs_per_interface(ic)`: the size of the stacked layout (the local matrix dimension)
  - `interface_dof_range(ic, field)`: positions of a field's dofs in the stacked layout
 
-Note that a dof shared between the two cells (e.g. for a field with a continuous
-interpolation) appears *twice* in the stacked layout, once per side; without shared dofs
-(e.g. pure discontinuous interpolations) the stacked vector can be passed directly to
-[`assemble!`](@ref).
+When dofs are shared between the two cells (the stacked dof vector then contains repeated
+entries), condense the stacked local system onto the unique dofs with
+[`condense_duplicates!`](@ref) before assembly; without shared dofs the stacked vector can
+be passed directly to [`assemble!`](@ref).
 
 See also [`InterfaceIterator`](@ref).
 """
@@ -249,7 +249,8 @@ Return the global dof ids of the interface, in the *stacked* layout.
 The stacked layout is `[celldofs(ic.a); celldofs(ic.b)]`: a concatenation, not a union, so
 a dof carried by both cells appears once per side, matching the basis layout of
 [`InterfaceValues`](@ref). When no dofs are shared between the two cells the stacked vector can be passed directly
-to [`assemble!`](@ref); with shared dofs it contains repeated entries.
+to [`assemble!`](@ref); with shared dofs it contains repeated entries and the local system
+must first be condensed onto the unique dofs, see [`condense_duplicates!`](@ref).
 """
 interfacedofs(ic::InterfaceCache) = ic.dofs
 

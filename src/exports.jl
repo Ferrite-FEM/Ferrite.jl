@@ -189,6 +189,8 @@ export
     interfacedofs,
     interface_dof_range,
     ndofs_per_interface,
+    CondensationBuffer,
+    condense_duplicates!,
 
     # assembly
     start_assemble,

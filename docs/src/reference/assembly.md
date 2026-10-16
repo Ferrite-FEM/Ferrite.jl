@@ -10,6 +10,13 @@ assemble!
 finish_assemble
 ```
 
+## Interface assembly
+
+```@docs
+condense_duplicates!
+CondensationBuffer
+```
+
 ## Multithreading
 
 ```@docs
