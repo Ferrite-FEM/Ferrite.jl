@@ -110,6 +110,13 @@ end
             @test getfield(tl, s) !== getfield(assembler, s)
         end
     end
+    # CondensationBuffer
+    let buf = CondensationBuffer{Float64}(8)
+        tl = @inferred task_local_copy(buf)
+        @test typeof(tl) === typeof(buf)
+        @test tl !== buf && tl.Ke !== buf.Ke && tl.fe !== buf.fe
+        @test size(tl.Ke) == size(buf.Ke)
+    end
     # CellCache, FacetCache, InterfaceCache
     grid = generate_grid(Triangle, (2, 2))
     dh = DofHandler(grid)

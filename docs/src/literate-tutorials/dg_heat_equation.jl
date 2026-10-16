@@ -318,7 +318,9 @@ function assemble_global(
         ## Compute interface surface integrals contribution
         assemble_interface!(Ki, interfacevalues, μ)
         ## Assemble Ki into K. The field is discontinuous, so no dofs are shared between
-        ## the two cells and the stacked dof vector can be assembled directly.
+        ## the two cells and the stacked dof vector can be assembled directly. (For
+        ## fields with dofs shared between the cells, e.g. continuous interpolations,
+        ## the local system must first be condensed with `condense_duplicates!`.)
         assemble!(assembler, interfacedofs(ic), Ki)
     end
     ## Loop over domain boundaries with Neumann boundary conditions

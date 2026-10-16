@@ -11,6 +11,7 @@ ba = "ba"
 nd = "nd"
 OT = "OT"
 alo = "alo"
+indexin = "indexin" # Base.indexin
 
 [type.qrtables]
 extend-glob = ["**/gaussquad_*_table.jl", "**/generate_quadrature.jl"]

@@ -2,7 +2,9 @@ using Ferrite, SparseArrays
 import LinearAlgebra: Symmetric
 
 @testset "assembly with repeated dofs" begin
-    # Exercise dense columns, the merge walk, and binary search separately.
+    # Repeated dofs are detected deterministically, independent of which traversal the
+    # storage pattern selects (dense columns, the merge walk, or binary search), and are
+    # rejected with an error pointing at `condense_duplicates!`.
     for mode in (:dense, :merge, :binary), sym in (false, true), atomic in (false, true)
         dofs = [3, 1, 3]
         pattern = mode === :dense ? ones(40, 40) : zeros(40, 40)
@@ -15,30 +17,24 @@ import LinearAlgebra: Symmetric
         f = zeros(40)
         Ke = [1.0 2.0 3.0; 2.0 5.0 6.0; 3.0 6.0 9.0]
         fe = [2.0, 3.0, 5.0]
-        expected = zeros(40, 40)
-        expected_f = zeros(40)
-        for (j, J) in pairs(dofs), (i, I) in pairs(dofs)
-            expected[I, J] += Ke[i, j]
+        err = try
+            assemble!(start_assemble(K, f; atomic), dofs, Ke, fe)
+            nothing
+        catch e
+            e
         end
-        for (i, I) in pairs(dofs)
-            expected_f[I] += fe[i]
-        end
-        assemble!(start_assemble(K, f; atomic), dofs, Ke, fe)
-        @test K == expected
-        @test f == expected_f
+        @test err isa ArgumentError
+        @test occursin("repeated entries", err.msg)
+        @test occursin("condense_duplicates!", err.msg)
     end
 
-    # Repetitions can occur independently in rectangular row and column lists.
+    # Rectangular assembly: repeated rows and/or repeated columns are both rejected
+    # (deterministically, not only when the storage's traversal happens to break)
     for atomic in (false, true)
-        rdofs, cdofs = [3, 1, 3], [2, 4, 2, 1]
-        expected = zeros(5, 5)
-        Ke = reshape(1.0:12.0, 3, 4)
-        for (j, J) in pairs(cdofs), (i, I) in pairs(rdofs)
-            expected[I, J] += Ke[i, j]
-        end
-        K = sparse(expected)
-        assemble!(start_assemble(K; atomic), rdofs, cdofs, Ke)
-        @test K == expected
+        K = spzeros(5, 5)
+        @test_throws ArgumentError assemble!(start_assemble(K; atomic), [3, 1, 3], [2, 4, 1], zeros(3, 3))
+        @test_throws ArgumentError assemble!(start_assemble(K; atomic), [3, 1], [2, 4, 2, 1], zeros(2, 4))
+        @test_throws ArgumentError assemble!(start_assemble(K; atomic), [3, 1, 3], [2, 4, 2, 1], zeros(3, 4))
     end
 end
 
