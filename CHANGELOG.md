@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - `ProjectedDirichlet` now supports zero-valued conditions for 3D H(curl) interpolations
    (e.g. `Nedelec{RefTetrahedron, 1}`), by passing `Returns(zero(Vec{3}))` as the
    function. ([#1232])
+ - New functions `interface_dof_range(ic, field)` and `ndofs_per_interface(ic)` for
+   interface terms in the stacked dof layout of `interfacedofs(ic)`. `interface_dof_range`
+   returns an `InterfaceDofRange` with the positions of a field's dofs in the stacked
+   local matrix (`r.here`/`r.there` for the two sides), also across `SubDofHandler`s, and
+   can be passed directly to `function_value` etc. Both also accept a `DofHandler` with a
+   single `SubDofHandler`, for use outside the interface loop. ([#1433], [#1556])
 
 ### Deprecated
 
@@ -41,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    quadrature rules has been deprecated in favor of `task_local_copy`. Note that, unlike
    the previous `copy` methods, `task_local_copy` also duplicates the quadrature rule.
    ([#1070])
+ - `dof_range(ic::InterfaceCache, field)` is deprecated in favor of
+   `interface_dof_range(ic, field)`; the old tuple return value is `(r.here, r.there)`.
+   ([#1433], [#1556])
+ - The `InterfaceValues` methods of `function_value`, `function_gradient` etc. that take
+   two separate dof ranges are deprecated: pass the `InterfaceDofRange` from
+   `interface_dof_range(ic, field)` instead. ([#1433], [#1556])
 
 ### Fixes
 
@@ -1531,6 +1543,7 @@ poking into Ferrite internals:
 [#1426]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1426
 [#1428]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1428
 [#1432]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1432
+[#1433]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1433
 [#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
 [#1438]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1438
 [#1452]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1452
@@ -1552,3 +1565,4 @@ poking into Ferrite internals:
 [#1553]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1553
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
+[#1556]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1556

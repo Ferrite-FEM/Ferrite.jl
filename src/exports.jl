@@ -187,6 +187,8 @@ export
     UpdateFlags,
     cellid,
     interfacedofs,
+    interface_dof_range,
+    ndofs_per_interface,
 
     # assembly
     start_assemble,
