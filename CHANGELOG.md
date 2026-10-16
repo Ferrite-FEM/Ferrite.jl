@@ -30,7 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    is safe. The new keyword argument `cells_share_dofs` can be set to `false` when no dofs
    are shared between cells (e.g. for `DiscontinuousLagrange` discretizations), in
    which case two items conflict only if they write to the same cell, resulting in very
-   few colors (and a single color for cells). See the updated
+   few colors (and a single color for cells). Passing a `ConstraintHandler` with the
+   new keyword argument `ch` accounts for condensation of affine constraints during
+   assembly (`apply_assemble!`), e.g. for periodic boundary conditions, where items
+   writing to a common master dof conflict even when far apart in the mesh. See the
+   updated
    [multithreaded assembly how-to](https://ferrite-fem.github.io/Ferrite.jl/dev/howto/threaded_assembly/)
    for usage. ([#1518])
  - New function `task_local_copy` for duplicating data structures such that they can be

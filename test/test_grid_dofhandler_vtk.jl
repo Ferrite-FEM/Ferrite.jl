@@ -1059,6 +1059,143 @@ end
     end
 end
 
+@testset "constraint aware coloring" begin
+    # The dofs an item writes to when condensing constraints during assembly
+    # (`apply_assemble!`): its own dofs S and the masters of the affinely constrained
+    # dofs in S
+    function write_set(dh, ch, cells)
+        W = Set{Int}()
+        for c in cells, d in celldofs(dh, c)
+            push!(W, d)
+            i = get(ch.dofmapping, d, nothing)
+            i === nothing && continue
+            coeffs = ch.dofcoefficients[i]
+            coeffs === nothing || foreach(((m, _),) -> push!(W, m), coeffs)
+        end
+        return W
+    end
+    item_cells(cell::Int) = (cell,)
+    item_cells(facet::FacetIndex) = (facet[1],)
+    item_cells(interface::NTuple{2, FacetIndex}) = (interface[1][1], interface[2][1])
+    # Whether any two items of the same color write to a common dof
+    function has_conflicts(dh, ch, colors)
+        for color in colors
+            Ws = [write_set(dh, ch, item_cells(item)) for item in color]
+            for x in eachindex(Ws), y in (x + 1):lastindex(Ws)
+                isdisjoint(Ws[x], Ws[y]) || return true
+            end
+        end
+        return false
+    end
+    function check_constraint_coloring(dh, ch, set; cells_share_dofs = true)
+        local grid = Ferrite.get_grid(dh)
+        for alg in (ColoringAlgorithm.WorkStream, ColoringAlgorithm.Greedy)
+            colors = create_coloring(grid, set; alg, cells_share_dofs, ch)
+            @test colors isa Vector{Vector{eltype(set)}}
+            @test sum(length, colors; init = 0) == length(unique(set))
+            @test Set(Iterators.flatten(colors)) == Set(set)
+            @test !has_conflicts(dh, ch, colors)
+        end
+        return
+    end
+
+    # Periodic constraints couple cells on opposite sides of the domain
+    grid = generate_grid(Quadrilateral, (8, 6))
+    topology = ExclusiveTopology(grid)
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid, "left", "right")))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "bottom"), Returns(0.0)))
+    close!(ch)
+    # Without the constraint handler the cell coloring is unsafe ...
+    @test has_conflicts(dh, ch, create_coloring(grid))
+    # ... and with it safe, for all kinds of items
+    check_constraint_coloring(dh, ch, 1:getncells(grid))
+    check_constraint_coloring(dh, ch, Int[])
+    check_constraint_coloring(dh, ch, [1, 2, 7, 8, 9, 16, 41, 48])
+    check_constraint_coloring(dh, ch, union(getfacetset(grid, "left"), getfacetset(grid, "right")))
+    check_constraint_coloring(dh, ch, interfaceskeleton(topology, grid))
+
+    # Constraints between arbitrary dofs, also with cells_share_dofs = false
+    let grid = generate_grid(Quadrilateral, (6, 6))
+        local topology, dh, ch
+        topology = ExclusiveTopology(grid)
+        dh = DofHandler(grid)
+        add!(dh, :u, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        n = ndofs(dh)
+        add!(ch, AffineConstraint(1, [n => 0.5, n ÷ 2 => 0.5], 0.0))
+        add!(ch, AffineConstraint(5, [n - 3 => 1.0], 0.0))
+        close!(ch)
+        colors = create_coloring(grid, interfaceskeleton(topology, grid); cells_share_dofs = false)
+        @test has_conflicts(dh, ch, colors)
+        for cells_share_dofs in (true, false)
+            check_constraint_coloring(dh, ch, 1:getncells(grid); cells_share_dofs)
+            check_constraint_coloring(dh, ch, interfaceskeleton(topology, grid); cells_share_dofs)
+            check_constraint_coloring(dh, ch, collect(union(values(grid.facetsets)...)); cells_share_dofs)
+        end
+        # Without shared dofs the cells only conflict through the constraints
+        colors = create_coloring(grid; cells_share_dofs = false, ch, alg = ColoringAlgorithm.Greedy)
+        @test length(colors) == 2
+    end
+
+    # Without affine constraints the coloring is unchanged
+    let grid = generate_grid(Quadrilateral, (8, 6))
+        local dh, ch
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefQuadrilateral, 1}())
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:u, getfacetset(grid, "left"), Returns(0.0)))
+        close!(ch)
+        for alg in (ColoringAlgorithm.WorkStream, ColoringAlgorithm.Greedy)
+            @test create_coloring(grid; alg, ch) == create_coloring(grid; alg)
+            @test create_coloring(grid, [1, 3, 9, 30]; alg, ch) == create_coloring(grid, [1, 3, 9, 30]; alg)
+        end
+    end
+
+    # Input validation
+    let dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefQuadrilateral, 1}())
+        close!(dh)
+        @test_throws ArgumentError create_coloring(grid; ch = ConstraintHandler(dh))
+        @test_throws ArgumentError create_coloring(generate_grid(Quadrilateral, (8, 6)); ch)
+    end
+
+    # Colored threaded assembly with condensation matches serial assembly
+    let
+        K0 = allocate_matrix(dh, ch)
+        colors = create_coloring(grid; ch)
+        Ke = [i == j ? 2.0 : (i + j) * 1.0e-2 for i in 1:4, j in 1:4]
+        fe = [1.0, 2.0, 3.0, 4.0]
+        function assemble_cells!(K, f, cellsets)
+            for cells in cellsets
+                assembler = start_assemble(K, f; fillzero = false)
+                for c in cells
+                    apply_assemble!(assembler, ch, celldofs(dh, c), copy(Ke), copy(fe))
+                end
+            end
+            return K, f
+        end
+        Kserial, fserial = assemble_cells!(copy(K0), zeros(ndofs(dh)), (1:getncells(grid),))
+        Kcolor, fcolor = assemble_cells!(copy(K0), zeros(ndofs(dh)), colors)
+        Kthreaded, fthreaded = copy(K0), zeros(ndofs(dh))
+        for color in colors
+            chunks = collect(Iterators.partition(color, max(1, cld(length(color), Threads.nthreads()))))
+            Threads.@threads for chunk in chunks
+                assemble_cells!(Kthreaded, fthreaded, (chunk,))
+            end
+        end
+        @test Kcolor.nzval == Kthreaded.nzval
+        @test fcolor == fthreaded
+        @test Kserial.nzval ≈ Kthreaded.nzval
+        @test fserial ≈ fthreaded
+    end
+end
+
 @testset "High order dof distribution" begin
     # 3-----4
     # | \   |

@@ -291,7 +291,8 @@ const WORKSTREAM = ColoringAlgorithm.WorkStream
 """
     create_coloring(
         grid::AbstractGrid, set = 1:getncells(grid);
-        alg::ColoringAlgorithm, cells_share_dofs::Bool = true
+        alg::ColoringAlgorithm, cells_share_dofs::Bool = true,
+        ch::Union{Nothing, ConstraintHandler} = nothing,
     )
 
 Create a coloring of the items in `set` such that no two conflicting items -- items
@@ -336,9 +337,16 @@ discontinuous but places (shared) dofs on the facets.
 Conflicts are only considered among the items in `set`, since only these are assembled
 by the corresponding loop. Duplicate cells in a cellset are ignored, while facets and
 interfaces must appear at most once in `set` (and interfaces in one orientation).
-Constraint condensation during assembly ([`apply_assemble!`](@ref) with e.g.
-[`AffineConstraint`](@ref)s) can write outside of the item dofs and is not accounted
-for here.
+
+Constraint condensation during assembly ([`apply_assemble!`](@ref)) of affine
+constraints (e.g. [`PeriodicDirichlet`](@ref) or [`AffineConstraint`](@ref)) also
+writes to the master dofs of constrained dofs, which can be far away from the item in
+the mesh (e.g. on the opposite side of the domain for periodic constraints). To account
+for this, pass the (closed) `ConstraintHandler` as the `ch` keyword argument: items
+writing to a common master dof then also conflict. This is not needed if the
+constraints are applied after assembly (e.g. with [`apply!`](@ref)), or if there are
+no affine constraints (plain [`Dirichlet`](@ref) constraints cause no writes outside
+of the item dofs).
 
 Two different algorithms are available, specified with the `alg` keyword argument:
  - `alg = ColoringAlgorithm.WorkStream` (default): Three step algorithm from
@@ -367,15 +375,31 @@ function create_coloring(
         grid::AbstractGrid, set = 1:getncells(grid);
         alg::ColoringAlgorithm.T = ColoringAlgorithm.WorkStream,
         cells_share_dofs::Bool = true,
+        ch::Union{Nothing, ConstraintHandler} = nothing,
     )
-    return _create_coloring(eltype(set), grid, set, alg, cells_share_dofs)
+    if ch !== nothing
+        isclosed(ch) || throw(ArgumentError("the ConstraintHandler must be closed"))
+        if get_grid(ch.dh) !== grid
+            throw(ArgumentError("the ConstraintHandler belongs to a DofHandler with a different grid"))
+        end
+    end
+    return _create_coloring(eltype(set), grid, set, alg, cells_share_dofs, ch)
 end
 
 # Cells
 function _create_coloring(
         ::Type{<:Integer}, grid::AbstractGrid, cellset, alg::ColoringAlgorithm.T,
-        cells_share_dofs::Bool
+        cells_share_dofs::Bool, ch::Union{Nothing, ConstraintHandler}
     )
+    if ch !== nothing
+        # Conflicts from constraint condensation are computed by the generic item
+        # coloring. The item ids of the sorted cells are a monotone relabeling of the
+        # cell ids, so in absence of affine constraints this gives the same coloring as
+        # the cell id based path below (for a sorted cellset; Greedy colors an unsorted
+        # cellset in the given order).
+        cellvec = collect(Int, _sorted_cellvec(cellset))
+        return _color_items(grid, cellvec, alg, cells_share_dofs, ch)
+    end
     if !cells_share_dofs
         # The write sets of any two (distinct) cells are disjoint
         cellvec = _sorted_cellvec(cellset)
@@ -387,7 +411,8 @@ end
 
 # Facets and interfaces
 function _create_coloring(
-        ::Type{T}, grid::AbstractGrid, set, alg::ColoringAlgorithm.T, cells_share_dofs::Bool
+        ::Type{T}, grid::AbstractGrid, set, alg::ColoringAlgorithm.T, cells_share_dofs::Bool,
+        ch::Union{Nothing, ConstraintHandler}
     ) where {T <: Union{FacetIndex, NTuple{2, FacetIndex}}}
     items = set isa AbstractVector{T} ? set : collect(T, set)
     ncells = getncells(grid)
@@ -399,7 +424,7 @@ function _create_coloring(
     if !allunique(items)
         throw(ArgumentError("the set contains duplicate entries"))
     end
-    return _color_items(grid, items, alg, cells_share_dofs)
+    return _color_items(grid, items, alg, cells_share_dofs, ch)
 end
 
 function _color_incidence_matrix(incidence_matrix, cellset, alg::ColoringAlgorithm.T)
@@ -412,11 +437,12 @@ function _color_incidence_matrix(incidence_matrix, cellset, alg::ColoringAlgorit
     end
 end
 
-################################
-# Facet and interface coloring #
-################################
+##########################################
+# Item (cell, facet, interface) coloring #
+##########################################
 
 # The cells an item writes to
+_item_cells(cell::Int) = (cell,)
 _item_cells(facet::FacetIndex) = (facet[1],)
 _item_cells((facet_a, facet_b)::NTuple{2, FacetIndex}) = (facet_a[1], facet_b[1])
 
@@ -448,7 +474,7 @@ end
 # discontinuous fields): two items conflict iff they write to a common cell. For
 # interfaces this is the "line graph" of the facet adjacency, which needs at most Δ + 1
 # colors where Δ is the maximum number of facet neighbors of a cell.
-function _gather_item_cell_chunk!(count, items, chunk, iptr, iadj)
+function _gather_item_cell_chunk!(count, items, chunk, iptr, iadj, masters)
     buf = Int[]
     candidates = Int[]
     for k in chunk
@@ -459,6 +485,7 @@ function _gather_item_cell_chunk!(count, items, chunk, iptr, iadj)
                 j == k || push!(candidates, j)
             end
         end
+        _append_master_conflicts!(candidates, masters, k)
         _append_candidates_sorted_unique!(buf, count, candidates, k)
     end
     return buf
@@ -468,7 +495,7 @@ end
 # also writes dofs shared with the node neighbors of its cells, so two items conflict iff
 # a cell of one is node-adjacent to (or equal to) a cell of the other. This is a superset
 # of the common-cell graph above.
-function _gather_item_node_chunk!(count, grid, items, chunk, nodeptr, nodecells, iptr, iadj)
+function _gather_item_node_chunk!(count, grid, items, chunk, nodeptr, nodecells, iptr, iadj, masters)
     buf = Int[]
     candidates = Int[]
     for k in chunk
@@ -485,9 +512,108 @@ function _gather_item_node_chunk!(count, grid, items, chunk, nodeptr, nodecells,
                 end
             end
         end
+        _append_master_conflicts!(candidates, masters, k)
         _append_candidates_sorted_unique!(buf, count, candidates, k)
     end
     return buf
+end
+
+# Conflicts from condensation of affine constraints during assembly (`apply_assemble!`):
+# condensing the local matrix and vector of an item with (global) dofs S writes to the
+# global entries of S ∪ M(S), where M(S) are the master dofs of the affinely constrained
+# dofs in S (see `_condense_local!`). The S ∩ S conflicts are covered by the cell/node
+# based gathers above, so the remaining conflicts are exactly the pairs of items
+# writing to a common master dof (through either S or M(S)). Note that these can be far
+# apart in the mesh, e.g. on opposite sides of the domain for periodic constraints.
+#
+# Returns `nothing` if there are no affine constraints, and otherwise the map from item
+# to (indices of) masters it writes to, and the inverse map from master to items, both
+# in CSR-like form. Masters are indexed in order of discovery.
+function _item_master_map(ch::ConstraintHandler, items)
+    dh = ch.dh
+    n = ndofs(dh)
+    # Map dofs to master indices and affinely constrained dofs to the indices of their
+    # masters. Note that `close!(ch)` has already resolved recursive constraints, so the
+    # coefficient lists are final.
+    master_of = zeros(Int, n) # dof -> master index, or 0
+    affine_of = zeros(Int, n) # dof -> index into affine_masters, or 0
+    nmasters = 0
+    affine_masters = Vector{Int}[]
+    for (i, d) in pairs(ch.prescribed_dofs)
+        coefficients = ch.dofcoefficients[i]
+        (coefficients === nothing || isempty(coefficients)) && continue
+        master_ids = Int[]
+        for (m, _) in coefficients
+            if master_of[m] == 0
+                nmasters += 1
+                master_of[m] = nmasters
+            end
+            push!(master_ids, master_of[m])
+        end
+        push!(affine_masters, master_ids)
+        affine_of[d] = length(affine_masters)
+    end
+    nmasters == 0 && return nothing
+    # Item -> masters
+    kptr = Vector{Int}(undef, length(items) + 1)
+    kptr[1] = 1
+    kadj = Int[]
+    dofbuf = Int[]
+    for (k, item) in pairs(items)
+        start = length(kadj) + 1
+        for c in _item_cells(item)
+            resize!(dofbuf, ndofs_per_cell(dh, c))
+            celldofs!(dofbuf, dh, c)
+            for dof in dofbuf
+                mi = master_of[dof]
+                mi == 0 || push!(kadj, mi)
+                ai = affine_of[dof]
+                ai == 0 || append!(kadj, affine_masters[ai])
+            end
+        end
+        # Sort and deduplicate the masters of this item
+        sort!(view(kadj, start:length(kadj)))
+        last = start - 1
+        for r in start:length(kadj)
+            if last < start || kadj[r] != kadj[last]
+                last += 1
+                kadj[last] = kadj[r]
+            end
+        end
+        resize!(kadj, last)
+        kptr[k + 1] = length(kadj) + 1
+    end
+    # Master -> items (transpose)
+    mptr = zeros(Int, nmasters + 1)
+    mptr[1] = 1
+    for mi in kadj
+        mptr[mi + 1] += 1
+    end
+    for i in 2:(nmasters + 1)
+        mptr[i] += mptr[i - 1]
+    end
+    madj = Vector{Int}(undef, length(kadj))
+    cursor = copy(mptr)
+    for k in eachindex(items)
+        for r in kptr[k]:(kptr[k + 1] - 1)
+            mi = kadj[r]
+            madj[cursor[mi]] = k
+            cursor[mi] += 1
+        end
+    end
+    return (kptr, kadj, mptr, madj)
+end
+
+_append_master_conflicts!(candidates, ::Nothing, k) = candidates
+function _append_master_conflicts!(candidates, (kptr, kadj, mptr, madj), k)
+    for r in kptr[k]:(kptr[k + 1] - 1)
+        mi = kadj[r]
+        for r2 in mptr[mi]:(mptr[mi + 1] - 1)
+            j = madj[r2]
+            j == k || push!(candidates, j)
+        end
+    end
+    return candidates
 end
 
 # The sorted unique cells written to by the items
@@ -501,17 +627,18 @@ end
 
 function _color_items(
         grid::AbstractGrid, items::AbstractVector{T}, alg::ColoringAlgorithm.T,
-        cells_share_dofs::Bool
+        cells_share_dofs::Bool, ch::Union{Nothing, ConstraintHandler}
     ) where {T}
     nitems = length(items)
     if nitems == 0
         return Vector{T}[]
     end
     iptr, iadj = _cell_to_item_map(getncells(grid), items)
+    masters = ch === nothing ? nothing : _item_master_map(ch, items)
     local colptr, rowval
     if !cells_share_dofs
         colptr, rowval = _chunked_gather!(nitems, 1:nitems) do counts, chunk
-            _gather_item_cell_chunk!(counts, items, chunk, iptr, iadj)
+            _gather_item_cell_chunk!(counts, items, chunk, iptr, iadj, masters)
         end
     else
         # Only node sharing between cells of the given items matters (other cells are
@@ -519,7 +646,7 @@ function _color_items(
         cellvec = _item_cellvec(items)
         nodeptr, nodecells = _build_node_to_cell_map(grid, cellvec)
         colptr, rowval = _chunked_gather!(nitems, 1:nitems) do counts, chunk
-            _gather_item_node_chunk!(counts, grid, items, chunk, nodeptr, nodecells, iptr, iadj)
+            _gather_item_node_chunk!(counts, grid, items, chunk, nodeptr, nodecells, iptr, iadj, masters)
         end
     end
     incidence_matrix = SparseMatrixCSC(nitems, nitems, colptr, rowval, fill(true, length(rowval)))
