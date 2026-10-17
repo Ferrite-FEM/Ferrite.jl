@@ -1,7 +1,46 @@
 abstract type AbstractProjector end
 
+"""
+    AbstractL2Solver
+
+Supertype for the methods that an [`L2Projector`](@ref) can use to solve the projection
+equation, see [`L2SolverCholesky`](@ref) and [`L2SolverCG`](@ref).
+"""
+abstract type AbstractL2Solver end
+
+"""
+    L2SolverCholesky()
+
+Solve the projection equation with a sparse Cholesky factorization of the consistent mass
+matrix, which is computed when the `L2Projector` is closed. This is the default. Each
+`project` call is fast, but storing the factorization can take a lot of memory for large
+3D meshes.
+"""
+struct L2SolverCholesky <: AbstractL2Solver end
+
+"""
+    L2SolverCG(; reltol = 1.0e-10, maxiter = nothing)
+
+Store the consistent mass matrix (upper triangle only) and solve the projection equation
+with the Jacobi-preconditioned conjugate gradient method. The iteration stops when the
+residual norm is below `reltol` times the norm of the right-hand side. It also stops after
+`maxiter` iterations (default: the number of dofs), and then an error is thrown.
+This needs much less memory than [`L2SolverCholesky`](@ref), at the cost of an iterative
+solve on every `project` call. The mass matrix is well conditioned, so it converges in
+few iterations.
+"""
+Base.@kwdef struct L2SolverCG <: AbstractL2Solver
+    reltol::Float64 = 1.0e-10
+    maxiter::Union{Int, Nothing} = nothing
+end
+
+const CholeskyData = SparseArrays.CHOLMOD.Factor{Float64, Int}
+const CGData = Tuple{Symmetric{Float64, SparseMatrixCSC{Float64, Int}}, Vector{Float64}}
+
 mutable struct L2Projector <: AbstractProjector
-    M_cholesky::Union{Nothing, SparseArrays.CHOLMOD.Factor{Float64, Int}}
+    const solver::AbstractL2Solver
+    # Factorization/matrix used by `solver`, set in `close!`
+    M::Union{Nothing, CholeskyData, CGData}
     const dh::DofHandler
     ch::Union{ConstraintHandler, Nothing}
     const qrs_lhs::Vector{<:QuadratureRule}
@@ -23,11 +62,12 @@ function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
     else
         println(io, "  Split into ", length(dh.subdofhandlers), " sets")
     end
+    print(io, "  solver:                  ", proj.solver)
     return nothing
 end
 
 """
-    L2Projector(grid::AbstractGrid)
+    L2Projector(grid::AbstractGrid; solver = L2SolverCholesky())
 
 Initiate an `L2Projector` for projecting quadrature data onto
 a function space. To define the function space, add interpolations for
@@ -41,6 +81,9 @@ Find projection ``u \\in U_h(\\Omega) \\subset L_2(\\Omega)`` such that
 ```
 where ``f \\in L_2(\\Omega)`` is the data to project. The function space ``U_h(\\Omega)``
 is the finite element approximation given by the interpolations `add!`ed to the `L2Projector`.
+
+The keyword argument `solver` sets how the projection equation is solved. The options are
+[`L2SolverCholesky`](@ref) (default) and [`L2SolverCG`](@ref).
 
 ### Example
 ```julia
@@ -65,18 +108,19 @@ projected = project(proj, vals)
 where `projected` can be used in e.g. `evaluate_at_points` with the [`PointEvalHandler`](@ref),
 or with [`evaluate_at_grid_nodes`](@ref).
 """
-function L2Projector(grid::AbstractGrid)
+function L2Projector(grid::AbstractGrid; solver::AbstractL2Solver = L2SolverCholesky())
     dh = DofHandler(grid)
-    return L2Projector(nothing, dh, nothing, QuadratureRule[], QuadratureRule[])
+    return L2Projector(solver, nothing, dh, nothing, QuadratureRule[], QuadratureRule[])
 end
 
 """
-    L2Projector(ip::Interpolation, grid::AbstractGrid; [qr_lhs], [set])
+    L2Projector(ip::Interpolation, grid::AbstractGrid; [qr_lhs], [set], [solver])
 
 A quick way to initiate an `L2Projector`, add an interpolation `ip` on the `set` to
 it, and then `close!` it so that it can be used to `project`. The optional
 keyword argument `set` defaults to all cells in the `grid`, while `qr_lhs` defaults
 to a quadrature rule that integrates the mass matrix exactly for the interpolation `ip`.
+`solver` defaults to [`L2SolverCholesky`](@ref), see [`L2Projector`](@ref).
 """
 function L2Projector(
         ip::Interpolation,
@@ -84,9 +128,10 @@ function L2Projector(
         qr_lhs::QuadratureRule = _mass_qr(ip),
         set = OrderedSet(1:getncells(grid)),
         geom_ip = nothing,
+        solver::AbstractL2Solver = L2SolverCholesky(),
     )
     geom_ip === nothing || @warn("Providing geom_ip is deprecated, the geometric interpolation of the cells with always be used")
-    proj = L2Projector(grid)
+    proj = L2Projector(grid; solver)
     add!(proj, set, ip; qr_lhs, qr_rhs = nothing)
     close!(proj)
     return proj
@@ -129,8 +174,10 @@ end
 """
     close!(proj::L2Projector)
 
-Close `proj` which assembles and calculates the left-hand-side of the projection equation, before doing a Cholesky factorization
-of the mass-matrix. For `NonConformingGrid`s, a [`ConformityConstraint`](@ref) is automatically added to ensure continuity across hanging nodes.
+Close `proj`, which assembles the left-hand side of the projection equation and prepares
+it for the solver of `proj`. For the default [`L2SolverCholesky`](@ref), the mass matrix is
+Cholesky factorized. For `NonConformingGrid`s, a [`ConformityConstraint`](@ref) is
+automatically added to ensure continuity across hanging nodes.
 """
 function close!(proj::L2Projector)
     close!(proj.dh)
@@ -141,6 +188,11 @@ function close!(proj::L2Projector)
         close!(ch)
         proj.ch = ch
     end
+    proj.M = _setup_solver(proj.solver, proj)
+    return proj
+end
+
+function _assemble_condensed_L2_matrix(proj::L2Projector)
     M = _assemble_L2_matrix(proj.dh, proj.ch, proj.qrs_lhs)
     if proj.ch !== nothing
         # Condense M := C' M C. The condensed matrix is symmetric again, so it can be
@@ -148,8 +200,14 @@ function close!(proj::L2Projector)
         apply!(M, proj.ch)
         M = Symmetric(M)
     end
-    proj.M_cholesky = cholesky(M)
-    return proj
+    return M
+end
+
+_setup_solver(::L2SolverCholesky, proj::L2Projector) = cholesky(_assemble_condensed_L2_matrix(proj))
+
+function _setup_solver(::L2SolverCG, proj::L2Projector)
+    M = _assemble_condensed_L2_matrix(proj)
+    return (M, inv.(Vector(diag(M))))
 end
 
 # Quadrature sufficient for integrating a mass matrix
@@ -159,13 +217,22 @@ end
 function _mass_qr(::Lagrange{shape, 2}) where {shape <: RefSimplex}
     return QuadratureRule{shape}(4)
 end
+# Prism basis functions are tensor products of degree-order triangle and line
+# polynomials, so their products have total degree 4order.
+function _mass_qr(::Lagrange{RefPrism, order}) where {order}
+    return QuadratureRule{RefPrism}(4order)
+end
+# Pyramid rules with order + 1 have too few points to make the mass matrix positive definite.
+function _mass_qr(::Lagrange{RefPyramid, order}) where {order}
+    return QuadratureRule{RefPyramid}(2order + 1)
+end
 _mass_qr(ip::VectorizedInterpolation) = _mass_qr(ip.ip)
 
 function _assemble_L2_matrix(dh::DofHandler, ch::Union{Nothing, ConstraintHandler}, qrs_lhs::Vector{<:QuadratureRule})
     # Condensation of the affine (hanging node) constraints in `apply!` needs the values
     # in both triangles, so the symmetric (upper triangle only) assembly can only be used
     # in the unconstrained case.
-    M = ch === nothing ? Symmetric(allocate_matrix(dh)) : allocate_matrix(dh, ch)
+    M = ch === nothing ? allocate_matrix(Symmetric{Float64, SparseMatrixCSC{Float64, Int}}, dh) : allocate_matrix(dh, ch)
     assembler = start_assemble(M)
     for (sdh, qr_lhs) in zip(dh.subdofhandlers, qrs_lhs)
         ip_fun = only(sdh.field_interpolations)
@@ -312,8 +379,7 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
         end
     end
 
-    M_cholesky = proj.M_cholesky::SparseArrays.CHOLMOD.Factor{Float64, Int}
-    projected_vals = M_cholesky \ f
+    projected_vals = _solve(proj.solver, proj.M::Union{CholeskyData, CGData}, f)::typeof(f)
 
     if proj.ch !== nothing
         # Compute the values of the hanging (slave) dofs from their masters
@@ -325,6 +391,41 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
     # Recast to original input type
     make_T(vals) = T <: AbstractTensor ? T(ntuple(i -> vals[i], Val(M))) : vals[1]
     return T[make_T(x) for x in Base.eachrow(projected_vals)]
+end
+
+_solve(::L2SolverCholesky, M_cholesky::CholeskyData, f::Matrix) = M_cholesky \ f
+
+function _solve(solver::L2SolverCG, (M, invdiag)::CGData, f::Matrix)
+    maxiter = solver.maxiter === nothing ? size(f, 1) : solver.maxiter
+    u = zero(f)
+    # Work buffers, reused for all columns
+    r, z, p, q = (similar(f, size(f, 1)) for _ in 1:4)
+    for j in axes(f, 2)
+        _pcg!(view(u, :, j), M, view(f, :, j), invdiag, r, z, p, q, solver.reltol, maxiter)
+    end
+    return u
+end
+
+# Jacobi-preconditioned conjugate gradient method for M x = b, starting from x = 0
+function _pcg!(x, M, b, invdiag, r, z, p, q, reltol, maxiter)
+    copyto!(r, b)
+    tol = reltol * norm(b)
+    norm(r) <= tol && return x
+    z .= invdiag .* r
+    copyto!(p, z)
+    ρ = dot(r, z)
+    for _ in 1:maxiter
+        mul!(q, M, p)
+        α = ρ / dot(p, q)
+        x .+= α .* p
+        r .-= α .* q
+        norm(r) <= tol && return x
+        z .= invdiag .* r
+        ρ_new = dot(r, z)
+        p .= z .+ (ρ_new / ρ) .* p
+        ρ = ρ_new
+    end
+    error("L2SolverCG did not converge in $maxiter iterations (residual norm $(norm(r)), tolerance $tol)")
 end
 
 function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandler, vars::Union{AbstractVector, AbstractDict})
