@@ -477,7 +477,7 @@ function test_show_l2()
     grid = generate_grid(Triangle, (2, 2))
     ip = Lagrange{RefTriangle, 1}()
     proj = L2Projector(ip, grid)
-    @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{RefTriangle, 1}()\n  geometric interpolation: Lagrange{RefTriangle, 1}()\n  solver:                  L2CholeskySolver()"
+    @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{RefTriangle, 1}()\n  geometric interpolation: Lagrange{RefTriangle, 1}()\n  solver:                  L2SolverCholesky()"
 
     # Multi-domain setup
     proj2 = L2Projector(grid)
@@ -490,8 +490,8 @@ function test_show_l2()
     @test contains(showstr, "L2Projector")
     @test contains(showstr, "4/8 cells in grid")
     @test contains(showstr, "Split into 2 sets")
-    proj3 = L2Projector(ip, grid; solver = L2CGSolver(; reltol = 1.0e-8))
-    @test contains(repr("text/plain", proj3), "solver:                  L2CGSolver(1.0e-8, nothing)")
+    proj3 = L2Projector(ip, grid; solver = L2SolverCG(; reltol = 1.0e-8))
+    @test contains(repr("text/plain", proj3), "solver:                  L2SolverCG(1.0e-8, nothing)")
     return
 end
 
@@ -579,7 +579,7 @@ end
             [spatial_coordinate(cv, qp, coords) for qp in 1:getnquadpoints(cv)]
         end
 
-        for solver in (L2CholeskySolver(), L2CGSolver())
+        for solver in (L2SolverCholesky(), L2SolverCG())
             proj = L2Projector(ncgrid; solver)
             add!(proj, collect(1:getncells(ncgrid)), ip; qr_rhs = qr)
             close!(proj)
@@ -619,8 +619,8 @@ end
             data_stens = qp_data(x -> SymmetricTensor{2, 2}((f(x), 2f(x), 3f(x))), grid, qr, ip)
 
             proj_chol = L2Projector(ip, grid; qr_lhs)
-            proj_cg = L2Projector(ip, grid; qr_lhs, solver = L2CGSolver())
-            @test proj_cg.solver isa L2CGSolver
+            proj_cg = L2Projector(ip, grid; qr_lhs, solver = L2SolverCG())
+            @test proj_cg.solver isa L2SolverCG
             for d in (data, data_vec, data_stens)
                 ref = project(proj_chol, d, qr)
                 u = project(proj_cg, d, qr)
@@ -638,7 +638,7 @@ end
             # This tensor-product polynomial belongs to the prism interpolation space.
             polynomial(x) = x[1]^order * x[3]^order
             data = qp_data(polynomial, grid, qr, ip)
-            for solver in (L2CholeskySolver(), L2CGSolver())
+            for solver in (L2SolverCholesky(), L2SolverCG())
                 proj = L2Projector(ip, grid; solver)
                 expected = zeros(ndofs(proj.dh))
                 apply_analytical!(expected, proj.dh, :_, polynomial)
@@ -651,6 +651,6 @@ end
     grid = generate_grid(Quadrilateral, (4, 4))
     ip = Lagrange{RefQuadrilateral, 1}()
     qr = QuadratureRule{RefQuadrilateral}(2)
-    proj = L2Projector(ip, grid; solver = L2CGSolver(; maxiter = 1))
-    @test_logs (:warn, r"L2CGSolver did not converge") project(proj, qp_data(f, grid, qr, ip), qr)
+    proj = L2Projector(ip, grid; solver = L2SolverCG(; maxiter = 1))
+    @test_throws ErrorException project(proj, qp_data(f, grid, qr, ip), qr)
 end

@@ -4,12 +4,12 @@ abstract type AbstractProjector end
     AbstractL2Solver
 
 Supertype for the methods that an [`L2Projector`](@ref) can use to solve the projection
-equation, see [`L2CholeskySolver`](@ref) and [`L2CGSolver`](@ref).
+equation, see [`L2SolverCholesky`](@ref) and [`L2SolverCG`](@ref).
 """
 abstract type AbstractL2Solver end
 
 """
-    L2CholeskySolver()
+    L2SolverCholesky()
 
 Solve the projection equation with a sparse Cholesky factorization of the consistent mass
 matrix, which is computed when the `L2Projector` is closed. This is the default. Each
@@ -19,13 +19,13 @@ matrix, which is computed when the `L2Projector` is closed. This is the default.
 struct L2SolverCholesky <: AbstractL2Solver end
 
 """
-    L2CGSolver(; reltol = 1.0e-10, maxiter = nothing)
+    L2SolverCG(; reltol = 1.0e-10, maxiter = nothing)
 
 Store the consistent mass matrix (upper triangle only) and solve the projection equation
 with the Jacobi-preconditioned conjugate gradient method. The iteration stops when the
 residual norm is below `reltol` times the norm of the right-hand side. It also stops after
-`maxiter` iterations (default: the number of dofs), and then a error is thrown.
-This needs much less memory than [`L2CholeskySolver`](@ref), at the cost of an iterative
+`maxiter` iterations (default: the number of dofs), and then an error is thrown.
+This needs much less memory than [`L2SolverCholesky`](@ref), at the cost of an iterative
 solve on every `project` call. The mass matrix is well conditioned, so it converges in
 few iterations.
 """
@@ -67,7 +67,7 @@ function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
 end
 
 """
-    L2Projector(grid::AbstractGrid; solver = L2CholeskySolver())
+    L2Projector(grid::AbstractGrid; solver = L2SolverCholesky())
 
 Initiate an `L2Projector` for projecting quadrature data onto
 a function space. To define the function space, add interpolations for
@@ -83,7 +83,7 @@ where ``f \\in L_2(\\Omega)`` is the data to project. The function space ``U_h(\
 is the finite element approximation given by the interpolations `add!`ed to the `L2Projector`.
 
 The keyword argument `solver` sets how the projection equation is solved. The options are
-[`L2CholeskySolver`](@ref) (default) and [`L2CGSolver`](@ref).
+[`L2SolverCholesky`](@ref) (default) and [`L2SolverCG`](@ref).
 
 ### Example
 ```julia
@@ -120,7 +120,7 @@ A quick way to initiate an `L2Projector`, add an interpolation `ip` on the `set`
 it, and then `close!` it so that it can be used to `project`. The optional
 keyword argument `set` defaults to all cells in the `grid`, while `qr_lhs` defaults
 to a quadrature rule that integrates the mass matrix exactly for the interpolation `ip`.
-`solver` defaults to [`L2CholeskySolver`](@ref), see [`L2Projector`](@ref).
+`solver` defaults to [`L2SolverCholesky`](@ref), see [`L2Projector`](@ref).
 """
 function L2Projector(
         ip::Interpolation,
@@ -175,7 +175,7 @@ end
     close!(proj::L2Projector)
 
 Close `proj`, which assembles the left-hand side of the projection equation and prepares
-it for the solver of `proj`. For the default [`L2CholeskySolver`](@ref), the mass matrix is
+it for the solver of `proj`. For the default [`L2SolverCholesky`](@ref), the mass matrix is
 Cholesky factorized. For `NonConformingGrid`s, a [`ConformityConstraint`](@ref) is
 automatically added to ensure continuity across hanging nodes.
 """
@@ -425,7 +425,7 @@ function _pcg!(x, M, b, invdiag, r, z, p, q, reltol, maxiter)
         p .= z .+ (ρ_new / ρ) .* p
         ρ = ρ_new
     end
-    error("L2CGSolver did not converge in $maxiter iterations (residual norm $(norm(r)), tolerance $tol)")
+    error("L2SolverCG did not converge in $maxiter iterations (residual norm $(norm(r)), tolerance $tol)")
 end
 
 function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandler, vars::Union{AbstractVector, AbstractDict})

@@ -33,12 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - `ProjectedDirichlet` now supports zero-valued conditions for 3D H(curl) interpolations
    (e.g. `Nedelec{RefTetrahedron, 1}`), by passing `Returns(zero(Vec{3}))` as the
    function. ([#1232])
- - `L2Projector` gains a `solver` keyword argument. The new `L2CGSolver` stores only the
+ - `L2Projector` gains a `solver` keyword argument. The new `L2SolverCG` stores only the
    (upper triangle of the) mass matrix and solves the projection with
    Jacobi-preconditioned conjugate gradients, instead of storing a Cholesky
    factorization. This uses much less memory for large 3D meshes (e.g. 16 MB instead of
    1 GB for 69k quadratic tetrahedron dofs) and makes `close!` faster, at the cost of an
-   iterative solve in each `project` call. The default, `L2CholeskySolver`, keeps the
+   iterative solve in each `project` call. The default, `L2SolverCholesky`, keeps the
    previous behavior. ([#XXXX])
 
 ### Deprecated
