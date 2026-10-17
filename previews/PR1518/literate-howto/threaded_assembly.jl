@@ -420,11 +420,11 @@ nothing # hide
 # [`FacetIterator`](@ref).)
 #
 # When no dofs are shared between cells (every field has all dofs interior to the
-# cells, e.g. `DiscontinuousLagrange`) pass `shared_dofs = false`: two interfaces
+# cells, e.g. `DiscontinuousLagrange`) pass `cells_share_dofs = false`: two interfaces
 # then conflict only if they share a cell, which needs very few colors (about the
 # maximum number of facet neighbors of a cell plus one). Note that in this case the
 # accompanying *cell* loop needs no coloring at all, since the write sets of any two
-# cells are disjoint (`create_coloring(grid; shared_dofs = false)` returns a single
+# cells are disjoint (`create_coloring(grid; cells_share_dofs = false)` returns a single
 # color).
 #
 # As an example we assemble the interface terms of the symmetric interior penalty
@@ -507,8 +507,8 @@ function main_interfaces(; n = 8, ntasks = Threads.nthreads())
     close!(dh)
     topology = ExclusiveTopology(grid)
     ## Color the interfaces: all dofs are interior to the cells, so we can pass
-    ## `shared_dofs = false` for the minimal number of colors
-    colors = create_coloring(grid, interfaceskeleton(topology, grid); shared_dofs = false)
+    ## `cells_share_dofs = false` for the minimal number of colors
+    colors = create_coloring(grid, interfaceskeleton(topology, grid); cells_share_dofs = false)
     ## Global matrix with interface entries in the sparsity pattern
     K = allocate_matrix(dh; topology, interface_coupling = trues(1, 1))
     ## InterfaceValues and penalty parameter

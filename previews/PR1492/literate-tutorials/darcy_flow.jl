@@ -471,7 +471,6 @@ using Printf
 function flux_jump_mixed(dh, a, topology)
     iv = InterfaceValues(FacetQuadratureRule{RefTriangle}(2), RaviartThomas{RefTriangle, 1}(), Lagrange{RefTriangle, 1}())
     ## Positions of the q dofs in the stacked interface layout [celldofs(a); celldofs(b)]
-    ## (with a single SubDofHandler the range is the same for every interface)
     range_q = interface_dof_range(dh, :q)
     aᵉ = zeros(eltype(a), ndofs_per_interface(dh))
     J = 0.0

@@ -107,9 +107,8 @@ function assemble_global(
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
     # Allocate the local interface matrix for the stacked interface system
-    # `[celldofs(here); celldofs(there)]`. With a single `SubDofHandler` the size is the
-    # same (twice the number of dofs of a cell) for every interface; for multiple
-    # `SubDofHandler`s, size by the maximal interface size instead.
+    # `[celldofs(here); celldofs(there)]`. Since there is a single domain, all interfaces
+    # have the same size (twice the number of dofs of a cell).
     Ki = zeros(ndofs_per_interface(dh), ndofs_per_interface(dh))
     # Allocate global force vector f
     f = zeros(ndofs(dh))
