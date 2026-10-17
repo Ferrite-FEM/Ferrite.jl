@@ -204,8 +204,8 @@ export
     # L2 Projection
     project,
     L2Projector,
-    L2CholeskySolver,
-    L2CGSolver,
+    L2SolverCholesky,
+    L2SolverCG,
 
     # Point Evaluation
     PointEvalHandler,
