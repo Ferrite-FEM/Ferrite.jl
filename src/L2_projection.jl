@@ -16,7 +16,7 @@ matrix, which is computed when the `L2Projector` is closed. This is the default.
 `project` call is fast, but storing the factorization can take a lot of memory for large
 3D meshes.
 """
-struct L2CholeskySolver <: AbstractL2Solver end
+struct L2SolverCholesky <: AbstractL2Solver end
 
 """
     L2CGSolver(; reltol = 1.0e-10, maxiter = nothing)
@@ -24,12 +24,12 @@ struct L2CholeskySolver <: AbstractL2Solver end
 Store the consistent mass matrix (upper triangle only) and solve the projection equation
 with the Jacobi-preconditioned conjugate gradient method. The iteration stops when the
 residual norm is below `reltol` times the norm of the right-hand side. It also stops after
-`maxiter` iterations (default: the number of dofs), and then a warning is shown.
+`maxiter` iterations (default: the number of dofs), and then a error is thrown.
 This needs much less memory than [`L2CholeskySolver`](@ref), at the cost of an iterative
 solve on every `project` call. The mass matrix is well conditioned, so it converges in
 few iterations.
 """
-Base.@kwdef struct L2CGSolver <: AbstractL2Solver
+Base.@kwdef struct L2SolverCG <: AbstractL2Solver
     reltol::Float64 = 1.0e-10
     maxiter::Union{Int, Nothing} = nothing
 end
@@ -108,7 +108,7 @@ projected = project(proj, vals)
 where `projected` can be used in e.g. `evaluate_at_points` with the [`PointEvalHandler`](@ref),
 or with [`evaluate_at_grid_nodes`](@ref).
 """
-function L2Projector(grid::AbstractGrid; solver::AbstractL2Solver = L2CholeskySolver())
+function L2Projector(grid::AbstractGrid; solver::AbstractL2Solver = L2SolverCholesky())
     dh = DofHandler(grid)
     return L2Projector(solver, nothing, dh, nothing, QuadratureRule[], QuadratureRule[])
 end
@@ -128,7 +128,7 @@ function L2Projector(
         qr_lhs::QuadratureRule = _mass_qr(ip),
         set = OrderedSet(1:getncells(grid)),
         geom_ip = nothing,
-        solver::AbstractL2Solver = L2CholeskySolver(),
+        solver::AbstractL2Solver = L2SolverCholesky(),
     )
     geom_ip === nothing || @warn("Providing geom_ip is deprecated, the geometric interpolation of the cells with always be used")
     proj = L2Projector(grid; solver)
@@ -203,9 +203,9 @@ function _assemble_condensed_L2_matrix(proj::L2Projector)
     return M
 end
 
-_setup_solver(::L2CholeskySolver, proj::L2Projector) = cholesky(_assemble_condensed_L2_matrix(proj))
+_setup_solver(::L2SolverCholesky, proj::L2Projector) = cholesky(_assemble_condensed_L2_matrix(proj))
 
-function _setup_solver(::L2CGSolver, proj::L2Projector)
+function _setup_solver(::L2SolverCG, proj::L2Projector)
     M = _assemble_condensed_L2_matrix(proj)
     return (M, inv.(Vector(diag(M))))
 end
@@ -393,9 +393,9 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
     return T[make_T(x) for x in Base.eachrow(projected_vals)]
 end
 
-_solve(::L2CholeskySolver, M_cholesky, f::Matrix) = M_cholesky \ f
+_solve(::L2SolverCholesky, M_cholesky::CholeskyData, f::Matrix) = M_cholesky \ f
 
-function _solve(solver::L2CGSolver, (M, invdiag), f::Matrix)
+function _solve(solver::L2SolverCG, (M, invdiag)::CGData, f::Matrix)
     maxiter = solver.maxiter === nothing ? size(f, 1) : solver.maxiter
     u = zero(f)
     # Work buffers, reused for all columns
@@ -425,8 +425,7 @@ function _pcg!(x, M, b, invdiag, r, z, p, q, reltol, maxiter)
         p .= z .+ (ρ_new / ρ) .* p
         ρ = ρ_new
     end
-    @warn "L2CGSolver did not converge in $maxiter iterations (residual norm $(norm(r)), tolerance $tol)"
-    return x
+    error("L2CGSolver did not converge in $maxiter iterations (residual norm $(norm(r)), tolerance $tol)")
 end
 
 function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandler, vars::Union{AbstractVector, AbstractDict})
