@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - `ProjectedDirichlet` now supports zero-valued conditions for 3D H(curl) interpolations
    (e.g. `Nedelec{RefTetrahedron, 1}`), by passing `Returns(zero(Vec{3}))` as the
    function. ([#1232])
+ - Hessians in `CellValues` (`update_hessians = true`) are now supported for embedded
+   elements, i.e. curves in 2D and 3D and surfaces in 3D.
+   ([#1558])
 
 ### Deprecated
 
@@ -1550,5 +1553,6 @@ poking into Ferrite internals:
 [#1548]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1548
 [#1549]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1549
 [#1553]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1553
+[#1558]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1558
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
