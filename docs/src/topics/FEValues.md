@@ -101,6 +101,24 @@ Second order gradients of the shape functions are computed as
     \end{align*}
     ```
 
+!!! details "Embedded elements"
+    For embedded elements (e.g. curves in 2D/3D or surfaces in 3D), $\boldsymbol{J}$ is not square, and
+    $\boldsymbol{J}^{-1}$ is replaced by the pseudo-inverse $\boldsymbol{J}^+ = (\boldsymbol{J}^\mathrm{T}\cdot\boldsymbol{J})^{-1}\cdot\boldsymbol{J}^\mathrm{T}$,
+    such that $\mathrm{grad}$ is the tangential gradient. The derivative of the pseudo-inverse contains an additional term,
+    ```math
+    \begin{align*}
+        \frac{\mathrm{d}J^{+}_{ri}}{\mathrm{d}\xi_s} = - J^{+}_{rk}\mathcal{H}_{kps} J^{+}_{pi} + G^{-1}_{rp}\mathcal{H}_{kps} P_{ki},
+        \quad \boldsymbol{G} = \boldsymbol{J}^\mathrm{T}\cdot\boldsymbol{J}, \quad \boldsymbol{P} = \boldsymbol{I} - \boldsymbol{J}\cdot\boldsymbol{J}^+
+    \end{align*}
+    ```
+    which vanishes for square $\boldsymbol{J}$. The second order gradient, i.e. the tangential gradient of the tangential gradient, thus becomes
+    ```math
+    \begin{align*}
+        \frac{\mathrm{d}^2 N}{\mathrm{d}x_i \mathrm{d}x_j} = J^{+}_{pi}\left[\frac{\mathrm{d}^2 \hat N}{\mathrm{d} \xi_p\mathrm{d} \xi_s} - \frac{\mathrm{d} N}{\mathrm{d} x_k}\mathcal{H}_{kps}\right] J^{+}_{sj} + \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r} G^{-1}_{rp} P_{ik}\mathcal{H}_{kps} J^{+}_{sj}
+    \end{align*}
+    ```
+    On curved elements, the last term accounts for the curvature, and the second order gradient is in general not symmetric.
+
 ### Covariant Piola mapping, H(curl)
 `Ferrite.CovariantPiolaMapping`
 
