@@ -170,6 +170,15 @@ required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_
     return inv(tdot(J)) ⋅ (J)'
 end
 
+# For embedded elements, ∂J⁺/∂ξ = -J⁺⋅H⋅J⁺ + (JᵀJ)⁻¹⋅Hᵀ⋅(I - J⋅J⁺). The second term contributes
+# dNdξ ⋅ E to the hessian, with Eᵧᵢⱼ = (JᵀJ)⁻¹ᵧₐ ((I - J⋅J⁺)⋅H)ᵢₐᵦ J⁺ᵦⱼ.
+@inline embedding_hessian_term(::Tensor{2}, Jinv, H) = nothing
+@inline function embedding_hessian_term(J::MixedTensor2{sdim, rdim}, Jinv, H) where {sdim, rdim}
+    PH = (one(Tensor{2, sdim}) - J ⋅ Jinv) ⋅ H
+    PHt = MixedTensor3{rdim, sdim, rdim}((α, i, β) -> PH[i, α, β])
+    return inv(tdot(J)) ⋅ PHt ⋅ Jinv
+end
+
 # =============
 # Apply mapping
 # =============
@@ -191,12 +200,10 @@ end
 end
 
 @inline function apply_mapping!(funvals::FunctionValues{2}, ::IdentityMapping, q_point::Int, mapping_values, args...)
-    Jinv = calculate_Jinv(getjacobian(mapping_values))
-
-    sdim, rdim = size(Jinv)
-    (rdim != sdim) && error("apply_mapping! for second order gradients and embedded elements not implemented")
-
+    J = getjacobian(mapping_values)
+    Jinv = calculate_Jinv(J)
     H = gethessian(mapping_values)
+    E = embedding_hessian_term(J, Jinv, H)
     is_vector_valued = first(funvals.Nx) isa Vec
     Jinv_otimesu_Jinv = is_vector_valued ? otimesu(Jinv, Jinv) : nothing
     @inbounds for j in 1:getnbasefunctions(funvals)
@@ -205,6 +212,9 @@ end
             d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⊡ Jinv_otimesu_Jinv
         else
             d2Ndx2 = Jinv' ⋅ (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⋅ Jinv
+        end
+        if !isnothing(E)
+            d2Ndx2 += funvals.dNdξ[j, q_point] ⋅ E
         end
 
         funvals.dNdx[j, q_point] = dNdx

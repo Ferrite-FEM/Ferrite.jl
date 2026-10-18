@@ -570,16 +570,26 @@ end
             end
         end
 
-        @testset "CellValues with hessians" begin
-            ip = Lagrange{RefQuadrilateral, 2}()
-            qr = QuadratureRule{RefQuadrilateral}(2)
-
-            cv_vector = CellValues(qr, ip^2, ip^3; update_hessians = true)
-            cv_scalar = CellValues(qr, ip, ip^3; update_hessians = true)
-
-            coords = [Vec{3}((x[1], x[2], 0.0)) for x in Ferrite.reference_coordinates(ip)]
-            @test_throws ErrorException reinit!(cv_vector, coords) # Not implemented for embedded elements
-            @test_throws ErrorException reinit!(cv_scalar, coords)
+        @testset "CellValues with hessians (rdim = $(Ferrite.getrefdim(ip_geo)), sdim = $sdim)" for (ip_geo, sdim) in (
+                (Lagrange{RefLine, 2}(), 2), (Lagrange{RefLine, 2}(), 3),
+                (Lagrange{RefTriangle, 2}(), 3), (Lagrange{RefQuadrilateral, 2}(), 3),
+            )
+            qr = QuadratureRule{getrefshape(ip_geo)}(3)
+            for ip in (ip_geo, ip_geo^2, ip_geo^3)
+                x = [rand(Vec{sdim}) for _ in 1:getnbasefunctions(ip_geo)]
+                cv = CellValues(qr, ip, ip_geo^sdim; update_hessians = true)
+                reinit!(cv, x)
+                for (q, ξ) in pairs(Ferrite.getpoints(qr))
+                    @test Ferrite.calculate_mapping(ip_geo, ξ, x, Val(2)).H ≈ Ferrite.calculate_mapping(cv.geo_mapping, q, x).H
+                    Jinv(ξ) = Ferrite.calculate_Jinv(Ferrite.calculate_mapping(ip_geo, ξ, x, Val(1)).J)
+                    for i in 1:getnbasefunctions(ip)
+                        # Tangential gradient of the tangential gradient
+                        dNdx(ξ) = Ferrite.reference_shape_gradient(ip, ξ, i) ⋅ Jinv(ξ)
+                        @test shape_gradient(cv, q, i) ≈ dNdx(ξ)
+                        @test shape_hessian(cv, q, i) ≈ Tensors.gradient(dNdx, ξ) ⋅ Jinv(ξ)
+                    end
+                end
+            end
         end
     end
 
