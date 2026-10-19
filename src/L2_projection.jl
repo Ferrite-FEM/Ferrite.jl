@@ -431,8 +431,13 @@ end
 
 # Jacobi-preconditioned conjugate gradient method for M x = b, starting from x = 0
 function _pcg!(x, M, b, invdiag, r, z, p, q, reltol, maxiter)
-    copyto!(r, b)
-    tol = reltol * norm(b)
+    # Solve for the normalized rhs b / ‖b‖ and scale the solution back at the end. The dot
+    # products below square the magnitude of the data, and would otherwise under- or
+    # overflow for very small or large data (`norm` itself avoids this).
+    bnorm = norm(b)
+    iszero(bnorm) && return x
+    r .= b ./ bnorm
+    tol = reltol # relative to ‖r‖ = 1
     norm(r) <= tol && return x
     z .= invdiag .* r
     copyto!(p, z)
@@ -445,13 +450,16 @@ function _pcg!(x, M, b, invdiag, r, z, p, q, reltol, maxiter)
         α = ρ / pq
         x .+= α .* p
         r .-= α .* q
-        norm(r) <= tol && return x
+        if norm(r) <= tol
+            x .*= bnorm
+            return x
+        end
         z .= invdiag .* r
         ρ_new = dot(r, z)
         p .= z .+ (ρ_new / ρ) .* p
         ρ = ρ_new
     end
-    error("L2SolverCG did not converge in $maxiter iterations (residual norm $(norm(r)), tolerance $tol)")
+    error("L2SolverCG did not converge in $maxiter iterations (residual norm $(norm(r) * bnorm), tolerance $(tol * bnorm))")
 end
 
 function assemble_proj_rhs!(f::Matrix, cellvalues::CellValues, sdh::SubDofHandler, vars::Union{AbstractVector, AbstractDict})

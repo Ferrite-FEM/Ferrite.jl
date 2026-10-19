@@ -650,6 +650,32 @@ end
         end
     end
 
+    @testset "CG with very small or large data" begin
+        # The dot products in CG square the magnitude of the data, so without normalizing
+        # the rhs they under- or overflow for these scales.
+        grid = generate_grid(Quadrilateral, (4, 4))
+        ip = Lagrange{RefQuadrilateral, 1}()
+        qr = QuadratureRule{RefQuadrilateral}(2)
+        proj = L2Projector(ip, grid; solver = L2SolverCG())
+        proj_chol = L2Projector(ip, grid; solver = L2SolverCholesky())
+        for value_shape in (identity, v -> (1 + 2im) * v, v -> Vec((v, 2v, 0.0)))
+            data = qp_data(x -> value_shape(f(x)), grid, qr, ip)
+            expected = project(proj_chol, data, qr)
+            for scale in (1.0, 1.0e-300, 1.0e-200, 1.0e-160, 1.0e160, 1.0e200, 1.0e300)
+                scaled_data = [scale .* cell_data for cell_data in data]
+                @test project(proj, scaled_data, qr) ./ scale ≈ expected rtol = 1.0e-9
+            end
+            zero_data = [zero.(cell_data) for cell_data in data]
+            @test all(iszero, project(proj, zero_data, qr))
+        end
+        # Not converging gives the non-convergence error (and not e.g. a PosDefException)
+        data = qp_data(f, grid, qr, ip)
+        for scale in (1.0e-200, 1.0, 1.0e200)
+            scaled_data = [scale .* cell_data for cell_data in data]
+            @test_throws r"did not converge" project(proj, scaled_data, qr; maxiter = 1)
+        end
+    end
+
     # CG errors when it does not converge
     grid = generate_grid(Quadrilateral, (4, 4))
     ip = Lagrange{RefQuadrilateral, 1}()
