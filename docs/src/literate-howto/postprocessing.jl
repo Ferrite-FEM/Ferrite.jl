@@ -95,9 +95,11 @@ end
 q_gp = compute_heat_fluxes(cellvalues, dh, u);
 
 # Next, create an [`L2Projector`](@ref) using the same interpolation as was used to approximate the
-# temperature field. On instantiation, the projector assembles the coefficient matrix `M` and
-# computes the Cholesky factorization of it. By doing so, the projector can be reused without
-# having to invert `M` every time.
+# temperature field. On instantiation, the projector assembles the coefficient matrix `M`
+# (the mass matrix), such that the projector can be reused without having to assemble `M`
+# every time. By default, each projection solves the system with the (Jacobi-preconditioned)
+# conjugate gradient method; pass `solver = L2SolverCholesky()` to instead store a Cholesky
+# factorization of `M`, see [`L2Projector`](@ref).
 projector = L2Projector(ip, grid);
 
 # Project the integration point values to the nodal values

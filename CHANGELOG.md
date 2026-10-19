@@ -39,14 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    local matrix (`r.here`/`r.there` for the two sides), also across `SubDofHandler`s, and
    can be passed directly to `function_value` etc. Both also accept a `DofHandler` with a
    single `SubDofHandler`, for use outside the interface loop. ([#1433], [#1556])
- - `L2Projector` gains a `solver` keyword argument. The new `L2SolverCG` stores only the
-   (upper triangle of the) mass matrix and solves the projection with
+ - `L2Projector` gains a `solver` keyword argument. The new default, `L2SolverCG`, stores
+   only the (upper triangle of the) mass matrix and solves the projection with
    Jacobi-preconditioned conjugate gradients, instead of storing a Cholesky
    factorization. This uses much less memory for large 3D meshes (e.g. 16 MB instead of
-   1 GB for 69k quadratic tetrahedron dofs) and makes `close!` faster, at the cost of an
-   iterative solve in each `project` call. The default, `L2SolverCholesky`, keeps the
-   previous behavior. The tolerances of `L2SolverCG` can be overridden per call with the
-   `reltol` and `maxiter` keyword arguments of `project`. ([#1554])
+   1 GB for 69k quadratic tetrahedron dofs) and makes `close!` much faster, at the cost of
+   an iterative solve in each `project` call. Projected values therefore change at the
+   level of the solver tolerance (`reltol = 1e-10` by default). The previous behavior is
+   available with `solver = L2SolverCholesky()`, which can be faster when the same
+   projector is used for many `project` calls. The tolerances of `L2SolverCG` can be
+   overridden per call with the `reltol` and `maxiter` keyword arguments of `project`.
+   ([#1554])
 
 ### Deprecated
 

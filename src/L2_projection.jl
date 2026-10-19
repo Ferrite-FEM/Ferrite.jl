@@ -12,9 +12,11 @@ abstract type AbstractL2Solver end
     L2SolverCholesky()
 
 Solve the projection equation with a sparse Cholesky factorization of the consistent mass
-matrix, which is computed when the `L2Projector` is closed. This is the default. Each
-`project` call is fast, but storing the factorization can take a lot of memory for large
-3D meshes.
+matrix, which is computed when the `L2Projector` is closed. Each `project` call is fast,
+in particular for tensor data, but computing and storing the factorization can take a lot
+of time and memory for large 3D meshes. This can be preferable to the default
+[`L2SolverCG`](@ref) when the same projector is used for many `project` calls on a mesh
+where the factorization fits in memory.
 """
 struct L2SolverCholesky <: AbstractL2Solver end
 
@@ -28,8 +30,9 @@ if this is not reached within `maxiter` iterations, and a `PosDefException` is t
 the mass matrix is found not to be positive definite (e.g. because `qr_lhs` is too low
 order). `reltol` and `maxiter` can be overridden in each [`project`](@ref) call.
 
-This needs much less memory than [`L2SolverCholesky`](@ref), at the cost of an iterative
-solve on every `project` call. The preconditioned mass matrix is well conditioned,
+This is the default. It needs much less memory than [`L2SolverCholesky`](@ref), and closing
+the `L2Projector` is much faster, at the cost of an iterative solve on every `project`
+call. The preconditioned mass matrix is well conditioned,
 independently of the mesh size and of the variation of element sizes, so the solver
 typically converges in 10 to 50 iterations.
 
@@ -82,7 +85,7 @@ function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
 end
 
 """
-    L2Projector(grid::AbstractGrid; solver = L2SolverCholesky())
+    L2Projector(grid::AbstractGrid; solver = L2SolverCG())
 
 Initiate an `L2Projector` for projecting quadrature data onto
 a function space. To define the function space, add interpolations for
@@ -98,7 +101,7 @@ where ``f \\in L_2(\\Omega)`` is the data to project. The function space ``U_h(\
 is the finite element approximation given by the interpolations `add!`ed to the `L2Projector`.
 
 The keyword argument `solver` sets how the projection equation is solved. The options are
-[`L2SolverCholesky`](@ref) (default) and [`L2SolverCG`](@ref).
+[`L2SolverCG`](@ref) (default) and [`L2SolverCholesky`](@ref).
 
 ### Example
 ```julia
@@ -123,7 +126,7 @@ projected = project(proj, vals)
 where `projected` can be used in e.g. `evaluate_at_points` with the [`PointEvalHandler`](@ref),
 or with [`evaluate_at_grid_nodes`](@ref).
 """
-function L2Projector(grid::AbstractGrid; solver::AbstractL2Solver = L2SolverCholesky())
+function L2Projector(grid::AbstractGrid; solver::AbstractL2Solver = L2SolverCG())
     dh = DofHandler(grid)
     return L2Projector(solver, nothing, dh, nothing, QuadratureRule[], QuadratureRule[])
 end
@@ -135,7 +138,7 @@ A quick way to initiate an `L2Projector`, add an interpolation `ip` on the `set`
 it, and then `close!` it so that it can be used to `project`. The optional
 keyword argument `set` defaults to all cells in the `grid`, while `qr_lhs` defaults
 to a quadrature rule that integrates the mass matrix exactly for the interpolation `ip`.
-`solver` defaults to [`L2SolverCholesky`](@ref), see [`L2Projector`](@ref).
+`solver` defaults to [`L2SolverCG`](@ref), see [`L2Projector`](@ref).
 """
 function L2Projector(
         ip::Interpolation,
@@ -143,7 +146,7 @@ function L2Projector(
         qr_lhs::QuadratureRule = _mass_qr(ip),
         set = OrderedSet(1:getncells(grid)),
         geom_ip = nothing,
-        solver::AbstractL2Solver = L2SolverCholesky(),
+        solver::AbstractL2Solver = L2SolverCG(),
     )
     geom_ip === nothing || @warn("Providing geom_ip is deprecated, the geometric interpolation of the cells with always be used")
     proj = L2Projector(grid; solver)

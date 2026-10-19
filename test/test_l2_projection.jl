@@ -134,7 +134,7 @@ function test_projection(order, refshape)
     else
         bad_order = 1
     end
-    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs = QuadratureRule{refshape}(bad_order))
+    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs = QuadratureRule{refshape}(bad_order), solver = L2SolverCholesky())
     # CG can only detect it when solving
     proj_cg = L2Projector(ip, grid; qr_lhs = QuadratureRule{refshape}(bad_order), solver = L2SolverCG())
     @test_throws LinearAlgebra.PosDefException project(proj_cg, qp_values, qr)
@@ -480,7 +480,7 @@ function test_show_l2()
     grid = generate_grid(Triangle, (2, 2))
     ip = Lagrange{RefTriangle, 1}()
     proj = L2Projector(ip, grid)
-    @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{RefTriangle, 1}()\n  geometric interpolation: Lagrange{RefTriangle, 1}()\n  solver:                  L2SolverCholesky()"
+    @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{RefTriangle, 1}()\n  geometric interpolation: Lagrange{RefTriangle, 1}()\n  solver:                  L2SolverCG(1.0e-10, 1000)"
 
     # Multi-domain setup
     proj2 = L2Projector(grid)
@@ -621,7 +621,7 @@ end
             data_vec = qp_data(x -> Vec{2}((f(x), 2f(x))), grid, qr, ip)
             data_stens = qp_data(x -> SymmetricTensor{2, 2}((f(x), 2f(x), 3f(x))), grid, qr, ip)
 
-            proj_chol = L2Projector(ip, grid; qr_lhs)
+            proj_chol = L2Projector(ip, grid; qr_lhs, solver = L2SolverCholesky())
             proj_cg = L2Projector(ip, grid; qr_lhs, solver = L2SolverCG())
             @test proj_cg.solver isa L2SolverCG
             for d in (data, data_vec, data_stens)
@@ -660,7 +660,7 @@ end
     @test_throws ErrorException project(proj, data, qr)
 
     # The tolerances can be overridden in the project call
-    ref = project(L2Projector(ip, grid), data, qr)
+    ref = project(L2Projector(ip, grid; solver = L2SolverCholesky()), data, qr)
     @test project(proj, data, qr; maxiter = 100) ≈ ref rtol = 1.0e-8
     proj = L2Projector(ip, grid; solver = L2SolverCG())
     @test_throws ErrorException project(proj, data, qr; maxiter = 1)
@@ -669,5 +669,5 @@ end
     @test u_loose ≈ ref rtol = 1.0e-1
     @test !isapprox(u_loose, ref; rtol = 1.0e-8)
     # and are ignored by Cholesky, which satisfies any tolerance
-    @test project(L2Projector(ip, grid), data, qr; reltol = 1.0, maxiter = 1) == ref
+    @test project(L2Projector(ip, grid; solver = L2SolverCholesky()), data, qr; reltol = 1.0, maxiter = 1) == ref
 end
