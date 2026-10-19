@@ -1,10 +1,10 @@
 # Imports for parallel (isolated) test execution:
 using LinearAlgebra
 include("vtk_test_utils.jl")
-import Ferrite: getrefdim
+using Ferrite: getrefdim, L2SolverCG, L2SolverCholesky
 
 @testset "complex L2 projection" begin
-    for nonconforming in (false, true)
+    for nonconforming in (false, true), solver in (L2SolverCholesky(), L2SolverCG())
         grid = generate_grid(Quadrilateral, (2, 2))
         if nonconforming
             forest = ForestBWG(grid, 3)
@@ -15,7 +15,7 @@ import Ferrite: getrefdim
         ip = Lagrange{RefQuadrilateral, 1}()
         qr = QuadratureRule{RefQuadrilateral}(2)
         cv = CellValues(qr, ip)
-        proj = L2Projector(ip, grid)
+        proj = L2Projector(ip, grid; solver)
         for T in (ComplexF32, ComplexF64), value_shape in (identity, z -> Vec((z, 2z)), z -> SymmetricTensor{2, 2}((z, 2z, 3z)))
             f(x) = value_shape(T(1 + x[1] + (2 - x[2]) * im))
             data = map(1:getncells(grid)) do cellid
@@ -134,7 +134,10 @@ function test_projection(order, refshape)
     else
         bad_order = 1
     end
-    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs = QuadratureRule{refshape}(bad_order))
+    @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs = QuadratureRule{refshape}(bad_order), solver = L2SolverCholesky())
+    # CG can only detect it when solving
+    proj_cg = L2Projector(ip, grid; qr_lhs = QuadratureRule{refshape}(bad_order), solver = L2SolverCG())
+    @test_throws LinearAlgebra.PosDefException project(proj_cg, qp_values, qr)
     return
 end
 
@@ -477,7 +480,7 @@ function test_show_l2()
     grid = generate_grid(Triangle, (2, 2))
     ip = Lagrange{RefTriangle, 1}()
     proj = L2Projector(ip, grid)
-    @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{RefTriangle, 1}()\n  geometric interpolation: Lagrange{RefTriangle, 1}()\n"
+    @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{RefTriangle, 1}()\n  geometric interpolation: Lagrange{RefTriangle, 1}()\n  solver:                  " * repr(L2SolverCG())
 
     # Multi-domain setup
     proj2 = L2Projector(grid)
@@ -490,6 +493,8 @@ function test_show_l2()
     @test contains(showstr, "L2Projector")
     @test contains(showstr, "4/8 cells in grid")
     @test contains(showstr, "Split into 2 sets")
+    proj3 = L2Projector(ip, grid; solver = L2SolverCG(; reltol = 1.0e-8))
+    @test contains(repr("text/plain", proj3), "solver:                  " * repr(L2SolverCG(; reltol = 1.0e-8)))
     return
 end
 
@@ -570,22 +575,99 @@ end
         qr = QuadratureRule{getrefshape(ip)}(2)
         cv = CellValues(qr, ip, ip)
 
-        proj = L2Projector(ncgrid)
-        add!(proj, collect(1:getncells(ncgrid)), ip; qr_rhs = qr)
-        close!(proj)
-
         # u(x) = x is componentwise linear, hence in the constrained ansatz space
         qpdata = map(1:getncells(ncgrid)) do cellid
             coords = getcoordinates(ncgrid, cellid)
             reinit!(cv, coords)
             [spatial_coordinate(cv, qp, coords) for qp in 1:getnquadpoints(cv)]
         end
-        projected = project(proj, qpdata, qr)
 
-        for cell in CellIterator(proj.dh)
-            for (dof, x) in zip(celldofs(cell), getcoordinates(cell))
-                @test projected[dof] ≈ x atol = 1.0e-12
+        for solver in (L2SolverCholesky(), L2SolverCG())
+            proj = L2Projector(ncgrid; solver)
+            add!(proj, collect(1:getncells(ncgrid)), ip; qr_rhs = qr)
+            close!(proj)
+            projected = project(proj, qpdata, qr)
+            for cell in CellIterator(proj.dh)
+                for (dof, x) in zip(celldofs(cell), getcoordinates(cell))
+                    @test projected[dof] ≈ x atol = 1.0e-8
+                end
             end
         end
     end
+end
+
+@testset "L2 projection solvers" begin
+    f(x) = 1 + x[1]^2 + sin(sum(x))
+    function qp_data(f, grid, qr, ip)
+        cv = CellValues(qr, ip, geometric_interpolation(getcelltype(grid)))
+        return map(1:getncells(grid)) do cellid
+            coords = getcoordinates(grid, cellid)
+            reinit!(cv, coords)
+            [f(spatial_coordinate(cv, qp, coords)) for qp in 1:getnquadpoints(cv)]
+        end
+    end
+    for (CT, RS) in (
+            (Line, RefLine), (Triangle, RefTriangle), (Quadrilateral, RefQuadrilateral),
+            (Tetrahedron, RefTetrahedron), (Hexahedron, RefHexahedron), (Wedge, RefPrism),
+            (Pyramid, RefPyramid),
+        )
+        grid = generate_grid(CT, ntuple(_ -> 3, getrefdim(RS)))
+        ips = Any[Lagrange{RS, 1}(), Lagrange{RS, 2}(), DiscontinuousLagrange{RS, 1}()]
+        RS in (RefQuadrilateral, RefHexahedron) && push!(ips, Serendipity{RS, 2}())
+        @testset "$ip" for ip in ips
+            qr = QuadratureRule{RS}(3)
+            qr_lhs = ip isa Lagrange ? Ferrite._mass_qr(ip) : QuadratureRule{RS}(4)
+            data = qp_data(f, grid, qr, ip)
+            data_vec = qp_data(x -> Vec{2}((f(x), 2f(x))), grid, qr, ip)
+            data_stens = qp_data(x -> SymmetricTensor{2, 2}((f(x), 2f(x), 3f(x))), grid, qr, ip)
+
+            proj_chol = L2Projector(ip, grid; qr_lhs, solver = L2SolverCholesky())
+            proj_cg = L2Projector(ip, grid; qr_lhs, solver = L2SolverCG())
+            @test proj_cg.solver isa L2SolverCG
+            for d in (data, data_vec, data_stens)
+                ref = project(proj_chol, d, qr)
+                u = project(proj_cg, d, qr)
+                @test typeof(u) == typeof(ref)
+                @test u ≈ ref rtol = 1.0e-8
+            end
+        end
+    end
+
+    @testset "Prism polynomial reproduction" begin
+        grid = generate_grid(Wedge, (1, 1, 1))
+        qr = QuadratureRule{RefPrism}(8)
+        for order in (1, 2)
+            ip = Lagrange{RefPrism, order}()
+            # This tensor-product polynomial belongs to the prism interpolation space.
+            polynomial(x) = x[1]^order * x[3]^order
+            data = qp_data(polynomial, grid, qr, ip)
+            for solver in (L2SolverCholesky(), L2SolverCG())
+                proj = L2Projector(ip, grid; solver)
+                expected = zeros(ndofs(proj.dh))
+                apply_analytical!(expected, proj.dh, :_, polynomial)
+                @test project(proj, data, qr) ≈ expected rtol = 1.0e-9
+            end
+        end
+    end
+
+    # CG errors when it does not converge
+    grid = generate_grid(Quadrilateral, (4, 4))
+    ip = Lagrange{RefQuadrilateral, 1}()
+    qr = QuadratureRule{RefQuadrilateral}(2)
+    data = qp_data(f, grid, qr, ip)
+    @test L2SolverCG().maxiter == 1000
+    proj = L2Projector(ip, grid; solver = L2SolverCG(; maxiter = 1))
+    @test_throws ErrorException project(proj, data, qr)
+
+    # The tolerances can be overridden in the project call
+    ref = project(L2Projector(ip, grid; solver = L2SolverCholesky()), data, qr)
+    @test project(proj, data, qr; maxiter = 100) ≈ ref rtol = 1.0e-8
+    proj = L2Projector(ip, grid; solver = L2SolverCG())
+    @test_throws ErrorException project(proj, data, qr; maxiter = 1)
+    @test_throws ErrorException project(proj, reduce(hcat, data), qr; maxiter = 1) # matrix input
+    u_loose = project(proj, data, qr; reltol = 1.0e-2)
+    @test u_loose ≈ ref rtol = 1.0e-1
+    @test !isapprox(u_loose, ref; rtol = 1.0e-8)
+    # and are ignored by Cholesky, which satisfies any tolerance
+    @test project(L2Projector(ip, grid; solver = L2SolverCholesky()), data, qr; reltol = 1.0, maxiter = 1) == ref
 end
