@@ -51,6 +51,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    when the same projector is used for many `project` calls. The tolerances of
    `L2SolverCG` can be overridden per call with the `reltol` and `maxiter` keyword
    arguments of `project`. ([#1554])
+ - `FacetValues` now supports multiple fields sharing quadrature rule and geometric
+   interpolation, in the same way as `CellValues`, e.g.
+   `FacetValues(fqr, (u = ipu, p = ipp))` with shape function queries on `fv.u` and
+   `fv.p`. The type parameters of `FacetValues` have changed (internal, but may affect
+   code dispatching on them). ([#1472])
 
 ### Deprecated
 
@@ -76,19 +81,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    edge are the 1D GLL points for all reference shapes, so mixed grids remain conforming.
    The dof numbering is unchanged, but the shape functions, and hence nodal values, differ.
    ([#1385], [#1523])
-
-### Changed
-
  - `CellValues` now supports multiple fields sharing quadrature rule and geometric
    interpolation by passing a `NamedTuple` of interpolations, e.g.
    `CellValues(qr, (u = ipu, p = ipp))`. This merges `MultiFieldCellValues` into
    `CellValues`; `MultiFieldCellValues` remains as an alias for this case and behaves as
    before. The type parameters of `CellValues` have changed (internal, but may affect
    code dispatching on them). ([#1469])
- - `FacetValues` now supports multiple fields the same way as `CellValues`, e.g.
-   `FacetValues(fqr, (u = ipu, p = ipp))` with shape function queries on `fv.u` and
-   `fv.p`. The type parameters of `FacetValues` have changed (internal, but may affect
-   code dispatching on them). ([#1472])
 
 ### Fixes
 
