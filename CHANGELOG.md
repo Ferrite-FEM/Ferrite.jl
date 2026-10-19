@@ -77,6 +77,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    The dof numbering is unchanged, but the shape functions, and hence nodal values, differ.
    ([#1385], [#1523])
 
+### Changed
+
+ - `CellValues` now supports multiple fields sharing quadrature rule and geometric
+   interpolation by passing a `NamedTuple` of interpolations, e.g.
+   `CellValues(qr, (u = ipu, p = ipp))`. This merges `MultiFieldCellValues` into
+   `CellValues`; `MultiFieldCellValues` remains as an alias for this case and behaves as
+   before. The type parameters of `CellValues` have changed (internal, but may affect
+   code dispatching on them). ([#1469])
+
 ### Fixes
 
  - Untangle the tangled `AffineConstraints` in `close!` ([#1327])
@@ -1596,3 +1605,4 @@ poking into Ferrite internals:
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
 [#1556]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1556
+[#1469]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1469
