@@ -1,7 +1,7 @@
 # Imports for parallel (isolated) test execution:
 using LinearAlgebra
 include("vtk_test_utils.jl")
-import Ferrite: getrefdim, L2SolverCG, L2SolverCholesky
+using Ferrite: getrefdim, L2SolverCG, L2SolverCholesky
 
 @testset "complex L2 projection" begin
     for nonconforming in (false, true), solver in (L2SolverCholesky(), L2SolverCG())

@@ -41,9 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    single `SubDofHandler`, for use outside the interface loop. ([#1433], [#1556])
  - `L2Projector` gains a `solver` keyword argument, with the (public, but not exported)
    options `Ferrite.L2SolverCG` and `Ferrite.L2SolverCholesky`. The new default,
-   `L2SolverCG`, stores only the (upper triangle of the) mass matrix and solves the
-   projection with Jacobi-preconditioned conjugate gradients, instead of storing a
-   Cholesky factorization. This uses much less memory for large 3D meshes (e.g. 16 MB
+   `L2SolverCG`, stores only the mass matrix and solves the projection with
+   Jacobi-preconditioned conjugate gradients, instead of storing a Cholesky
+   factorization. This uses much less memory for large 3D meshes (e.g. 16 MB
    instead of 1 GB for 69k quadratic tetrahedron dofs) and makes `close!` much faster, at
    the cost of an iterative solve in each `project` call. Projected values therefore
    change at the level of the solver tolerance (`reltol = 1e-10` by default). The previous
@@ -113,8 +113,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    memory. ([#1107], [#1549])
  - `project` with an `L2Projector` is faster (2–5× for typical meshes) and allocates
    much less memory. ([#1553])
- - `close!` for an `L2Projector` on conforming grids assembles and stores only the upper
-   triangle of the mass matrix, reducing its memory use. ([#1554])
 
 ### Documentation
 
