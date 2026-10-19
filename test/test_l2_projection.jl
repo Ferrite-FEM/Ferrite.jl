@@ -4,7 +4,7 @@ include("vtk_test_utils.jl")
 import Ferrite: getrefdim
 
 @testset "complex L2 projection" begin
-    for nonconforming in (false, true)
+    for nonconforming in (false, true), solver in (L2SolverCholesky(), L2SolverCG())
         grid = generate_grid(Quadrilateral, (2, 2))
         if nonconforming
             forest = ForestBWG(grid, 3)
@@ -15,7 +15,7 @@ import Ferrite: getrefdim
         ip = Lagrange{RefQuadrilateral, 1}()
         qr = QuadratureRule{RefQuadrilateral}(2)
         cv = CellValues(qr, ip)
-        proj = L2Projector(ip, grid)
+        proj = L2Projector(ip, grid; solver)
         for T in (ComplexF32, ComplexF64), value_shape in (identity, z -> Vec((z, 2z)), z -> SymmetricTensor{2, 2}((z, 2z, 3z)))
             f(x) = value_shape(T(1 + x[1] + (2 - x[2]) * im))
             data = map(1:getncells(grid)) do cellid
@@ -135,6 +135,9 @@ function test_projection(order, refshape)
         bad_order = 1
     end
     @test_throws LinearAlgebra.PosDefException L2Projector(ip, grid; qr_lhs = QuadratureRule{refshape}(bad_order))
+    # CG can only detect it when solving
+    proj_cg = L2Projector(ip, grid; qr_lhs = QuadratureRule{refshape}(bad_order), solver = L2SolverCG())
+    @test_throws LinearAlgebra.PosDefException project(proj_cg, qp_values, qr)
     return
 end
 
@@ -491,7 +494,7 @@ function test_show_l2()
     @test contains(showstr, "4/8 cells in grid")
     @test contains(showstr, "Split into 2 sets")
     proj3 = L2Projector(ip, grid; solver = L2SolverCG(; reltol = 1.0e-8))
-    @test contains(repr("text/plain", proj3), "solver:                  L2SolverCG(1.0e-8, nothing)")
+    @test contains(repr("text/plain", proj3), "solver:                  L2SolverCG(1.0e-8, 1000)")
     return
 end
 
@@ -647,10 +650,24 @@ end
         end
     end
 
-    # CG warns when it does not converge
+    # CG errors when it does not converge
     grid = generate_grid(Quadrilateral, (4, 4))
     ip = Lagrange{RefQuadrilateral, 1}()
     qr = QuadratureRule{RefQuadrilateral}(2)
+    data = qp_data(f, grid, qr, ip)
+    @test L2SolverCG().maxiter == 1000
     proj = L2Projector(ip, grid; solver = L2SolverCG(; maxiter = 1))
-    @test_throws ErrorException project(proj, qp_data(f, grid, qr, ip), qr)
+    @test_throws ErrorException project(proj, data, qr)
+
+    # The tolerances can be overridden in the project call
+    ref = project(L2Projector(ip, grid), data, qr)
+    @test project(proj, data, qr; maxiter = 100) ≈ ref rtol = 1.0e-8
+    proj = L2Projector(ip, grid; solver = L2SolverCG())
+    @test_throws ErrorException project(proj, data, qr; maxiter = 1)
+    @test_throws ErrorException project(proj, reduce(hcat, data), qr; maxiter = 1) # matrix input
+    u_loose = project(proj, data, qr; reltol = 1.0e-2)
+    @test u_loose ≈ ref rtol = 1.0e-1
+    @test !isapprox(u_loose, ref; rtol = 1.0e-8)
+    # and are ignored by Cholesky, which satisfies any tolerance
+    @test project(L2Projector(ip, grid), data, qr; reltol = 1.0, maxiter = 1) == ref
 end

@@ -19,19 +19,34 @@ matrix, which is computed when the `L2Projector` is closed. This is the default.
 struct L2SolverCholesky <: AbstractL2Solver end
 
 """
-    L2SolverCG(; reltol = 1.0e-10, maxiter = nothing)
+    L2SolverCG(; reltol = 1.0e-10, maxiter = 1000)
 
 Store the consistent mass matrix (upper triangle only) and solve the projection equation
 with the Jacobi-preconditioned conjugate gradient method. The iteration stops when the
-residual norm is below `reltol` times the norm of the right-hand side. It also stops after
-`maxiter` iterations (default: the number of dofs), and then an error is thrown.
+residual norm is below `reltol` times the norm of the right-hand side. An error is thrown
+if this is not reached within `maxiter` iterations, and a `PosDefException` is thrown if
+the mass matrix is found not to be positive definite (e.g. because `qr_lhs` is too low
+order). `reltol` and `maxiter` can be overridden in each [`project`](@ref) call.
+
 This needs much less memory than [`L2SolverCholesky`](@ref), at the cost of an iterative
-solve on every `project` call. The mass matrix is well conditioned, so it converges in
-few iterations.
+solve on every `project` call. The preconditioned mass matrix is well conditioned,
+independently of the mesh size and of the variation of element sizes, so the solver
+typically converges in 10 to 50 iterations.
+
+Note that the solution converges in the (volume weighted) L2 sense: on meshes with
+extremely different element sizes, nodal values in the smallest elements are less accurate
+than with [`L2SolverCholesky`](@ref). Use a smaller `reltol` if this matters.
 """
 Base.@kwdef struct L2SolverCG <: AbstractL2Solver
     reltol::Float64 = 1.0e-10
-    maxiter::Union{Int, Nothing} = nothing
+    maxiter::Int = 1000
+end
+
+# Override the tolerances of `solver` for a `project` call (`nothing`: keep the value of
+# `solver`). Direct solvers satisfy any tolerance, so they ignore them.
+_with_tolerances(solver::L2SolverCholesky, reltol, maxiter) = solver
+function _with_tolerances(solver::L2SolverCG, reltol, maxiter)
+    return L2SolverCG(something(reltol, solver.reltol), something(maxiter, solver.maxiter))
 end
 
 const CholeskyData = SparseArrays.CHOLMOD.Factor{Float64, Int}
@@ -280,7 +295,7 @@ function _assemble_L2_matrix!(assembler, cellvalues::CellValues, sdh::SubDofHand
 end
 
 """
-    project(proj::L2Projector, vals, [qr_rhs::QuadratureRule])
+    project(proj::L2Projector, vals, [qr_rhs::QuadratureRule]; reltol = nothing, maxiter = nothing)
 
 Makes a L2 projection of data `vals` to the nodes of the grid using the projector `proj`
 (see [`L2Projector`](@ref)).
@@ -319,27 +334,32 @@ vals = [
 ```
 Supported data types to project are `Number`s and `AbstractTensor`s.
 
+For an iterative solver ([`L2SolverCG`](@ref)), the keyword arguments `reltol` and
+`maxiter` override the solver's tolerances for this call (`nothing` keeps the solver's
+values). They are ignored by direct solvers ([`L2SolverCholesky`](@ref)), which satisfy
+any tolerance.
+
 !!! note
     The order of the returned data correspond to the order of the `L2Projector`'s internal
     `DofHandler`. The data can be further analyzed with [`evaluate_at_points`](@ref) and
     [`evaluate_at_grid_nodes`](@ref). Use [`write_projection`](@ref) to export the result.
 
 """
-function project(proj::L2Projector, vars::Union{AbstractVector, AbstractDict})
-    return _project(proj, vars, proj.qrs_rhs)
+function project(proj::L2Projector, vars::Union{AbstractVector, AbstractDict}; reltol = nothing, maxiter = nothing)
+    return _project(proj, vars, proj.qrs_rhs, reltol, maxiter)
 end
 # Old-style providing quadrature rule to project
-function project(p::L2Projector, vars::Union{AbstractVector, AbstractDict}, qr_rhs::QuadratureRule)
+function project(p::L2Projector, vars::Union{AbstractVector, AbstractDict}, qr_rhs::QuadratureRule; reltol = nothing, maxiter = nothing)
     length(p.dh.subdofhandlers) == 1 || error("For multiple domains, provide the right-hand-side quadrature rule to the L2Projector")
-    return _project(p, vars, [qr_rhs])
+    return _project(p, vars, [qr_rhs], reltol, maxiter)
 end
 # Providing matrix data instead of Vector / Dict
-function project(p::L2Projector, vars::AbstractMatrix, args...)
+function project(p::L2Projector, vars::AbstractMatrix, args...; kwargs...)
     # TODO: Random access into vars is required for now, hence the collect
-    return project(p, collect(eachcol(vars)), args...)
+    return project(p, collect(eachcol(vars)), args...; kwargs...)
 end
 
-function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDict{Int, TC}}, qrs_rhs::Vector{<:QuadratureRule}) where {
+function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDict{Int, TC}}, qrs_rhs::Vector{<:QuadratureRule}, reltol, maxiter) where {
         T <: Union{Number, AbstractTensor}, TC <: AbstractVector{T},
     }
 
@@ -359,10 +379,11 @@ function _project(proj::L2Projector, vars::Union{AbstractVector{TC}, AbstractDic
 
     M = T <: AbstractTensor ? Tensors.n_components(Tensors.get_base(T)) : 1
 
-    return _project(proj, qrs_rhs, vars, Val(M), T)::Vector{T}
+    solver = _with_tolerances(proj.solver, reltol, maxiter)
+    return _project(proj, solver, qrs_rhs, vars, Val(M), T)::Vector{T}
 end
 
-function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Union{AbstractVector, AbstractDict}, ::Val{M}, ::Type{T}) where {M, T}
+function _project(proj::L2Projector, solver::AbstractL2Solver, qrs_rhs::Vector{<:QuadratureRule}, vars::Union{AbstractVector, AbstractDict}, ::Val{M}, ::Type{T}) where {M, T}
     f = zeros(promote_type(Float64, eltype(T)), ndofs(proj.dh), M)
     for (sdh, qr_rhs) in zip(proj.dh.subdofhandlers, qrs_rhs)
         ip_fun = only(sdh.field_interpolations)
@@ -379,7 +400,7 @@ function _project(proj::L2Projector, qrs_rhs::Vector{<:QuadratureRule}, vars::Un
         end
     end
 
-    projected_vals = _solve(proj.solver, proj.M::Union{CholeskyData, CGData}, f)::typeof(f)
+    projected_vals = _solve(solver, proj.M::Union{CholeskyData, CGData}, f)::typeof(f)
 
     if proj.ch !== nothing
         # Compute the values of the hanging (slave) dofs from their masters
@@ -396,12 +417,11 @@ end
 _solve(::L2SolverCholesky, M_cholesky::CholeskyData, f::Matrix) = M_cholesky \ f
 
 function _solve(solver::L2SolverCG, (M, invdiag)::CGData, f::Matrix)
-    maxiter = solver.maxiter === nothing ? size(f, 1) : solver.maxiter
     u = zero(f)
     # Work buffers, reused for all columns
     r, z, p, q = (similar(f, size(f, 1)) for _ in 1:4)
     for j in axes(f, 2)
-        _pcg!(view(u, :, j), M, view(f, :, j), invdiag, r, z, p, q, solver.reltol, maxiter)
+        _pcg!(view(u, :, j), M, view(f, :, j), invdiag, r, z, p, q, solver.reltol, solver.maxiter)
     end
     return u
 end
@@ -416,7 +436,10 @@ function _pcg!(x, M, b, invdiag, r, z, p, q, reltol, maxiter)
     ρ = dot(r, z)
     for _ in 1:maxiter
         mul!(q, M, p)
-        α = ρ / dot(p, q)
+        pq = dot(p, q)
+        # pᵀMp ≤ 0 is only possible if M is not positive definite (e.g. too low order qr_lhs)
+        real(pq) > 0 || throw(PosDefException(0))
+        α = ρ / pq
         x .+= α .* p
         r .-= α .* q
         norm(r) <= tol && return x

@@ -45,7 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    factorization. This uses much less memory for large 3D meshes (e.g. 16 MB instead of
    1 GB for 69k quadratic tetrahedron dofs) and makes `close!` faster, at the cost of an
    iterative solve in each `project` call. The default, `L2SolverCholesky`, keeps the
-   previous behavior. ([#XXXX])
+   previous behavior. The tolerances of `L2SolverCG` can be overridden per call with the
+   `reltol` and `maxiter` keyword arguments of `project`. ([#1554])
 
 ### Deprecated
 
@@ -91,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - The default left-hand-side quadrature rule of `L2Projector` for `Lagrange`
    interpolations on prisms and pyramids now has enough points to make the mass matrix
    positive definite. Previously, `close!` could throw a `PosDefException` for e.g.
-   `Wedge` grids. ([#XXXX])
+   `Wedge` grids. ([#1554])
 
 ### Performance
 
@@ -109,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - `project` with an `L2Projector` is faster (2–5× for typical meshes) and allocates
    much less memory. ([#1553])
  - `close!` for an `L2Projector` on conforming grids assembles and stores only the upper
-   triangle of the mass matrix, reducing its memory use. ([#XXXX])
+   triangle of the mass matrix, reducing its memory use. ([#1554])
 
 ### Documentation
 
@@ -1589,7 +1590,7 @@ poking into Ferrite internals:
 [#1548]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1548
 [#1549]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1549
 [#1553]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1553
-[#XXXX]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/XXXX
+[#1554]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1554
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
 [#1556]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1556
