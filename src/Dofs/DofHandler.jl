@@ -239,6 +239,55 @@ ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell
 ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell # for compatibility with DofHandler
 
 """
+    ndofs_per_interface(dh::DofHandler) -> Int
+
+Return the number of dofs of an interface, in the stacked layout.
+
+Requires a `DofHandler` with a single `SubDofHandler`: both cells of every interface then
+have the same number of cell dofs, so the size, `2 * ndofs_per_cell(dh)`, is the same for
+every interface and local interface matrices/vectors can be sized once, outside the
+interface loop. For a `DofHandler` with multiple `SubDofHandler`s the size depends on the
+interface, use `ndofs_per_interface(ic::InterfaceCache)` inside the loop.
+"""
+function ndofs_per_interface(dh::DofHandler)
+    isclosed(dh) || error("DofHandler must be closed")
+    if length(dh.subdofhandlers) > 1
+        error(
+            "The given DofHandler has $(length(dh.subdofhandlers)) SubDofHandlers, so " *
+                "the stacked interface size depends on the interface. Use " *
+                "`ndofs_per_interface(ic::InterfaceCache)` inside the interface loop " *
+                "(2 * maximum(ndofs_per_cell, dh.subdofhandlers) bounds it)."
+        )
+    end
+    return 2 * ndofs_per_cell(dh)
+end
+
+"""
+    interface_dof_range(dh::DofHandler, field::Symbol) -> InterfaceDofRange
+
+Return the positions of `field`'s dofs in the stacked interface layout.
+
+Requires a `DofHandler` with a single `SubDofHandler`: both cells of every interface then
+have the same local dof layout, so the range is the same for every interface and can be computed
+once, outside the interface loop. For a `DofHandler` with multiple `SubDofHandler`s the
+range depends on the interface, use
+[`interface_dof_range(::InterfaceCache, ::Symbol)`](@ref) instead.
+"""
+function interface_dof_range(dh::DofHandler, field::Symbol)
+    if length(dh.subdofhandlers) > 1
+        error(
+            "The given DofHandler has $(length(dh.subdofhandlers)) SubDofHandlers, so " *
+                "the stacked positions of a field depend on the interface. Use " *
+                "`interface_dof_range(ic::InterfaceCache, field)` inside the interface " *
+                "loop instead."
+        )
+    end
+    here = dof_range(dh, field)
+    there = here .+ ndofs_per_cell(dh)
+    return InterfaceDofRange(here, there)
+end
+
+"""
     celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
 
 Store the degrees of freedom that belong to cell `i` in `global_dofs`.

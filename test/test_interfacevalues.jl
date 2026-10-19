@@ -337,7 +337,9 @@ end
         add!(dh, :_p, ip_p)
         close!(dh)
         ic = first(InterfaceIterator(dh))
-        @test dof_range(ic, :p) == (9:12, 25:28)
+        r = interface_dof_range(ic, :p)
+        @test r.here == 9:12
+        @test r.there == 25:28
     end
     @testset "undefined transformation matrix error path" begin
         it = Ferrite.InterfaceOrientationInfo{DummyRefShapes.RefDodecahedron, DummyRefShapes.RefDodecahedron}(false, 0, 0, 1, 1)

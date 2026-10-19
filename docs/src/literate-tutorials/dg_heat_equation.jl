@@ -286,7 +286,10 @@ function assemble_global(
     n_basefuncs = getnbasefunctions(cellvalues)
     Ke = zeros(n_basefuncs, n_basefuncs)
     fe = zeros(n_basefuncs)
-    Ki = zeros(n_basefuncs * 2, n_basefuncs * 2)
+    ## Allocate the local interface matrix for the stacked interface system
+    ## `[celldofs(here); celldofs(there)]`. Since there is a single domain, all interfaces
+    ## have the same size (twice the number of dofs of a cell).
+    Ki = zeros(ndofs_per_interface(dh), ndofs_per_interface(dh))
     ## Allocate global force vector f
     f = zeros(ndofs(dh))
     ## Create an assembler
@@ -314,7 +317,8 @@ function assemble_global(
         fill!(Ki, 0)
         ## Compute interface surface integrals contribution
         assemble_interface!(Ki, interfacevalues, μ)
-        ## Assemble Ki into K
+        ## Assemble Ki into K. The field is discontinuous, so no dofs are shared between
+        ## the two cells and the stacked dof vector can be assembled directly.
         assemble!(assembler, interfacedofs(ic), Ki)
     end
     ## Loop over domain boundaries with Neumann boundary conditions
