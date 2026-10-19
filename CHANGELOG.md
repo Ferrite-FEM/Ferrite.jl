@@ -95,6 +95,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    allocating, using a preallocated element vector and `ue .= @view u[celldofs(cell)]`.
    ([#341], [#1540])
 
+### Internal changes
+ - Introduce `AbstractCellCache` which `CellCache` and friends are now subtype of.
+
 ## [v1.7.0] - 2026-08-31
 
 ### Added

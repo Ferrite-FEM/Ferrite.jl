@@ -13,6 +13,8 @@ UpdateFlags(; nodes::Bool = true, coords::Bool = true, dofs::Bool = true) =
 ## CellCache ##
 ###############
 
+abstract type AbstractCellCache end
+
 """
     CellCache(grid::Grid)
     CellCache(dh::AbstractDofHandler)
@@ -31,7 +33,7 @@ cell. The cache is updated for a new cell by calling `reinit!(cache, cellid)` wh
 
 See also [`CellIterator`](@ref).
 """
-struct CellCache{X, G <: AbstractGrid, DH <: Union{AbstractDofHandler, Nothing}, CID <: AbstractArray, NID <: AbstractArray, DID <: AbstractArray, TX <: AbstractArray{X}}
+struct CellCache{X, G <: AbstractGrid, DH <: Union{AbstractDofHandler, Nothing}, CID <: AbstractArray, NID <: AbstractArray, DID <: AbstractArray, TX <: AbstractArray{X}} <: AbstractCellCache
     flags::UpdateFlags
     grid::G
     # Pretty useless to store this since you have it already for the reinit! call, but
@@ -130,7 +132,7 @@ calling `reinit!(cache, fi::FacetIndex)`.
 
 See also [`FacetIterator`](@ref).
 """
-mutable struct FacetCache{CC <: CellCache}
+mutable struct FacetCache{CC <: CellCache} <: AbstractCellCache
     const cc::CC  # const for julia > 1.8
     const dofs::Vector{Int} # aliasing cc.dofs
     current_facet_id::Int
@@ -194,7 +196,7 @@ interpolation) appears *twice* in the stacked layout, once per side; without sha
 
 See also [`InterfaceIterator`](@ref).
 """
-struct InterfaceCache{FC <: FacetCache}
+struct InterfaceCache{FC <: FacetCache} <: AbstractCellCache
     a::FC
     b::FC
     dofs::Vector{Int} # stacked layout: [celldofs(a); celldofs(b)]
@@ -343,7 +345,7 @@ end
     `CellIterator` is stateful and should not be used for things other than `for`-looping
     (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
 """
-struct CellIterator{CC <: CellCache, IC <: IntegerCollection}
+struct CellIterator{CC <: AbstractCellCache, IC <: IntegerCollection}
     cc::CC
     set::IC
 end
