@@ -9,8 +9,8 @@ L2Projector(::Ferrite.AbstractGrid; kwargs...)
 add!(::L2Projector, ::Ferrite.AbstractVecOrSet{Int}, ::Interpolation; kwargs...)
 close!(::L2Projector)
 L2Projector(::Interpolation, ::Ferrite.AbstractGrid; kwargs...)
-L2SolverCholesky
-L2SolverCG
+Ferrite.L2SolverCholesky
+Ferrite.L2SolverCG
 project
 ```
 

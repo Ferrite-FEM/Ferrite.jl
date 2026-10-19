@@ -98,7 +98,7 @@ q_gp = compute_heat_fluxes(cellvalues, dh, u);
 # temperature field. On instantiation, the projector assembles the coefficient matrix `M`
 # (the mass matrix), such that the projector can be reused without having to assemble `M`
 # every time. By default, each projection solves the system with the (Jacobi-preconditioned)
-# conjugate gradient method; pass `solver = L2SolverCholesky()` to instead store a Cholesky
+# conjugate gradient method; pass `solver = Ferrite.L2SolverCholesky()` to instead store a Cholesky
 # factorization of `M`, see [`L2Projector`](@ref).
 projector = L2Projector(ip, grid);
 

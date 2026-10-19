@@ -1,7 +1,7 @@
 # Imports for parallel (isolated) test execution:
 using LinearAlgebra
 include("vtk_test_utils.jl")
-import Ferrite: getrefdim
+import Ferrite: getrefdim, L2SolverCG, L2SolverCholesky
 
 @testset "complex L2 projection" begin
     for nonconforming in (false, true), solver in (L2SolverCholesky(), L2SolverCG())
@@ -480,7 +480,7 @@ function test_show_l2()
     grid = generate_grid(Triangle, (2, 2))
     ip = Lagrange{RefTriangle, 1}()
     proj = L2Projector(ip, grid)
-    @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{RefTriangle, 1}()\n  geometric interpolation: Lagrange{RefTriangle, 1}()\n  solver:                  L2SolverCG(1.0e-10, 1000)"
+    @test repr("text/plain", proj) == repr(typeof(proj)) * "\n  projection on:           8/8 cells in grid\n  function interpolation:  Lagrange{RefTriangle, 1}()\n  geometric interpolation: Lagrange{RefTriangle, 1}()\n  solver:                  " * repr(L2SolverCG())
 
     # Multi-domain setup
     proj2 = L2Projector(grid)
@@ -494,7 +494,7 @@ function test_show_l2()
     @test contains(showstr, "4/8 cells in grid")
     @test contains(showstr, "Split into 2 sets")
     proj3 = L2Projector(ip, grid; solver = L2SolverCG(; reltol = 1.0e-8))
-    @test contains(repr("text/plain", proj3), "solver:                  L2SolverCG(1.0e-8, 1000)")
+    @test contains(repr("text/plain", proj3), "solver:                  " * repr(L2SolverCG(; reltol = 1.0e-8)))
     return
 end
 

@@ -206,8 +206,6 @@ export
     # L2 Projection
     project,
     L2Projector,
-    L2SolverCholesky,
-    L2SolverCG,
 
     # Point Evaluation
     PointEvalHandler,
@@ -218,3 +216,8 @@ export
 
     # Misc
     task_local_copy
+
+# Public API that is not exported (the `public` keyword requires Julia 1.11)
+@static if VERSION >= v"1.11.0-DEV.469"
+    eval(Meta.parse("public L2SolverCholesky, L2SolverCG"))
+end

@@ -9,7 +9,7 @@ equation, see [`L2SolverCholesky`](@ref) and [`L2SolverCG`](@ref).
 abstract type AbstractL2Solver end
 
 """
-    L2SolverCholesky()
+    Ferrite.L2SolverCholesky()
 
 Solve the projection equation with a sparse Cholesky factorization of the consistent mass
 matrix, which is computed when the `L2Projector` is closed. Each `project` call is fast,
@@ -21,7 +21,7 @@ where the factorization fits in memory.
 struct L2SolverCholesky <: AbstractL2Solver end
 
 """
-    L2SolverCG(; reltol = 1.0e-10, maxiter = 1000)
+    Ferrite.L2SolverCG(; reltol = 1.0e-10, maxiter = 1000)
 
 Store the consistent mass matrix (upper triangle only) and solve the projection equation
 with the Jacobi-preconditioned conjugate gradient method. The iteration stops when the
@@ -85,7 +85,7 @@ function Base.show(io::IO, ::MIME"text/plain", proj::L2Projector)
 end
 
 """
-    L2Projector(grid::AbstractGrid; solver = L2SolverCG())
+    L2Projector(grid::AbstractGrid; solver = Ferrite.L2SolverCG())
 
 Initiate an `L2Projector` for projecting quadrature data onto
 a function space. To define the function space, add interpolations for
