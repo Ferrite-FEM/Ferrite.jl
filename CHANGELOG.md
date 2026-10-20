@@ -17,7 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    between dofs without a designated constrained dof. `close!` picks the dof to eliminate,
    skipping already constrained dofs and preferring dofs that appear in few other
    constraints (to avoid fill-in); `prefer = dof` biases the choice. Useful for e.g. mean
-   value constraints combined with periodic boundary conditions. ([#1541])
+   value constraints combined with periodic boundary conditions. Note that the coefficients
+   are on opposite sides of the equation in the two forms: `AffineConstraint(1, [2 => 2.0],
+   1.0)` (`u[1] = 2u[2] + 1`) corresponds to `AffineConstraint([1 => 1.0, 2 => -2.0], 1.0)`.
+   ([#1541])
  - New function `interfaceskeleton(topology, grid)` returning the *interfaces* of the
    grid (the interior facets, i.e. the subset of `facetskeleton` shared between two
    cells) as a `Vector` of facet pairs `(facet_here, facet_there)`. Like the facet

@@ -1651,6 +1651,17 @@ end # testset
     add!(ch, AffineConstraint(2, [3 => 1.0], 0.0))
     add!(ch, AffineConstraint([1 => 1.0, 2 => 1.0], 1.0))
     @test_throws ArgumentError close!(ch)
+
+    # Argument checks
+    @test_throws ArgumentError AffineConstraint([1 => 1.0, 2 => 1.0], 1.0; prefer = 3)
+    @test_throws ArgumentError AffineConstraint{Float64, Int}(1, [2 => 1.0], 1.0, 2)
+    @test_throws ArgumentError add!(ConstraintHandler(dh), AffineConstraint([ndofs(dh) + 1 => 1.0], 1.0))
+    @test_throws ArgumentError add!(ConstraintHandler(dh), AffineConstraint([0 => 1.0], 1.0))
+    # A preferred dof with a small coefficient is not used
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint([1 => 1.0, 2 => 0.05], 1.0; prefer = 2))
+    close!(ch)
+    @test ch.prescribed_dofs == [1]
 end
 
 @testset "AffineConstraint without constrained dof: zero mean on periodic Poisson" begin
