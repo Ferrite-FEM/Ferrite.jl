@@ -155,14 +155,14 @@ function reinit!(
     reinit!(iv.here, cell_here, coords_here, facet_here)
     # Transform the quadrature points from the here side to the there side
     set_current_facet!(iv.there, facet_there) # Includes boundscheck
-    quad_points_a = getpoints(iv.here.fqr, facet_here)
-    quad_points_b = getpoints(iv.there.fqr, facet_there)
+    quad_points_a = getpoints(getfield(iv.here, :fqr), facet_here)
+    quad_points_b = getpoints(getfield(iv.there, :fqr), facet_there)
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
     # TODO: This is the bottleneck, cache it?
     @assert length(quad_points_a) <= length(quad_points_b)
 
     # Re-evaluate shape functions in the transformed quadrature points
-    precompute_values!(get_fun_values(iv.there), quad_points_b)
+    foreach(fun_values -> precompute_values!(fun_values, quad_points_b), get_fun_values(iv.there))
     precompute_values!(get_geo_mapping(iv.there), quad_points_b)
 
     # reinit! the "there" side

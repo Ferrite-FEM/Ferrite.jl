@@ -47,6 +47,9 @@ include("test_utils.jl")
         @test_call reinit!(cmv, coords)
         @test_call reinit!(cmv_u, coords)
         @test_call reinit!(cmv3, coords)
+
+        fmv = FacetValues(FacetQuadratureRule{RefQuadrilateral}(2), (u = ipu, p = ipp, T = ipT))
+        @test_call reinit!(fmv, coords, 1)
     end
     @testset "Embedded elements" begin
         @testset "Scalar/vector on curves (vdim = $vdim)" for vdim in (0, 1, 2, 3)
