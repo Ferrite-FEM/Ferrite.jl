@@ -113,6 +113,7 @@ codeblocks_plugin = CodeBlocks(
             "howto/postprocessing.md",
             "howto/threaded_assembly.md",
             "howto/gpu_assembly.md",
+            "howto/matrix_free.md",
         ],
         "Code gallery" => [
             "Code gallery overview" => "gallery/index.md",

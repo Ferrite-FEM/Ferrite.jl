@@ -144,6 +144,9 @@ include("Dofs/untangling_affine_constraints.jl")
 include("iterators.jl")
 include("Dofs/algebraic_coupling.jl")
 
+# Matrix-free operator evaluation (experimental)
+include("matrix_free.jl")
+
 # Assembly
 include("assembler.jl")
 
