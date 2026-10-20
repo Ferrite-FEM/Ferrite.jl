@@ -231,6 +231,47 @@ function function_curl(::_VectorValues, ::Int, ::AbstractVector{Vec{dim, T}}) wh
     throw(DeprecationError("function_curl(fe_v::VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}})" => "function_curl(fe_v, q_point, reinterpret(T, u))"))
 end
 
+# function_(gradient|divergence|curl) with a vector of `Vec`s as dof values for a scalar
+# interpolation (the `u_i ⊗ ∇N_i` form), previously defined for all `AbstractValues`.
+# Use values for the vectorized interpolation with the reinterpreted dof values instead.
+@noinline function depwarn_vec_dofs(func::Symbol)
+    Base.depwarn(
+        "`$(func)(fe_v, q_point, u::AbstractVector{<:Vec})` with a scalar interpolation is " *
+            "deprecated. Use values for the vectorized interpolation (`ip^dim`) with the dof " *
+            "values `reinterpret(T, u)` instead.",
+        func,
+    )
+    return
+end
+const _ScalarVecDofValues = Union{SingleFieldCellValues, SingleFieldFacetValues, FunctionValues, PointValues}
+function function_gradient(fe_v::_ScalarVecDofValues, q_point::Int, u::AbstractVector{<:Vec}, dof_range = eachindex(u))
+    depwarn_vec_dofs(:function_gradient)
+    n_base_funcs = getnbasefunctions(fe_v)
+    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
+    @boundscheck checkbounds(u, dof_range)
+    @boundscheck checkquadpoint(fe_v, q_point)
+    grad = function_gradient_init(fe_v, u)
+    @inbounds for (i, j) in enumerate(dof_range)
+        grad += u[j] ⊗ shape_gradient(fe_v, q_point, i)
+    end
+    return grad
+end
+function function_divergence(fe_v::_ScalarVecDofValues, q_point::Int, u::AbstractVector{<:Vec})
+    depwarn_vec_dofs(:function_divergence)
+    n_base_funcs = getnbasefunctions(fe_v)
+    length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
+    @boundscheck checkquadpoint(fe_v, q_point)
+    diverg = zero(eltype(eltype(u)))
+    @inbounds for i in 1:n_base_funcs
+        diverg += shape_gradient(fe_v, q_point, i) ⋅ u[i]
+    end
+    return diverg
+end
+function function_curl(fe_v::_ScalarVecDofValues, q_point::Int, u::AbstractVector{<:Vec})
+    depwarn_vec_dofs(:function_curl)
+    return curl_from_gradient(function_gradient(fe_v, q_point, u))
+end
+
 # New reference shapes
 struct RefCube end
 export RefCube

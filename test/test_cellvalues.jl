@@ -106,7 +106,7 @@ end
 
             for i in 1:getnquadpoints(cv)
                 if func_interpol isa Ferrite.ScalarInterpolation
-                    @test function_gradient(cv, i, ue_vec) ≈ G_vector
+                    @test (@test_deprecated function_gradient(cv, i, ue_vec)) ≈ G_vector
                 else # func_interpol isa Ferrite.VectorInterpolation
                     @test_throws Ferrite.DeprecationError function_gradient(cv, i, ue_vec)
                     @test_throws Ferrite.DeprecationError function_symmetric_gradient(cv, i, ue_vec)
@@ -443,9 +443,7 @@ end
             @test_throws ArgumentError function_value(test_values, qp, ue)
             @test_throws ArgumentError function_gradient(test_values, qp, ue)
             # Vector dofs
-            @test_throws ArgumentError function_value(test_values, qp, ue)
-            @test_throws ArgumentError function_gradient(test_values, qp, ue)
-            @test_throws ArgumentError function_divergence(test_values, qp, ue)
+            @test_throws ArgumentError function_value(test_values, qp, ue_vec)
         end
 
         # Vector values, scalar dofs

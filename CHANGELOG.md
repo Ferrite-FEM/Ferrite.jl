@@ -75,6 +75,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - The `InterfaceValues` methods of `function_value`, `function_gradient` etc. that take
    two separate dof ranges are deprecated: pass the `InterfaceDofRange` from
    `interface_dof_range(ic, field)` instead. ([#1433], [#1556])
+ - `function_gradient`, `function_divergence` and `function_curl` with a vector of `Vec`s
+   as dof values for a scalar interpolation are deprecated. Use values for the vectorized
+   interpolation (`ip^dim`) with the dof values `reinterpret(T, u)` instead.
+   ([#1563])
 
 ### Changed
 
@@ -1615,3 +1619,4 @@ poking into Ferrite internals:
 [#1469]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1469
 [#1472]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1472
 [#1561]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1561
+[#1563]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1563
