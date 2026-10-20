@@ -117,6 +117,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixes
 
+ - `add_sparsity_entries!` (and `add_interface_entries!`) with `interface_coupling` now
+   works for a `BlockSparsityPattern`. ([#1564])
  - Untangle the tangled `AffineConstraints` in `close!` ([#1327])
  - Symmetric CSC assembly now rejects incompatible row/column dof lists and
    lower-triangle storage before modifying the system. Constraint application also
@@ -1638,3 +1640,4 @@ poking into Ferrite internals:
 [#1469]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1469
 [#1472]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1472
 [#1561]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1561
+[#1564]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1564

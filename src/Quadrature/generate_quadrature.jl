@@ -99,7 +99,7 @@ end
 x, w = legendre(n, endpt=neither)
 Convenience function with type T = Float64.
 """
-legendre(n, endpt = neither) = legendre(Float64, n, endpt)
+legendre(n::Integer, endpt::EndPt = neither) = legendre(Float64, n, endpt)
 
 function legendre_coeff(::Type{T}, n::Integer, endpt::EndPt) where {T <: AbstractFloat}
     muzero = convert(T, 2.0)

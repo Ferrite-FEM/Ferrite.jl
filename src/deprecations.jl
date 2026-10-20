@@ -304,14 +304,7 @@ function QuadratureRule{1, RefTetrahedron}(quad_type::Symbol, order::Int)
     throw(DeprecationError(msg))
 end
 
-# Catch remaining cases in (Cell|Face)Value constructors
-function CellValues(
-        ::Type{T}, qr::QuadratureRule{2, RefTetrahedron, TQ}, ip::Interpolation{RefTriangle},
-        gip::Interpolation{RefTriangle} = default_geometric_interpolation(ip),
-    ) where {T, TQ}
-    msg = "The input quadrature rule have the wrong reference shape, likely this comes from a constructor like `QuadratureRule{2, RefTetrahedron}(...)` which have been deprecated in favor of `QuadratureRule{RefTriangle}(...)`."
-    throw(DeprecationError(msg))
-end
+# Catch remaining cases in FacetValues constructors
 function FacetValues(
         qr::QuadratureRule, ip::Interpolation,
         gip::Interpolation = default_geometric_interpolation(ip)

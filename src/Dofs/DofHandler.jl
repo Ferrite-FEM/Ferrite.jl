@@ -322,7 +322,7 @@ function celldofs(dh::AbstractDofHandler, i::Integer)
     return celldofs!(zeros(Int, ndofs_per_cell(dh, i)), dh, i)
 end
 
-function cellnodes!(global_nodes::AbstractVector{<:Integer}, dh::AbstractDofHandler, i::Union{<:Integer, <:AbstractCell})
+function cellnodes!(global_nodes::AbstractVector{Int}, dh::AbstractDofHandler, i::Integer)
     return cellnodes!(global_nodes, get_grid(dh), i)
 end
 

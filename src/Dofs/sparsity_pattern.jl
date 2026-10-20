@@ -516,7 +516,7 @@ between cells as described by the DofHandler `dh`.
    `coupling`, rows correspond to test functions and columns to trial functions.
 """
 function add_interface_entries!(
-        sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
+        sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
         topology::Union{ExclusiveTopology, Nothing} = nothing, keep_constrained::Bool = true,
         interface_coupling::AbstractMatrix{Bool},
     )
@@ -922,7 +922,7 @@ function _add_constraint_entries!(
 end
 
 function _add_interface_entry(
-        sp::SparsityPattern,
+        sp::AbstractSparsityPattern,
         cell_field_dofs::Union{Vector{Int}, SubArray}, neighbor_field_dofs::Union{Vector{Int}, SubArray},
         i::Int, j::Int, keep_constrained::Bool, ch::Union{ConstraintHandler, Nothing}
     )
@@ -935,7 +935,7 @@ function _add_interface_entry(
 end
 
 function _add_interface_entries!(
-        sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
+        sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
         topology::ExclusiveTopology, keep_constrained::Bool,
         interface_coupling::AbstractMatrix{Bool},
     )

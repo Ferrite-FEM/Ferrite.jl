@@ -352,6 +352,15 @@ end
     sp_ic = add_sparsity_entries!(SparsityPattern(ndofs(dh), ndofs(dh)), dh; interface_coupling = trues(2, 2))
     sp_ic_topo = add_sparsity_entries!(SparsityPattern(ndofs(dh), ndofs(dh)), dh; interface_coupling = trues(2, 2), topology = ExclusiveTopology(grid))
     compare_patterns(sp_ic, sp_ic_topo)
+    # Interface entries for all pattern types, with and without constraints
+    topology = ExclusiveTopology(grid)
+    for args in ((dh,), (dh, ch))
+        ps = make_patterns(dh)
+        for p in ps
+            add_sparsity_entries!(p, args...; interface_coupling = trues(2, 2), topology)
+        end
+        compare_patterns(ps...)
+    end
     # Passing only a topology (no interface_coupling) should not error
     # (https://github.com/Ferrite-FEM/Ferrite.jl/issues/1029)
     K_topo = allocate_matrix(dh; topology = ExclusiveTopology(grid))

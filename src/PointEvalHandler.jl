@@ -406,7 +406,7 @@ function _evaluate_at_points!(
         cellid = ph.cells[pointid]
         cellid === nothing && continue # next point if no cell was found for this one
         cellset !== nothing && (cellid ∈ cellset || continue) # no need to check the cellset for a regular DofHandler
-        celldofs!(cell_dofs, dh, ph.cells[pointid])
+        celldofs!(cell_dofs, dh, cellid)
         for (i, I) in pairs(cell_dofs)
             u_e[i] = dof_vals[I]
         end
