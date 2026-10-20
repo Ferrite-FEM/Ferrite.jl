@@ -92,13 +92,15 @@ using Ferrite: FieldView
         end
         Ke_blocks = zeros(n, n)
         Ke_views = zeros(n, n)
+        vu = FieldView(cv, dh, :u)
+        vp = FieldView(cv, dh, :p)
         for cell in CellIterator(dh)
             reinit!(cv, cell)
+            @test (@allocated reinit!(vu)) == 0
+            reinit!(vp)
             fill!(Ke_blocks, 0)
             fill!(Ke_views, 0)
             assemble_blocks!(Ke_blocks, cv, ranges.u, ranges.p)
-            vu = FieldView(cv, dh, :u)
-            vp = FieldView(cv, dh, :p)
             assemble_views!(Ke_views, cv, vu, vp)
             @test Ke_views ≈ Ke_blocks
             @test (@allocated assemble_views!(Ke_views, cv, vu, vp)) == 0
