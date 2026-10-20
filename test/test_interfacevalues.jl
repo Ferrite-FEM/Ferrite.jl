@@ -1,5 +1,6 @@
 # Imports for parallel (isolated) test execution:
 include(joinpath(@__DIR__, "test_utils.jl"))
+using Ferrite: InterfaceFunctionValues
 
 @testset "interface iteration with abstract cell storage" begin
     function interface_facets(iterator)
@@ -531,4 +532,75 @@ end
             end
         end
     end
+end
+
+@testset "InterfaceValues: evaluation for one field of multiple fields" begin
+    grid = generate_grid(Quadrilateral, (3, 2))
+    fqr = FacetQuadratureRule{RefQuadrilateral}(2)
+    ipu = DiscontinuousLagrange{RefQuadrilateral, 2}()^2
+    ipp = DiscontinuousLagrange{RefQuadrilateral, 1}()
+    dh = DofHandler(grid)
+    add!(dh, :u, ipu)
+    add!(dh, :p, ipp)
+    close!(dh)
+    a = rand(ndofs(dh))
+    # Constructed directly with a NamedTuple, and from multi-field FacetValues
+    for iv in (InterfaceValues(fqr, (u = ipu, p = ipp)), InterfaceValues(FacetValues(fqr, (u = ipu, p = ipp))))
+        @test propertynames(iv) == (:here, :there, :u, :p)
+        @test iv.here isa FacetValues
+        @test @inferred((iv -> iv.u)(iv)) isa InterfaceFunctionValues
+        ivs = (u = InterfaceValues(fqr, ipu), p = InterfaceValues(fqr, ipp))
+        for ic in InterfaceIterator(dh)
+            reinit!(iv, ic)
+            reinit!(ivs.u, ic)
+            reinit!(ivs.p, ic)
+            ae = a[interfacedofs(ic)]
+            for field in (:u, :p)
+                ivf = getproperty(iv, field)
+                ref = ivs[field]
+                r = interface_dof_range(ic, field)
+                @test getnbasefunctions(ivf) == getnbasefunctions(ref) == length(r)
+                for qp in 1:getnquadpoints(iv)
+                    @test getdetJdV(iv, qp) ≈ getdetJdV(ref, qp)
+                    @test getnormal(iv, qp) ≈ getnormal(ref, qp)
+                    for i in 1:getnbasefunctions(ivf)
+                        for here in (true, false)
+                            @test shape_value(ivf, qp, i; here) ≈ shape_value(ref, qp, i; here)
+                            @test shape_gradient(ivf, qp, i; here) ≈ shape_gradient(ref, qp, i; here)
+                        end
+                        @test shape_value_average(ivf, qp, i) ≈ shape_value_average(ref, qp, i)
+                        @test shape_value_jump(ivf, qp, i) ≈ shape_value_jump(ref, qp, i)
+                        @test shape_gradient_average(ivf, qp, i) ≈ shape_gradient_average(ref, qp, i)
+                        @test shape_gradient_jump(ivf, qp, i) ≈ shape_gradient_jump(ref, qp, i)
+                    end
+                    # With the stacked dof values of all fields and the field's dof range,
+                    # compared to the single-field values with only the field's dof values
+                    for here in (true, false)
+                        @test function_value(ivf, qp, ae, r; here) ≈ function_value(ref, qp, ae[r]; here)
+                        @test function_gradient(ivf, qp, ae, r; here) ≈ function_gradient(ref, qp, ae[r]; here)
+                    end
+                    @test function_value_average(ivf, qp, ae, r) ≈ function_value_average(ref, qp, ae[r])
+                    @test function_value_jump(ivf, qp, ae, r) ≈ function_value_jump(ref, qp, ae[r])
+                    @test function_gradient_average(ivf, qp, ae, r) ≈ function_gradient_average(ref, qp, ae[r])
+                    @test function_gradient_jump(ivf, qp, ae, r) ≈ function_gradient_jump(ref, qp, ae[r])
+                    @test function_value_jump(ivf, qp, ae[r]) ≈ function_value_jump(ref, qp, ae[r])
+                end
+            end
+        end
+        # The evaluation methods should be called on the values of a specific field
+        ic = first(InterfaceIterator(dh))
+        ae = a[interfacedofs(ic)]
+        r = interface_dof_range(ic, :u)
+        @test_throws ArgumentError getnbasefunctions(iv)
+        @test_throws ArgumentError shape_value(iv, 1, 1; here = true)
+        @test_throws ArgumentError shape_value_jump(iv, 1, 1)
+        @test_throws ArgumentError function_value(iv, 1, ae; here = true)
+        @test_throws ArgumentError function_value(iv, 1, ae, r; here = true)
+        @test_throws ArgumentError function_gradient_average(iv, 1, ae)
+        @test_throws ArgumentError function_value_jump(iv, 1, ae, r)
+    end
+    # The fields must be the same on both sides, and `here` and `there` are reserved
+    @test_throws ArgumentError InterfaceValues(FacetValues(fqr, (u = ipu, p = ipp)), FacetValues(fqr, (u = ipu, q = ipp)))
+    @test_throws ArgumentError InterfaceValues(FacetValues(fqr, (u = ipu, p = ipp)), FacetValues(fqr, ipu))
+    @test_throws ArgumentError InterfaceValues(fqr, (here = ipu, p = ipp))
 end

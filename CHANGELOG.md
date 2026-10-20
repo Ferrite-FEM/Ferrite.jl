@@ -56,6 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `FacetValues(fqr, (u = ipu, p = ipp))` with shape function queries on `fv.u` and
    `fv.p`. The type parameters of `FacetValues` have changed (internal, but may affect
    code dispatching on them). ([#1472])
+ - `InterfaceValues` now supports multiple fields, e.g.
+   `InterfaceValues(fqr, (u = ipu, p = ipp))`. The shape and function evaluation functions,
+   e.g. `shape_value_jump(iv.u, qp, i)` and
+   `function_value_average(iv.p, qp, ue, interface_dof_range(ic, :p))`, are called on
+   `iv.u` and `iv.p`, and geometric quantities such as `getnormal` on `iv`. ([#1561])
 
 ### Deprecated
 
@@ -1609,3 +1614,4 @@ poking into Ferrite internals:
 [#1556]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1556
 [#1469]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1469
 [#1472]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1472
+[#1561]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1561
