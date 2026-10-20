@@ -10,6 +10,7 @@
   * [`PointValues`](@ref)
   * [`InterfaceValues`](@ref)
   * [`FunctionValues`](@ref Ferrite.FunctionValues)
+  * [`InterfaceFunctionValues`](@ref Ferrite.InterfaceFunctionValues)
 
 
 ## Internal types
@@ -17,6 +18,7 @@
 Ferrite.GeometryMapping
 Ferrite.MappingValues
 Ferrite.FunctionValues
+Ferrite.InterfaceFunctionValues
 Ferrite.BCValues
 ```
 

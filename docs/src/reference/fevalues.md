@@ -54,7 +54,9 @@ getnormal
 ## [InterfaceValues](@id reference-interfacevalues)
 
 All of the methods for [`FacetValues`](@ref) apply for `InterfaceValues` as well.
-In addition, there are some methods that are unique for `InterfaceValues`:
+In addition, there are some methods that are unique for `InterfaceValues`. For an
+`InterfaceValues` with multiple fields, the shape and function evaluation methods are called
+on the values of a field, e.g. `iv.u`, see [`InterfaceValues`](@ref):
 
 ```@docs
 InterfaceValues
