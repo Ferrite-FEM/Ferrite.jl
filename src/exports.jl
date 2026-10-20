@@ -121,6 +121,7 @@ export
 
     # Grid coloring
     create_coloring,
+    AssemblyConflicts,
     ColoringAlgorithm,
 
     # Dofs
