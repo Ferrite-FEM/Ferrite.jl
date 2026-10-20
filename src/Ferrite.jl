@@ -134,6 +134,7 @@ include("Grid/coloring.jl")
 # Dofs
 include("Dofs/algebraic_variables.jl")
 include("Dofs/DofHandler.jl")
+include("FEValues/FieldView.jl")
 include("Dofs/ConstraintHandler.jl")
 include("Dofs/apply_analytical.jl")
 include("Dofs/sparsity_pattern.jl")
