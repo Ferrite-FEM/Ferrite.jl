@@ -20,6 +20,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    materialized skeleton, and gains methods taking an explicit subset of it,
    `InterfaceIterator(grid_or_dh, set)`, analogous to passing a cellset to
    `CellIterator`. ([#1522])
+ - `create_coloring` can now also color boundary facets and interfaces, for
+   multithreading assembly loops over facets (`FacetIterator`) and interfaces
+   (`InterfaceIterator`, e.g. interface terms in DG methods). The kind of loop is
+   determined by the element type of the set passed: cells (`Int`, e.g. a cellset, as
+   before), facets (`FacetIndex`, e.g. a facetset), or interfaces
+   (`NTuple{2, FacetIndex}`, e.g. `interfaceskeleton` or a subset of it). The returned
+   colors partition the set such that concurrent assembly of the items within one color
+   is safe. ([#1559])
+ - New methods `create_coloring(dh::DofHandler, [ch::ConstraintHandler], set)` for exact
+   coloring based on the dofs that the items write to: two items conflict if and only if
+   they write to a common dof. This typically results in fewer colors than the
+   (conservative, node based) grid coloring, e.g. for discontinuous fields (a single color
+   for cells) or fields with dofs only on facets or edges (e.g. `Nedelec`). Passing a
+   `ConstraintHandler` accounts for condensation of affine constraints during assembly
+   (`apply_assemble!`), e.g. for periodic boundary conditions, where items writing to a
+   common master dof conflict even when far apart in the mesh. The new type
+   `AssemblyConflicts`, constructed from a grid or a `DofHandler` (and optionally a
+   `ConstraintHandler`), holds the conflicts between cells and can be passed to
+   `create_coloring` to color multiple sets (e.g. both the cells and the interfaces)
+   without recomputing them. See the updated
+   [multithreaded assembly how-to](https://ferrite-fem.github.io/Ferrite.jl/dev/howto/threaded_assembly/)
+   for usage. ([#1559])
  - New function `task_local_copy` for duplicating data structures such that they can be
    used concurrently from multiple tasks, e.g. for multithreaded assembly. Only data that
    is modified during assembly (internal buffers) is duplicated, while e.g. the global
@@ -1609,6 +1631,7 @@ poking into Ferrite internals:
 [#1549]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1549
 [#1553]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1553
 [#1554]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1554
+[#1559]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1559
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
 [#1556]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1556

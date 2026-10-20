@@ -785,49 +785,6 @@ end
     end
 end
 
-@testset "grid coloring" begin
-    function test_coloring(grid, cellset = 1:getncells(grid))
-        for alg in (ColoringAlgorithm.Greedy, ColoringAlgorithm.WorkStream)
-            color_vectors = create_coloring(grid, cellset; alg = alg)
-            @test sum(length, color_vectors, init = 0) == length(cellset)
-            @test union!(Set{Int}(), color_vectors...) == Set(cellset)
-            conn = Ferrite.create_incidence_matrix(grid, cellset)
-            for color in color_vectors, c1 in color, c2 in color
-                @test !conn[c1, c2]
-            end
-        end
-    end
-    test_coloring(generate_grid(Line, (5,)))
-    test_coloring(generate_grid(QuadraticLine, (5,)))
-    test_coloring(generate_grid(Triangle, (5, 5)))
-    test_coloring(generate_grid(QuadraticTriangle, (5, 5)))
-    test_coloring(generate_grid(Quadrilateral, (5, 5)))
-    test_coloring(generate_grid(QuadraticQuadrilateral, (5, 5)))
-    test_coloring(generate_grid(Tetrahedron, (5, 5, 5)))
-    # test_coloring(generate_grid(QuadraticTetrahedron, (5, 5, 5)))
-    test_coloring(generate_grid(Hexahedron, (5, 5, 5)))
-    # test_coloring(generate_grid(QuadraticHexahedron, (5, 5, 5)))
-
-    # color only a subset
-    test_coloring(generate_grid(Line, (5,)), 1:3)
-    test_coloring(generate_grid(Triangle, (5, 5)), Set{Int}(1:(3^2)))
-    test_coloring(generate_grid(Quadrilateral, (5, 5)), Set{Int}(1:(3^2)))
-    test_coloring(generate_grid(Tetrahedron, (5, 5, 5)), Set{Int}(1:(3^3)))
-    test_coloring(generate_grid(Hexahedron, (5, 5, 5)), Set{Int}(1:(3^3)))
-    # unconnected subset
-    test_coloring(generate_grid(Triangle, (10, 10)), union(Set(1:10), Set(70:80)))
-
-    #Special case with one and zero elements in the sets
-    test_coloring(generate_grid(Quadrilateral, (2, 2)), [1])
-    test_coloring(generate_grid(Quadrilateral, (2, 2)), [])
-
-    # duplicate entries in the cellset are ignored
-    let grid = generate_grid(Quadrilateral, (3, 3))
-        @test create_coloring(grid, [2, 2, 4]) == create_coloring(grid, [2, 4])
-        @test create_coloring(grid, [5, 5]) == create_coloring(grid, [5])
-    end
-end
-
 @testset "High order dof distribution" begin
     # 3-----4
     # | \   |
