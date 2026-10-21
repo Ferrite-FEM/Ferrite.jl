@@ -9,12 +9,7 @@ function checkquadpoint(fe_v::AbstractValues, qp::Int)
     return nothing
 end
 
-@inline function reinit_needs_cell(fe_values::AbstractValues)
-    # TODO: Might need better logic for this, but for current implementations this
-    # is ok. If someone implements a non-identity mapping that doesn't require the cell
-    # as input, this is only a slight performance issue in some cases.
-    return !isa(mapping_type(get_fun_values(fe_values)), IdentityMapping)
-end
+@inline reinit_needs_cell(fe_values::AbstractValues) = reinit_needs_cell(get_fun_values(fe_values))
 
 @noinline function throw_incompatible_dof_length(length_ue, n_base_funcs)
     msg = "the number of base functions ($(n_base_funcs)) does not match the length " *

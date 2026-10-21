@@ -148,6 +148,17 @@ struct ContravariantPiolaMapping end
 mapping_type(fv::FunctionValues) = mapping_type(fv.ip)
 
 """
+    reinit_needs_cell(fun_mapping)
+
+Return whether `reinit!` requires the cell to apply `fun_mapping`, e.g. for the
+edge/facet orientations used by the Piola mappings. Defaults to `true`; overload for
+custom mappings that do not need it.
+"""
+reinit_needs_cell(::Any) = true
+reinit_needs_cell(::IdentityMapping) = false
+reinit_needs_cell(fv::FunctionValues) = reinit_needs_cell(mapping_type(fv))
+
+"""
     required_geo_diff_order(fun_mapping, fun_diff_order::Int)
 
 Return the required order of geometric derivatives to map

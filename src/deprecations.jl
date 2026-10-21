@@ -217,7 +217,7 @@ end
 
 # TODO: Are these needed to be deprecated - harder? with the new parameterization
 # (Cell|Face)Values with vector dofs
-const _VectorValues = Union{CellValues{<:FV}, FacetValues{<:FV}} where {FV <: FunctionValues{<:Any, <:VectorInterpolation}}
+const _VectorValues = Union{CellValues{Nothing, Tuple{FV}}, FacetValues{Nothing, Tuple{FV}}} where {FV <: FunctionValues{<:Any, <:VectorInterpolation}}
 function function_value(::_VectorValues, ::Int, ::AbstractVector{Vec{dim, T}}) where {dim, T}
     throw(DeprecationError("function_value(fe_v::VectorValues, q_point::Int, u::AbstractVector{Vec{dim,T}})" => "function_value(fe_v, q_point, reinterpret(T, u))"))
 end
@@ -451,4 +451,56 @@ for T in (
         InterfaceValues, Interpolation, QuadratureRule, FacetQuadratureRule,
     )
     @eval @deprecate copy(x::$T) task_local_copy(x)
+end
+
+# dof_range(::InterfaceCache) -> interface_dof_range, https://github.com/Ferrite-FEM/Ferrite.jl/issues/1433
+# (exact forwarding: the old method returned the two ranges that the InterfaceDofRange
+# returned by interface_dof_range exposes as `r.here` and `r.there`)
+function dof_range(ic::InterfaceCache, field::Symbol)
+    Base.depwarn(
+        "`dof_range(ic::InterfaceCache, field)` is deprecated, use " *
+            "`interface_dof_range(ic, field)` instead, which returns an " *
+            "`InterfaceDofRange` with the two ranges available as `r.here` and `r.there`.",
+        :dof_range,
+    )
+    r = interface_dof_range(ic, field)
+    return r.here, r.there
+end
+
+# function_*(iv, qp, u, dof_range_here, dof_range_there) -> pass an InterfaceDofRange,
+# https://github.com/Ferrite-FEM/Ferrite.jl/issues/1433 (exact forwarding: the two
+# separate ranges are the `r.here` and `r.there` of the InterfaceDofRange returned by
+# `interface_dof_range(ic, field)`)
+for func in (:function_value, :function_gradient, :function_symmetric_gradient)
+    @eval begin
+        function $(func)(
+                iv::InterfaceValues, q_point::Int, u::AbstractVector,
+                dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int};
+                here::Bool
+            )
+            Base.depwarn(
+                "`$($(QuoteNode(func)))(iv, qp, u, dof_range_here, dof_range_there; here)` with two " *
+                    "separate ranges is deprecated: pass the `InterfaceDofRange` from " *
+                    "`interface_dof_range(ic, field)` instead.",
+                $(QuoteNode(func)),
+            )
+            return $(func)(iv, q_point, u, InterfaceDofRange(dof_range_here, dof_range_there); here = here)
+        end
+    end
+end
+for func in (:function_value_average, :function_gradient_average, :function_value_jump, :function_gradient_jump)
+    @eval begin
+        function $(func)(
+                iv::InterfaceValues, qp::Int, u::AbstractVector,
+                dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int},
+            )
+            Base.depwarn(
+                "`$($(QuoteNode(func)))(iv, qp, u, dof_range_here, dof_range_there)` with two " *
+                    "separate ranges is deprecated: pass the `InterfaceDofRange` from " *
+                    "`interface_dof_range(ic, field)` instead.",
+                $(QuoteNode(func)),
+            )
+            return $(func)(iv, qp, u, InterfaceDofRange(dof_range_here, dof_range_there))
+        end
+    end
 end

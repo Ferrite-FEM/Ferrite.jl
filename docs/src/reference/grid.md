@@ -65,4 +65,5 @@ addnodeset!
 ### Multithreaded assembly
 ```@docs
 create_coloring
+AssemblyConflicts
 ```

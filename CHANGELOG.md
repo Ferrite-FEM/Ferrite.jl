@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `Lagrange{RefPrism, 2}()`, including VTK export. Gmsh "Prism 18" elements can be
    imported as `QuadraticWedge` with FerriteGmsh (see
    [FerriteGmsh.jl#61](https://github.com/Ferrite-FEM/FerriteGmsh.jl/pull/61)). ([#1538])
+ - New `AffineConstraint(entries, b)` constructor for an equation `∑ a[j] u[j] = b`
+   between dofs without a designated constrained dof. `close!` picks the dof to eliminate,
+   skipping already constrained dofs and preferring dofs that appear in few other
+   constraints (to avoid fill-in); `prefer = dof` biases the choice. Useful for e.g. mean
+   value constraints combined with periodic boundary conditions. Note that the coefficients
+   are on opposite sides of the equation in the two forms: `AffineConstraint(1, [2 => 2.0],
+   1.0)` (`u[1] = 2u[2] + 1`) corresponds to `AffineConstraint([1 => 1.0, 2 => -2.0], 1.0)`.
+   ([#1541])
  - New function `interfaceskeleton(topology, grid)` returning the *interfaces* of the
    grid (the interior facets, i.e. the subset of `facetskeleton` shared between two
    cells) as a `Vector` of facet pairs `(facet_here, facet_there)`. Like the facet
@@ -20,6 +28,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    materialized skeleton, and gains methods taking an explicit subset of it,
    `InterfaceIterator(grid_or_dh, set)`, analogous to passing a cellset to
    `CellIterator`. ([#1522])
+ - `create_coloring` can now also color boundary facets and interfaces, for
+   multithreading assembly loops over facets (`FacetIterator`) and interfaces
+   (`InterfaceIterator`, e.g. interface terms in DG methods). The kind of loop is
+   determined by the element type of the set passed: cells (`Int`, e.g. a cellset, as
+   before), facets (`FacetIndex`, e.g. a facetset), or interfaces
+   (`NTuple{2, FacetIndex}`, e.g. `interfaceskeleton` or a subset of it). The returned
+   colors partition the set such that concurrent assembly of the items within one color
+   is safe. ([#1559])
+ - New methods `create_coloring(dh::DofHandler, [ch::ConstraintHandler], set)` for exact
+   coloring based on the dofs that the items write to: two items conflict if and only if
+   they write to a common dof. This typically results in fewer colors than the
+   (conservative, node based) grid coloring, e.g. for discontinuous fields (a single color
+   for cells) or fields with dofs only on facets or edges (e.g. `Nedelec`). Passing a
+   `ConstraintHandler` accounts for condensation of affine constraints during assembly
+   (`apply_assemble!`), e.g. for periodic boundary conditions, where items writing to a
+   common master dof conflict even when far apart in the mesh. The new type
+   `AssemblyConflicts`, constructed from a grid or a `DofHandler` (and optionally a
+   `ConstraintHandler`), holds the conflicts between cells and can be passed to
+   `create_coloring` to color multiple sets (e.g. both the cells and the interfaces)
+   without recomputing them. See the updated
+   [multithreaded assembly how-to](https://ferrite-fem.github.io/Ferrite.jl/dev/howto/threaded_assembly/)
+   for usage. ([#1559])
  - New function `task_local_copy` for duplicating data structures such that they can be
    used concurrently from multiple tasks, e.g. for multithreaded assembly. Only data that
    is modified during assembly (internal buffers) is duplicated, while e.g. the global
@@ -33,6 +63,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - `ProjectedDirichlet` now supports zero-valued conditions for 3D H(curl) interpolations
    (e.g. `Nedelec{RefTetrahedron, 1}`), by passing `Returns(zero(Vec{3}))` as the
    function. ([#1232])
+ - New functions `interface_dof_range(ic, field)` and `ndofs_per_interface(ic)` for
+   interface terms in the stacked dof layout of `interfacedofs(ic)`. `interface_dof_range`
+   returns an `InterfaceDofRange` with the positions of a field's dofs in the stacked
+   local matrix (`r.here`/`r.there` for the two sides), also across `SubDofHandler`s, and
+   can be passed directly to `function_value` etc. Both also accept a `DofHandler` with a
+   single `SubDofHandler`, for use outside the interface loop. ([#1433], [#1556])
+ - `L2Projector` gains a `solver` keyword argument, with the (public, but not exported)
+   options `Ferrite.L2SolverCG` and `Ferrite.L2SolverCholesky`. The new default,
+   `L2SolverCG`, stores only the mass matrix and solves the projection with
+   Jacobi-preconditioned conjugate gradients, instead of storing a Cholesky
+   factorization. This uses much less memory for large 3D meshes (e.g. 16 MB
+   instead of 1 GB for 69k quadratic tetrahedron dofs) and makes `close!` much faster, at
+   the cost of an iterative solve in each `project` call. Projected values therefore
+   change at the level of the solver tolerance (`reltol = 1e-10` by default). The previous
+   behavior is available with `solver = Ferrite.L2SolverCholesky()`, which can be faster
+   when the same projector is used for many `project` calls. The tolerances of
+   `L2SolverCG` can be overridden per call with the `reltol` and `maxiter` keyword
+   arguments of `project`. ([#1554])
+ - `FacetValues` now supports multiple fields sharing quadrature rule and geometric
+   interpolation, in the same way as `CellValues`, e.g.
+   `FacetValues(fqr, (u = ipu, p = ipp))` with shape function queries on `fv.u` and
+   `fv.p`. The type parameters of `FacetValues` have changed (internal, but may affect
+   code dispatching on them). ([#1472])
+ - `InterfaceValues` now supports multiple fields, e.g.
+   `InterfaceValues(fqr, (u = ipu, p = ipp))`. The shape and function evaluation functions,
+   e.g. `shape_value_jump(iv.u, qp, i)` and
+   `function_value_average(iv.p, qp, ue, interface_dof_range(ic, :p))`, are called on
+   `iv.u` and `iv.p`, and geometric quantities such as `getnormal` on `iv`. ([#1561])
  - Hessians in `CellValues` (`update_hessians = true`) are now supported for embedded
    elements, i.e. curves in 2D and 3D and surfaces in 3D.
    ([#1558])
@@ -44,6 +102,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    quadrature rules has been deprecated in favor of `task_local_copy`. Note that, unlike
    the previous `copy` methods, `task_local_copy` also duplicates the quadrature rule.
    ([#1070])
+ - `dof_range(ic::InterfaceCache, field)` is deprecated in favor of
+   `interface_dof_range(ic, field)`; the old tuple return value is `(r.here, r.there)`.
+   ([#1433], [#1556])
+ - The `InterfaceValues` methods of `function_value`, `function_gradient` etc. that take
+   two separate dof ranges are deprecated: pass the `InterfaceDofRange` from
+   `interface_dof_range(ic, field)` instead. ([#1433], [#1556])
+
+### Changed
+
+ - `Lagrange` (and thus `DiscontinuousLagrange`) interpolations of order 3 and higher now
+   use Gauss–Lobatto–Legendre (GLL) based nodes instead of equispaced nodes:
+   tensor-product GLL nodes for `Lagrange{RefQuadrilateral, 3}` and
+   `Lagrange{RefHexahedron, 3}`, and the GLL-warped nodes of Basix (`gll_warped`) for
+   `Lagrange{RefTriangle, 3/4/5}` and `Lagrange{RefTetrahedron, 3/4}`. The nodes on each
+   edge are the 1D GLL points for all reference shapes, so mixed grids remain conforming.
+   The dof numbering is unchanged, but the shape functions, and hence nodal values, differ.
+   ([#1385], [#1523])
+ - `CellValues` now supports multiple fields sharing quadrature rule and geometric
+   interpolation by passing a `NamedTuple` of interpolations, e.g.
+   `CellValues(qr, (u = ipu, p = ipp))`. This merges `MultiFieldCellValues` into
+   `CellValues`; `MultiFieldCellValues` remains as an alias for this case and behaves as
+   before. The type parameters of `CellValues` have changed (internal, but may affect
+   code dispatching on them). ([#1469])
 
 ### Fixes
 
@@ -61,6 +142,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    local condensation (e.g. `apply_assemble!`) writes to for affine constraints whose
    master dofs are in other cells, e.g. periodic boundary conditions. Previously this
    resulted in a `SparsityError`. ([#1470], [#1546])
+ - The default left-hand-side quadrature rule of `L2Projector` for `Lagrange`
+   interpolations on prisms and pyramids now has enough points to make the mass matrix
+   positive definite. Previously, `close!` could throw a `PosDefException` for e.g.
+   `Wedge` grids. ([#1554])
 
 ### Performance
 
@@ -1518,6 +1603,7 @@ poking into Ferrite internals:
 [#1381]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1381
 [#1382]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1382
 [#1384]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1384
+[#1385]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1385
 [#1396]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1396
 [#1387]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1387
 [#1388]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1388
@@ -1534,6 +1620,7 @@ poking into Ferrite internals:
 [#1426]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1426
 [#1428]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1428
 [#1432]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1432
+[#1433]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1433
 [#1434]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1434
 [#1438]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1438
 [#1452]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1452
@@ -1545,6 +1632,7 @@ poking into Ferrite internals:
 [#1475]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1475
 [#1481]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1481
 [#1522]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1522
+[#1523]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1523
 [#1534]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1534
 [#1538]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1538
 [#1540]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1540
@@ -1553,6 +1641,13 @@ poking into Ferrite internals:
 [#1548]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1548
 [#1549]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1549
 [#1553]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1553
+[#1554]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1554
 [#1558]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1558
+[#1559]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1559
+[#1541]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1541
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
+[#1556]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1556
+[#1469]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1469
+[#1472]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1472
+[#1561]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1561

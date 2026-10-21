@@ -8,7 +8,7 @@ using Base:
 using EnumX:
     EnumX, @enumx
 using LinearAlgebra:
-    LinearAlgebra, Symmetric, cholesky, cholesky!, det, ldiv!, norm, tr, mul!, normalize
+    LinearAlgebra, PosDefException, Symmetric, cholesky, cholesky!, det, ldiv!, norm, tr, mul!, normalize, diag, dot
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
@@ -129,7 +129,6 @@ include("Grid/grid.jl")
 include("Grid/topology.jl")
 include("Grid/utils.jl")
 include("Grid/grid_generators.jl")
-include("Grid/coloring.jl")
 
 # Dofs
 include("Dofs/algebraic_variables.jl")
@@ -143,6 +142,9 @@ include("Dofs/untangling_affine_constraints.jl")
 
 include("iterators.jl")
 include("Dofs/algebraic_coupling.jl")
+
+# Grid coloring
+include("coloring.jl")
 
 # Assembly
 include("assembler.jl")

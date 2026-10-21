@@ -3,14 +3,14 @@
 ## Type definitions
 * `AbstractValues`
   * `AbstractCellValues`
-    * [`CellValues`](@ref)
-    * [`MultiFieldCellValues`](@ref)
+    * [`CellValues`](@ref) (with [`MultiFieldCellValues`](@ref) as an alias for the multi-field case)
   * `AbstractFacetValues`
     * [`FacetValues`](@ref)
     * [`BCValues`](@ref Ferrite.BCValues)
   * [`PointValues`](@ref)
   * [`InterfaceValues`](@ref)
   * [`FunctionValues`](@ref Ferrite.FunctionValues)
+  * [`InterfaceFunctionValues`](@ref Ferrite.InterfaceFunctionValues)
 
 
 ## Internal types
@@ -18,6 +18,7 @@
 Ferrite.GeometryMapping
 Ferrite.MappingValues
 Ferrite.FunctionValues
+Ferrite.InterfaceFunctionValues
 Ferrite.BCValues
 ```
 

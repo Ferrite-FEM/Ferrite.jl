@@ -22,6 +22,9 @@ The first element of the interface is denoted "here" and the second element "the
 * `InterfaceValues(fv_here::FacetValues, fv_there::FacetValues)`: quadrature rule and
   interpolations from the facet values.
 
+In all constructors the interpolations can also be given as a `NamedTuple` of
+interpolations, one for each field, see *Multiple fields* below.
+
 **Associated methods:**
 * [`shape_value_average`](@ref)
 * [`shape_value_jump`](@ref)
@@ -44,6 +47,29 @@ The first element of the interface is denoted "here" and the second element "the
 * [`function_divergence`](@ref)
 * [`function_curl`](@ref)
 * [`spatial_coordinate`](@ref)
+
+**Multiple fields**
+
+Constructed with a `NamedTuple` of interpolations (or from multi-field
+[`FacetValues`](@ref)), `iv::InterfaceValues` includes values for multiple fields that share
+the quadrature rule and geometric interpolation. The shape and function evaluation methods
+above, e.g. [`shape_value_jump`](@ref) and [`function_value_average`](@ref), are then called on
+`iv.<name>`, where `<name>` is the key used in the named tuple, while geometric quantities
+(e.g. [`getdetJdV`](@ref), [`getnormal`](@ref) and [`spatial_coordinate`](@ref)) are queried on
+`iv` directly. The facet values of the two sides are still available as `iv.here` and
+`iv.there`, so `here` and `there` can not be used as field names. For example:
+```julia
+ip_u = DiscontinuousLagrange{RefQuadrilateral, 1}()^2
+ip_p = DiscontinuousLagrange{RefQuadrilateral, 1}()
+iv = InterfaceValues(FacetQuadratureRule{RefQuadrilateral}(2), (u = ip_u, p = ip_p))
+```
+After calling [`reinit!`](@ref) on `iv`, it can be used as, e.g.
+```julia
+dΓ = getdetJdV(iv, q_point)
+n = getnormal(iv, q_point)
+jump_Nu = shape_value_jump(iv.u, q_point, i)
+avg_∇p = function_gradient_average(iv.p, q_point, ue, interface_dof_range(ic, :p))
+```
 """
 InterfaceValues
 
@@ -52,13 +78,62 @@ struct InterfaceValues{FVA <: FacetValues, FVB <: FacetValues} <: AbstractValues
     there::FVB
     function InterfaceValues{FVA, FVB}(here::FVA, there::FVB) where {FVA, FVB}
         # TODO: check that fields don't alias
+        check_interface_fields(here, there)
         return new{FVA, FVB}(here, there)
     end
 end
 
+const SingleFieldInterfaceValues = InterfaceValues{<:SingleFieldFacetValues, <:SingleFieldFacetValues}
+const MultiFieldInterfaceValues = InterfaceValues{<:MultiFieldFacetValues, <:MultiFieldFacetValues}
+
+check_interface_fields(::SingleFieldFacetValues, ::SingleFieldFacetValues) = nothing
+function check_interface_fields(here::MultiFieldFacetValues, there::MultiFieldFacetValues)
+    fields_here = propertynames(here)
+    fields_there = propertynames(there)
+    if fields_here != fields_there
+        throw(ArgumentError("the facet values on the two sides of the interface have different fields, $(fields_here) and $(fields_there)"))
+    end
+    if :here in fields_here || :there in fields_here
+        throw(ArgumentError("`here` and `there` can not be used as field names for InterfaceValues"))
+    end
+    return nothing
+end
+function check_interface_fields(::FacetValues, ::FacetValues)
+    throw(ArgumentError("the facet values on the two sides of the interface must both have a single field, or the same multiple fields"))
+end
+
+"""
+    InterfaceFunctionValues
+
+The values of the shape functions of one field on both sides of an interface, obtained as
+`iv.<name>` from an [`InterfaceValues`](@ref) `iv` with multiple fields. The shape and
+function evaluation methods for `InterfaceValues` (e.g. [`shape_value_jump`](@ref) and
+[`function_value_average`](@ref)) apply, while geometric quantities are queried on `iv`.
+"""
+struct InterfaceFunctionValues{FVA <: FunctionValues, FVB <: FunctionValues} <: AbstractValues
+    here::FVA
+    there::FVB
+end
+
+# The values that the shape and function evaluation methods below apply to:
+# single-field InterfaceValues, and one field of a multi-field InterfaceValues (`iv.u`).
+# For multi-field InterfaceValues these methods throw an error, see the end of this section.
+const InterfaceShapeValues = Union{SingleFieldInterfaceValues, InterfaceFunctionValues}
+
+# In multi-field mode, `iv.u` gives the values of field `u` on both sides of the interface,
+# while `iv.here` and `iv.there` are the facet values of the two sides.
+@inline function Base.getproperty(iv::MultiFieldInterfaceValues, key::Symbol)
+    here = getfield(iv, :here)
+    there = getfield(iv, :there)
+    key === :here && return here
+    key === :there && return there
+    return InterfaceFunctionValues(getproperty(here, key), getproperty(there, key))
+end
+Base.propertynames(iv::MultiFieldInterfaceValues) = (:here, :there, propertynames(getfield(iv, :here))...)
+
 function InterfaceValues(
-        qr_here::FacetQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation,
-        qr_there::FacetQuadratureRule, ip_there::Interpolation, ipg_there::Interpolation
+        qr_here::FacetQuadratureRule, ip_here::Union{Interpolation, NamedTuple}, ipg_here::Interpolation,
+        qr_there::FacetQuadratureRule, ip_there::Union{Interpolation, NamedTuple}, ipg_there::Interpolation
     )
     # FacetValues constructor enforces that refshape matches for all arguments
     here = FacetValues(qr_here, ip_here, ipg_here)
@@ -67,15 +142,15 @@ function InterfaceValues(
 end
 
 # Same on both sides, default geometric mapping
-InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation) =
+InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Union{Interpolation, NamedTuple}) =
     InterfaceValues(qr_here, ip_here, deepcopy(qr_here), ip_here)
 # Same on both sides, given geometric mapping
-InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Interpolation, ipg_here::Interpolation) =
+InterfaceValues(qr_here::FacetQuadratureRule, ip_here::Union{Interpolation, NamedTuple}, ipg_here::Interpolation) =
     InterfaceValues(qr_here, ip_here, ipg_here, deepcopy(qr_here), ip_here, ipg_here)
 # Different on both sides, default geometric mapping
 function InterfaceValues(
-        qr_here::FacetQuadratureRule, ip_here::Interpolation,
-        qr_there::FacetQuadratureRule, ip_there::Interpolation,
+        qr_here::FacetQuadratureRule, ip_here::Union{Interpolation, NamedTuple},
+        qr_there::FacetQuadratureRule, ip_there::Union{Interpolation, NamedTuple},
     )
     return InterfaceValues(
         qr_here, ip_here, default_geometric_interpolation(ip_here),
@@ -90,7 +165,7 @@ function task_local_copy(iv::InterfaceValues)
     return InterfaceValues(task_local_copy(iv.here), task_local_copy(iv.there))
 end
 
-function getnbasefunctions(iv::InterfaceValues)
+function getnbasefunctions(iv::InterfaceShapeValues)
     return getnbasefunctions(iv.here) + getnbasefunctions(iv.there)
 end
 
@@ -155,14 +230,14 @@ function reinit!(
     reinit!(iv.here, cell_here, coords_here, facet_here)
     # Transform the quadrature points from the here side to the there side
     set_current_facet!(iv.there, facet_there) # Includes boundscheck
-    quad_points_a = getpoints(iv.here.fqr, facet_here)
-    quad_points_b = getpoints(iv.there.fqr, facet_there)
+    quad_points_a = getpoints(getfield(iv.here, :fqr), facet_here)
+    quad_points_b = getpoints(getfield(iv.there, :fqr), facet_there)
     transform_interface_points!(quad_points_b, quad_points_a, interface_transformation)
     # TODO: This is the bottleneck, cache it?
     @assert length(quad_points_a) <= length(quad_points_b)
 
     # Re-evaluate shape functions in the transformed quadrature points
-    precompute_values!(get_fun_values(iv.there), quad_points_b)
+    foreach(fun_values -> precompute_values!(fun_values, quad_points_b), get_fun_values(iv.there))
     precompute_values!(get_geo_mapping(iv.there), quad_points_b)
 
     # reinit! the "there" side
@@ -183,16 +258,17 @@ function getnormal(iv::InterfaceValues, qp::Int; here::Bool = true)
 end
 
 """
-    function_value(iv::InterfaceValues, q_point::Int, u; here::Bool)
-    function_value(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there; here::Bool)
+    function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool)
+    function_value(iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange; here::Bool)
 
 Compute the value of the function in quadrature point `q_point` on the "here" (`here=true`)
-or "there" (`here=false`) side of the interface. `u_here` and `u_there` are the values of
-the degrees of freedom for the respective element.
+or "there" (`here=false`) side of the interface.
 
-`u` is a vector of scalar values for the degrees of freedom.
-This function can be used with a single `u` vector containing the dofs of both elements of the interface or
-two vectors (`u_here` and `u_there`) which contain the dofs of each cell of the interface respectively.
+`u` is a vector of scalar dof values in the *stacked* interface layout (cf.
+[`interfacedofs`](@ref)): the dof values of the here cell followed by the dof values of
+the there cell. In the first form `u` holds the values for all dofs of both cells; in the
+second form the [`InterfaceDofRange`](@ref) `r` (from [`interface_dof_range`](@ref))
+selects one field's dofs within `u`.
 
 `here` determines which element to use for calculating function value.
 `true` uses the value on the first element's side of the interface, while `false` uses the value on the second element's side.
@@ -206,12 +282,15 @@ function_value(::InterfaceValues, ::Int, args...; kwargs...)
 
 
 """
-    function_gradient(iv::InterfaceValues, q_point::Int, u; here::Bool)
-    function_gradient(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there; here::Bool)
+    function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector; here::Bool)
+    function_gradient(iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange; here::Bool)
 
-Compute the gradient of the function in a quadrature point. `u` is a vector of scalar values for the degrees of freedom.
-This function can be used with a single `u` vector containing the dofs of both elements of the interface or
-two vectors (`u_here` and `u_there`) which contain the dofs of each cell of the interface respectively.
+Compute the gradient of the function in a quadrature point. `u` is a vector of scalar dof
+values in the *stacked* interface layout (cf. [`interfacedofs`](@ref)): the dof values of
+the here cell followed by the dof values of the there cell. In the first form `u` holds
+the values for all dofs of both cells; in the second form the
+[`InterfaceDofRange`](@ref) `r` (from [`interface_dof_range`](@ref)) selects one field's
+dofs within `u`.
 
 `here` determines which element to use for calculating function value.
 `true` uses the value on the first element's side of the interface, while `false` uses the value on the second element's side.
@@ -269,7 +348,7 @@ for (func, f_, f_type) in (
         (:shape_gradient, :shape_gradient, :shape_gradient_type),
     )
     @eval begin
-        function $(func)(iv::InterfaceValues, qp::Int, i::Int; here::Bool)
+        function $(func)(iv::InterfaceShapeValues, qp::Int, i::Int; here::Bool)
             nbf = getnbasefunctions(iv)
             nbf_a = getnbasefunctions(iv.here)
             if i <= nbf_a
@@ -295,7 +374,7 @@ for (func, f_, is_avg) in (
         (:shape_gradient_jump, :shape_gradient, false),
     )
     @eval begin
-        function $(func)(iv::InterfaceValues, qp::Int, i::Int)
+        function $(func)(iv::InterfaceShapeValues, qp::Int, i::Int)
             f_here = $(f_)(iv, qp, i; here = true)
             f_there = $(f_)(iv, qp, i; here = false)
             return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
@@ -304,16 +383,16 @@ for (func, f_, is_avg) in (
 end
 
 """
-    function_value_average(iv::InterfaceValues, q_point::Int, u)
-    function_value_average(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
+    function_value_average(iv::InterfaceValues, q_point::Int, u::AbstractVector)
+    function_value_average(iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange)
 
 Compute the average of the function value at the quadrature point on the interface.
 """
 function function_value_average end
 
 """
-    function_value_jump(iv::InterfaceValues, q_point::Int, u)
-    function_value_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
+    function_value_jump(iv::InterfaceValues, q_point::Int, u::AbstractVector)
+    function_value_jump(iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange)
 
 Compute the jump of the function value at the quadrature point over the interface along the default normal direction.
 
@@ -324,16 +403,16 @@ multiply by minus the outward facing normal to the first element's side of the i
 function function_value_jump end
 
 """
-    function_gradient_average(iv::InterfaceValues, q_point::Int, u)
-    function_gradient_average(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
+    function_gradient_average(iv::InterfaceValues, q_point::Int, u::AbstractVector)
+    function_gradient_average(iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange)
 
 Compute the average of the function gradient at the quadrature point on the interface.
 """
 function function_gradient_average end
 
 """
-    function_gradient_jump(iv::InterfaceValues, q_point::Int, u)
-    function_gradient_jump(iv::InterfaceValues, q_point::Int, u, dof_range_here, dof_range_there)
+    function_gradient_jump(iv::InterfaceValues, q_point::Int, u::AbstractVector)
+    function_gradient_jump(iv::InterfaceValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange)
 
 Compute the jump of the function gradient at the quadrature point over the interface along the default normal direction.
 
@@ -343,10 +422,36 @@ multiply by minus the outward facing normal to the first element's side of the i
 """
 function function_gradient_jump end
 
+"""
+    InterfaceDofRange
+
+Positions of a field's dofs in the stacked interface layout.
+
+Returned by [`interface_dof_range`](@ref), as an `AbstractVector{Int}`. Index `i` runs over
+the field's basis functions in the [`InterfaceValues`](@ref) ordering (here side first,
+then there side); the value is the corresponding row/column of the stacked local matrix.
+
+The `function_value`/`function_gradient` evaluation methods (and their `_average`/`_jump`
+variants) accept an `InterfaceDofRange` directly. The two sides are also available as
+contiguous ranges through the fields `r.here` and `r.there` (the latter shifted to point
+into the stacked layout).
+"""
+struct InterfaceDofRange <: AbstractVector{Int}
+    here::UnitRange{Int}    # the field's block in celldofs(a)
+    there::UnitRange{Int}   # the field's block in celldofs(b), shifted by ndofs_per_cell(a)
+end
+Base.size(r::InterfaceDofRange) = (length(r.here) + length(r.there),)
+Base.IndexStyle(::Type{InterfaceDofRange}) = IndexLinear()
+@inline function Base.getindex(r::InterfaceDofRange, i::Int)
+    @boundscheck checkbounds(r, i)
+    nh = length(r.here)
+    return i <= nh ? @inbounds(r.here[i]) : @inbounds(r.there[i - nh])
+end
+
 for func in (:function_value, :function_gradient, :function_symmetric_gradient)
     @eval begin
         function $(func)(
-                iv::InterfaceValues, q_point::Int, u::AbstractVector;
+                iv::InterfaceShapeValues, q_point::Int, u::AbstractVector;
                 here::Bool
             )
             @boundscheck checkbounds(u, 1:getnbasefunctions(iv))
@@ -359,17 +464,15 @@ for func in (:function_value, :function_gradient, :function_symmetric_gradient)
             end
         end
         function $(func)(
-                iv::InterfaceValues, q_point::Int,
-                u::AbstractVector,
-                dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int};
+                iv::InterfaceShapeValues, q_point::Int, u::AbstractVector, r::InterfaceDofRange;
                 here::Bool
             )
-            @boundscheck checkbounds(u, dof_range_here)
-            @boundscheck checkbounds(u, dof_range_there)
+            @boundscheck checkbounds(u, r.here)
+            @boundscheck checkbounds(u, r.there)
             if here
-                return $(func)(iv.here, q_point, u, dof_range_here)
+                return $(func)(iv.here, q_point, u, r.here)
             else # there
-                return $(func)(iv.there, q_point, u, dof_range_there)
+                return $(func)(iv.there, q_point, u, r.there)
             end
         end
     end
@@ -382,7 +485,7 @@ for (func, f_, is_avg) in (
         (:function_gradient_jump, :function_gradient, false),
     )
     @eval begin
-        function $(func)(iv::InterfaceValues, qp::Int, u::AbstractVector)
+        function $(func)(iv::InterfaceShapeValues, qp::Int, u::AbstractVector)
             @boundscheck checkbounds(u, getnbasefunctions(iv))
             dof_range_here = 1:getnbasefunctions(iv.here)
             dof_range_there = (1:getnbasefunctions(iv.there)) .+ getnbasefunctions(iv.here)
@@ -390,15 +493,52 @@ for (func, f_, is_avg) in (
             f_there = $(f_)(iv.there, qp, u, dof_range_there)
             return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
-        function $(func)(
-                iv::InterfaceValues, qp::Int,
-                u::AbstractVector,
-                dof_range_here::AbstractUnitRange{Int}, dof_range_there::AbstractUnitRange{Int},
-            )
-            f_here = $(f_)(iv.here, qp, u, dof_range_here)
-            f_there = $(f_)(iv.there, qp, u, dof_range_there)
+        function $(func)(iv::InterfaceShapeValues, qp::Int, u::AbstractVector, r::InterfaceDofRange)
+            f_here = $(f_)(iv.here, qp, u, r.here)
+            f_there = $(f_)(iv.there, qp, u, r.there)
             return $(is_avg ? :((f_here + f_there) / 2) : :(f_there - f_here))
         end
+    end
+end
+
+# Error messages for functions that should be called on the values of a specific field
+function getnbasefunctions(iv::MultiFieldInterfaceValues)
+    k = propertynames(iv)[3] # Pick the first field to use in the example
+    throw(ArgumentError("getnbasefunctions isn't applicable to a multi-field InterfaceValues. Use on the values for the specific field, e.g. getnbasefunctions(iv.$k)"))
+end
+for f in (:shape_value, :shape_gradient)
+    @eval function $f(iv::MultiFieldInterfaceValues, ::Int, ::Int; here::Bool)
+        k = propertynames(iv)[3]
+        fun = $f
+        throw(ArgumentError("$fun isn't applicable to a multi-field InterfaceValues. Use on the values for the specific field, e.g. $fun(iv.$k, q_point, shapenr; here)"))
+    end
+end
+for f in (:shape_value_average, :shape_gradient_average, :shape_value_jump, :shape_gradient_jump)
+    @eval function $f(iv::MultiFieldInterfaceValues, ::Int, ::Int)
+        k = propertynames(iv)[3]
+        fun = $f
+        throw(ArgumentError("$fun isn't applicable to a multi-field InterfaceValues. Use on the values for the specific field, e.g. $fun(iv.$k, q_point, shapenr)"))
+    end
+end
+@noinline function throw_multifield_interface_error(iv::MultiFieldInterfaceValues, fun, here::Bool)
+    k = propertynames(iv)[3]
+    kw = here ? "; here" : ""
+    throw(ArgumentError("$fun isn't applicable to a multi-field InterfaceValues. Use on the values for the specific field, e.g. $fun(iv.$k, q_point, ue, interface_dof_range(ic, :$k)$kw)"))
+end
+for f in (:function_value, :function_gradient, :function_symmetric_gradient)
+    @eval begin
+        $f(iv::MultiFieldInterfaceValues, ::Int, ::AbstractVector{<:Number}; here::Bool) =
+            throw_multifield_interface_error(iv, $f, true)
+        $f(iv::MultiFieldInterfaceValues, ::Int, ::AbstractVector{<:Number}, ::InterfaceDofRange; here::Bool) =
+            throw_multifield_interface_error(iv, $f, true)
+    end
+end
+for f in (:function_value_average, :function_gradient_average, :function_value_jump, :function_gradient_jump)
+    @eval begin
+        $f(iv::MultiFieldInterfaceValues, ::Int, ::AbstractVector{<:Number}) =
+            throw_multifield_interface_error(iv, $f, false)
+        $f(iv::MultiFieldInterfaceValues, ::Int, ::AbstractVector{<:Number}, ::InterfaceDofRange) =
+            throw_multifield_interface_error(iv, $f, false)
     end
 end
 
