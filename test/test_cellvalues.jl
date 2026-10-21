@@ -576,18 +576,25 @@ end
             )
             qr = QuadratureRule{getrefshape(ip_geo)}(3)
             for ip in (ip_geo, ip_geo^2, ip_geo^3)
-                x = [rand(Vec{sdim}) for _ in 1:getnbasefunctions(ip_geo)]
+                # Perturbed reference element, curved out of plane
+                x = map(Ferrite.reference_coordinates(ip_geo)) do ξ
+                    Vec{sdim}(d -> d <= length(ξ) ? ξ[d] : 0.0) + (rand(Vec{sdim}) - Vec{sdim}(_ -> 0.5)) / 5
+                end
                 cv = CellValues(qr, ip, ip_geo^sdim; update_hessians = true)
                 reinit!(cv, x)
+                ue = rand(getnbasefunctions(ip))
+                Jinv(ξ) = Ferrite.calculate_Jinv(Ferrite.calculate_mapping(ip_geo, ξ, x, Val(1)).J)
+                # Tangential gradient of the tangential gradient
+                dNdx(ξ, i) = Ferrite.reference_shape_gradient(ip, ξ, i) ⋅ Jinv(ξ)
+                dudx(ξ) = sum(i -> dNdx(ξ, i) * ue[i], 1:getnbasefunctions(ip))
                 for (q, ξ) in pairs(Ferrite.getpoints(qr))
                     @test Ferrite.calculate_mapping(ip_geo, ξ, x, Val(2)).H ≈ Ferrite.calculate_mapping(cv.geo_mapping, q, x).H
-                    Jinv(ξ) = Ferrite.calculate_Jinv(Ferrite.calculate_mapping(ip_geo, ξ, x, Val(1)).J)
                     for i in 1:getnbasefunctions(ip)
-                        # Tangential gradient of the tangential gradient
-                        dNdx(ξ) = Ferrite.reference_shape_gradient(ip, ξ, i) ⋅ Jinv(ξ)
-                        @test shape_gradient(cv, q, i) ≈ dNdx(ξ)
-                        @test shape_hessian(cv, q, i) ≈ Tensors.gradient(dNdx, ξ) ⋅ Jinv(ξ)
+                        @test shape_gradient(cv, q, i) ≈ dNdx(ξ, i)
+                        @test shape_hessian(cv, q, i) ≈ Tensors.gradient(ξ -> dNdx(ξ, i), ξ) ⋅ Jinv(ξ)
                     end
+                    @test function_gradient(cv, q, ue) ≈ dudx(ξ)
+                    @test Ferrite.function_hessian(cv, q, ue) ≈ Tensors.gradient(dudx, ξ) ⋅ Jinv(ξ)
                 end
             end
         end
