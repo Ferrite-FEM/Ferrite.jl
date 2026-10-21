@@ -184,12 +184,13 @@ solved by using the usual first order reaction diffusion operator splitting.
 
 #### [Tutorial 14: Linear shell](@ref tutorial-linear-shell)
 
-In this tutorial a linear shell element formulation is set up as a two-dimensional domain
-embedded in three-dimensional space. This will teach, and perhaps inspire, you on how
-Ferrite can be used for non-standard things and how to add "hacks" that build on top of
-Ferrite.
+In this tutorial a linear Reissner–Mindlin shell with three rotational degrees of freedom
+per node (including a stabilized drilling rotation) is implemented using the local frame
+derivatives of the `CellValues`. Different strategies to avoid shear locking (reduced
+integration, MITC4, and quadratic displacements with Crouzeix–Raviart rotations) are compared
+on the Scordelis–Lo roof benchmark.
 
-**Keywords**: shell elements, automatic differentiation.
+**Keywords**: shell elements, drilling rotations, shear locking, MITC.
 
 ---
 
