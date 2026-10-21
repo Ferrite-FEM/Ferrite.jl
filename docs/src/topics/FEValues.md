@@ -110,13 +110,16 @@ Second order gradients of the shape functions are computed as
         \quad \boldsymbol{G} = \boldsymbol{J}^\mathrm{T}\cdot\boldsymbol{J}, \quad \boldsymbol{P} = \boldsymbol{I} - \boldsymbol{J}\cdot\boldsymbol{J}^+
     \end{align*}
     ```
-    which vanishes for square $\boldsymbol{J}$. The second order gradient, i.e. the tangential gradient of the tangential gradient, thus becomes
+    which vanishes for square $\boldsymbol{J}$. Here, $\boldsymbol{P}$ projects onto the normal space, and $\boldsymbol{J}\cdot\boldsymbol{J}^+ = \boldsymbol{I} - \boldsymbol{P}$ onto the tangent space.
+    The second order gradient, i.e. the tangential gradient of the tangential gradient, thus becomes
     ```math
     \begin{align*}
         \frac{\mathrm{d}^2 N}{\mathrm{d}x_i \mathrm{d}x_j} = J^{+}_{pi}\left[\frac{\mathrm{d}^2 \hat N}{\mathrm{d} \xi_p\mathrm{d} \xi_s} - \frac{\mathrm{d} N}{\mathrm{d} x_k}\mathcal{H}_{kps}\right] J^{+}_{sj} + \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r} G^{-1}_{rp} P_{ik}\mathcal{H}_{kps} J^{+}_{sj}
     \end{align*}
     ```
-    On curved elements, the last term accounts for the curvature, and the second order gradient is in general not symmetric.
+    The first term is the tangential part, $(\boldsymbol{I} - \boldsymbol{P})\cdot\mathrm{grad}(\mathrm{grad}(N))$, which is the symmetric covariant hessian. The second term is the normal part, $\boldsymbol{P}\cdot\mathrm{grad}(\mathrm{grad}(N))$, which accounts for the curvature.
+    Hence, the second order gradient is in general not symmetric, its trace (the Laplace–Beltrami operator) is not affected by the normal part,
+    and the covariant hessian is recovered as $\boldsymbol{J}\cdot\boldsymbol{J}^+\cdot\mathrm{grad}(\mathrm{grad}(N))$.
 
 ### Covariant Piola mapping, H(curl)
 `Ferrite.CovariantPiolaMapping`

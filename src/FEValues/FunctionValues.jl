@@ -185,7 +185,7 @@ end
 # dNdξ ⋅ E to the hessian, with Eᵧᵢⱼ = (JᵀJ)⁻¹ᵧₐ ((I - J⋅J⁺)⋅H)ᵢₐᵦ J⁺ᵦⱼ.
 @inline embedding_hessian_term(::Tensor{2}, Jinv, H) = nothing
 @inline function embedding_hessian_term(J::MixedTensor2{sdim, rdim}, Jinv, H) where {sdim, rdim}
-    PH = (one(Tensor{2, sdim}) - J ⋅ Jinv) ⋅ H
+    PH = (one(Tensor{2, sdim, eltype(J)}) - J ⋅ Jinv) ⋅ H
     PHt = MixedTensor3{rdim, sdim, rdim}((α, i, β) -> PH[i, α, β])
     return inv(tdot(J)) ⋅ PHt ⋅ Jinv
 end

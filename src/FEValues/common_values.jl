@@ -256,6 +256,11 @@ end
 
     Compute the hessian of the function in a quadrature point. `u` is a vector with values
     for the degrees of freedom.
+
+    For embedded elements (e.g. curves in 2D/3D or surfaces in 3D), this is the tangential
+    gradient of the tangential gradient, which in general is not symmetric. Its tangential
+    part, `(J ⋅ J⁺) ⋅ H` with `J⁺` the pseudo-inverse of the jacobian, is the symmetric
+    covariant hessian, while the remaining normal part accounts for the curvature.
 """
 function function_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
     n_base_funcs = getnbasefunctions(fe_v)
