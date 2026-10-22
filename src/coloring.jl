@@ -112,20 +112,32 @@ function _chunked_gather!(gather!::F, ncells::Int, cellvec) where {F}
     return ptr, adj
 end
 
+# The coloring algorithms access a conflict graph `g` through `_nvertices(g)` and
+# `_foreach_neighbor(f, g, i)`, implemented for the subtypes `ConflictGraph` and
+# `ItemConflictGraph`.
+abstract type AbstractConflictGraph end
+
 # Conflict graph in CSR-like form, i.e. the sparsity pattern of a symmetric incidence
 # matrix without the values: the neighbors of vertex `i` are
 # `adj[ptr[i]:(ptr[i + 1] - 1)]`, which do not have to be sorted.
-struct ConflictGraph
+struct ConflictGraph <: AbstractConflictGraph
     ptr::Vector{Int}
     adj::Vector{Int}
 end
 _nvertices(g::ConflictGraph) = length(g.ptr) - 1
 _neighbor_range(g::ConflictGraph, i::Integer) = g.ptr[i]:(g.ptr[i + 1] - 1)
+# Call `f(j)` for the neighbors `j` of vertex `i` (possibly multiple times for the same `j`)
+@inline function _foreach_neighbor(f::F, g::ConflictGraph, i::Integer) where {F}
+    for r in _neighbor_range(g, i)
+        f(g.adj[r])
+    end
+    return
+end
 
 # Greedy coloring of the cells in `cells` such that no two connected cells (for which
 # `is_member` returns `true` for both) have the same color. `cell_colors` (indexed by cell
 # id, zeroed for the cells to color) and `occupied` are scratch data.
-function _greedy_coloring!(cell_colors::Vector{Int}, occupied::Vector{Bool}, graph::ConflictGraph, cells, is_member::F) where {F}
+function _greedy_coloring!(cell_colors::Vector{Int}, occupied::Vector{Bool}, graph::AbstractConflictGraph, cells, is_member::F) where {F}
     final_colors = Vector{Int}[]
     total_colors = 0
     for cellid in cells
@@ -133,9 +145,8 @@ function _greedy_coloring!(cell_colors::Vector{Int}, occupied::Vector{Bool}, gra
             occupied[i] = false
         end
         # loop over neighbors
-        for r in _neighbor_range(graph, cellid)
-            cell_neighbour = graph.adj[r]
-            is_member(cell_neighbour) || continue # Only care about the given subset
+        _foreach_neighbor(graph, cellid) do cell_neighbour
+            is_member(cell_neighbour) || return # Only care about the given subset
             color = cell_colors[cell_neighbour]
             if color != 0
                 occupied[color] = true
@@ -164,7 +175,7 @@ end
 
 # Greedy algorithm for coloring a grid such that no two cells with the same node
 # have the same color
-function greedy_coloring(graph::ConflictGraph, cells = 1:_nvertices(graph))
+function greedy_coloring(graph::AbstractConflictGraph, cells = 1:_nvertices(graph))
     ncells = _nvertices(graph)
     cell_colors = zeros(Int, ncells)
     occupied = Bool[]
@@ -179,7 +190,7 @@ function greedy_coloring(graph::ConflictGraph, cells = 1:_nvertices(graph))
     end
 end
 
-function _color_zone_chunk!(zone_colors, chunk, zones, zone_of, cell_colors, graph::ConflictGraph)
+function _color_zone_chunk!(zone_colors, chunk, zones, zone_of, cell_colors, graph::AbstractConflictGraph)
     occupied = Bool[]
     for zi in chunk
         zone_colors[zi] = _greedy_coloring!(cell_colors, occupied, graph, zones[zi], c -> zone_of[c] == zi)
@@ -188,7 +199,7 @@ function _color_zone_chunk!(zone_colors, chunk, zones, zone_of, cell_colors, gra
 end
 
 # See Appendix A in https://www.math.colostate.edu/%7Ebangerth/publications/2013-pattern.pdf
-function workstream_coloring(graph::ConflictGraph, cellset)
+function workstream_coloring(graph::AbstractConflictGraph, cellset)
 
     cellvec = _sorted_cellvec(cellset)
     if length(cellvec) == 0
@@ -223,8 +234,7 @@ function workstream_coloring(graph::ConflictGraph, cellset)
             s = Int[]
             Z = length(zones) + 1
             for c in zones[end]
-                for r in _neighbor_range(graph, c)
-                    cell_neighbour = graph.adj[r]
+                _foreach_neighbor(graph, c) do cell_neighbour
                     if zone_of[cell_neighbour] == 0
                         zone_of[cell_neighbour] = Z
                         push!(s, cell_neighbour)
@@ -390,7 +400,7 @@ function _collect_items(
     return items
 end
 
-function _color_conflict_graph(graph::ConflictGraph, cellset, alg::ColoringAlgorithm.T)
+function _color_conflict_graph(graph::AbstractConflictGraph, cellset, alg::ColoringAlgorithm.T)
     if alg === ColoringAlgorithm.WorkStream
         return workstream_coloring(graph, cellset)
     elseif alg === ColoringAlgorithm.Greedy
@@ -412,8 +422,8 @@ _item_cells((facet_a, facet_b)::NTuple{2, FacetIndex}) = (facet_a[1], facet_b[1]
 # Map from cell id to the ids (indices into `items`) of the items writing to it, in
 # CSR-like form. Since items are enumerated in order the per-cell lists are sorted. An item
 # is listed twice for a cell if it writes to that cell twice (an interface with the same
-# cell on both sides, which `interfaceskeleton` never contains); such duplicates are
-# skipped by the conflict gathers (see `_push_candidate!`).
+# cell on both sides, which `interfaceskeleton` never contains); such duplicates only
+# result in the same neighbor being visited twice, which the coloring algorithms tolerate.
 function _cell_to_item_map(ncells::Int, items)
     ptr = zeros(Int, ncells + 1)
     ptr[1] = 1
@@ -664,46 +674,44 @@ function _gather_cell_groups_chunk!(counts, dof_group, wptr, wdofs, chunk)
     return buf
 end
 
-# Exact conflict gather: two items conflict iff their write sets (the union of the write
-# sets of their cells) intersect, i.e. iff they write to a common cell (with a nonempty
-# write set) or a cell of one conflicts with a cell of the other.
-function _gather_item_conflict_chunk!(count, cc::AssemblyConflicts, items, chunk, iptr, iadj)
-    buf = Int[]
-    candidates = Int[]
-    mark = zeros(Int, length(count))
-    for k in chunk
-        empty!(candidates)
-        mark[k] = k
-        for c in _item_cells(items[k])
-            cc.cell_writes[c] || continue
-            # Items writing to the same cell
-            for r in iptr[c]:(iptr[c + 1] - 1)
-                _push_candidate!(candidates, mark, iadj[r], k)
-            end
-            # Items writing to a cell conflicting with c
-            for rc in cc.conflict_ptr[c]:(cc.conflict_ptr[c + 1] - 1)
-                c2 = cc.conflict_cells[rc]
-                for r in iptr[c2]:(iptr[c2 + 1] - 1)
-                    _push_candidate!(candidates, mark, iadj[r], k)
-                end
+# Conflict graph of the items (cells, facets, or interfaces) of a set, indexed by item
+# number. Two items conflict iff their write sets (the union of the write sets of their
+# cells) intersect, i.e. iff they write to a common cell (with a nonempty write set) or a
+# cell of one conflicts with a cell of the other. The neighbors are computed on the fly
+# from the cell conflict graph cached in the `AssemblyConflicts` (the expensive, set
+# independent part), instead of materializing the item conflict graph, which can be very
+# large (e.g. each interface of a hexahedral grid conflicts with ~130 others).
+struct ItemConflictGraph{V <: AbstractVector, C <: AssemblyConflicts} <: AbstractConflictGraph
+    cc::C
+    items::V
+    # Map from cell to the items writing to it (see `_cell_to_item_map`)
+    iptr::Vector{Int}
+    iadj::Vector{Int}
+end
+function ItemConflictGraph(cc::AssemblyConflicts, items::AbstractVector)
+    iptr, iadj = _cell_to_item_map(getncells(cc.grid), items)
+    return ItemConflictGraph(cc, items, iptr, iadj)
+end
+_nvertices(g::ItemConflictGraph) = length(g.items)
+@inline function _foreach_neighbor(f::F, g::ItemConflictGraph, k::Integer) where {F}
+    cc, iptr, iadj = g.cc, g.iptr, g.iadj
+    for c in _item_cells(g.items[k])
+        cc.cell_writes[c] || continue
+        # Items writing to the same cell
+        for r in iptr[c]:(iptr[c + 1] - 1)
+            j = iadj[r]
+            j == k || f(j)
+        end
+        # Items writing to a cell conflicting with c
+        for rc in cc.conflict_ptr[c]:(cc.conflict_ptr[c + 1] - 1)
+            c2 = cc.conflict_cells[rc]
+            for r in iptr[c2]:(iptr[c2 + 1] - 1)
+                j = iadj[r]
+                j == k || f(j)
             end
         end
-        # The neighbors are not sorted since the coloring algorithms do not require it
-        _append_candidates!(buf, count, candidates, k)
     end
-    return buf
-end
-
-# Conflict graph of the items, indexed by item number. The cell conflict graph (the
-# expensive, set independent part) is cached in the `AssemblyConflicts`; this only
-# translates it to the items of the given set, which is different for every set.
-function _item_conflict_graph(cc::AssemblyConflicts, items)
-    nitems = length(items)
-    iptr, iadj = _cell_to_item_map(getncells(cc.grid), items)
-    colptr, rowval = _chunked_gather!(nitems, 1:nitems) do counts, chunk
-        _gather_item_conflict_chunk!(counts, cc, items, chunk, iptr, iadj)
-    end
-    return ConflictGraph(colptr, rowval)
+    return
 end
 
 """
@@ -736,7 +744,7 @@ function _create_coloring(conflicts::AssemblyConflicts, items::AbstractVector{T}
         cellset = length(items) == _nvertices(graph) ? (1:length(items)) : items
         return _color_conflict_graph(graph, cellset, alg)
     end
-    graph = _item_conflict_graph(conflicts, items)
+    graph = ItemConflictGraph(conflicts, items)
     id_colors = _color_conflict_graph(graph, 1:length(items), alg)
     return Vector{T}[items[ids] for ids in id_colors]
 end

@@ -306,10 +306,11 @@ end
         ws = AssemblyConflicts(dh, ch)
         items = Ferrite._collect_items(eltype(set), getncells(Ferrite.get_grid(dh)), set)
         Ws = [write_set(dh, ch, item) for item in items]
-        graph = Ferrite._item_conflict_graph(ws, items)
+        graph = Ferrite.ItemConflictGraph(ws, items)
         for x in eachindex(items)
-            neighbors = view(graph.adj, Ferrite._neighbor_range(graph, x))
-            @test allunique(neighbors)
+            neighbors = Set{Int}()
+            Ferrite._foreach_neighbor(j -> push!(neighbors, j), graph, x)
+            @test x ∉ neighbors
             for y in eachindex(items)
                 x == y && continue
                 @test (y in neighbors) == !isdisjoint(Ws[x], Ws[y])
