@@ -108,7 +108,7 @@ function _get_dunavant_gauss_tridata(n::Int)
     return xw
 end
 
-# TheseqQuadrature rules for orders 9 to 20 have been obtained using the
+# These quadrature rules for orders 9 to 15 have been obtained using the
 # basix.make_quadrature(basix.CellType.triangle, n) calls of the
 # FEniCS / basix python package, which corresponds to Gauss-Jacobi rules.
 #
