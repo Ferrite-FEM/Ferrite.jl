@@ -371,3 +371,53 @@ end
     m = minimum(pdofs)
     @test_throws "K[$m, $m]" assemble!(assembler, pdofs, ones(length(pdofs), length(pdofs)))
 end
+
+@testset "BlockAssembler with repeated dofs" begin
+    # Repeated dofs (interface assembly with shared dofs) are rejected like for the other
+    # assemblers; the condensed (duplicate-free) system from condense_duplicates!
+    # assembles and must match the dense scatter semantics of the stacked system.
+    grid = generate_grid(Quadrilateral, (2, 1))
+    topology = ExclusiveTopology(grid)
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 1}())
+    add!(dh, :p, Lagrange{RefQuadrilateral, 1}())
+    close!(dh)
+    renumber!(dh, DofOrder.FieldWise())
+    nu = ndofs(dh) ÷ 2
+    sp = BlockSparsityPattern([nu, nu])
+    add_sparsity_entries!(sp, dh)
+    # add_interface_entries! does not support BlockSparsityPattern: add the cross-cell
+    # interface entries manually
+    for ic in InterfaceIterator(dh, topology)
+        sd = interfacedofs(ic)
+        for J in sd, I in sd
+            Ferrite.add_entry!(sp, I, J)
+        end
+    end
+    K = allocate_matrix(BlockMatrix, sp)
+    f = BlockVector(zeros(ndofs(dh)), [nu, nu])
+    assembler = start_assemble(K, f)
+    buf = CondensationBuffer{Float64}(ndofs_per_interface(dh))
+    Kref = zeros(ndofs(dh), ndofs(dh))
+    fref = zeros(ndofs(dh))
+    for ic in InterfaceIterator(dh, topology)
+        sd = interfacedofs(ic)
+        n = length(sd)
+        @test length(unique(sd)) < n # continuous fields: dofs are repeated
+        Ke = rand(n, n)
+        fe = rand(n)
+        # The raw stacked scatter is rejected like for the other assemblers ...
+        @test_throws ArgumentError assemble!(assembler, sd, Ke, fe)
+        # ... and the condensed system assembles
+        udofs, Kc, fc = condense_duplicates!(buf, interfacedofs(ic), Ke, fe)
+        assemble!(assembler, udofs, Kc, fc)
+        for (j, J) in pairs(sd), (i, I) in pairs(sd)
+            Kref[I, J] += Ke[i, j]
+        end
+        for (i, I) in pairs(sd)
+            fref[I] += fe[i]
+        end
+    end
+    @test Matrix(K) ≈ Kref
+    @test Vector(f) ≈ fref
+end

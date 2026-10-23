@@ -3,22 +3,20 @@ import SparseMatricesCSR: SparseMatrixCSR, sparsecsr
 using SparseArrays, LinearAlgebra
 
 @testset "CSR assembly with repeated dofs" begin
-    for mode in (:dense, :merge, :binary), atomic in (false, true)
-        rdofs, cdofs = [3, 1, 3], [2, 4, 2, 1]
-        pattern = mode === :dense ? ones(40, 40) : zeros(40, 40)
-        if mode === :binary
-            pattern[:, 1:39] .= 1
-        else
-            pattern[rdofs, cdofs] .= 1
+    # Repeated dofs are rejected deterministically, with the same error as for CSC
+    for atomic in (false, true)
+        K = SparseMatrixCSR(sparse(ones(5, 5)))
+        err = try
+            assemble!(start_assemble(K; atomic), [3, 1, 3], [2, 4, 1], zeros(3, 3))
+            nothing
+        catch e
+            e
         end
-        K = SparseMatrixCSR(sparse(pattern))
-        Ke = reshape(1.0:12.0, 3, 4)
-        expected = zeros(40, 40)
-        for (j, J) in pairs(cdofs), (i, I) in pairs(rdofs)
-            expected[I, J] += Ke[i, j]
-        end
-        assemble!(start_assemble(K; atomic), rdofs, cdofs, Ke)
-        @test K == expected
+        @test err isa ArgumentError
+        @test occursin("repeated entries", err.msg)
+        @test occursin("condense_duplicates!", err.msg)
+        @test_throws ArgumentError assemble!(start_assemble(K; atomic), [3, 1], [2, 4, 2, 1], zeros(2, 4))
+        @test_throws ArgumentError assemble!(start_assemble(K; atomic), [3, 1, 3], zeros(3, 3))
     end
 end
 

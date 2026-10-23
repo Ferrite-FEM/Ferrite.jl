@@ -310,6 +310,16 @@ function_gradient(::InterfaceValues, ::Int, args...; kwargs...)
 
 Compute the average of the value of shape function `i` at quadrature point `qp` across the
 interface.
+
+!!! note "Weighting rule for shared dofs"
+    The interface basis is *duplicated*: a dof shared between the two cells (e.g. for a
+    field with a continuous interpolation) is represented by one basis function per side.
+    Across the two copies, the weights a kernel applies must sum to 1 for value-like
+    operators and to 0 for jump-like operators — the average (1/2 + 1/2) and the jump
+    (-1/+1) satisfy this, and for a continuous field the average is the single-valued
+    trace in this basis. *Summing* both raw one-sided values (`shape_value(iv, qp, i;
+    here)`) instead gives a shared dof total weight 2, i.e. double-counts it — a mistake
+    that the condensation in [`condense_duplicates!`](@ref) preserves, not repairs.
 """
 function shape_value_average end
 
@@ -329,6 +339,11 @@ function shape_value_jump end
 
 Compute the average of the gradient of shape function `i` at quadrature point `qp` across
 the interface.
+
+!!! note
+    Even for a field that is continuous across the interface, the gradient is generally
+    *not* single-valued on the interface (only its tangential part is). This function is
+    therefore the average of the two one-sided gradient traces, not "the" gradient trace.
 """
 function shape_gradient_average end
 
