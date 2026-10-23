@@ -124,7 +124,8 @@ end
                 u_vector = reinterpret(Float64, u)
                 for i in 1:getnquadpoints(iv)
                     if ip_here isa Ferrite.ScalarInterpolation
-                        @test function_gradient(iv, i, u, here = here) ≈ H
+                        # Vector of `Vec`s as dof values for a scalar interpolation (deprecated)
+                        @test (@test_deprecated function_gradient(iv, i, u, here = here)) ≈ H
                         @test function_gradient(iv, i, u_scal, here = here) ≈ V
 
                         @test isapprox(function_value_average(iv, i, u_scal), function_value(iv, i, u_scal, here = here); atol = tol)
@@ -134,8 +135,11 @@ end
 
                         @test isapprox(function_value_average(iv, i, u), function_value(iv, i, u, here = here); atol = tol)
                         @test all(function_value_jump(iv, i, u) .<= 30 * eps(Float64))
-                        @test isapprox(function_gradient_average(iv, i, u), function_gradient(iv, i, u, here = here); atol = tol)
-                        @test all(function_gradient_jump(iv, i, u) .<= 30 * eps(Float64))
+                        @test isapprox(
+                            (@test_deprecated function_gradient_average(iv, i, u)),
+                            (@test_deprecated function_gradient(iv, i, u, here = here)); atol = tol
+                        )
+                        @test all((@test_deprecated function_gradient_jump(iv, i, u)) .<= 30 * eps(Float64))
                     else # func_interpol isa Ferrite.VectorInterpolation
                         @test function_gradient(iv, i, u_vector; here = here) ≈ H
                         @test isapprox(function_value_average(iv, i, u_vector), function_value(iv, i, u_vector, here = here); atol = tol)

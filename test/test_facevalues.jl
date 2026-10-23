@@ -102,7 +102,7 @@ end
 
                 for i in 1:getnquadpoints(fv)
                     if func_interpol isa Ferrite.ScalarInterpolation
-                        @test function_gradient(fv, i, ue_vec) ≈ G_vector
+                        @test (@test_deprecated function_gradient(fv, i, ue_vec)) ≈ G_vector
                     else # func_interpol isa Ferrite.VectorInterpolation
                         @test_throws Ferrite.DeprecationError function_gradient(fv, i, ue_vec)
                         @test_throws Ferrite.DeprecationError function_symmetric_gradient(fv, i, ue_vec)
