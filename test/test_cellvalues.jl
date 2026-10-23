@@ -97,6 +97,32 @@ end
                 end
             end
 
+            # Local frame derivatives. For non-embedded elements the local frame, E, is a rotation, such that
+            # ∇ₛu = ∇u⋅E and ∇ₛ∇ₛu = Eᵀ⋅∇∇u⋅E
+            cv_s = CellValues(
+                quad_rule, func_interpol, geom_interpol;
+                update_local_gradients = true, update_local_hessians = update_hessians, update_jacobians = true
+            )
+            reinit_gram_schmidt!(cv_s, coords)
+            for i in 1:getnquadpoints(cv_s)
+                ξqp = Ferrite.getpoints(quad_rule)[i]
+                J = Ferrite.getjacobian(cv_s, i)
+                @test J ≈ Tensors.gradient(ξ -> spatial_coordinate(geom_interpol, ξ, coords), ξqp)
+                E = Ferrite.gram_schmidt_frame(J)
+                @test E' ⋅ E ≈ one(E)
+                xqp = spatial_coordinate(cv_s, i, coords)
+                Hqp, Gqp, Vqp = Tensors.hessian(x -> u_funk(x, V, G, H), xqp, :all)
+                @test function_value(cv_s, i, ue) ≈ Vqp
+                @test function_local_gradient(cv_s, i, ue) ≈ Gqp ⋅ E
+                for j in 1:n_basefuncs
+                    @test shape_local_gradient(cv_s, i, j) ≈ shape_gradient(cv, i, j) ⋅ E
+                end
+                if update_hessians
+                    Hqp_s = func_interpol isa Ferrite.ScalarInterpolation ? E' ⋅ Hqp ⋅ E : Hqp ⊡ otimesu(E, E)
+                    @test function_local_hessian(cv_s, i, ue) ≈ Hqp_s
+                end
+            end
+
             # Test CellValues when input is a ::Vector{<:Vec} (most of which is deprecated)
             ue_vec = [zero(Vec{rdim, Float64}) for i in 1:n_basefunc_base]
             G_vector = rand(Tensor{2, rdim})
@@ -134,6 +160,18 @@ end
                     @test function_gradient(cv, i, ue_nl) ≈ Gqp
                     if update_hessians
                         @test Ferrite.function_hessian(cv, i, ue_nl) ≈ Hqp
+                    end
+                end
+
+                # Local frame derivatives, compared with derivatives wrt. the coordinates in the local frame, s
+                reinit_gram_schmidt!(cv_s, coords_nl)
+                for i in 1:getnquadpoints(cv_s)
+                    xqp = spatial_coordinate(cv_s, i, coords_nl)
+                    Hqp_s, Gqp_s, Vqp = local_frame_function_derivatives(func_interpol, coords_nl, xqp, Ferrite.getjacobian(cv_s, i), ue_nl)
+                    @test function_value(cv_s, i, ue_nl) ≈ Vqp
+                    @test function_local_gradient(cv_s, i, ue_nl) ≈ Gqp_s
+                    if update_hessians
+                        @test function_local_hessian(cv_s, i, ue_nl) ≈ Hqp_s
                     end
                 end
                 reinit!(cv, coords) # reinit back to old coords
@@ -589,6 +627,161 @@ end
             @test_throws ErrorException reinit!(cv_vector, coords) # Not implemented for embedded elements
             @test_throws ErrorException reinit!(cv_scalar, coords)
         end
+
+        @testset "Local frame derivatives ($ip_base in $(sdim)D, vdim = $vdim)" for (ip_base, sdim) in (
+                    (Lagrange{RefLine, 2}(), 2),
+                    (Lagrange{RefLine, 2}(), 3),
+                    (Lagrange{RefQuadrilateral, 2}(), 3),
+                    (Lagrange{RefTriangle, 2}(), 3),
+                ), vdim in (0, 2)
+            rdim = Ferrite.getrefdim(ip_base)
+            ip = vdim > 0 ? ip_base^vdim : ip_base
+            qr = QuadratureRule{Ferrite.getrefshape(ip_base)}(2)
+            cv = CellValues(
+                qr, ip, ip_base^sdim;
+                update_local_gradients = true, update_local_hessians = true, update_jacobians = true
+            )
+            # Curved geometry: Reference coordinates lifted to sdim, a quadratic bump in the normal direction,
+            # a small random perturbation, and a rotation.
+            R = rotmat(sdim)
+            coords = map(Ferrite.reference_coordinates(ip_base)) do ξ
+                bump = 0.2 * (ξ ⋅ ξ)
+                x = Vec{sdim}(d -> d <= rdim ? ξ[d] : (d == rdim + 1 ? bump : 0.0))
+                return R ⋅ (x + 0.02 * rand(Vec{sdim}))
+            end
+            reinit_gram_schmidt!(cv, coords)
+            ue = rand(getnbasefunctions(ip))
+            for i in 1:getnquadpoints(cv)
+                J = Ferrite.getjacobian(cv, i)
+                E = Ferrite.gram_schmidt_frame(J)
+                @test E' ⋅ E ≈ one(Tensor{2, rdim})
+                if rdim == 2 && sdim == 3 # Frame is tangent to the surface
+                    n = J[:, 1] × J[:, 2]
+                    @test norm(n ⋅ E) < 1.0e-12 * norm(n)
+                end
+                # Consistency with the tangential gradients
+                for j in 1:getnbasefunctions(cv)
+                    @test shape_local_gradient(cv, i, j) ≈ shape_gradient(cv, i, j) ⋅ E
+                end
+                # Compare with AD of the function wrt. the local frame coordinates
+                xqp = spatial_coordinate(cv, i, coords)
+                Hqp_s, Gqp_s, Vqp = local_frame_function_derivatives(ip, coords, xqp, J, ue)
+                @test function_value(cv, i, ue) ≈ Vqp
+                @test function_local_gradient(cv, i, ue) ≈ Gqp_s
+                @test function_local_hessian(cv, i, ue) ≈ Hqp_s
+            end
+            # User supplied frames: The Gram-Schmidt frame rotated in the tangent plane
+            if rdim == 2
+                frames = [Ferrite.gram_schmidt_frame(J) ⋅ rotmat(2, 0.3 * i) for (i, J) in pairs(Ferrite.getjacobians(cv))]
+                reinit_local_frame!(cv, frames)
+                for i in 1:getnquadpoints(cv), j in 1:getnbasefunctions(cv)
+                    @test shape_local_gradient(cv, i, j) ≈ shape_gradient(cv, i, j) ⋅ frames[i]
+                end
+            end
+        end
+    end
+
+    @testset "Local frame derivatives and stored jacobians: options and errors" begin
+        ip = Lagrange{RefQuadrilateral, 2}()
+        qr = QuadratureRule{RefQuadrilateral}(2)
+        x = [xi + 0.1 * rand(typeof(xi)) for xi in Ferrite.reference_coordinates(ip)]
+
+        # No overhead by default
+        cv = CellValues(qr, ip, ip)
+        @test cv.J === nothing
+        @test cv.H === nothing
+        @test only(cv.fun_values).dNds === nothing
+        @test only(cv.fun_values).d2Nds2 === nothing
+        reinit!(cv, x)
+        @test_throws ArgumentError Ferrite.getjacobian(cv, 1)
+
+        # Type stable construction
+        cv_s = @inferred CellValues(qr, ip, ip; update_local_gradients = Val(true), update_local_hessians = Val(true), update_jacobians = Val(true))
+        @test cv_s.J isa Vector{Tensor{2, 2, Float64, 4}}
+        @test cv_s.H isa Vector{Tensor{3, 2, Float64, 8}}
+        reinit_gram_schmidt!(cv_s, x)
+
+        # Local gradients without spatial gradients
+        cv_nograd = CellValues(qr, ip, ip; update_gradients = false, update_local_gradients = true)
+        @test only(cv_nograd.fun_values).dNdx === nothing
+        @test cv_nograd.J isa Vector{Tensor{2, 2, Float64, 4}} # Required for the local gradients
+        @test cv_nograd.H === nothing # Only required for the local hessians
+        reinit_gram_schmidt!(cv_nograd, x)
+        for i in 1:getnquadpoints(cv_nograd), j in 1:getnbasefunctions(cv_nograd)
+            @test shape_local_gradient(cv_nograd, i, j) ≈ shape_local_gradient(cv_s, i, j)
+        end
+
+        # Stored jacobians only (no local derivatives or detJdV)
+        cv_J = CellValues(qr, ip, ip; update_gradients = false, update_detJdV = false, update_jacobians = true)
+        reinit!(cv_J, x)
+        for i in 1:getnquadpoints(cv_J)
+            @test Ferrite.getjacobian(cv_J, i) ≈ Ferrite.getjacobian(cv_s, i)
+        end
+
+        # MultiFieldCellValues
+        cmv = MultiFieldCellValues(qr, (u = ip^2, p = ip), ip; update_local_hessians = true, update_jacobians = true)
+        cv_u = CellValues(qr, ip^2, ip; update_local_hessians = true)
+        reinit_gram_schmidt!(cmv, x)
+        reinit_gram_schmidt!(cv_u, x)
+        ue = rand(getnbasefunctions(cmv.u))
+        pe = rand(getnbasefunctions(cmv.p))
+        for i in 1:getnquadpoints(cmv)
+            @test Ferrite.getjacobian(cmv, i) ≈ Ferrite.getjacobian(cv_s, i)
+            @test function_local_gradient(cmv.p, i, pe) ≈ function_local_gradient(cv_s, i, pe)
+            @test function_local_hessian(cmv.p, i, pe) ≈ function_local_hessian(cv_s, i, pe)
+            @test function_local_gradient(cmv.u, i, ue) ≈ function_local_gradient(cv_u, i, ue)
+            @test function_local_hessian(cmv.u, i, ue) ≈ function_local_hessian(cv_u, i, ue)
+        end
+        @test_throws ArgumentError shape_local_gradient(cmv, 1, 1)
+        @test_throws ArgumentError function_local_hessian(cmv, 1, ue)
+
+        # PointValues keep the local derivatives and jacobians
+        pv = PointValues(cv_s)
+        ξ = Ferrite.getpoints(qr)[2]
+        reinit_gram_schmidt!(pv, x, ξ)
+        @test Ferrite.getjacobian(pv, 1) ≈ Ferrite.getjacobian(cv_s, 2)
+        @test function_local_gradient(pv, pe) ≈ function_local_gradient(cv_s, 2, pe)
+        @test function_local_hessian(pv, pe) ≈ function_local_hessian(cv_s, 2, pe)
+
+        # Only supported for identity mapping, while other mappings work without local derivatives
+        ip_rt = RaviartThomas{RefQuadrilateral, 1}()
+        @test_throws ArgumentError CellValues(qr, ip_rt; update_local_gradients = true)
+        cv_rt = CellValues(qr, ip_rt; update_jacobians = true)
+        reinit!(cv_rt, Quadrilateral((1, 2, 3, 4)), x[1:4])
+        @test Ferrite.getjacobian(cv_rt, 1) isa Tensor{2, 2}
+
+        # Local derivatives imply stored jacobians (and hessians), also without `update_jacobians`
+        cv_impl = CellValues(qr, ip, ip; update_local_hessians = true)
+        reinit!(cv_impl, x)
+        for i in 1:getnquadpoints(cv_impl)
+            mv = Ferrite.calculate_mapping(Ferrite.get_geo_mapping(cv_impl), i, x)
+            @test Ferrite.getjacobian(cv_impl, i) ≈ Ferrite.getjacobian(mv)
+            @test cv_impl.H[i] ≈ Ferrite.gethessian(mv)
+        end
+        @test Ferrite.getjacobians(cv_impl) == [Ferrite.getjacobian(cv_impl, i) for i in 1:getnquadpoints(cv_impl)]
+        Ferrite.getjacobians(cv_impl)
+        @test (@allocated Ferrite.getjacobians(cv_impl)) == 0
+        @test_throws ArgumentError Ferrite.getjacobians(cv)
+        @test_throws ArgumentError Ferrite.gethessians(cv_nograd)
+        @test Ferrite.getjacobians(cv_impl) === cv_impl.J
+        @test Ferrite.gethessians(cv_impl) === cv_impl.H
+
+        # User supplied frames: For non-embedded elements any rotation, E, gives ∇ₛN = ∇N⋅E and ∇ₛ∇ₛN = Eᵀ⋅∇∇N⋅E
+        cv_ref = CellValues(qr, ip, ip; update_hessians = true)
+        reinit!(cv_ref, x)
+        frames = [rotmat(2, 0.3 * i) for i in 1:getnquadpoints(cv_impl)]
+        reinit_local_frame!(cv_impl, frames)
+        for i in 1:getnquadpoints(cv_impl), j in 1:getnbasefunctions(cv_impl)
+            E = frames[i]
+            @test shape_local_gradient(cv_impl, i, j) ≈ shape_gradient(cv_ref, i, j) ⋅ E
+            @test shape_local_hessian(cv_impl, i, j) ≈ E' ⋅ shape_hessian(cv_ref, i, j) ⋅ E
+        end
+        @test (@allocated reinit_local_frame!(cv_impl, frames)) == 0
+
+        # Errors
+        @test_throws ArgumentError reinit_local_frame!(cv_impl, frames[1:(end - 1)]) # One frame per quadrature point
+        @test_throws ArgumentError reinit_local_frame!(cv, frames) # No mapping values stored
+        @test_throws ArgumentError reinit_local_frame!(cv_J, frames) # No local derivatives
     end
 
     @testset "CellValues constructor entry points" begin

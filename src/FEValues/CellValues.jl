@@ -32,7 +32,13 @@ values of nodal functions, gradients and divergences of nodal functions etc. in 
 **Keyword arguments:** The following keyword arguments are experimental and may change in future minor releases
 * `update_gradients`: Specifies if the gradients of the shape functions should be updated (default true)
 * `update_hessians`: Specifies if the hessians of the shape functions should be updated (default false)
+* `update_local_gradients`: Specifies if the gradients of the shape functions wrt. the local frame coordinates
+  should be updated (default false), see [`shape_local_gradient`](@ref)
+* `update_local_hessians`: Specifies if the hessians of the shape functions wrt. the local frame coordinates
+  should be updated (default false), see [`shape_local_hessian`](@ref)
 * `update_detJdV`: Specifies if the volume associated with each quadrature point should be updated (default true)
+* `update_jacobians`: Specifies if the jacobian of the geometric mapping should be stored in each quadrature point
+  (default false), see [`Ferrite.getjacobian`](@ref). Always stored if `update_local_gradients` or `update_local_hessians` is true.
 
 **Common methods:**
 
@@ -86,16 +92,20 @@ function default_geometric_interpolation(::Interpolation{shape}) where {dim, sha
 end
 default_geometric_interpolation(ip_funs::NamedTuple) = default_geometric_interpolation(first(ip_funs))
 
-struct CellValues{NT, FVT, GM, QR, detT} <: AbstractCellValues
+struct CellValues{NT, FVT, GM, QR, detT, JT, HT} <: AbstractCellValues
     fun_values_nt::NT # NamedTuple mapping field names to Val-indices into fun_values, or Nothing (single-field mode)
     fun_values::FVT   # FunctionValues collected in a tuple (each unique)
     geo_mapping::GM   # GeometryMapping
     qr::QR            # QuadratureRule
-    # CellValues are only functional for `detT <: AbstractVector{<:Number}`.
+    # CellValues are only functional for `detT <: AbstractVector{<:Number}`, `JT <: AbstractVector{<:AbstractTensor{2}}`,
+    # and `HT <: AbstractVector{<:AbstractTensor{3}}`.
     # However, e.g. for GPU support, we allow AbstractMatrix{<:Number} to be passed, allowing this type to be used as a struct-of-arrays (SoA) type.
     # See `soa_utils.jl` for the SoA transformation infrastructure.
     detJdV::detT      # AbstractVector{<:Number} or Nothing
+    J::JT             # AbstractVector{<:AbstractTensor{2}} or Nothing, jacobians of the geometric mapping
+    H::HT             # AbstractVector{<:AbstractTensor{3}} or Nothing, hessians of the geometric mapping (only for local hessians)
 end
+CellValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV) = CellValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV, nothing, nothing)
 
 const SingleFieldCellValues = CellValues{Nothing}
 
@@ -108,27 +118,31 @@ e.g. `CellValues(qr, (u = ipu, p = ipp))`.
 const MultiFieldCellValues = CellValues{<:NamedTuple}
 
 function CellValues(
-        ::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation,
-        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}
-    ) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
+        ::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}},
+        ::ValuesUpdateFlags{FunDiffOrder_x, FunDiffOrder_s, GeoDiffOrder, DetJdV, StoreJacobian}
+    ) where {T, sdim, rdim, FunDiffOrder_x, FunDiffOrder_s, GeoDiffOrder, DetJdV, StoreJacobian}
 
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
-    fun_values = (FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo),)
+    fun_values = (FunctionValues{FunDiffOrder_x, FunDiffOrder_s}(T, ip_fun, qr, ip_geo),)
     detJdV = DetJdV ? fill(T(NaN), length(getweights(qr))) : nothing
-    return CellValues(nothing, fun_values, geo_mapping, qr, detJdV)
+    J = StoreJacobian ? allocate_jacobians(T, Val(sdim), Val(rdim), length(getweights(qr))) : nothing
+    H = FunDiffOrder_s >= 2 ? allocate_hessians(T, Val(sdim), Val(rdim), length(getweights(qr))) : nothing
+    return CellValues(nothing, fun_values, geo_mapping, qr, detJdV, J, H)
 end
 
 function CellValues(
-        ::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation,
-        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}
-    ) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
+        ::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}},
+        ::ValuesUpdateFlags{FunDiffOrder_x, FunDiffOrder_s, GeoDiffOrder, DetJdV, StoreJacobian}
+    ) where {T, sdim, rdim, FunDiffOrder_x, FunDiffOrder_s, GeoDiffOrder, DetJdV, StoreJacobian}
 
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     unique_ips = unique(values(ip_funs)) # Not type-stable, but ok for advanced users this should be constructed outside...
-    fun_values = tuple((FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...)
+    fun_values = tuple((FunctionValues{FunDiffOrder_x, FunDiffOrder_s}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...)
     fun_values_nt = NamedTuple((key => Val(findfirst(unique_ip -> ip == unique_ip, unique_ips)) for (key, ip) in pairs(ip_funs)))
     detJdV = DetJdV ? fill(T(NaN), length(getweights(qr))) : nothing
-    return CellValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV)
+    J = StoreJacobian ? allocate_jacobians(T, Val(sdim), Val(rdim), length(getweights(qr))) : nothing
+    H = FunDiffOrder_s >= 2 ? allocate_hessians(T, Val(sdim), Val(rdim), length(getweights(qr))) : nothing
+    return CellValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV, J, H)
 end
 
 CellValues(qr::QuadratureRule, ip::Union{Interpolation, NamedTuple}, args...; kwargs...) = CellValues(Float64, qr, ip, args...; kwargs...)
@@ -146,7 +160,8 @@ end
 function task_local_copy(cv::CellValues)
     return CellValues(
         getfield(cv, :fun_values_nt), map(task_local_copy, get_fun_values(cv)),
-        task_local_copy(get_geo_mapping(cv)), task_local_copy(get_quadrature_rule(cv)), task_local_copy(getdetJdVs(cv))
+        task_local_copy(get_geo_mapping(cv)), task_local_copy(get_quadrature_rule(cv)),
+        task_local_copy(getdetJdVs(cv)), task_local_copy(getfield(cv, :J)), task_local_copy(getfield(cv, :H))
     )
 end
 
@@ -160,6 +175,49 @@ Base.propertynames(cv::MultiFieldCellValues) = propertynames(getfield(cv, :fun_v
 get_geo_mapping(cv::CellValues) = getfield(cv, :geo_mapping)
 
 getdetJdVs(cv::CellValues) = getfield(cv, :detJdV)
+@noinline function throw_jacobians_not_stored(fe_v)
+    throw(
+        ArgumentError(
+            "The jacobians are not stored in $(nameof(typeof(fe_v))). Use `update_jacobians = true`, " *
+                "`update_local_gradients = true`, or `update_local_hessians = true` when constructing it."
+        )
+    )
+end
+@noinline function throw_hessians_not_stored(fe_v)
+    throw(ArgumentError("The hessians are not stored in $(nameof(typeof(fe_v))). Use `update_local_hessians = true` when constructing it."))
+end
+
+"""
+    getjacobians(fe_v::Union{CellValues, FacetValues})
+
+Return the stored jacobians, ``\\mathbf{J} = \\partial \\mathbf{x} / \\partial \\boldsymbol{\\xi}``,
+in all quadrature points, see [`Ferrite.getjacobian`](@ref), e.g. for computing the local frames,
+`frames = Ferrite.gram_schmidt_frame.(Ferrite.getjacobians(cv))`. Requires `update_jacobians = true`
+(or `update_local_gradients = true`) when creating `fe_v`. For `FacetValues`, a view of the jacobians
+on the current facet is returned.
+"""
+function getjacobians(cv::CellValues)
+    jacobians = getfield(cv, :J)
+    jacobians === nothing && throw_jacobians_not_stored(cv)
+    return jacobians
+end
+
+# Hessians of the geometric mapping, ``\\partial^2 \\mathbf{x} / \\partial \\boldsymbol{\\xi}^2``, in all quadrature points.
+# Only stored for `update_local_hessians = true`, since they are required by `reinit_local_frame!`.
+function gethessians(cv::CellValues)
+    hessians = getfield(cv, :H)
+    hessians === nothing && throw_hessians_not_stored(cv)
+    return hessians
+end
+
+"""
+    getjacobian(cv::CellValues, q_point::Int)
+
+Return the jacobian of the geometric mapping, ``\\mathbf{J} = \\partial \\mathbf{x} / \\partial \\boldsymbol{\\xi}``,
+in quadrature point `q_point`. Requires `update_jacobians = true` (or `update_local_gradients = true`)
+when creating `cv`.
+"""
+@propagate_inbounds getjacobian(cv::CellValues, q_point::Int) = getjacobians(cv)[q_point]
 
 # Access quadrature rule values
 get_quadrature_rule(cv::CellValues) = getfield(cv, :qr)
@@ -174,10 +232,15 @@ function_difforder(cv::SingleFieldCellValues) = function_difforder(_single_fun_v
 shape_value_type(cv::SingleFieldCellValues) = shape_value_type(_single_fun_values(cv))
 shape_gradient_type(cv::SingleFieldCellValues) = shape_gradient_type(_single_fun_values(cv))
 shape_hessian_type(cv::SingleFieldCellValues) = shape_hessian_type(_single_fun_values(cv))
+function_local_difforder(cv::SingleFieldCellValues) = function_local_difforder(_single_fun_values(cv))
+shape_local_gradient_type(cv::SingleFieldCellValues) = shape_local_gradient_type(_single_fun_values(cv))
+shape_local_hessian_type(cv::SingleFieldCellValues) = shape_local_hessian_type(_single_fun_values(cv))
 
 @propagate_inbounds shape_value(cv::SingleFieldCellValues, q_point::Int, i::Int) = shape_value(_single_fun_values(cv), q_point, i)
 @propagate_inbounds shape_gradient(cv::SingleFieldCellValues, q_point::Int, i::Int) = shape_gradient(_single_fun_values(cv), q_point, i)
 @propagate_inbounds shape_hessian(cv::SingleFieldCellValues, q_point::Int, i::Int) = shape_hessian(_single_fun_values(cv), q_point, i)
+@propagate_inbounds shape_local_gradient(cv::SingleFieldCellValues, q_point::Int, i::Int) = shape_local_gradient(_single_fun_values(cv), q_point, i)
+@propagate_inbounds shape_local_hessian(cv::SingleFieldCellValues, q_point::Int, i::Int) = shape_local_hessian(_single_fun_values(cv), q_point, i)
 
 @inline function _update_detJdV!(detJvec::AbstractVector, q_point::Int, w, mapping)
     detJ = calculate_detJ(getjacobian(mapping))
@@ -185,6 +248,16 @@ shape_hessian_type(cv::SingleFieldCellValues) = shape_hessian_type(_single_fun_v
     @inbounds detJvec[q_point] = detJ * w
     return
 end
+@inline function _update_jacobian!(jacobians::AbstractVector, q_point::Int, mapping)
+    @inbounds jacobians[q_point] = getjacobian(mapping)
+    return
+end
+@inline _update_jacobian!(::Nothing, q_point, mapping) = nothing
+@inline function _update_hessian!(hessians::AbstractVector, q_point::Int, mapping)
+    @inbounds hessians[q_point] = gethessian(mapping)
+    return
+end
+@inline _update_hessian!(::Nothing, q_point, mapping) = nothing
 @inline _update_detJdV!(::Nothing, q_point, w, mapping) = nothing
 
 @inline function reinit!(cv::AbstractCellValues, x::AbstractVector)
@@ -214,6 +287,8 @@ function reinit!(cv::AbstractCellValues, cell::Union{AbstractCell, Nothing}, x::
     @inbounds for (q_point, w) in enumerate(getweights(get_quadrature_rule(cv)))
         mapping = calculate_mapping(geo_mapping, q_point, x)
         _update_detJdV!(getdetJdVs(cv), q_point, w, mapping)
+        _update_jacobian!(getfield(cv, :J), q_point, mapping)
+        _update_hessian!(getfield(cv, :H), q_point, mapping)
         apply_mapping!(fun_values, q_point, mapping, cell)
     end
     return nothing
@@ -225,6 +300,18 @@ end
     expr = Expr(:block)
     for i in 1:N
         push!(expr.args, :(apply_mapping!(fun_values[$i], q_point, mapping, cell)))
+    end
+    return quote
+        $(Expr(:meta, :inline))
+        @inbounds return $expr
+    end
+end
+
+# Equivalent to `foreach(fv -> apply_local_frame!(fv, q_point, mapping, E), fun_values))`, see `apply_mapping!` above
+@generated function apply_local_frame!(fun_values::Tuple{Vararg{FunctionValues, N}}, q_point, mapping, E) where {N}
+    expr = Expr(:block)
+    for i in 1:N
+        push!(expr.args, :(apply_local_frame!(fun_values[$i], q_point, mapping, E)))
     end
     return quote
         $(Expr(:meta, :inline))
@@ -270,14 +357,14 @@ function getnbasefunctions(cv::MultiFieldCellValues)
     throw(ArgumentError("getnbasefunctions isn't applicable to a multi-field CellValues. Use on `FunctionValues` for the specific field, e.g. getnbasefunctions(cv.$k)"))
 end
 
-for f in (:shape_value, :shape_gradient, :shape_symmetric_gradient, :shape_divergence)
+for f in (:shape_value, :shape_gradient, :shape_symmetric_gradient, :shape_divergence, :shape_local_gradient, :shape_local_hessian)
     @eval function $f(cv::MultiFieldCellValues, ::Int, ::Int)
         k = first(propertynames(cv)) # Pick the first function values to use in example
         fun = $f                       # Make the function name available to use in the error message
         throw(ArgumentError("$fun isn't applicable to a multi-field CellValues. Use on `FunctionValues` for the specific field, e.g. $fun(cv.$k, q_point, shapenr)"))
     end
 end
-for f in (:function_value, :function_gradient, :function_symmetric_gradient, :function_divergence)
+for f in (:function_value, :function_gradient, :function_symmetric_gradient, :function_divergence, :function_local_gradient, :function_local_hessian)
     @eval function $f(cv::MultiFieldCellValues, ::Int, ::AbstractVector, args...)
         k = first(propertynames(cv)) # Pick the first function values to use in example
         fun = $f                       # Make the function name available to use in the error message

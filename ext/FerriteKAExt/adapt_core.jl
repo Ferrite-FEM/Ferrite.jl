@@ -18,6 +18,8 @@ function adapt_structure(to, cv::CellValues)
         adapt(to, Ferrite.get_geo_mapping(cv)),
         adapt(to, Ferrite.get_quadrature_rule(cv)),
         adapt(to, Ferrite.getdetJdVs(cv)),
+        adapt(to, getfield(cv, :J)),
+        adapt(to, getfield(cv, :H)),
     )
 end
 
@@ -32,6 +34,8 @@ function adapt_structure(d, fv::Ferrite.FunctionValues)
         adapt(d, fv.dNdξ),
         adapt(d, fv.d2Ndx2),
         adapt(d, fv.d2Ndξ2),
+        adapt(d, fv.dNds),
+        adapt(d, fv.d2Nds2),
     )
 end
 
