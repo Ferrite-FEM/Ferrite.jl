@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Heat Equation · Ferrite.jl</title><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.039/juliamono-regular.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../manual/fe_intro/">Introduction to FEM</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../manual/assembly/">Assembly</a></li><li><a class="tocitem" href="../../manual/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../manual/grid/">Grid</a></li><li><a class="tocitem" href="../../manual/export/">Export</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li class="is-active"><a class="tocitem" href>Heat Equation</a><ul class="internal"><li><a class="tocitem" href="#Introduction"><span>Introduction</span></a></li><li><a class="tocitem" href="#Commented-Program"><span>Commented Program</span></a></li><li><a class="tocitem" href="#heat_equation-plain-program"><span>Plain Program</span></a></li></ul></li><li><a class="tocitem" href="../postprocessing/">Postprocessing</a></li><li><a class="tocitem" href="../helmholtz/">Helmholtz equation</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible Elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../threaded_assembly/">Threaded Assembly</a></li><li><a class="tocitem" href="../plasticity/">von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Time Dependent Problems</a></li><li><a class="tocitem" href="../landau/">Ginzburg-Landau model energy minimization</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../quasi_incompressible_hyperelasticity/">Nearly Incompressible Hyperelasticity</a></li><li><a class="tocitem" href="../ns_vs_diffeq/">Incompressible Navier-Stokes Equations via DifferentialEquations.jl</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">DofHandler</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Heat Equation</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Heat Equation</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate/heat_equation.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Heat-Equation"><a class="docs-heading-anchor" href="#Heat-Equation">Heat Equation</a><a id="Heat-Equation-1"></a><a class="docs-heading-anchor-permalink" href="#Heat-Equation" title="Permalink"></a></h1><p><img src="../heat_square.png" alt/></p><div class="admonition is-success"><header class="admonition-header">Tip</header><div class="admonition-body"><p>This example is also available as a Jupyter notebook: <a href="https://nbviewer.jupyter.org/github/Ferrite-FEM/Ferrite.jl/blob/gh-pages/v0.3.3/examples/heat_equation.ipynb"><code>heat_equation.ipynb</code></a></p></div></div><h2 id="Introduction"><a class="docs-heading-anchor" href="#Introduction">Introduction</a><a id="Introduction-1"></a><a class="docs-heading-anchor-permalink" href="#Introduction" title="Permalink"></a></h2><p>The heat equation is the &quot;Hello, world!&quot; equation of finite elements. Here we solve the equation on a unit square, with a uniform internal source. The strong form of the (linear) heat equation is given by</p><p class="math-container">\[ -\nabla \cdot (k \nabla u) = f  \quad x \in \Omega,\]</p><p>where <span>$u$</span> is the unknown temperature field, <span>$k$</span> the heat conductivity, <span>$f$</span> the heat source and <span>$\Omega$</span> the domain. For simplicity we set <span>$f = 1$</span> and <span>$k = 1$</span>. We will consider homogeneous Dirichlet boundary conditions such that</p><p class="math-container">\[u(x) = 0 \quad x \in \partial \Omega,\]</p><p>where <span>$\partial \Omega$</span> denotes the boundary of <span>$\Omega$</span>.</p><p>The resulting weak form is given by</p><p class="math-container">\[\int_{\Omega} \nabla v \cdot \nabla u \ d\Omega = \int_{\Omega} v \ d\Omega,\]</p><p>where <span>$v$</span> is a suitable test function.</p><h2 id="Commented-Program"><a class="docs-heading-anchor" href="#Commented-Program">Commented Program</a><a id="Commented-Program-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-Program" title="Permalink"></a></h2><p>Now we solve the problem in Ferrite. What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#heat_equation-plain-program">section</a>.</p><p>First we load Ferrite, and some other packages we need</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays</code></pre><p>We start  generating a simple grid with 20x20 quadrilateral elements using <code>generate_grid</code>. The generator defaults to the unit square, so we don&#39;t need to specify the corners of the domain.</p><pre><code class="language-julia hljs">grid = generate_grid(Quadrilateral, (20, 20));</code></pre><h3 id="Trial-and-test-functions"><a class="docs-heading-anchor" href="#Trial-and-test-functions">Trial and test functions</a><a id="Trial-and-test-functions-1"></a><a class="docs-heading-anchor-permalink" href="#Trial-and-test-functions" title="Permalink"></a></h3><p>A <code>CellValues</code> facilitates the process of evaluating values and gradients of test and trial functions (among other things). Since the problem is a scalar problem we will use a <code>CellScalarValues</code> object. To define this we need to specify an interpolation space for the shape functions. We use Lagrange functions (both for interpolating the function and the geometry) based on the reference &quot;cube&quot;. We also define a quadrature rule based on the same reference cube. We combine the interpolation and the quadrature rule to a <code>CellScalarValues</code> object.</p><pre><code class="language-julia hljs">dim = 2
+ip = Lagrange{dim, RefCube, 1}()
+qr = QuadratureRule{dim, RefCube}(2)
+cellvalues = CellScalarValues(qr, ip);</code></pre><h3 id="Degrees-of-freedom"><a class="docs-heading-anchor" href="#Degrees-of-freedom">Degrees of freedom</a><a id="Degrees-of-freedom-1"></a><a class="docs-heading-anchor-permalink" href="#Degrees-of-freedom" title="Permalink"></a></h3><p>Next we need to define a <code>DofHandler</code>, which will take care of numbering and distribution of degrees of freedom for our approximated fields. We create the <code>DofHandler</code> and then add a single field called <code>u</code>. Lastly we <code>close!</code> the <code>DofHandler</code>, it is now that the dofs are distributed for all the elements.</p><pre><code class="language-julia hljs">dh = DofHandler(grid)
+push!(dh, :u, 1)
+close!(dh);</code></pre><p>Now that we have distributed all our dofs we can create our tangent matrix, using <code>create_sparsity_pattern</code>. This function returns a sparse matrix with the correct elements stored.</p><pre><code class="language-julia hljs">K = create_sparsity_pattern(dh);</code></pre><p>We can inspect the pattern using the <code>spy</code> function from <code>UnicodePlots.jl</code>. By default the stored values are set to <span>$0$</span>, so we first need to fill the stored values, e.g. <code>K.nzval</code> with something meaningful.</p><pre><code class="language-julia hljs">using UnicodePlots
+fill!(K.nzval, 1.0)
+spy(K; height = 15)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">       ⠀⠀⠀⠀⠀⠀⠀⠀Sparsity Pattern⠀⠀⠀⠀⠀⠀⠀⠀    
+       ┌──────────────────────────────┐    
+     1 │⠻⣦⡈⢧⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ &gt; 0
+       │⠦⣌⡻⣮⣧⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│ &lt; 0
+       │⠀⠀⠉⠻⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│    
+       │⠀⠀⠀⠀⠈⠻⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│    
+       │⠀⠀⠀⠀⠀⠀⠈⠻⣿⣿⢦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│    
+       │⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⣿⣿⣦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│    
+       │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠿⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│    
+       │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│    
+       │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀│    
+       │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣿⣿⢦⡀⠀⠀⠀⠀⠀⠀⠀⠀│    
+       │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⣿⣿⣦⡄⠀⠀⠀⠀⠀⠀│    
+       │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠿⣿⣿⣦⡀⠀⠀⠀⠀│    
+       │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣿⣿⣦⡀⠀⠀│    
+       │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣿⣿⣦⡀│    
+   441 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⣿⣿│    
+       └──────────────────────────────┘    
+       ⠀1⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀441⠀    
+       ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀3721 nonzeros⠀⠀⠀⠀⠀⠀⠀⠀⠀    </code></pre><h3 id="Boundary-conditions"><a class="docs-heading-anchor" href="#Boundary-conditions">Boundary conditions</a><a id="Boundary-conditions-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-conditions" title="Permalink"></a></h3><p>In Ferrite constraints like Dirichlet boundary conditions are handled by a <code>ConstraintHandler</code>.</p><pre><code class="language-julia hljs">ch = ConstraintHandler(dh);</code></pre><p>Next we need to add constraints to <code>ch</code>. For this problem we define homogeneous Dirichlet boundary conditions on the whole boundary, i.e. the <code>union</code> of all the face sets on the boundary.</p><pre><code class="language-julia hljs">∂Ω = union(getfaceset.((grid, ), [&quot;left&quot;, &quot;right&quot;, &quot;top&quot;, &quot;bottom&quot;])...);</code></pre><p>Now we are set up to define our constraint. We specify which field the condition is for, and our combined face set <code>∂Ω</code>. The last argument is a function which takes the spatial coordinate <span>$x$</span> and the current time <span>$t$</span> and returns the prescribed value. In this case it is trivial – no matter what <span>$x$</span> and <span>$t$</span> we return <span>$0$</span>. When we have specified our constraint we <code>add!</code> it to <code>ch</code>.</p><pre><code class="language-julia hljs">dbc = Dirichlet(:u, ∂Ω, (x, t) -&gt; 0)
+add!(ch, dbc);</code></pre><p>We also need to <code>close!</code> and <code>update!</code> our boundary conditions. When we call <code>close!</code> the dofs which will be constrained by the boundary conditions are calculated and stored in our <code>ch</code> object. Since the boundary conditions are, in this case, independent of time we can <code>update!</code> them directly with e.g. <span>$t = 0$</span>.</p><pre><code class="language-julia hljs">close!(ch)
+update!(ch, 0.0);</code></pre><h3 id="Assembling-the-linear-system"><a class="docs-heading-anchor" href="#Assembling-the-linear-system">Assembling the linear system</a><a id="Assembling-the-linear-system-1"></a><a class="docs-heading-anchor-permalink" href="#Assembling-the-linear-system" title="Permalink"></a></h3><p>Now we have all the pieces needed to assemble the linear system, <span>$K u = f$</span>. We define a function, <code>doassemble</code> to do the assembly, which takes our <code>cellvalues</code>, the sparse matrix and our DofHandler as input arguments. The function returns the assembled stiffness matrix, and the force vector.</p><pre><code class="language-julia hljs">function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler) where {dim}</code></pre><p>We allocate the element stiffness matrix and element force vector just once before looping over all the cells instead of allocating them every time in the loop.</p><pre><code class="language-julia hljs">    n_basefuncs = getnbasefunctions(cellvalues)
+    Ke = zeros(n_basefuncs, n_basefuncs)
+    fe = zeros(n_basefuncs)</code></pre><p>Next we define the global force vector <code>f</code> and use that and the stiffness matrix <code>K</code> and create an assembler. The assembler is just a thin wrapper around <code>f</code> and <code>K</code> and some extra storage to make the assembling faster.</p><pre><code class="language-julia hljs">    f = zeros(ndofs(dh))
+    assembler = start_assemble(K, f)</code></pre><p>It is now time to loop over all the cells in our grid. We do this by iterating over a <code>CellIterator</code>. The iterator caches some useful things for us, for example the nodal coordinates for the cell, and the local degrees of freedom.</p><pre><code class="language-julia hljs">    @inbounds for cell in CellIterator(dh)</code></pre><p>Always remember to reset the element stiffness matrix and force vector since we reuse them for all elements.</p><pre><code class="language-julia hljs">        fill!(Ke, 0)
+        fill!(fe, 0)</code></pre><p>For each cell we also need to reinitialize the cached values in <code>cellvalues</code>.</p><pre><code class="language-julia hljs">        reinit!(cellvalues, cell)</code></pre><p>It is now time to loop over all the quadrature points in the cell and assemble the contribution to <code>Ke</code> and <code>fe</code>. The integration weight can be queried from <code>cellvalues</code> by <code>getdetJdV</code>.</p><pre><code class="language-julia hljs">        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)</code></pre><p>For each quadrature point we loop over all the (local) shape functions. We need the value and gradient of the testfunction <code>v</code> and also the gradient of the trial function <code>u</code>. We get all of these from <code>cellvalues</code>.</p><pre><code class="language-julia hljs">            for i in 1:n_basefuncs
+                v  = shape_value(cellvalues, q_point, i)
+                ∇v = shape_gradient(cellvalues, q_point, i)
+                fe[i] += v * dΩ
+                for j in 1:n_basefuncs
+                    ∇u = shape_gradient(cellvalues, q_point, j)
+                    Ke[i, j] += (∇v ⋅ ∇u) * dΩ
+                end
+            end
+        end</code></pre><p>The last step in the element loop is to assemble <code>Ke</code> and <code>fe</code> into the global <code>K</code> and <code>f</code> with <code>assemble!</code>.</p><pre><code class="language-julia hljs">        assemble!(assembler, celldofs(cell), fe, Ke)
+    end
+    return K, f
+end</code></pre><h3 id="Solution-of-the-system"><a class="docs-heading-anchor" href="#Solution-of-the-system">Solution of the system</a><a id="Solution-of-the-system-1"></a><a class="docs-heading-anchor-permalink" href="#Solution-of-the-system" title="Permalink"></a></h3><p>The last step is to solve the system. First we call <code>doassemble</code> to obtain the global stiffness matrix <code>K</code> and force vector <code>f</code>.</p><pre><code class="language-julia hljs">K, f = doassemble(cellvalues, K, dh);</code></pre><p>To account for the boundary conditions we use the <code>apply!</code> function. This modifies elements in <code>K</code> and <code>f</code> respectively, such that we can get the correct solution vector <code>u</code> by using <code>\</code>.</p><pre><code class="language-julia hljs">apply!(K, f, ch)
+u = K \ f;</code></pre><h3 id="Exporting-to-VTK"><a class="docs-heading-anchor" href="#Exporting-to-VTK">Exporting to VTK</a><a id="Exporting-to-VTK-1"></a><a class="docs-heading-anchor-permalink" href="#Exporting-to-VTK" title="Permalink"></a></h3><p>To visualize the result we export the grid and our field <code>u</code> to a VTK-file, which can be viewed in e.g. <a href="https://www.paraview.org/">ParaView</a>.</p><pre><code class="language-julia hljs">vtk_grid(&quot;heat_equation&quot;, dh) do vtk
+    vtk_point_data(vtk, dh, u)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1-element Vector{String}:
+ &quot;heat_equation.vtu&quot;</code></pre><h2 id="heat_equation-plain-program"><a class="docs-heading-anchor" href="#heat_equation-plain-program">Plain Program</a><a id="heat_equation-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#heat_equation-plain-program" title="Permalink"></a></h2><p>Below follows a version of the program without any comments. The file is also available here: <a href="../heat_equation.jl">heat_equation.jl</a></p><pre><code class="language-julia hljs">using Ferrite, SparseArrays
+
+grid = generate_grid(Quadrilateral, (20, 20));
+
+dim = 2
+ip = Lagrange{dim, RefCube, 1}()
+qr = QuadratureRule{dim, RefCube}(2)
+cellvalues = CellScalarValues(qr, ip);
+
+dh = DofHandler(grid)
+push!(dh, :u, 1)
+close!(dh);
+
+K = create_sparsity_pattern(dh);
+
+using UnicodePlots
+fill!(K.nzval, 1.0)
+spy(K; height = 15)
+
+ch = ConstraintHandler(dh);
+
+∂Ω = union(getfaceset.((grid, ), [&quot;left&quot;, &quot;right&quot;, &quot;top&quot;, &quot;bottom&quot;])...);
+
+dbc = Dirichlet(:u, ∂Ω, (x, t) -&gt; 0)
+add!(ch, dbc);
+
+close!(ch)
+update!(ch, 0.0);
+
+function doassemble(cellvalues::CellScalarValues{dim}, K::SparseMatrixCSC, dh::DofHandler) where {dim}
+
+    n_basefuncs = getnbasefunctions(cellvalues)
+    Ke = zeros(n_basefuncs, n_basefuncs)
+    fe = zeros(n_basefuncs)
+
+    f = zeros(ndofs(dh))
+    assembler = start_assemble(K, f)
+
+    @inbounds for cell in CellIterator(dh)
+
+        fill!(Ke, 0)
+        fill!(fe, 0)
+
+        reinit!(cellvalues, cell)
+
+        for q_point in 1:getnquadpoints(cellvalues)
+            dΩ = getdetJdV(cellvalues, q_point)
+
+            for i in 1:n_basefuncs
+                v  = shape_value(cellvalues, q_point, i)
+                ∇v = shape_gradient(cellvalues, q_point, i)
+                fe[i] += v * dΩ
+                for j in 1:n_basefuncs
+                    ∇u = shape_gradient(cellvalues, q_point, j)
+                    Ke[i, j] += (∇v ⋅ ∇u) * dΩ
+                end
+            end
+        end
+
+        assemble!(assembler, celldofs(cell), fe, Ke)
+    end
+    return K, f
+end
+
+K, f = doassemble(cellvalues, K, dh);
+
+apply!(K, f, ch)
+u = K \ f;
+
+vtk_grid(&quot;heat_equation&quot;, dh) do vtk
+    vtk_point_data(vtk, dh, u)
+end
+
+# This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../manual/export/">« Export</a><a class="docs-footer-nextpage" href="../postprocessing/">Postprocessing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.10 on <span class="colophon-date" title="Friday 4 February 2022 13:20">Friday 4 February 2022</span>. Using Julia version 1.7.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
