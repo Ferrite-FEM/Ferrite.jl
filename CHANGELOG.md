@@ -91,6 +91,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    e.g. `shape_value_jump(iv.u, qp, i)` and
    `function_value_average(iv.p, qp, ue, interface_dof_range(ic, :p))`, are called on
    `iv.u` and `iv.p`, and geometric quantities such as `getnormal` on `iv`. ([#1561])
+ - Hessians in `CellValues` (`update_hessians = true`) are now supported for embedded
+   elements, i.e. curves in 2D and 3D and surfaces in 3D.
+   ([#1558])
 
 ### Deprecated
 
@@ -1642,6 +1645,7 @@ poking into Ferrite internals:
 [#1549]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1549
 [#1553]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1553
 [#1554]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1554
+[#1558]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1558
 [#1559]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1559
 [#1541]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1541
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
