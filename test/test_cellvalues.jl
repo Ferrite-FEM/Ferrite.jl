@@ -583,13 +583,16 @@ end
                 (Lagrange{RefTriangle, 2}(), 3), (Lagrange{RefQuadrilateral, 2}(), 3),
             )
             qr = QuadratureRule{getrefshape(ip_geo)}(3)
+            # Same precision as the values, since MixedTensor has no eltype conversion
+            # in Tensors 1.17 (https://github.com/Ferrite-FEM/Tensors.jl/pull/264)
+            qr32 = QuadratureRule{getrefshape(ip_geo)}(Float32, 3)
             for ip in (ip_geo, ip_geo^2, ip_geo^3)
                 # Rotated and perturbed reference element, curved out of plane
                 Q = Tensor{2, sdim}(Matrix(LinearAlgebra.qr(randn(sdim, sdim)).Q))
                 x = [Q ⋅ Vec{sdim}(d -> d <= length(ξ) ? ξ[d] : 0.0) + 0.1 * rand(Vec{sdim}) for ξ in Ferrite.reference_coordinates(ip_geo)]
                 cv = CellValues(qr, ip, ip_geo^sdim; update_hessians = true)
                 reinit!(cv, x)
-                cv32 = CellValues(Float32, qr, ip, ip_geo^sdim; update_hessians = true)
+                cv32 = CellValues(Float32, qr32, ip, ip_geo^sdim; update_hessians = true)
                 reinit!(cv32, [Vec{sdim, Float32}(Tuple(xi)) for xi in x])
                 ue = rand(getnbasefunctions(ip))
                 Jinv(ξ) = Ferrite.calculate_Jinv(Ferrite.calculate_mapping(ip_geo, ξ, x, Val(1)).J)
