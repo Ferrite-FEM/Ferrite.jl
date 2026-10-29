@@ -431,107 +431,62 @@ Ferrite.cell_to_vtkcell(::Type{VTKTestCellDefaultOrder}) = Ferrite.VTKCellTypes.
             @test data.point_data["u"] ≈ expected_u
         end
     end
-    @testset "write_solution prefix and suffix" begin
+
+    @testset "VTK export prefix and suffix" begin
         mktempdir() do tmp
             grid = generate_grid(Quadrilateral, (1, 1))
+            addcellset!(grid, "cells", 1:1)
+            addnodeset!(grid, "right", x -> x[1] ≈ 1.0)
+
             dh = DofHandler(grid)
             add!(dh, :temperature, Lagrange{RefQuadrilateral, 1}())
             close!(dh)
 
             u = collect(1.0:ndofs(dh))
-
-            cases = [
-                ("default", "", "", nothing, "temperature"),
-                ("prefix", "run1_", "", nothing, "run1_temperature"),
-                ("suffix", "", "_final", nothing, "temperature_final"),
-                ("both", "run1_", "_final", nothing, "run1_temperature_final"),
-                ("positional", "", "", "_applied", "temperature_applied"),
-            ]
-
-            for (filename, prefix, suffix, positional_suffix, expected_name) in cases
-                filepath = joinpath(tmp, filename)
-
-                VTKGridFile(filepath, grid) do vtk
-                    if positional_suffix === nothing
-                        write_solution(vtk, dh, u; prefix, suffix)
-                    else
-                        write_solution(vtk, dh, u, positional_suffix)
-                    end
-                end
-
-                data = read_vtk(filepath * ".vtu")
-                @test expected_name in keys(data.point_data)
-                @test data.point_data[expected_name] ≈ u[[1, 2, 4, 3]]
-            end
-        end
-    end
-
-
-    @testset "write_facetset prefix and suffix" begin
-        mktempdir() do tmp
-            grid = generate_grid(Quadrilateral, (2, 2))
             facetset = getfacetset(grid, "left")
-            baseline_path = joinpath(tmp, "baseline")
-            VTKGridFile(baseline_path, grid) do vtk
-                Ferrite.write_facetset(vtk, grid, facetset, "left")
-            end
-            baseline = read_vtk(baseline_path * ".vtu").point_data["left"]
 
             cases = [
-                ("default", "", "", "left"), ("prefix", "run1_", "", "run1_left"),
-                ("suffix", "", "_final", "left_final"), ("both", "run1_", "_final", "run1_left_final"),
+                ("default", "", "", "temperature", "cells", "left", "right"),
+                ("prefix", "run1_", "", "run1_temperature", "run1_cells", "run1_left", "run1_right"),
+                ("suffix", "", "_final", "temperature_final", "cells_final", "left_final", "right_final"),
+                ("both", "run1_", "_final", "run1_temperature_final", "run1_cells_final", "run1_left_final", "run1_right_final"),
             ]
 
-            for (filename, prefix, suffix, expected_name) in cases
+            baseline = nothing
+
+            for (filename, prefix, suffix, solution_name, cellset_name, facetset_name, nodeset_name) in cases
                 filepath = joinpath(tmp, filename)
 
                 VTKGridFile(filepath, grid) do vtk
-                    Ferrite.write_facetset(vtk, grid, facetset, "left"; prefix = prefix, suffix = suffix)
+                    write_solution(vtk, dh, u; prefix, suffix)
+                    Ferrite.write_cellset(vtk, grid; prefix, suffix)
+                    Ferrite.write_facetset(vtk, grid, facetset, "left"; prefix, suffix)
+                    Ferrite.write_nodeset(vtk, grid, "right"; prefix, suffix)
                 end
 
                 data = read_vtk(filepath * ".vtu")
-                @test expected_name in keys(data.point_data)
-                @test data.point_data[expected_name] == baseline
-            end
 
-            filepath = joinpath(tmp, "convenience")
-            VTKGridFile(filepath, grid) do vtk
-                Ferrite.write_facetset(vtk, grid, "left"; prefix = "run1_", suffix = "_final")
-            end
-            data = read_vtk(filepath * ".vtu")
-            @test "run1_left_final" in keys(data.point_data)
-            @test data.point_data["run1_left_final"] == baseline
-        end
-    end
+                @test solution_name in keys(data.point_data)
+                @test cellset_name in keys(data.cell_data)
+                @test facetset_name in keys(data.point_data)
+                @test nodeset_name in keys(data.point_data)
 
+                @test data.point_data[solution_name] ≈ u[[1, 2, 4, 3]]
+                @test data.cell_data[cellset_name] == [1]
 
-    @testset "write_nodeset prefix and suffix" begin
-        mktempdir() do tmp
-            grid = generate_grid(Quadrilateral, (2, 2))
-            addnodeset!(grid, "right", x -> x[1] ≈ 1.0)
-            nodeset = getnodeset(grid, "right")
-
-            baseline_path = joinpath(tmp, "baseline")
-            VTKGridFile(baseline_path, grid) do vtk
-                Ferrite.write_nodeset(vtk, grid, "right")
-            end
-            baseline = read_vtk(baseline_path * ".vtu").point_data["right"]
-
-            cases = [
-                ("default", "", "", "right"), ("prefix", "run1_", "", "run1_right"),
-                ("suffix", "", "_final", "right_final"), ("both", "run1_", "_final", "run1_right_final"),
-            ]
-
-            for (filename, prefix, suffix, expected_name) in cases
-                filepath = joinpath(tmp, filename)
-
-                VTKGridFile(filepath, grid) do vtk
-                    Ferrite.write_nodeset(vtk, grid, "right"; prefix = prefix, suffix = suffix)
+                if baseline === nothing
+                    baseline = (
+                        solution = copy(data.point_data[solution_name]),
+                        facetset = copy(data.point_data[facetset_name]),
+                        nodeset = copy(data.point_data[nodeset_name]),
+                        cellset = copy(data.cell_data[cellset_name]),
+                    )
+                else
+                    @test data.point_data[solution_name] ≈ baseline.solution
+                    @test data.point_data[facetset_name] == baseline.facetset
+                    @test data.point_data[nodeset_name] == baseline.nodeset
+                    @test data.cell_data[cellset_name] == baseline.cellset
                 end
-
-                data = read_vtk(filepath * ".vtu")
-                @test expected_name in keys(data.point_data)
-                @test data.point_data[expected_name] == baseline
             end
         end
     end
