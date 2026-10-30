@@ -263,8 +263,6 @@ function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVec
     return vtk
 end
 
-Base.@deprecate write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix::AbstractString) write_solution(vtk, dh, u; suffix)
-
 """
     write_projection(vtk::VTKGridFile, proj::L2Projector, vals::Vector, name::AbstractString)
 
