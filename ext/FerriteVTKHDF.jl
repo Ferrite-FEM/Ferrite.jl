@@ -91,7 +91,7 @@ _write_node_array(vtk::VTKHDFGridFile, data::Vector{<:Ferrite.Tensors.AbstractTe
 _write_node_array(vtk::VTKHDFGridFile, data::Union{Vector{<:Real}, Matrix{<:Real}}, name::AbstractString) =
     setindex!(hdf(vtk), data, name, VTKPointData())
 
-function write_solution(vtk::VTKHDFGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix = "")
+function write_solution(vtk::VTKHDFGridFile, dh::AbstractDofHandler, u::AbstractVector; prefix = "", suffix = "")
     fieldnames = getfieldnames(dh)
     for name in fieldnames
         if Ferrite.write_discontinuous(vtk)
@@ -99,7 +99,7 @@ function write_solution(vtk::VTKHDFGridFile, dh::AbstractDofHandler, u::Abstract
         else
             data = Ferrite._evaluate_at_grid_nodes(dh, u, name, #= vtk =# Val(true))
         end
-        _write_node_array(vtk, data, string(name, suffix))
+        _write_node_array(vtk, data, string(prefix, name, suffix))
     end
     return vtk
 end
