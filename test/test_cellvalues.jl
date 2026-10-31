@@ -578,16 +578,41 @@ end
             end
         end
 
-        @testset "CellValues with hessians" begin
-            ip = Lagrange{RefQuadrilateral, 2}()
-            qr = QuadratureRule{RefQuadrilateral}(2)
-
-            cv_vector = CellValues(qr, ip^2, ip^3; update_hessians = true)
-            cv_scalar = CellValues(qr, ip, ip^3; update_hessians = true)
-
-            coords = [Vec{3}((x[1], x[2], 0.0)) for x in Ferrite.reference_coordinates(ip)]
-            @test_throws ErrorException reinit!(cv_vector, coords) # Not implemented for embedded elements
-            @test_throws ErrorException reinit!(cv_scalar, coords)
+        @testset "CellValues with hessians (rdim = $(Ferrite.getrefdim(ip_geo)), sdim = $sdim)" for (ip_geo, sdim) in (
+                (Lagrange{RefLine, 2}(), 2), (Lagrange{RefLine, 2}(), 3),
+                (Lagrange{RefTriangle, 2}(), 3), (Lagrange{RefQuadrilateral, 2}(), 3),
+            )
+            qr = QuadratureRule{getrefshape(ip_geo)}(3)
+            for ip in (ip_geo, ip_geo^2, ip_geo^3)
+                # Rotated and perturbed reference element, curved out of plane
+                Q = Tensor{2, sdim}(Matrix(LinearAlgebra.qr(randn(sdim, sdim)).Q))
+                x = [Q ⋅ Vec{sdim}(d -> d <= length(ξ) ? ξ[d] : 0.0) + 0.1 * rand(Vec{sdim}) for ξ in Ferrite.reference_coordinates(ip_geo)]
+                cv = CellValues(qr, ip, ip_geo^sdim; update_hessians = true)
+                reinit!(cv, x)
+                cv32 = CellValues(Float32, qr, ip, ip_geo^sdim; update_hessians = true)
+                reinit!(cv32, [Vec{sdim, Float32}(Tuple(xi)) for xi in x])
+                ue = rand(getnbasefunctions(ip))
+                Jinv(ξ) = Ferrite.calculate_Jinv(Ferrite.calculate_mapping(ip_geo, ξ, x, Val(1)).J)
+                # Tangential gradient of the tangential gradient
+                dNdx(ξ, i) = Ferrite.reference_shape_gradient(ip, ξ, i) ⋅ Jinv(ξ)
+                dudx(ξ) = sum(i -> dNdx(ξ, i) * ue[i], 1:getnbasefunctions(ip))
+                for (q, ξ) in pairs(Ferrite.getpoints(qr))
+                    @test Ferrite.calculate_mapping(ip_geo, ξ, x, Val(2)).H ≈ Ferrite.calculate_mapping(cv.geo_mapping, q, x).H
+                    for i in 1:getnbasefunctions(ip)
+                        @test shape_gradient(cv, q, i) ≈ dNdx(ξ, i)
+                        @test shape_hessian(cv, q, i) ≈ Tensors.gradient(ξ -> dNdx(ξ, i), ξ) ⋅ Jinv(ξ)
+                        @test shape_hessian(cv32, q, i) ≈ shape_hessian(cv, q, i) rtol = 1.0e-3
+                    end
+                    if ip isa ScalarInterpolation
+                        # Tangential part is the symmetric covariant hessian
+                        J = Ferrite.calculate_mapping(ip_geo, ξ, x, Val(1)).J
+                        Hcov = J ⋅ Jinv(ξ) ⋅ Ferrite.function_hessian(cv, q, ue)
+                        @test Hcov ≈ Hcov'
+                    end
+                    @test function_gradient(cv, q, ue) ≈ dudx(ξ)
+                    @test Ferrite.function_hessian(cv, q, ue) ≈ Tensors.gradient(dudx, ξ) ⋅ Jinv(ξ)
+                end
+            end
         end
     end
 
