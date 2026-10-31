@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 410" width="430" height="410">
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+        orient="auto-start-reverse"><path d="M0,0.6 L10,5 L0,9.4 z" fill="#dfe4ea"/></marker>
+<pattern id="hatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+<line x1="0" y1="0" x2="0" y2="7" stroke="#98a2b0" stroke-width="1.1"/></pattern>
+</defs>
+<line x1="65.0" y1="350.0" x2="65.0" y2="50.0" stroke="#98a2b0" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="165.0" y1="350.0" x2="165.0" y2="50.0" stroke="#98a2b0" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="265.0" y1="350.0" x2="265.0" y2="50.0" stroke="#98a2b0" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="365.0" y1="350.0" x2="365.0" y2="50.0" stroke="#98a2b0" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="65.0" y1="350.0" x2="365.0" y2="350.0" stroke="#98a2b0" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="65.0" y1="250.0" x2="365.0" y2="250.0" stroke="#98a2b0" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="65.0" y1="150.0" x2="365.0" y2="150.0" stroke="#98a2b0" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="65.0" y1="50.0" x2="365.0" y2="50.0" stroke="#98a2b0" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="265.0" y1="150.0" x2="165.0" y2="150.0" stroke="#e69f00" stroke-width="3.5" stroke-linecap="round"/>
+<circle cx="165.0" cy="150.0" r="6.5" fill="#56b4e9"/>
+<line x1="265.0" y1="150.0" x2="365.0" y2="150.0" stroke="#e69f00" stroke-width="3.5" stroke-linecap="round"/>
+<circle cx="365.0" cy="150.0" r="6.5" fill="#56b4e9"/>
+<line x1="265.0" y1="150.0" x2="265.0" y2="250.0" stroke="#e69f00" stroke-width="3.5" stroke-linecap="round"/>
+<circle cx="265.0" cy="250.0" r="6.5" fill="#56b4e9"/>
+<line x1="265.0" y1="150.0" x2="265.0" y2="50.0" stroke="#e69f00" stroke-width="3.5" stroke-linecap="round"/>
+<circle cx="265.0" cy="50.0" r="6.5" fill="#56b4e9"/>
+<circle cx="265.0" cy="150.0" r="8.0" fill="#00c9a0"/>
+<circle cx="67.0" cy="390.0" r="7.0" fill="#00c9a0"/>
+<text x="82.0" y="395.0" fill="#98a2b0" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" font-style="normal" text-anchor="start">center vertex</text>
+<circle cx="227.0" cy="390.0" r="6.5" fill="#56b4e9"/>
+<text x="242.0" y="395.0" fill="#98a2b0" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" font-style="normal" text-anchor="start">edge-connected vertices</text>
+</svg>
