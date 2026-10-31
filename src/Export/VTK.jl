@@ -239,11 +239,11 @@ end
 """
     write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector; prefix = "", suffix = "")
 
-Save the interpolated values of the degree of freedom vector `u` at the grid nodes to `vtk`. 
+Save the interpolated values of the degree of freedom vector `u` at the grid nodes to `vtk`.
 Each field in `dh` is saved separately with the field name prepended by `prefix` and appended by `suffix`.
 
 `u` can also contain tensorial values, but each entry in `u` must correspond to a
-degree of freedom in `dh`, see [`write_node_data`](@ref write_node_data) for details. 
+degree of freedom in `dh`, see [`write_node_data`](@ref write_node_data) for details.
 Use `write_node_data` directly when exporting values that are already
 sorted by the nodes in the grid.
 """
