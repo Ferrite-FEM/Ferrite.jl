@@ -33,6 +33,22 @@ using VTKHDF.HDF5
         end
     end
 
+    @testset "solution prefix and suffix" begin
+        fn = joinpath(dir, "prefix_suffix.vtkhdf")
+
+        VTKHDFGridFile(fn, dh) do vtk
+            write_solution(vtk, dh, u; prefix = "run1_", suffix = "_final")
+        end
+
+        h5open(fn) do f
+            g = f["VTKHDF"]
+            @test haskey(g, "PointData/run1_u_final")
+            @test haskey(g, "PointData/run1_v_final")
+            @test !haskey(g, "PointData/u")
+            @test !haskey(g, "PointData/v")
+        end
+    end
+
     @testset "temporal, grid stored once" begin
         fn = joinpath(dir, "temporal.vtkhdf")
         vtkhdf = VTKHDFGridFile(fn, dh; temporal = true)

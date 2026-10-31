@@ -237,18 +237,17 @@ function component_names(::Type{S}) where {S}
 end
 
 """
-    write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix = "")
+    write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector; prefix = "", suffix = "")
 
-Save the values at the nodes in the degree of freedom vector `u` to `vtk`.
-Each field in `dh` will be saved separately, and `suffix` can be used to append
-to the fieldname.
+Save the interpolated values of the degree of freedom vector `u` at the grid nodes to `vtk`.
+Each field in `dh` is saved separately with the field name prepended by `prefix` and appended by `suffix`.
 
 `u` can also contain tensorial values, but each entry in `u` must correspond to a
 degree of freedom in `dh`, see [`write_node_data`](@ref write_node_data) for details.
 Use `write_node_data` directly when exporting values that are already
 sorted by the nodes in the grid.
 """
-function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix = "")
+function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector; prefix = "", suffix = "")
     fieldnames = getfieldnames(dh)  # all primary fields
     for name in fieldnames
         if write_discontinuous(vtk)
@@ -256,7 +255,7 @@ function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVec
         else
             data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
         end
-        _vtk_write_node_data(vtk.vtk, data, string(name, suffix))
+        _vtk_write_node_data(vtk.vtk, data, string(prefix, name, suffix))
     end
     return vtk
 end
@@ -324,24 +323,30 @@ function write_node_data(vtk::VTKGridFile, nodedata, name)
 end
 
 """
-    write_nodeset(vtk::VTKGridFile, grid::AbstractGrid, nodeset::String)
+    write_nodeset(vtk::VTKGridFile, grid::AbstractGrid, nodeset::String; prefix = "", suffix = "")
 
-Write nodal values of 1 for nodes in `nodeset`, and 0 otherwise
+Write a value of 1 for nodes belonging to `nodeset` and 0 for all other nodes.
+
+The `prefix` and `suffix` keyword arguments can be used to add text before and
+after the exported data name, respectively.
 """
-function write_nodeset(vtk, grid::AbstractGrid, nodeset::String)
+function write_nodeset(vtk, grid::AbstractGrid, nodeset::String; prefix = "", suffix = "")
     z = zeros(getnnodes(grid))
     z[collect(getnodeset(grid, nodeset))] .= 1.0
-    write_node_data(vtk, z, nodeset)
+    write_node_data(vtk, z, string(prefix, nodeset, suffix))
     return vtk
 end
 
 """
-    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetsetname::String)
-    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetset::AbstractVecOrSet{FacetIndex}, facetsetname::String)
+    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetsetname::String; prefix = "", suffix = "")
+    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetset::AbstractVecOrSet{FacetIndex}, facetsetname::String; prefix = "", suffix = "")
 
-Write nodal values of 1 for nodes of the faces in `facetset`, and 0 otherwise
+Write a value of 1 for nodes belonging to the facets in `facetset` and 0 for all
+other nodes.
+The `prefix` and `suffix` keyword arguments can be used to add text before and
+after the exported data name, respectively.
 """
-function write_facetset(vtk, grid::AbstractGrid, facetset::AbstractVecOrSet{FacetIndex}, facetsetname::String)
+function write_facetset(vtk, grid::AbstractGrid, facetset::AbstractVecOrSet{FacetIndex}, facetsetname::String; prefix = "", suffix = "")
     z = zeros(getnnodes(grid))
     for (cellid, lfi) in facetset
         cell = getcells(grid, cellid)
@@ -352,30 +357,30 @@ function write_facetset(vtk, grid::AbstractGrid, facetset::AbstractVecOrSet{Face
             z[i] = 1.0
         end
     end
-    write_node_data(vtk, z, facetsetname)
+    write_node_data(vtk, z, string(prefix, facetsetname, suffix))
     return vtk
 end
-write_facetset(vtk, grid::AbstractGrid, facetsetname::String) = write_facetset(vtk, grid, getfacetset(grid, facetsetname), facetsetname)
+write_facetset(vtk, grid::AbstractGrid, facetsetname::String; kwargs...) = write_facetset(vtk, grid, getfacetset(grid, facetsetname), facetsetname; kwargs...)
 
 """
-    write_cellset(vtk, grid::AbstractGrid)
-    write_cellset(vtk, grid::AbstractGrid, cellset::String)
-    write_cellset(vtk, grid::AbstractGrid, cellsets::Union{AbstractVector{String},AbstractSet{String})
+    write_cellset(vtk::VTKGridFile, grid::AbstractGrid; prefix = "", suffix = "")
+    write_cellset(vtk::VTKGridFile, grid::AbstractGrid, cellset::String; prefix = "", suffix = "")
+    write_cellset(vtk::VTKGridFile, grid::AbstractGrid, cellsets::Union{AbstractVector{String}, AbstractSet{String}}; prefix = "", suffix = "")
 
-Write all cell sets in the grid with name according to their keys and
-celldata 1 if the cell is in the set, and 0 otherwise. It is also possible to
-only export a single `cellset`, or multiple `cellsets`.
+Write cell data for each `cellset` in `cellsets`: 1 if the cell is in `cellset` and 0 otherwise.
+If `cellset` or `cellsets` are not provided, default to all cell sets in the grid.
+The data name is the name of the cellset, prepended by `prefix` and appended by `suffix`.
 """
-function write_cellset(vtk, grid::AbstractGrid, cellsets = keys(getcellsets(grid)))
+function write_cellset(vtk, grid::AbstractGrid, cellsets = keys(getcellsets(grid)); prefix = "", suffix = "")
     z = zeros(getncells(grid))
     for cellset in cellsets
         fill!(z, 0)
         z[collect(getcellset(grid, cellset))] .= 1.0
-        write_cell_data(vtk, z, cellset)
+        write_cell_data(vtk, z, string(prefix, cellset, suffix))
     end
     return vtk
 end
-write_cellset(vtk, grid::AbstractGrid, cellset::String) = write_cellset(vtk, grid, [cellset])
+write_cellset(vtk, grid::AbstractGrid, cellset::String; kwargs...) = write_cellset(vtk, grid, [cellset]; kwargs...)
 
 """
     write_constraints(vtk::VTKGridFile, ch::ConstraintHandler)
