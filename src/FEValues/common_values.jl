@@ -221,19 +221,6 @@ function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector
     return grad
 end
 
-# TODO: Deprecate this, nobody is using this in practice...
-function function_gradient(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec}, dof_range = eachindex(u))
-    n_base_funcs = getnbasefunctions(fe_v)
-    length(dof_range) == n_base_funcs || throw_incompatible_dof_length(length(dof_range), n_base_funcs)
-    @boundscheck checkbounds(u, dof_range)
-    @boundscheck checkquadpoint(fe_v, q_point)
-    grad = function_gradient_init(fe_v, u)
-    @inbounds for (i, j) in enumerate(dof_range)
-        grad += u[j] ⊗ shape_gradient(fe_v, q_point, i)
-    end
-    return grad
-end
-
 """
     shape_gradient_type(fe_v::AbstractValues)
 
@@ -320,18 +307,6 @@ function function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVect
     return divergence_from_gradient(function_gradient(fe_v, q_point, u, dof_range))
 end
 
-# TODO: Deprecate this, nobody is using this in practice...
-function function_divergence(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec})
-    n_base_funcs = getnbasefunctions(fe_v)
-    length(u) == n_base_funcs || throw_incompatible_dof_length(length(u), n_base_funcs)
-    @boundscheck checkquadpoint(fe_v, q_point)
-    diverg = zero(eltype(eltype(u)))
-    @inbounds for i in 1:n_base_funcs
-        diverg += shape_gradient(fe_v, q_point, i) ⋅ u[i]
-    end
-    return diverg
-end
-
 """
     function_curl(fe_v::AbstractValues, q_point::Int, u::AbstractVector, [dof_range])
 
@@ -343,10 +318,6 @@ where ``\\mathbf{u}_i`` are the nodal values of the function.
 """
 function_curl(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u)) =
     curl_from_gradient(function_gradient(fe_v, q_point, u, dof_range))
-
-# TODO: Deprecate this, nobody is using this in practice...
-function_curl(fe_v::AbstractValues, q_point::Int, u::AbstractVector{<:Vec}) =
-    curl_from_gradient(function_gradient(fe_v, q_point, u))
 
 """
     spatial_coordinate(fe_v::AbstractValues, q_point::Int, x::AbstractVector)

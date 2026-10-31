@@ -180,4 +180,35 @@ using Ferrite, Test
             function_gradient_jump(iv, 1, ue, r)
     end
 
+    @testset "function_* with Vec dof values for a scalar interpolation" begin
+        qr = QuadratureRule{RefQuadrilateral}(2)
+        ip = Lagrange{RefQuadrilateral, 2}()
+        x = [Vec((0.0, 0.0)), Vec((1.0, 0.1)), Vec((1.1, 1.0)), Vec((0.0, 1.0))] # linear geometry
+        u = [rand(Vec{2}) for _ in 1:getnbasefunctions(ip)]
+        # The replacement: the vectorized interpolation with the reinterpreted dof values
+        cvv = CellValues(qr, ip^2)
+        reinit!(cvv, x)
+        uv = reinterpret(Float64, u)
+        cv = CellValues(qr, ip)
+        cvm = CellValues(qr, (u = ip, p = ip))
+        fv = FacetValues(FacetQuadratureRule{RefQuadrilateral}(2), ip)
+        reinit!(cv, x)
+        reinit!(cvm, x)
+        reinit!(fv, x, 1)
+        for values in (cv, cvm.u)
+            @test (@test_deprecated function_gradient(values, 1, u)) ≈ function_gradient(cvv, 1, uv)
+            @test (@test_deprecated function_divergence(values, 1, u)) ≈ function_divergence(cvv, 1, uv)
+            @test (@test_deprecated function_curl(values, 1, u)) ≈ function_curl(cvv, 1, uv)
+        end
+        @test (@test_deprecated function_gradient(fv, 1, u)) isa Tensor{2, 2}
+        pv = PointValues(ip)
+        pvv = PointValues(ip^2)
+        ξ = Vec((0.1, -0.3))
+        reinit!(pv, x, ξ)
+        reinit!(pvv, x, ξ)
+        @test (@test_deprecated function_gradient(pv, u)) ≈ function_gradient(pvv, uv)
+        # Not supported for multi-field values
+        @test_throws ArgumentError function_gradient(cvm, 1, u)
+    end
+
 end # testset deprecations
