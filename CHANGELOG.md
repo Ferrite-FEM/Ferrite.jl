@@ -91,18 +91,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    e.g. `shape_value_jump(iv.u, qp, i)` and
    `function_value_average(iv.p, qp, ue, interface_dof_range(ic, :p))`, are called on
    `iv.u` and `iv.p`, and geometric quantities such as `getnormal` on `iv`. ([#1561])
- - Shape function derivatives wrt. a user-given local orthonormal frame in each quadrature
-   point (e.g. the tangent frame of shell elements). Gradients and hessians wrt. the local
-   frame coordinates are enabled by passing `update_local_gradients = true` and
+ - Shape function derivatives wrt. a local orthonormal frame in each quadrature point (e.g.
+   the tangent frame of shell elements). Gradients and hessians wrt. the local frame
+   coordinates are enabled by passing `update_local_gradients = true` and
    `update_local_hessians = true` to `CellValues`, `MultiFieldCellValues`, and `FacetValues`,
-   updated with the new function `reinit_local_frame!(fe_values, frames)` after `reinit!`, and
-   accessed with the new functions `shape_local_gradient`, `shape_local_hessian`,
-   `function_local_gradient`, and `function_local_hessian`. A typical frame is
-   `Ferrite.gram_schmidt_frame.(Ferrite.getjacobians(fe_values))`. This is also supported for
-   embedded elements.
- - New keyword argument `update_jacobians = true` to `CellValues`, `MultiFieldCellValues`,
-   and `FacetValues` for storing the jacobian of the geometric mapping in each quadrature
-   point, accessed with `Ferrite.getjacobian(fe_values, q_point)`. Nothing is stored by default.
+   and accessed with the new functions `shape_local_gradient`, `shape_local_hessian`,
+   `function_local_gradient`, and `function_local_hessian`. The local frame is computed in
+   `reinit!` by Gram-Schmidt orthonormalization of the jacobian, and is accessed with
+   `Ferrite.getlocalframe(fe_values, q_point)`. This is also supported for embedded elements.
 
 ### Deprecated
 

@@ -120,13 +120,9 @@ function otimes_returntype(#=typeof(x)=# ::Type{<:Vec{sdim, Tx}}, #=typeof(d2MdÎ
     return Tensors.regular_if_possible(MixedTensor3{sdim, rdim, rdim, promote_type(Tx, TM)})
 end
 
-# Storage for the jacobians and hessians of the geometric mapping in each quadrature point,
-# see e.g. `getjacobian(::AbstractValues, ::Int)` and `reinit_local_frame!`.
-function allocate_jacobians(::Type{T}, ::Val{sdim}, ::Val{rdim}, n::Int) where {T, sdim, rdim}
+# Storage for the local frames (same size as the jacobian) in each quadrature point, see `getlocalframe`
+function allocate_frames(::Type{T}, ::Val{sdim}, ::Val{rdim}, n::Int) where {T, sdim, rdim}
     return fill(zero(otimes_returntype(Vec{sdim, T}, Vec{rdim, T})) * T(NaN), n)
-end
-function allocate_hessians(::Type{T}, ::Val{sdim}, ::Val{rdim}, n::Int) where {T, sdim, rdim}
-    return fill(zero(otimes_returntype(Vec{sdim, T}, Tensor{2, rdim, T})) * T(NaN), n)
 end
 
 @inline function calculate_mapping(::GeometryMapping{0}, q_point::Int, x::AbstractVector{<:Vec})

@@ -107,14 +107,14 @@ frame attached to the element, rather than wrt. the global coordinates, $\boldsy
 
 **The local frame.** In each quadrature point, $\boldsymbol{x}_q = \boldsymbol{x}(\boldsymbol{\xi}_q)$,
 we can assign a local frame: $\boldsymbol{E} = [\boldsymbol{e}_1, \dots, \boldsymbol{e}_{r_\mathrm{dim}}]$ ($s_\mathrm{dim} \times r_\mathrm{dim}$).
-The frame is given by the user with [`reinit_local_frame!`](@ref) after calling [`reinit!`](@ref), and must have orthonormal columns,
-$\boldsymbol{E}^\mathrm{T} \cdot \boldsymbol{E} = \boldsymbol{I}$, that span the same space as the columns of the jacobian, $\boldsymbol{J}$:
+The frame has orthonormal columns, $\boldsymbol{E}^\mathrm{T} \cdot \boldsymbol{E} = \boldsymbol{I}$, that span the same
+space as the columns of the jacobian, $\boldsymbol{J}$. It is computed in [`reinit!`](@ref) and stored, such that it can be
+used in the element routine:
 ```julia
-reinit!(cv, x)                                      # Update the jacobians (and hessians) of the geometric mapping
-frames = Ferrite.gram_schmidt_frame.(Ferrite.getjacobians(cv))
-reinit_local_frame!(cv, frames)                     # Update the local frame derivatives
+reinit!(cv, x)                      # Update the local frames and the local frame derivatives
+E = Ferrite.getlocalframe(cv, qp)   # The local frame in quadrature point qp
 ```
-A typical choice, given by [`Ferrite.gram_schmidt_frame`](@ref), is the Gram-Schmidt orthonormalization of the columns,
+The frame, given by [`Ferrite.gram_schmidt_frame`](@ref), is the Gram-Schmidt orthonormalization of the columns,
 $\boldsymbol{j}_r = \partial \boldsymbol{x} / \partial \xi_r$, of the jacobian:
 ```math
 \begin{align*}

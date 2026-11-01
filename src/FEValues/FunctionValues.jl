@@ -274,11 +274,8 @@ end
 Return the orthonormal local frame, `E`, obtained by Gram-Schmidt orthonormalization of the columns
 of the jacobian `J = ∂x/∂ξ` (size `sdim × rdim`). `E` has the same size as `J`, and its columns span
 the same (tangent) space as the columns of `J`. The first column of `E` is aligned with the first column of `J`.
-This is a typical choice of frame for [`reinit_local_frame!`](@ref):
-```julia
-reinit!(cv, x)
-reinit_local_frame!(cv, Ferrite.gram_schmidt_frame.(Ferrite.getjacobians(cv)))
-```
+This is the local frame used for the local frame derivatives, see [`shape_local_gradient`](@ref)
+and [`Ferrite.getlocalframe`](@ref).
 """
 @inline gram_schmidt_frame(J::Tensor{2, dim}) where {dim} = _gram_schmidt_frame(Tensor{2, dim}, J, Val(dim))
 @inline gram_schmidt_frame(J::MixedTensor2{sdim, rdim}) where {sdim, rdim} = _gram_schmidt_frame(MixedTensor2{sdim, rdim}, J, Val(rdim))
@@ -302,11 +299,7 @@ end
     return TT((e1..., e2..., e3...))
 end
 
-# Local frame derivatives, see `reinit_local_frame!`
-@inline function apply_local_frame!(::FunctionValues{<:Any, 0}, ::Int, ::MappingValues, ::Any)
-    throw(ArgumentError("Local frame derivatives are not updated. Use `update_local_gradients = true` or `update_local_hessians = true` when constructing the values object."))
-end
-
+# Local frame derivatives given the local frame `E`, called from `reinit!` with the Gram-Schmidt frame of the jacobian
 @inline function apply_local_frame!(funvals::FunctionValues{<:Any, 1}, q_point::Int, mapping_values::MappingValues, E::AbstractTensor{2})
     Binv = inv(E' ⋅ getjacobian(mapping_values))
     @inbounds for j in 1:getnbasefunctions(funvals)

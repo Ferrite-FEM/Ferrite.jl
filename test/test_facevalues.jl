@@ -165,25 +165,22 @@ end
         end
     end
 
-    @testset "Local frame derivatives and stored jacobians" begin
+    @testset "Local frame derivatives and stored frames" begin
         ip = Lagrange{RefQuadrilateral, 2}()
         fqr = FacetQuadratureRule{RefQuadrilateral}(2)
         x = [xi + 0.1 * rand(typeof(xi)) for xi in Ferrite.reference_coordinates(ip)]
         fv = FacetValues(fqr, ip, ip)
-        @test fv.J === nothing
-        @test fv.H === nothing
-        fv_s = FacetValues(fqr, ip, ip; update_local_gradients = true, update_local_hessians = true, update_jacobians = true)
+        @test fv.E === nothing
+        fv_s = FacetValues(fqr, ip, ip; update_local_gradients = true, update_local_hessians = true)
         ue = rand(getnbasefunctions(ip))
         for facet in 1:nfacets(fv_s)
             reinit!(fv, x, facet)
-            reinit_gram_schmidt!(fv_s, x, facet)
-            @test_throws ArgumentError Ferrite.getjacobians(fv)
-            @test length(Ferrite.getjacobians(fv_s)) == getnquadpoints(fv_s)
-            @test length(Ferrite.gethessians(fv_s)) == getnquadpoints(fv_s)
+            reinit!(fv_s, x, facet)
+            @test_throws ArgumentError Ferrite.getlocalframe(fv, 1)
             for i in 1:getnquadpoints(fv_s)
-                J = Ferrite.getjacobians(fv_s)[i]
-                @test J ≈ Ferrite.getjacobian(Ferrite.calculate_mapping(Ferrite.get_geo_mapping(fv_s), i, x))
-                E = Ferrite.gram_schmidt_frame(J)
+                J = Ferrite.getjacobian(Ferrite.calculate_mapping(Ferrite.get_geo_mapping(fv_s), i, x))
+                E = Ferrite.getlocalframe(fv_s, i)
+                @test E ≈ Ferrite.gram_schmidt_frame(J)
                 @test function_local_gradient(fv_s, i, ue) ≈ function_gradient(fv, i, ue) ⋅ E
                 for j in 1:getnbasefunctions(fv_s)
                     @test shape_local_gradient(fv_s, i, j) ≈ shape_gradient(fv, i, j) ⋅ E

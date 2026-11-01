@@ -36,7 +36,6 @@ export
     FacetValues,
     InterfaceValues,
     reinit!,
-    reinit_local_frame!,
     shape_value,
     shape_gradient,
     shape_hessian,
