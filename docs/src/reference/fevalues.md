@@ -46,16 +46,17 @@ function_curl
 
 ### Local frame derivatives
 For e.g. shell elements, it is convenient to work with derivatives wrt. coordinates in a local
-orthonormal frame that is tangent to the element. The frame in each quadrature point is computed in [`reinit!`](@ref)
+orthonormal frame that is tangent to the element. These are computed by [`ShellCellValues`](@ref), which
+supports everything [`CellValues`](@ref) does, and in addition computes the local frame and the derivatives
+wrt. the local frame coordinates in [`reinit!`](@ref). The frame in each quadrature point is obtained
 by Gram-Schmidt orthonormalization of the columns of the jacobian, ``\mathbf{J} = \partial \mathbf{x} / \partial \boldsymbol{\xi}``,
-see [`Ferrite.gram_schmidt_frame`](@ref), and is stored such that it can be accessed with [`Ferrite.getlocalframe`](@ref),
-see [`shape_local_gradient`](@ref) for details. The gradients and hessians
-wrt. the local frame coordinates are available if the keyword arguments `update_local_gradients = true`
-and `update_local_hessians = true`, respectively, are given when constructing the values object.
-This is supported for interpolations with identity mapping, also for embedded elements
-(e.g. `CellValues(qr, ip, ip_geo^3)` for surfaces in 3D).
+see [`Ferrite.gram_schmidt_frame`](@ref), and is accessed with [`Ferrite.getlocalframe`](@ref),
+see [`shape_local_gradient`](@ref) for details. This is supported for interpolations with identity mapping,
+also for embedded elements (e.g. `ShellCellValues(qr, ip, ip_geo^3)` for surfaces in 3D).
 
 ```@docs
+ShellCellValues
+Ferrite.ShellFunctionValues
 Ferrite.getlocalframe
 Ferrite.gram_schmidt_frame
 shape_local_gradient

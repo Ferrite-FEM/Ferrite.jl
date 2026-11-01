@@ -18,8 +18,17 @@ function adapt_structure(to, cv::CellValues)
         adapt(to, Ferrite.get_geo_mapping(cv)),
         adapt(to, Ferrite.get_quadrature_rule(cv)),
         adapt(to, Ferrite.getdetJdVs(cv)),
-        adapt(to, Ferrite.getlocalframes(cv)),
     )
+end
+
+# Adapted manually (instead of @adapt_structure) since getproperty is overloaded
+function adapt_structure(to, scv::ShellCellValues)
+    local_values = map(lfv -> adapt(to, lfv), getfield(scv, :local_values))
+    return ShellCellValues(adapt(to, Ferrite._cell_values(scv)), local_values, adapt(to, Ferrite.getlocalframes(scv)))
+end
+
+function adapt_structure(to, lfv::Ferrite.LocalFunctionValues)
+    return Ferrite.LocalFunctionValues(adapt(to, lfv.dNdξ), adapt(to, lfv.d2Ndξ2), adapt(to, lfv.dNds), adapt(to, lfv.d2Nds2))
 end
 
 # This is adapted manually to ensure the aliasing is kept correctly
@@ -33,8 +42,6 @@ function adapt_structure(d, fv::Ferrite.FunctionValues)
         adapt(d, fv.dNdξ),
         adapt(d, fv.d2Ndx2),
         adapt(d, fv.d2Ndξ2),
-        adapt(d, fv.dNds),
-        adapt(d, fv.d2Nds2),
     )
 end
 

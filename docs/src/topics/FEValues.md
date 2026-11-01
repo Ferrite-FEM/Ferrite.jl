@@ -108,11 +108,12 @@ frame attached to the element, rather than wrt. the global coordinates, $\boldsy
 **The local frame.** In each quadrature point, $\boldsymbol{x}_q = \boldsymbol{x}(\boldsymbol{\xi}_q)$,
 we can assign a local frame: $\boldsymbol{E} = [\boldsymbol{e}_1, \dots, \boldsymbol{e}_{r_\mathrm{dim}}]$ ($s_\mathrm{dim} \times r_\mathrm{dim}$).
 The frame has orthonormal columns, $\boldsymbol{E}^\mathrm{T} \cdot \boldsymbol{E} = \boldsymbol{I}$, that span the same
-space as the columns of the jacobian, $\boldsymbol{J}$. It is computed in [`reinit!`](@ref) and stored, such that it can be
-used in the element routine:
+space as the columns of the jacobian, $\boldsymbol{J}$. The local frame derivatives are computed by [`ShellCellValues`](@ref),
+where the frame is computed in [`reinit!`](@ref) and stored, such that it can be used in the element routine:
 ```julia
-reinit!(cv, x)                      # Update the local frames and the local frame derivatives
-E = Ferrite.getlocalframe(cv, qp)   # The local frame in quadrature point qp
+scv = ShellCellValues(qr, ip, ip_geo^3; update_local_hessians = true)
+reinit!(scv, x)                      # Update the local frames and the local frame derivatives
+E = Ferrite.getlocalframe(scv, qp)   # The local frame in quadrature point qp
 ```
 The frame, given by [`Ferrite.gram_schmidt_frame`](@ref), is the Gram-Schmidt orthonormalization of the columns,
 $\boldsymbol{j}_r = \partial \boldsymbol{x} / \partial \xi_r$, of the jacobian:

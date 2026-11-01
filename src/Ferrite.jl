@@ -114,7 +114,7 @@ include("interpolations.jl")
 include("Quadrature/quadrature.jl")
 
 # FEValues
-struct ValuesUpdateFlags{FunDiffOrder_x, FunDiffOrder_s, GeoDiffOrder, DetJdV} end # Default constructor in common_values.jl
+struct ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV} end # Default constructor in common_values.jl
 include("FEValues/GeometryMapping.jl")
 include("FEValues/FunctionValues.jl")
 include("FEValues/CellValues.jl")
@@ -122,6 +122,7 @@ include("FEValues/FacetValues.jl")
 include("FEValues/InterfaceValues.jl")
 include("FEValues/PointValues.jl")
 include("FEValues/common_values.jl")
+include("FEValues/ShellCellValues.jl")
 include("FEValues/facet_integrals.jl")
 
 # Grid
