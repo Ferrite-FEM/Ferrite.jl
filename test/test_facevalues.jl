@@ -281,6 +281,72 @@ end
 
 end # of testset
 
+@testset "EmbeddedQuadrilateralFacetValues" begin
+    ip = Lagrange{RefQuadrilateral, 2}()
+    ip_geo = Lagrange{RefQuadrilateral, 2}()^3
+    fqr = FacetQuadratureRule{RefQuadrilateral}(4)
+    fv = FacetValues(fqr, ip, ip_geo)
+    ref_coords = Ferrite.reference_coordinates(ip)
+    coords = [
+        Vec(ξ[1], ξ[2], 0.2 * ξ[1]^2 + 0.1 * ξ[2]^2 + 0.15 * ξ[1] * ξ[2])
+            for ξ in ref_coords
+    ]
+
+    for facet in 1:4
+        reinit!(fv, coords, facet)
+        for (qp, ξfacet) in enumerate(Ferrite.getpoints(fqr, facet))
+            ξ, η = ξfacet
+            a₁ = Vec(1.0, 0.0, 0.4 * ξ + 0.15 * η)
+            a₂ = Vec(0.0, 1.0, 0.2 * η + 0.15 * ξ)
+            surface_normal = normalize(a₁ × a₂)
+            weighted_tangent = if facet == 1
+                a₁
+            elseif facet == 2
+                a₂
+            elseif facet == 3
+                -a₁
+            else
+                -a₂
+            end
+
+            @test getnormal(fv, qp) ≈ normalize(weighted_tangent × surface_normal) atol = 1.0e-10
+            @test getdetJdV(fv, qp) ≈ norm(weighted_tangent) * Ferrite.getweights(fqr, facet)[qp] atol = 1.0e-10
+        end
+    end
+end
+
+@testset "EmbeddedTriangleFacetValues" begin
+    ip = Lagrange{RefTriangle, 2}()
+    ip_geo = Lagrange{RefTriangle, 2}()^3
+    fqr = FacetQuadratureRule{RefTriangle}(4)
+    fv = FacetValues(fqr, ip, ip_geo)
+    ref_coords = Ferrite.reference_coordinates(ip)
+    coords = [
+        Vec(ξ[1], ξ[2], 0.2 * ξ[1]^2 + 0.1 * ξ[2]^2 + 0.15 * ξ[1] * ξ[2])
+            for ξ in ref_coords
+    ]
+
+    for facet in 1:3
+        reinit!(fv, coords, facet)
+        for (qp, ξfacet) in enumerate(Ferrite.getpoints(fqr, facet))
+            ξ, η = ξfacet
+            a₁ = Vec(1.0, 0.0, 0.4 * ξ + 0.15 * η)
+            a₂ = Vec(0.0, 1.0, 0.2 * η + 0.15 * ξ)
+            surface_normal = normalize(a₁ × a₂)
+            weighted_tangent = if facet == 1
+                a₂ - a₁
+            elseif facet == 2
+                -a₂
+            else
+                a₁
+            end
+
+            @test getnormal(fv, qp) ≈ normalize(weighted_tangent × surface_normal) atol = 1.0e-10
+            @test getdetJdV(fv, qp) ≈ norm(weighted_tangent) * Ferrite.getweights(fqr, facet)[qp] atol = 1.0e-10
+        end
+    end
+end
+
 @testset "EmbeddedLineFacetValues" begin
 
     for dim in (2, 3)
