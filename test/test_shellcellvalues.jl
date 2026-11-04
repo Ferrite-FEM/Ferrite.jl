@@ -153,8 +153,8 @@ include(joinpath(@__DIR__, "test_utils.jl"))
             @test function_local_gradient(smv.u, i, ue) ≈ function_local_gradient(scv_u, i, ue)
             @test function_local_hessian(smv.u, i, ue) ≈ function_local_hessian(scv_u, i, ue)
         end
-        @test smv.p.fun_values === smv.q.fun_values # Equal interpolations are aliased
-        @test smv.p.local_values === smv.q.local_values
+        @test smv.p === smv.q # Equal interpolations are aliased
+        @test smv.u isa Ferrite.FunctionValues
         @test_throws ArgumentError getnbasefunctions(smv)
         @test_throws ArgumentError shape_value(smv, 1, 1)
         @test_throws ArgumentError shape_local_gradient(smv, 1, 1)
@@ -167,8 +167,8 @@ include(joinpath(@__DIR__, "test_utils.jl"))
         scv_copy = Ferrite.task_local_copy(scv)
         @test getfield(scv_copy, :E) == getfield(scv, :E)
         @test getfield(scv_copy, :E) !== getfield(scv, :E)
-        @test only(getfield(scv_copy, :local_values)).dNds !== only(getfield(scv, :local_values)).dNds
-        @test Ferrite.task_local_copy(smv).u.local_values.dNds == smv.u.local_values.dNds
+        @test only(Ferrite.get_fun_values(scv_copy)).dNds !== only(Ferrite.get_fun_values(scv)).dNds
+        @test Ferrite.task_local_copy(smv).u.dNds == smv.u.dNds
 
         # Show
         @test occursin("ShellCellValues", sprint(show, MIME"text/plain"(), scv))

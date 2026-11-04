@@ -51,16 +51,13 @@ function get_substruct(fv::FunctionValues, i)
     Nx = _soa_Nx_slice(fv.Nx, fv.Nξ, i)
     dNdx = view_from_shared(fv.dNdx, i)
     d2Ndx2 = view_from_shared(fv.d2Ndx2, i)
-    return FunctionValues(fv.ip, Nx, fv.Nξ, dNdx, fv.dNdξ, d2Ndx2, fv.d2Ndξ2)
+    dNds = view_from_shared(fv.dNds, i)
+    d2Nds2 = view_from_shared(fv.d2Nds2, i)
+    return FunctionValues(fv.ip, Nx, fv.Nξ, dNdx, fv.dNdξ, d2Ndx2, fv.d2Ndξ2, dNds, d2Nds2)
 end
 
 function get_substruct(scv::ShellCellValues, i)
-    local_values = map(lfv -> get_substruct(lfv, i), getfield(scv, :local_values))
-    return ShellCellValues(get_substruct(_cell_values(scv), i), local_values, view_from_shared(getlocalframes(scv), i))
-end
-
-function get_substruct(lfv::LocalFunctionValues, i)
-    return LocalFunctionValues(lfv.dNdξ, lfv.d2Ndξ2, view_from_shared(lfv.dNds, i), view_from_shared(lfv.d2Nds2, i))
+    return ShellCellValues(get_substruct(_cell_values(scv), i), view_from_shared(getlocalframes(scv), i))
 end
 
 function get_substruct(cc::CellCache, i)

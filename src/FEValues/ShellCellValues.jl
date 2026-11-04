@@ -4,125 +4,12 @@
 # tangent frame of shell elements.                              #
 #################################################################
 
-"""
-    gram_schmidt_frame(J)
-
-Return the orthonormal local frame, `E`, obtained by Gram-Schmidt orthonormalization of the columns
-of the jacobian `J = ∂x/∂ξ` (size `sdim × rdim`). `E` has the same size as `J`, and its columns span
-the same (tangent) space as the columns of `J`. The first column of `E` is aligned with the first column of `J`.
-This is the local frame used by [`ShellCellValues`](@ref), see [`Ferrite.getlocalframe`](@ref).
-"""
-@inline gram_schmidt_frame(J::Tensor{2, dim}) where {dim} = _gram_schmidt_frame(Tensor{2, dim}, J, Val(dim))
-@inline gram_schmidt_frame(J::MixedTensor2{sdim, rdim}) where {sdim, rdim} = _gram_schmidt_frame(MixedTensor2{sdim, rdim}, J, Val(rdim))
-
-@inline function _gram_schmidt_frame(::Type{TT}, J, ::Val{1}) where {TT}
-    e1 = normalize(J[:, 1])
-    return TT((e1...,))
-end
-@inline function _gram_schmidt_frame(::Type{TT}, J, ::Val{2}) where {TT}
-    e1 = normalize(J[:, 1])
-    x2 = J[:, 2]
-    e2 = normalize(x2 - (e1 ⋅ x2) * e1)
-    return TT((e1..., e2...))
-end
-@inline function _gram_schmidt_frame(::Type{TT}, J, ::Val{3}) where {TT}
-    e1 = normalize(J[:, 1])
-    x2 = J[:, 2]
-    e2 = normalize(x2 - (e1 ⋅ x2) * e1)
-    x3 = J[:, 3]
-    e3 = normalize(x3 - (e1 ⋅ x3) * e1 - (e2 ⋅ x3) * e2)
-    return TT((e1..., e2..., e3...))
-end
-
-# =============================================================
-# LocalFunctionValues: Local frame derivatives for one interpolation
-# =============================================================
-struct LocalFunctionValues{DiffOrder, dNdξ_t, d2Ndξ2_t, dNds_t, d2Nds2_t}
-    # As for `FunctionValues`, arrays of one order higher are allowed for the SoA (GPU) layout, see `soa_utils.jl`.
-    dNdξ::dNdξ_t     # ::AbstractMatrix{<:Tensor}               Gradients in the reference domain (precomputed)
-    d2Ndξ2::d2Ndξ2_t # ::AbstractMatrix{<:Tensor} or Nothing    Hessians in the reference domain (precomputed)
-    dNds::dNds_t     # ::AbstractMatrix{<:Tensor}               Gradients wrt. the local frame coordinates
-    d2Nds2::d2Nds2_t # ::AbstractMatrix{<:Tensor} or Nothing    Hessians wrt. the local frame coordinates
-    function LocalFunctionValues(dNdξ::AbstractArray, ::Nothing, dNds::AbstractArray, ::Nothing)
-        return new{1, typeof(dNdξ), Nothing, typeof(dNds), Nothing}(dNdξ, nothing, dNds, nothing)
-    end
-    function LocalFunctionValues(dNdξ::AbstractArray, d2Ndξ2::AbstractArray, dNds::AbstractArray, d2Nds2::AbstractArray)
-        return new{2, typeof(dNdξ), typeof(d2Ndξ2), typeof(dNds), typeof(d2Nds2)}(dNdξ, d2Ndξ2, dNds, d2Nds2)
-    end
-end
-
-function LocalFunctionValues{DiffOrder}(::Type{T}, ip::Interpolation, qr::QuadratureRule, ip_geo::VectorizedInterpolation) where {DiffOrder, T}
-    assert_same_refshapes(qr, ip, ip_geo)
-    if !isa(mapping_type(ip), IdentityMapping)
-        throw(ArgumentError("Local frame derivatives are only supported for interpolations with identity mapping"))
-    end
-    n_shape = getnbasefunctions(ip)
-    n_qpoints = getnquadpoints(qr)
-    # The local frame derivatives have the same type as the reference derivatives (rdim local coordinates)
-    Nξ = zeros(typeof_N(T, ip, ip_geo), n_shape, n_qpoints) # Only used for precomputing
-    dNdξ = zeros(typeof_dNdξ(T, ip, ip_geo), n_shape, n_qpoints)
-    dNds = fill(zero(typeof_dNdξ(T, ip, ip_geo)) * T(NaN), n_shape, n_qpoints)
-    if DiffOrder == 1
-        reference_shape_gradients_and_values!(dNdξ, Nξ, ip, getpoints(qr))
-        return LocalFunctionValues(dNdξ, nothing, dNds, nothing)
-    elseif DiffOrder == 2
-        d2Ndξ2 = zeros(typeof_d2Ndξ2(T, ip, ip_geo), n_shape, n_qpoints)
-        d2Nds2 = fill(zero(typeof_d2Ndξ2(T, ip, ip_geo)) * T(NaN), n_shape, n_qpoints)
-        reference_shape_hessians_gradients_and_values!(d2Ndξ2, dNdξ, Nξ, ip, getpoints(qr))
-        return LocalFunctionValues(dNdξ, d2Ndξ2, dNds, d2Nds2)
-    else
-        throw(ArgumentError("Currently only local gradients and hessians can be updated in ShellCellValues"))
-    end
-end
-
-function task_local_copy(lfv::LocalFunctionValues)
-    return LocalFunctionValues(
-        task_local_copy(lfv.dNdξ), task_local_copy(lfv.d2Ndξ2), task_local_copy(lfv.dNds), task_local_copy(lfv.d2Nds2)
-    )
-end
-
-@propagate_inbounds shape_local_gradient(lfv::LocalFunctionValues, q_point::Int, base_func::Int) = lfv.dNds[base_func, q_point]
-@propagate_inbounds shape_local_hessian(lfv::LocalFunctionValues{2}, q_point::Int, base_func::Int) = lfv.d2Nds2[base_func, q_point]
-function_local_difforder(::LocalFunctionValues{DiffOrder}) where {DiffOrder} = DiffOrder
-shape_local_gradient_type(lfv::LocalFunctionValues) = eltype(lfv.dNds)
-shape_local_hessian_type(lfv::LocalFunctionValues) = eltype(lfv.d2Nds2)
-shape_local_hessian_type(::LocalFunctionValues{1}) = nothing
-
-# Local frame derivatives, given the local frame `E` in the quadrature point
-@inline function apply_local_frame!(lfv::LocalFunctionValues{1}, q_point::Int, mapping_values::MappingValues, E::AbstractTensor{2})
-    Binv = inv(E' ⋅ getjacobian(mapping_values))
-    @inbounds for j in 1:size(lfv.dNds, 1)
-        lfv.dNds[j, q_point] = lfv.dNdξ[j, q_point] ⋅ Binv
-    end
-    return nothing
-end
-
-@inline function apply_local_frame!(lfv::LocalFunctionValues{2}, q_point::Int, mapping_values::MappingValues, E::AbstractTensor{2})
-    J = getjacobian(mapping_values)
-    H = gethessian(mapping_values)
-    Binv = inv(E' ⋅ J)
-    Hs = E' ⋅ H
-    is_vector_valued = first(lfv.dNdξ) isa AbstractTensor{2}
-    Binv_otimesu_Binv = is_vector_valued ? otimesu(Binv, Binv) : nothing
-    @inbounds for j in 1:size(lfv.dNds, 1)
-        dNds = lfv.dNdξ[j, q_point] ⋅ Binv
-        if is_vector_valued
-            d2Nds2 = (lfv.d2Ndξ2[j, q_point] - dNds ⋅ Hs) ⊡ Binv_otimesu_Binv
-        else
-            d2Nds2 = Binv' ⋅ (lfv.d2Ndξ2[j, q_point] - dNds ⋅ Hs) ⋅ Binv
-        end
-        lfv.dNds[j, q_point] = dNds
-        lfv.d2Nds2[j, q_point] = d2Nds2
-    end
-    return nothing
-end
-
-# Equivalent to `foreach(lfv -> apply_local_frame!(lfv, q_point, mapping, E), local_values))`,
+# Equivalent to `foreach(fv -> apply_local_frame!(fv, q_point, mapping, E), fun_values))`,
 # see `apply_mapping!(::Tuple, ...)` in CellValues.jl
-@generated function apply_local_frame!(local_values::Tuple{Vararg{LocalFunctionValues, N}}, q_point, mapping, E) where {N}
+@generated function apply_local_frame!(fun_values::Tuple{Vararg{FunctionValues, N}}, q_point, mapping, E) where {N}
     expr = Expr(:block)
     for i in 1:N
-        push!(expr.args, :(apply_local_frame!(local_values[$i], q_point, mapping, E)))
+        push!(expr.args, :(apply_local_frame!(fun_values[$i], q_point, mapping, E)))
     end
     return quote
         $(Expr(:meta, :inline))
@@ -161,7 +48,7 @@ Only interpolations with identity mapping are supported.
 # Multiple fields
 Constructed with a `NamedTuple` of interpolations, the field specific functions are called on
 `scv.<name>`, e.g. `shape_gradient(scv.u, q_point, i)` and `shape_local_gradient(scv.u, q_point, i)`,
-as for [`CellValues`](@ref).
+where `scv.<name>` is of type [`FunctionValues`](@ref Ferrite.FunctionValues), as for [`CellValues`](@ref).
 
 ```julia
 scv = ShellCellValues(qr, ip, ip_geo^3; update_local_hessians = true)
@@ -170,11 +57,10 @@ E = Ferrite.getlocalframe(scv, q_point)
 ∇ₛN = shape_local_gradient(scv, q_point, i)
 ```
 """
-struct ShellCellValues{CV <: CellValues, LFV <: Tuple{Vararg{LocalFunctionValues}}, ET} <: AbstractCellValues
-    cv::CV            # CellValues (single- or multi-field)
-    local_values::LFV # LocalFunctionValues collected in a tuple, one for each FunctionValues in `cv`
+struct ShellCellValues{CV <: CellValues, ET} <: AbstractCellValues
+    cv::CV # CellValues (single- or multi-field), with the local frame derivatives in its FunctionValues
     # ShellCellValues are only functional for `ET <: AbstractVector{<:AbstractTensor{2}}`, see `CellValues`.
-    E::ET             # Local frame in each quadrature point
+    E::ET  # Local frame in each quadrature point
 end
 
 const SingleFieldShellCellValues = ShellCellValues{<:SingleFieldCellValues}
@@ -184,12 +70,9 @@ function ShellCellValues(
         ::Type{T}, qr::QuadratureRule, ip_fun::Union{Interpolation, NamedTuple}, ip_geo::VectorizedInterpolation{sdim, <:AbstractRefShape{rdim}},
         flags::ValuesUpdateFlags, ::Val{LocalDiffOrder}
     ) where {T, sdim, rdim, LocalDiffOrder}
-    cv = CellValues(T, qr, ip_fun, ip_geo, _shell_update_flags(flags, Val(LocalDiffOrder)))
-    # Same ordering as the (unique) FunctionValues in `cv`
-    unique_ips = ip_fun isa Interpolation ? (ip_fun,) : unique(values(ip_fun))
-    local_values = tuple((LocalFunctionValues{LocalDiffOrder}(T, ip, qr, ip_geo) for ip in unique_ips)...)
+    cv = CellValues(T, qr, ip_fun, ip_geo, _shell_update_flags(flags, Val(LocalDiffOrder)), Val(LocalDiffOrder))
     E = allocate_frames(T, Val(sdim), Val(rdim), getnquadpoints(qr))
-    return ShellCellValues(cv, local_values, E)
+    return ShellCellValues(cv, E)
 end
 
 # The local derivatives require the geometric derivatives up to the same order
@@ -211,14 +94,12 @@ function ShellCellValues(
 end
 
 function task_local_copy(scv::ShellCellValues)
-    return ShellCellValues(
-        task_local_copy(_cell_values(scv)), map(task_local_copy, getfield(scv, :local_values)), task_local_copy(getlocalframes(scv))
-    )
+    return ShellCellValues(task_local_copy(_cell_values(scv)), task_local_copy(getlocalframes(scv)))
 end
 
 # getproperty is overloaded in multi-field mode, so the fields are accessed with getfield
 @inline _cell_values(scv::ShellCellValues) = getfield(scv, :cv)
-@inline _single_local_values(scv::SingleFieldShellCellValues) = getfield(scv, :local_values)[1]
+@inline _single_fun_values(scv::SingleFieldShellCellValues) = _single_fun_values(_cell_values(scv))
 getlocalframes(scv::ShellCellValues) = getfield(scv, :E)
 
 """
@@ -246,44 +127,15 @@ for f in (:shape_value, :shape_gradient, :shape_hessian)
     @eval @propagate_inbounds $f(scv::SingleFieldShellCellValues, q_point::Int, i::Int) = $f(_cell_values(scv), q_point, i)
 end
 for f in (:function_local_difforder, :shape_local_gradient_type, :shape_local_hessian_type)
-    @eval $f(scv::SingleFieldShellCellValues) = $f(_single_local_values(scv))
+    @eval $f(scv::SingleFieldShellCellValues) = $f(_single_fun_values(scv))
 end
 for f in (:shape_local_gradient, :shape_local_hessian)
-    @eval @propagate_inbounds $f(scv::SingleFieldShellCellValues, q_point::Int, i::Int) = $f(_single_local_values(scv), q_point, i)
+    @eval @propagate_inbounds $f(scv::SingleFieldShellCellValues, q_point::Int, i::Int) = $f(_single_fun_values(scv), q_point, i)
 end
 
-# Multiple fields: `scv.u` gives the FunctionValues and LocalFunctionValues of field `u`
-"""
-    ShellFunctionValues
-
-The values of a single field in a multi-field [`ShellCellValues`](@ref), e.g. `scv.u`.
-Supports the same functions as [`FunctionValues`](@ref Ferrite.FunctionValues), and in addition
-[`shape_local_gradient`](@ref), [`shape_local_hessian`](@ref), [`function_local_gradient`](@ref),
-and [`function_local_hessian`](@ref).
-"""
-struct ShellFunctionValues{FV <: FunctionValues, LFV <: LocalFunctionValues} <: AbstractValues
-    fun_values::FV
-    local_values::LFV
-end
-
-@inline function Base.getproperty(scv::MultiFieldShellCellValues, key::Symbol)
-    idx = getproperty(getfield(_cell_values(scv), :fun_values_nt), key)
-    return ShellFunctionValues(_tuple_index(get_fun_values(scv), idx), _tuple_index(getfield(scv, :local_values), idx))
-end
+# Multiple fields: `scv.u` gives the FunctionValues of field `u`, which includes the local frame derivatives
+@inline Base.getproperty(scv::MultiFieldShellCellValues, key::Symbol) = getproperty(_cell_values(scv), key)
 Base.propertynames(scv::MultiFieldShellCellValues) = propertynames(_cell_values(scv))
-
-for f in (:getnbasefunctions, :getnquadpoints, :function_interpolation, :function_difforder, :shape_value_type, :shape_gradient_type, :shape_hessian_type)
-    @eval $f(sfv::ShellFunctionValues) = $f(sfv.fun_values)
-end
-for f in (:shape_value, :shape_gradient, :shape_hessian)
-    @eval @propagate_inbounds $f(sfv::ShellFunctionValues, q_point::Int, i::Int) = $f(sfv.fun_values, q_point, i)
-end
-for f in (:function_local_difforder, :shape_local_gradient_type, :shape_local_hessian_type)
-    @eval $f(sfv::ShellFunctionValues) = $f(sfv.local_values)
-end
-for f in (:shape_local_gradient, :shape_local_hessian)
-    @eval @propagate_inbounds $f(sfv::ShellFunctionValues, q_point::Int, i::Int) = $f(sfv.local_values, q_point, i)
-end
 
 # Error messages for functions that should be called on the specific field
 function getnbasefunctions(scv::MultiFieldShellCellValues)
@@ -312,7 +164,6 @@ end
 function reinit!(scv::ShellCellValues, cell::Union{AbstractCell, Nothing}, x::AbstractVector{<:Vec})
     geo_mapping = get_geo_mapping(scv)
     fun_values = get_fun_values(scv)
-    local_values = getfield(scv, :local_values)
     frames = getlocalframes(scv)
     n_geom_basefuncs = getngeobasefunctions(geo_mapping)
 
@@ -329,14 +180,14 @@ function reinit!(scv::ShellCellValues, cell::Union{AbstractCell, Nothing}, x::Ab
         apply_mapping!(fun_values, q_point, mapping, cell)
         # Local frame derivatives
         E = gram_schmidt_frame(getjacobian(mapping))
-        apply_local_frame!(local_values, q_point, mapping, E)
+        apply_local_frame!(fun_values, q_point, mapping, E)
         frames[q_point] = E
     end
     return nothing
 end
 
 function Base.show(io::IO, d::MIME"text/plain", scv::ShellCellValues)
-    order = function_local_difforder(first(getfield(scv, :local_values)))
+    order = function_local_difforder(first(get_fun_values(scv)))
     print(io, "ShellCellValues with local frame ", order == 1 ? "gradients" : "gradients and hessians", " wrapping a\n")
     show(io, d, _cell_values(scv))
     return

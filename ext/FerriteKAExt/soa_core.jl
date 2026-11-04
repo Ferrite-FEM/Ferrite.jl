@@ -31,23 +31,15 @@ function as_structure_of_arrays(d, N, fv::Ferrite.FunctionValues)
         adapt(d, fv.dNdξ),
         zeros_shared(d, fv.d2Ndx2, N),
         adapt(d, fv.d2Ndξ2),
+        zeros_shared(d, fv.dNds, N),
+        zeros_shared(d, fv.d2Nds2, N),
     )
 end
 
 function as_structure_of_arrays(d, N, scv::ShellCellValues)
-    local_values = map(lfv -> as_structure_of_arrays(d, N, lfv), getfield(scv, :local_values))
     return ShellCellValues(
-        as_structure_of_arrays(d, N, Ferrite._cell_values(scv)), local_values,
+        as_structure_of_arrays(d, N, Ferrite._cell_values(scv)),
         zeros_shared(d, Ferrite.getlocalframes(scv), N),
-    )
-end
-
-function as_structure_of_arrays(d, N, lfv::Ferrite.LocalFunctionValues)
-    return Ferrite.LocalFunctionValues(
-        adapt(d, lfv.dNdξ),
-        adapt(d, lfv.d2Ndξ2),
-        zeros_shared(d, lfv.dNds, N),
-        zeros_shared(d, lfv.d2Nds2, N),
     )
 end
 

@@ -56,7 +56,6 @@ also for embedded elements (e.g. `ShellCellValues(qr, ip, ip_geo^3)` for surface
 
 ```@docs
 ShellCellValues
-Ferrite.ShellFunctionValues
 Ferrite.getlocalframe
 Ferrite.gram_schmidt_frame
 shape_local_gradient

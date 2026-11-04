@@ -109,23 +109,23 @@ const MultiFieldCellValues = CellValues{<:NamedTuple}
 
 function CellValues(
         ::Type{T}, qr::QuadratureRule, ip_fun::Interpolation, ip_geo::VectorizedInterpolation,
-        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}
-    ) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
+        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}, ::Val{FunDiffOrder_s} = Val(0) # Local frame derivatives, see ShellCellValues
+    ) where {T, FunDiffOrder, GeoDiffOrder, DetJdV, FunDiffOrder_s}
 
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
-    fun_values = (FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo),)
+    fun_values = (FunctionValues{FunDiffOrder, FunDiffOrder_s}(T, ip_fun, qr, ip_geo),)
     detJdV = DetJdV ? fill(T(NaN), length(getweights(qr))) : nothing
     return CellValues(nothing, fun_values, geo_mapping, qr, detJdV)
 end
 
 function CellValues(
         ::Type{T}, qr::QuadratureRule, ip_funs::NamedTuple, ip_geo::VectorizedInterpolation,
-        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}
-    ) where {T, FunDiffOrder, GeoDiffOrder, DetJdV}
+        ::ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, DetJdV}, ::Val{FunDiffOrder_s} = Val(0) # Local frame derivatives, see ShellCellValues
+    ) where {T, FunDiffOrder, GeoDiffOrder, DetJdV, FunDiffOrder_s}
 
     geo_mapping = GeometryMapping{GeoDiffOrder}(T, ip_geo.ip, qr)
     unique_ips = unique(values(ip_funs)) # Not type-stable, but ok for advanced users this should be constructed outside...
-    fun_values = tuple((FunctionValues{FunDiffOrder}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...)
+    fun_values = tuple((FunctionValues{FunDiffOrder, FunDiffOrder_s}(T, ip_fun, qr, ip_geo) for ip_fun in unique_ips)...)
     fun_values_nt = NamedTuple((key => Val(findfirst(unique_ip -> ip == unique_ip, unique_ips)) for (key, ip) in pairs(ip_funs)))
     detJdV = DetJdV ? fill(T(NaN), length(getweights(qr))) : nothing
     return CellValues(fun_values_nt, fun_values, geo_mapping, qr, detJdV)
