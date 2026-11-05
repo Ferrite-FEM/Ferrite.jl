@@ -85,7 +85,10 @@ end
 end
 
 
-function meandiag(K::AbstractGPUSparseMatrixCSC{T}) where {T}
+# The device implementation, also used for sparse matrix types that do not subtype the
+# GPUArrays sparse types (oneAPI.jl's and GenericSparseArrays.jl's, see the corresponding
+# extensions). Only the CSC storage arrays and the backend of the values are required.
+function _meandiag_ka(K::AbstractSparseMatrix{T}) where {T}
     n = size(K, 1)
     backend = get_backend(nonzeros(K))
     diag = KA.zeros(backend, T, n)
@@ -97,17 +100,17 @@ function meandiag(K::AbstractGPUSparseMatrixCSC{T}) where {T}
     return sum(diag) / n
 end
 
-function Ferrite.apply!(K::AbstractGPUSparseMatrixCSC{T}, f::AbstractGPUVector{T}, ch::DeviceConstraintHandler{T}, applyzero::Bool = false) where {T}
+meandiag(K::AbstractGPUSparseMatrixCSC) = _meandiag_ka(K)
+
+# A `DeviceConstraintHandler` is only created by adapting to a backend, so it is the
+# discriminator for the kernel based implementation. The matrix must have CSC storage; it
+# may live on the host (`KA.CPU`) or on a device.
+function Ferrite.apply!(K::AbstractSparseMatrix{T}, f::AbstractVector{T}, ch::DeviceConstraintHandler{T}, applyzero::Bool = false) where {T}
     _apply_ka_csc!(K, f, ch, applyzero)
     return
 end
 
-function Ferrite.apply!(K::AbstractSparseMatrixCSC{T}, f::AbstractVector{T}, ch::DeviceConstraintHandler{T}, applyzero::Bool = false) where {T}
-    _apply_ka_csc!(K, f, ch, applyzero)
-    return
-end
-
-function Ferrite.apply_zero!(K::AbstractGPUSparseMatrixCSC{T}, f::AbstractGPUVector{T}, ch::DeviceConstraintHandler{T}) where {T}
+function Ferrite.apply_zero!(K::AbstractSparseMatrix{T}, f::AbstractVector{T}, ch::DeviceConstraintHandler{T}) where {T}
     _apply_ka_csc!(K, f, ch, true)
     return
 end
@@ -120,7 +123,7 @@ function _apply_ka_csc!(K, f, ch::DeviceConstraintHandler{T}, applyzero::Bool = 
     rv = rowvals(K)
     nz = nonzeros(K)
     nnz_K = length(nz)
-    m = meandiag(K)
+    m = _meandiag_ka(K)
     backend = get_backend(nz)
 
     # Step 1+2: f -= K[:,d]*v, then zero prescribed columns
