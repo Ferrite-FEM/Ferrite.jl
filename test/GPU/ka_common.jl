@@ -5,6 +5,7 @@
 # including `heat_assembly.jl`.
 using Ferrite, Test, SparseArrays
 using FerriteGmsh
+using FerriteGmsh: Gmsh
 import Adapt: adapt
 import KernelAbstractions as KA
 import KernelAbstractions: @kernel, @index
@@ -188,7 +189,7 @@ function setup_heat_problem(T = Float32, num_elements = 5)
 end
 
 function generate_mixed_grid()
-    gmsh.initialize()
+    Gmsh.initialize()
     gmsh.option.setNumber("General.Terminal", 1)
     gmsh.model.add("mixed")
     gmsh.option.setNumber("Mesh.MeshSizeMax", 0.05)
@@ -237,7 +238,7 @@ function generate_mixed_grid()
     boundarydict = toboundary(1)
     facetsets = tofacetsets(boundarydict, elements)
     cellsets = tocellsets(2, gmsh_eleidx)
-    gmsh.finalize()
+    Gmsh.finalize()
 
     return Grid(elements, nodes, facetsets = facetsets, cellsets = cellsets)
 end

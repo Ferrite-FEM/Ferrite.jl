@@ -97,14 +97,13 @@ function precompute_values!(fv::FunctionValues{2}, qr_points::AbstractVector{<:V
     return reference_shape_hessians_gradients_and_values!(fv.d2Ndξ2, fv.dNdξ, fv.Nξ, fv.ip, qr_points)
 end
 
-function Base.copy(v::FunctionValues)
-    Nξ_copy = copy(v.Nξ)
-    Nx_copy = v.Nξ === v.Nx ? Nξ_copy : copy(v.Nx) # Preserve aliasing
-    dNdx_copy = _copy_or_nothing(v.dNdx)
-    dNdξ_copy = _copy_or_nothing(v.dNdξ)
-    d2Ndx2_copy = _copy_or_nothing(v.d2Ndx2)
-    d2Ndξ2_copy = _copy_or_nothing(v.d2Ndξ2)
-    return FunctionValues(copy(v.ip), Nx_copy, Nξ_copy, dNdx_copy, dNdξ_copy, d2Ndx2_copy, d2Ndξ2_copy)
+function task_local_copy(v::FunctionValues)
+    Nξ = task_local_copy(v.Nξ)
+    Nx = v.Nξ === v.Nx ? Nξ : task_local_copy(v.Nx) # Preserve aliasing
+    return FunctionValues(
+        task_local_copy(v.ip), Nx, Nξ, task_local_copy(v.dNdx), task_local_copy(v.dNdξ),
+        task_local_copy(v.d2Ndx2), task_local_copy(v.d2Ndξ2)
+    )
 end
 
 getnbasefunctions(funvals::FunctionValues) = size(funvals.Nx, 1)
@@ -149,6 +148,17 @@ struct ContravariantPiolaMapping end
 mapping_type(fv::FunctionValues) = mapping_type(fv.ip)
 
 """
+    reinit_needs_cell(fun_mapping)
+
+Return whether `reinit!` requires the cell to apply `fun_mapping`, e.g. for the
+edge/facet orientations used by the Piola mappings. Defaults to `true`; overload for
+custom mappings that do not need it.
+"""
+reinit_needs_cell(::Any) = true
+reinit_needs_cell(::IdentityMapping) = false
+reinit_needs_cell(fv::FunctionValues) = reinit_needs_cell(mapping_type(fv))
+
+"""
     required_geo_diff_order(fun_mapping, fun_diff_order::Int)
 
 Return the required order of geometric derivatives to map
@@ -169,6 +179,15 @@ required_geo_diff_order(::CovariantPiolaMapping, fun_diff_order::Int) = 1 + fun_
     # Optimized Moore-Penrose pseudo inverse.
     # We assume that `J'⋅J` is invertible. This is a reasonable for non-degenerate elements.
     return inv(tdot(J)) ⋅ (J)'
+end
+
+# For embedded elements, ∂J⁺/∂ξ = -J⁺⋅H⋅J⁺ + (JᵀJ)⁻¹⋅Hᵀ⋅(I - J⋅J⁺). The second term contributes
+# dNdξ ⋅ E to the hessian, with Eᵧᵢⱼ = (JᵀJ)⁻¹ᵧₐ ((I - J⋅J⁺)⋅H)ᵢₐᵦ J⁺ᵦⱼ.
+@inline embedding_hessian_term(::Tensor{2}, Jinv, H) = nothing
+@inline function embedding_hessian_term(J::MixedTensor2{sdim, rdim}, Jinv, H) where {sdim, rdim}
+    PH = (one(Tensor{2, sdim, eltype(J)}) - J ⋅ Jinv) ⋅ H
+    PHt = MixedTensor3{rdim, sdim, rdim}((α, i, β) -> PH[i, α, β])
+    return inv(tdot(J)) ⋅ PHt ⋅ Jinv
 end
 
 # =============
@@ -192,12 +211,10 @@ end
 end
 
 @inline function apply_mapping!(funvals::FunctionValues{2}, ::IdentityMapping, q_point::Int, mapping_values, args...)
-    Jinv = calculate_Jinv(getjacobian(mapping_values))
-
-    sdim, rdim = size(Jinv)
-    (rdim != sdim) && error("apply_mapping! for second order gradients and embedded elements not implemented")
-
+    J = getjacobian(mapping_values)
+    Jinv = calculate_Jinv(J)
     H = gethessian(mapping_values)
+    E = embedding_hessian_term(J, Jinv, H)
     is_vector_valued = first(funvals.Nx) isa Vec
     Jinv_otimesu_Jinv = is_vector_valued ? otimesu(Jinv, Jinv) : nothing
     @inbounds for j in 1:getnbasefunctions(funvals)
@@ -206,6 +223,9 @@ end
             d2Ndx2 = (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⊡ Jinv_otimesu_Jinv
         else
             d2Ndx2 = Jinv' ⋅ (funvals.d2Ndξ2[j, q_point] - dNdx ⋅ H) ⋅ Jinv
+        end
+        if !isnothing(E)
+            d2Ndx2 += funvals.dNdξ[j, q_point] ⋅ E
         end
 
         funvals.dNdx[j, q_point] = dNdx

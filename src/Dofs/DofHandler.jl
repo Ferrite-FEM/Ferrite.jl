@@ -239,6 +239,55 @@ ndofs_per_cell(sdh::SubDofHandler) = sdh.ndofs_per_cell
 ndofs_per_cell(sdh::SubDofHandler, ::Int) = sdh.ndofs_per_cell # for compatibility with DofHandler
 
 """
+    ndofs_per_interface(dh::DofHandler) -> Int
+
+Return the number of dofs of an interface, in the stacked layout.
+
+Requires a `DofHandler` with a single `SubDofHandler`: both cells of every interface then
+have the same number of cell dofs, so the size, `2 * ndofs_per_cell(dh)`, is the same for
+every interface and local interface matrices/vectors can be sized once, outside the
+interface loop. For a `DofHandler` with multiple `SubDofHandler`s the size depends on the
+interface, use `ndofs_per_interface(ic::InterfaceCache)` inside the loop.
+"""
+function ndofs_per_interface(dh::DofHandler)
+    isclosed(dh) || error("DofHandler must be closed")
+    if length(dh.subdofhandlers) > 1
+        error(
+            "The given DofHandler has $(length(dh.subdofhandlers)) SubDofHandlers, so " *
+                "the stacked interface size depends on the interface. Use " *
+                "`ndofs_per_interface(ic::InterfaceCache)` inside the interface loop " *
+                "(2 * maximum(ndofs_per_cell, dh.subdofhandlers) bounds it)."
+        )
+    end
+    return 2 * ndofs_per_cell(dh)
+end
+
+"""
+    interface_dof_range(dh::DofHandler, field::Symbol) -> InterfaceDofRange
+
+Return the positions of `field`'s dofs in the stacked interface layout.
+
+Requires a `DofHandler` with a single `SubDofHandler`: both cells of every interface then
+have the same local dof layout, so the range is the same for every interface and can be computed
+once, outside the interface loop. For a `DofHandler` with multiple `SubDofHandler`s the
+range depends on the interface, use
+[`interface_dof_range(::InterfaceCache, ::Symbol)`](@ref) instead.
+"""
+function interface_dof_range(dh::DofHandler, field::Symbol)
+    if length(dh.subdofhandlers) > 1
+        error(
+            "The given DofHandler has $(length(dh.subdofhandlers)) SubDofHandlers, so " *
+                "the stacked positions of a field depend on the interface. Use " *
+                "`interface_dof_range(ic::InterfaceCache, field)` inside the interface " *
+                "loop instead."
+        )
+    end
+    here = dof_range(dh, field)
+    there = here .+ ndofs_per_cell(dh)
+    return InterfaceDofRange(here, there)
+end
+
+"""
     celldofs!(global_dofs::Vector{Int}, dh::AbstractDofHandler, i::Int)
 
 Store the degrees of freedom that belong to cell `i` in `global_dofs`.
@@ -912,8 +961,10 @@ dofs on 2D cells that have not opted in to the lattice assumption are pushed in 
 order (such dofs are not necessarily placed on a lattice, e.g. for
 `RaviartThomas{RefTriangle, 2}`).
 
-The permutation assumes that the interior dofs are placed on a regular lattice, in the
-enumeration order specified by [`facedof_interior_indices`](@ref). An interpolation must opt
+The permutation assumes that the interior dofs are placed on a (topological) lattice, in the
+enumeration order specified by [`facedof_interior_indices`](@ref), with node positions that
+are invariant under the symmetries of the face (e.g. the equispaced lattice, or the GLL
+nodes of `Lagrange`, which are warped lattice points). An interpolation must opt
 in to this assumption via [`interior_facedofs_on_lattice`](@ref); otherwise distributing more
 than one dof on a shared 3D face errors. For a triangular face
 with vertices ``(v_1, v_2, v_3)`` the interior dofs make up a smaller triangular lattice,
@@ -921,7 +972,7 @@ which is traversed row by row, where rows are lines of constant barycentric ``v_
 starting with the row closest to the edge ``(v_3, v_1)``, and each row is traversed with
 increasing barycentric ``v_1``-weight (i.e. starting from the point closest to ``v_3``).
 This matches the interior node ordering of `Lagrange{RefTriangle, order}`. For a
-quadrilateral face the interior dofs make up a regular grid which is traversed row by row,
+quadrilateral face the interior dofs make up a tensor-product grid which is traversed row by row,
 where rows are lines of constant local ``v_1 \\to v_4`` coordinate, starting with the row
 closest to the edge ``(v_1, v_2)``, and each row is traversed in the direction
 ``v_1 \\to v_2``. This matches the interior node ordering of

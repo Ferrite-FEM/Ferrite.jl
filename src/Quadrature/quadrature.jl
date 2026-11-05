@@ -320,5 +320,11 @@ getpoints(qr::FacetQuadratureRule, facet::Int) = getpoints(qr.facet_rules[facet]
 
 getrefshape(::QuadratureRule{RefShape}) where {RefShape} = RefShape
 
-# TODO: This is used in copy(::(Cell|Facet)Values), but it it useful to get an actual copy?
-Base.copy(qr::Union{QuadratureRule, FacetQuadratureRule}) = qr
+# TODO: For typical use the quadrature rule is read-only, but seems safer to copy anyway?
+#       And might even be beneficial with e.g. NUMA?
+function task_local_copy(qr::QR) where {refshape, QR <: QuadratureRule{refshape}}
+    return QuadratureRule{refshape}(task_local_copy(qr.weights), task_local_copy(qr.points))::QR
+end
+function task_local_copy(qr::QR) where {refshape, QR <: FacetQuadratureRule{refshape}}
+    return FacetQuadratureRule{refshape}(task_local_copy(qr.facet_rules))::QR
+end

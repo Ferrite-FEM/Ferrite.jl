@@ -49,3 +49,5 @@ end
 gpu_backend == "cuda" && include("howto.jl")
 
 include("heat_assembly.jl")
+include("../multifield_cellvalues_utils.jl")
+test_multifield_cellvalues(backend)

@@ -46,6 +46,9 @@ ndofs_per_cell
 dof_range
 celldofs
 celldofs!
+interfacedofs
+interface_dof_range
+ndofs_per_interface
 ```
 
 ## Grid iterators

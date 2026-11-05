@@ -22,6 +22,17 @@ and ``a_3``), i.e.
 a_1 = 0.5a_2 + 0.5a_3.
 ```
 
+Some constraints have no natural dependent DoF, for example requiring the mean value of a
+field to be zero:
+
+```math
+w_1 a_1 + w_2 a_2 + \dots + w_n a_n = 0.
+```
+
+Such a constraint can still be brought to the form above by solving for any DoF with a
+nonzero weight; Ferrite can make this choice automatically, see
+[below](@ref "Affine constraints in Ferrite").
+
 Furthermore, affine constraints can also be viewed as a generalization of Dirichlet
 boundary conditions of the form ``a_1 = c`` for some prescribed value ``c``. However,
 Dirichlet BCs are mathematically and implementation-wise much easier to handle.
@@ -78,30 +89,32 @@ The reduced system of equations can be used to solve for ``\boldsymbol{a}_f``, w
 be used to calculate the dependent DoFs. Ferrite has functionality for setting up the
 ``\hat{\boldsymbol{K}}`` and ``\hat{\boldsymbol{f}}`` in an efficient way.
 
-!!! note "Limitations"
-    Ferrite currently cannot untangle constraints where a DoF is both *master* and *slave*
-    DoF. For example, if we have two affine constraints such as:
-    ```math
-    a_1 = 2a_2 + 4 \\
-    a_2 = 3a_3 + 1
-    ```
-    Ferrite will not be able to resolve this situation because `` a_2 `` is both a master
-    and a slave DoF in different constraints.
+!!! note "Tangled affine constraints"
+    In  `close!` the tangled affine constraints are untangled. To check if your `ConstraintHandler` is tangled you can call `Ferrite._istangled`. It should be noted that this is internal and can change on non-breaking releases without warning.
 
 ### Affine constraints in Ferrite
 
 To explain how affine constraints are handled in Ferrite, we will use the same example as
-above. The constraint equations can be constructed with `Ferrite.AffineConstraint` and
+above. The constraint equations can be constructed with `AffineConstraint` and
 added to the `ConstraintHandler`:
 
 ```julia
 ch = ConstraintHandler(dh)
 
-lc1 = Ferrite.AffineConstraint(1, [2 => 5.0, 3 => 3.0], 1.0)
-lc2 = Ferrite.AffineConstraint(4, [3 => 2.0, 5 => 6.0], 0.0)
+lc1 = AffineConstraint(1, [2 => 5.0, 3 => 3.0], 1.0)
+lc2 = AffineConstraint(4, [3 => 2.0, 5 => 6.0], 0.0)
 
 add!(ch, lc1)
 add!(ch, lc2)
+```
+
+If a constraint has no natural dof to eliminate, e.g. a constraint on the mean value of a
+field, the constrained dof can be left out and the constraint given as an equation
+``\sum_j c_j a_j = b``. In `close!` one of the DoFs is chosen as the dependent one,
+avoiding DoFs that are already constrained, for example by periodic boundary conditions:
+
+```julia
+lc3 = AffineConstraint([1 => 1.0, 2 => -5.0, 3 => -3.0], 1.0) # same equation as lc1
 ```
 
 Affine constraints will impact the sparsity pattern of the matrix, and as such, it is

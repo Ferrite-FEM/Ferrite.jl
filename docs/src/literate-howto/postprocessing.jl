@@ -74,9 +74,12 @@ function compute_heat_fluxes(cellvalues::CellValues, dh::DofHandler, a::Abstract
     ## Allocate storage for the fluxes to store
     q = [Vec{2, T}[] for _ in 1:getncells(dh.grid)]
 
+    ## Allocate the local solution vector
+    aᵉ = zeros(T, ndofs_per_cell(dh))
+
     for cell in CellIterator(dh)
         q_cell = q[cellid(cell)]
-        aᵉ = a[celldofs(cell)]
+        aᵉ .= @view a[celldofs(cell)]
         reinit!(cellvalues, cell)
 
         for q_point in 1:nqp
@@ -92,9 +95,11 @@ end
 q_gp = compute_heat_fluxes(cellvalues, dh, u);
 
 # Next, create an [`L2Projector`](@ref) using the same interpolation as was used to approximate the
-# temperature field. On instantiation, the projector assembles the coefficient matrix `M` and
-# computes the Cholesky factorization of it. By doing so, the projector can be reused without
-# having to invert `M` every time.
+# temperature field. On instantiation, the projector assembles the coefficient matrix `M`
+# (the mass matrix), such that the projector can be reused without having to assemble `M`
+# every time. By default, each projection solves the system with the (Jacobi-preconditioned)
+# conjugate gradient method; pass `solver = Ferrite.L2SolverCholesky()` to instead store a Cholesky
+# factorization of `M`, see [`L2Projector`](@ref).
 projector = L2Projector(ip, grid);
 
 # Project the integration point values to the nodal values

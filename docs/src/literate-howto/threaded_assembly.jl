@@ -153,8 +153,8 @@ nothing # hide
 
 # ### Task local scratch data
 #
-# We group everything that needs to be duplicated for each task in the struct
-# `ScratchData`:
+# Some of the data used during assembly is modified for each cell, and each task therefore
+# needs its own instance of it:
 #  - `cell_cache::CellCache`: contain buffers for coordinates and (global) dofs which will
 #    be `reinit!`ed for each cell.
 #  - `cellvalues::CellValues`: the cell values which will be `reinit!`ed for each cell using
@@ -163,37 +163,17 @@ nothing # hide
 #  - `fe::Vector`: the local vector
 #  - `assembler`: the assembler (which needs to be duplicated because it contains buffers
 #    that are modified during the call to `assemble!`)
-struct ScratchData{CC, CV, T, A}
-    cell_cache::CC
-    cellvalues::CV
-    Ke::Matrix{T}
-    fe::Vector{T}
-    assembler::A
-end
-
-# This constructor will be called within each task to create a independent `ScratchData`
-# object. For `cell_cache`, `Ke`, and `fe` we simply call the constructors to allocate
-# independent objects. For `cellvalues` we use `copy` which Ferrite defines for this
-# purpose. Finally, for the assembler we call `start_assemble` to create a new assembler but
-# note that we set `fillzero = false` because we don't want to risk that a task that starts
-# a bit later will zero out data that another task have already assembled. The `atomic`
-# flag is forwarded to `start_assemble` and will be used for the [atomic
-# accumulation](@ref howto-threaded-assembly-atomic) version at the end of this howto.
-# Note that it is passed as `Val(true)`/`Val(false)`: the type of the returned assembler
-# depends on the flag, so passing it in the type domain makes sure that the `ScratchData`
-# type (and thus the assembly loop) is concretely typed.
-function ScratchData(
-        dh::DofHandler, K::SparseMatrixCSC, f::Vector, cellvalues::CellValues,
-        ::Val{atomic} = Val(false)
-    ) where {atomic}
-    cell_cache = CellCache(dh)
-    n = ndofs_per_cell(dh)
-    Ke = zeros(n, n)
-    fe = zeros(n)
-    asm = start_assemble(K, f; fillzero = false, atomic = atomic)
-    return ScratchData(cell_cache, copy(cellvalues), Ke, fe, asm)
-end
-nothing # hide
+#
+# We create all of these outside of the parallel loop, just like for serial assembly, and
+# then each task creates its own instances from these using [`task_local_copy`](@ref).
+# `task_local_copy` is similar to `copy`, but only the data that is modified during
+# assembly ("scratch data") is duplicated: for example, the duplicated `CellValues` get
+# their own internal buffers, and the duplicated assembler gets its own internal buffers
+# but still assembles into the same global matrix `K` and vector `f`. The task local data
+# is created with the `@local` macro in the parallel loop below. Note that the right hand
+# side of `@local x = ...` is evaluated in the scope outside of the loop, so `@local
+# assembler = task_local_copy(assembler)` creates a task local copy of the `assembler`
+# defined outside of the loop.
 
 # ### Global assembly routine
 
@@ -233,13 +213,19 @@ using OhMyThreads, TaskLocalValues
 
 function assemble_global!(
         K::SparseMatrixCSC, f::Vector, dh::DofHandler, colors,
-        cellvalues_template::CellValues; ntasks = Threads.nthreads()
+        cellvalues::CellValues; ntasks = Threads.nthreads()
     )
-    ## Zero-out existing data in K and f
-    _ = start_assemble(K, f)
     ## Body force and material stiffness
     b = Vec{3}((0.0, 0.0, -1.0))
     C = create_material_stiffness()
+    ## Create the assembler. Note that `start_assemble` zeroes out existing data in K and f,
+    ## but since this is only done once, before the parallel loop, it is safe.
+    assembler = start_assemble(K, f)
+    ## Cell cache and local matrix and vector
+    cell_cache = CellCache(dh)
+    n = ndofs_per_cell(dh)
+    Ke = zeros(n, n)
+    fe = zeros(n)
     ## Loop over the colors
     for color in colors
         ## Dynamic scheduler spawning `ntasks` tasks where each task will process a chunk of
@@ -249,9 +235,14 @@ function assemble_global!(
         OhMyThreads.@tasks for cellidx in color
             ## Tell the @tasks loop to use the scheduler defined above
             @set scheduler = scheduler
-            ## Obtain a task local scratch and unpack it
-            @local scratch = ScratchData(dh, K, f, cellvalues_template)
-            (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
+            ## Task local scratch data, created once for each task
+            @local begin
+                cell_cache = task_local_copy(cell_cache)
+                cellvalues = task_local_copy(cellvalues)
+                Ke = task_local_copy(Ke)
+                fe = task_local_copy(fe)
+                assembler = task_local_copy(assembler)
+            end
             ## Reinitialize the cell cache and then the cellvalues
             reinit!(cell_cache, cellidx)
             reinit!(cellvalues, cell_cache)
@@ -274,12 +265,18 @@ nothing # hide
 #     ```julia
 #     # using TaskLocalValues
 #     scratches = TaskLocalValue() do
-#         ScratchData(dh, K, f, cellvalues)
+#         return (;
+#             cell_cache = task_local_copy(cell_cache),
+#             cellvalues = task_local_copy(cellvalues),
+#             Ke = task_local_copy(Ke), fe = task_local_copy(fe),
+#             assembler = task_local_copy(assembler),
+#         )
 #     end
 #     OhMyThreads.tforeach(color; scheduler) do cellidx
-#         # Obtain a task local scratch and unpack it
-#         scratch = scratches[]
-#         (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
+#         # Obtain the task local scratch data and unpack it. Note that `local` is
+#         # required here: without it the assignment would overwrite the variables with the
+#         # same names outside of the closure, which are shared by all tasks.
+#         local (; cell_cache, cellvalues, Ke, fe, assembler) = scratches[]
 #         # Reinitialize the cell cache and then the cellvalues
 #         reinit!(cell_cache, cellidx)
 #         reinit!(cellvalues, cell_cache)
@@ -292,7 +289,7 @@ nothing # hide
 #     end
 #     ```
 
-# ### [Assembly without coloring: atomic accumulation](@id howto-threaded-assembly-atomic)
+# ### [Assembly without coloring: Atomic accumulation](@id howto-threaded-assembly-atomic)
 #
 # The grid coloring above ensures that no two concurrently running tasks write to the
 # same entries of `K` and `f`. An alternative is to allow concurrent writes, but make the
@@ -317,26 +314,38 @@ nothing # hide
 #    coloring approach is deterministic).
 #
 # Note that each task still needs its own assembler (the assembler wraps buffers that are
-# used during `assemble!`) which is why the `atomic` flag is part of `ScratchData` above.
-# The global assembly routine is like before, but with a single loop over all cells:
+# used during `assemble!`). Calling `task_local_copy` on an atomic assembler returns a new
+# atomic assembler, so the task local data can be created just like before. The global
+# assembly routine is like before, but with an atomic assembler and a single loop over all
+# cells:
 
 function assemble_global_atomic!(
         K::SparseMatrixCSC, f::Vector, dh::DofHandler,
-        cellvalues_template::CellValues; ntasks = Threads.nthreads()
+        cellvalues::CellValues; ntasks = Threads.nthreads()
     )
-    ## Zero-out existing data in K and f
-    _ = start_assemble(K, f)
     ## Body force and material stiffness
     b = Vec{3}((0.0, 0.0, -1.0))
     C = create_material_stiffness()
+    ## Create an atomic assembler (this also zeroes out existing data in K and f)
+    assembler = start_assemble(K, f; atomic = true)
+    ## Cell cache and local matrix and vector
+    cell_cache = CellCache(dh)
+    n = ndofs_per_cell(dh)
+    Ke = zeros(n, n)
+    fe = zeros(n)
     scheduler = OhMyThreads.DynamicScheduler(; ntasks)
     ## Parallelize the loop over all cells
     OhMyThreads.@tasks for cellidx in 1:getncells(dh.grid)
         ## Tell the @tasks loop to use the scheduler defined above
         @set scheduler = scheduler
-        ## Obtain a task local scratch (with an atomic assembler) and unpack it
-        @local scratch = ScratchData(dh, K, f, cellvalues_template, #= atomic = =# Val(true))
-        (; cell_cache, cellvalues, Ke, fe, assembler) = scratch
+        ## Task local scratch data (with an atomic assembler), created once for each task
+        @local begin
+            cell_cache = task_local_copy(cell_cache)
+            cellvalues = task_local_copy(cellvalues)
+            Ke = task_local_copy(Ke)
+            fe = task_local_copy(fe)
+            assembler = task_local_copy(assembler)
+        end
         ## Reinitialize the cell cache and then the cellvalues
         reinit!(cell_cache, cellidx)
         reinit!(cellvalues, cell_cache)
@@ -396,6 +405,139 @@ nothing # hide
 # the timings above, the atomic version doesn't pay for the grid coloring itself, which
 # for this grid takes about 0.3 seconds).
 
+# ### [Threaded assembly of interface terms](@id howto-threaded-assembly-interfaces)
+#
+# Interface terms in discontinuous Galerkin methods (see the
+# [Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation) tutorial) are
+# assembled in a separate loop over the *interfaces* of the grid (the interior facets,
+# materialized by [`interfaceskeleton`](@ref) as pairs of facets
+# `(facet_here, facet_there)`). An interface writes to the dofs of both its cells, so
+# concurrent assembly of two interfaces sharing a cell would race. Analogously to the
+# cell loop, passing the interfaces to [`create_coloring`](@ref), i.e.
+# `create_coloring(grid, interfaceskeleton(topology, grid))`, partitions them into
+# colors such that all interfaces of one color can be assembled concurrently. (In the
+# same way, passing a facetset colors the facets for a threaded boundary loop over
+# [`FacetIterator`](@ref).)
+#
+# The grid based coloring is conservative: two interfaces conflict if any of their cells
+# share a node. By passing the `DofHandler` instead of the grid, i.e.
+# `create_coloring(dh, interfaceskeleton(topology, grid))`, the coloring is instead based
+# on the dofs that the interfaces write to, which is exact. For discontinuous fields
+# (e.g. `DiscontinuousLagrange`) two interfaces then only conflict if they share a cell,
+# which needs very few colors (about the maximum number of facet neighbors of a cell
+# plus one). Note that in this case the accompanying *cell* loop needs no coloring at
+# all, since the write sets of any two cells are disjoint (`create_coloring(dh)` with
+# `alg = ColoringAlgorithm.Greedy` returns a single color). To color both the cells and
+# the interfaces, construct the conflicts once with
+# [`AssemblyConflicts`](@ref) and pass them instead of the `DofHandler` (or grid).
+#
+# As an example we assemble the interface terms of the symmetric interior penalty
+# method for the heat equation, with the same element routine as in the
+# [Discontinuous Galerkin heat equation](@ref tutorial-dg-heat-equation) tutorial
+# (refer to the tutorial for the theory; here we use a constant penalty parameter `μ`
+# since the grid is uniform):
+
+function assemble_interface!(Ki::Matrix, iv::InterfaceValues, μ::Float64)
+    for q_point in 1:getnquadpoints(iv)
+        normal = getnormal(iv, q_point)
+        dΓ = getdetJdV(iv, q_point)
+        for i in 1:getnbasefunctions(iv)
+            δu_jump = shape_value_jump(iv, q_point, i) * (-normal)
+            ∇δu_avg = shape_gradient_average(iv, q_point, i)
+            for j in 1:getnbasefunctions(iv)
+                u_jump = shape_value_jump(iv, q_point, j) * (-normal)
+                ∇u_avg = shape_gradient_average(iv, q_point, j)
+                Ki[i, j] += -(δu_jump ⋅ ∇u_avg + ∇δu_avg ⋅ u_jump) * dΓ + μ * (δu_jump ⋅ u_jump) * dΓ
+            end
+        end
+    end
+    return Ki
+end
+nothing # hide
+
+# The threaded loop follows the same pattern as the cell loop above, with an
+# [`InterfaceCache`](@ref) instead of a `CellCache` and an `InterfaceValues` instead of a
+# `CellValues` as task local scratch data. Since the interfaces of a color are just a
+# `Vector` of facet pairs `(facet_here, facet_there)` we loop over them directly and
+# `reinit!` the cache with each pair:
+
+function assemble_interfaces!(
+        K::SparseMatrixCSC, dh::DofHandler, colors, iv::InterfaceValues, μ::Float64;
+        ntasks = Threads.nthreads()
+    )
+    ## Create the assembler (which zeroes out existing data in K) once, before the
+    ## parallel loop
+    assembler = start_assemble(K)
+    ## Interface cache and local matrix
+    cache = InterfaceCache(dh)
+    ni = 2 * ndofs_per_cell(dh) # dofs per interface (both cells)
+    Ki = zeros(ni, ni)
+    ## Loop over the colors
+    for color in colors
+        scheduler = OhMyThreads.DynamicScheduler(; ntasks)
+        ## Parallelize the loop over the interfaces in this color
+        OhMyThreads.@tasks for (facet_here, facet_there) in color
+            @set scheduler = scheduler
+            ## Task local scratch data, created once for each task
+            @local begin
+                cache = task_local_copy(cache)
+                iv = task_local_copy(iv)
+                Ki = task_local_copy(Ki)
+                assembler = task_local_copy(assembler)
+            end
+            ## Reinitialize the interface cache and then the interface values
+            reinit!(cache, facet_here, facet_there)
+            reinit!(iv, cache)
+            fill!(Ki, 0)
+            ## Compute and assemble the local contribution of the interface
+            assemble_interface!(Ki, iv, μ)
+            assemble!(assembler, interfacedofs(cache), Ki)
+        end
+    end
+    return K
+end
+nothing # hide
+
+# Finally we set up a discontinuous discretization and assemble. Note that the cell
+# contributions (not shown here) could be assembled in a single parallel loop over all
+# cells without any coloring, as discussed above.
+
+function main_interfaces(; n = 8, ntasks = Threads.nthreads())
+    ## Grid, dofs and topology
+    grid = generate_grid(Hexahedron, (n, n, n))
+    ip = DiscontinuousLagrange{RefHexahedron, 1}()
+    dh = DofHandler(grid)
+    add!(dh, :u, ip)
+    close!(dh)
+    topology = ExclusiveTopology(grid)
+    ## Color the interfaces based on the dofs they write to: all dofs are interior to
+    ## the cells, so only interfaces sharing a cell conflict
+    colors = create_coloring(dh, interfaceskeleton(topology, grid))
+    ## Global matrix with interface entries in the sparsity pattern
+    K = allocate_matrix(dh; topology, interface_coupling = trues(1, 1))
+    ## InterfaceValues and penalty parameter
+    iv = InterfaceValues(FacetQuadratureRule{RefHexahedron}(2), ip)
+    μ = 8 / (2 / n) # (1 + order)^dim / h_e for this uniform grid
+    ## Compile and time the interface assembly
+    assemble_interfaces!(K, dh, colors, iv, μ; ntasks)
+    @time assemble_interfaces!(K, dh, colors, iv, μ; ntasks)
+    return K
+end
+
+main_interfaces();
+
+# For serial code, or simple per-task loops, each color can also be iterated with
+# `InterfaceIterator(dh, color)`, since the [`InterfaceIterator`](@ref) accepts any
+# subset of the interface skeleton.
+#
+# Finally, just like for the cell loop,
+# [atomic assembly](@ref howto-threaded-assembly-atomic) works for interface assembly
+# too: with `start_assemble(K; atomic = true)` no interface coloring is needed and all
+# of `interfaceskeleton(topology, grid)` can be processed in a single parallel loop, in
+# natural order and without synchronization between colors. The trade-offs are the same
+# as discussed for the cell loop above, in particular that the accumulation order, and
+# thereby the result, depends on the task scheduling.
+
 using Test                                               #src
 nK1, nf1, aK1, af1 = main(; n = 5, ntasks = 1)           #src
 nK2, nf2, aK2, af2 = main(; n = 5, ntasks = 2)           #src
@@ -410,6 +552,31 @@ nK4, nf4, aK4, af4 = main(; n = 5, ntasks = 4)           #src
 @test af2 ≈ nf1                                          #src
 @test aK4 ≈ nK1                                          #src
 @test af4 ≈ nf1                                          #src
+## Colored interface assembly is deterministic (bitwise identical for any ntasks,     #src
+## since the write sets within a color are disjoint and the color order is fixed)     #src
+iK1 = main_interfaces(; n = 4, ntasks = 1)               #src
+iK2 = main_interfaces(; n = 4, ntasks = 2)               #src
+iK4 = main_interfaces(; n = 4, ntasks = 4)               #src
+@test iK1.nzval == iK2.nzval == iK4.nzval                #src
+## ... and matches a serial loop over all interfaces up to summation order            #src
+let grid = generate_grid(Hexahedron, (4, 4, 4)),         #src
+        topology = ExclusiveTopology(grid)               #src
+    ip = DiscontinuousLagrange{RefHexahedron, 1}()       #src
+    dh = DofHandler(grid)                                #src
+    add!(dh, :u, ip)                                     #src
+    close!(dh)                                           #src
+    K = allocate_matrix(dh; topology, interface_coupling = trues(1, 1)) #src
+    iv = InterfaceValues(FacetQuadratureRule{RefHexahedron}(2), ip)     #src
+    Ki = zeros(2 * ndofs_per_cell(dh), 2 * ndofs_per_cell(dh))          #src
+    assembler = start_assemble(K)                        #src
+    for ic in InterfaceIterator(dh, topology)            #src
+        reinit!(iv, ic)                                  #src
+        fill!(Ki, 0)                                     #src
+        assemble_interface!(Ki, iv, 8 / (2 / 4))         #src
+        assemble!(assembler, interfacedofs(ic), Ki)      #src
+    end                                                  #src
+    @test K.nzval ≈ iK1.nzval                            #src
+end                                                      #src
 
 #md # ## [Plain program](@id threaded_assembly-plain-program)
 #md #

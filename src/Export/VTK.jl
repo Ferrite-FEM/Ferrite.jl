@@ -92,46 +92,88 @@ cell_to_vtkcell(::Type{QuadraticHexahedron}) = VTKCellTypes.VTK_TRIQUADRATIC_HEX
 cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
+cell_to_vtkcell(::Type{QuadraticWedge}) = VTKCellTypes.VTK_BIQUADRATIC_QUADRATIC_WEDGE
 cell_to_vtkcell(::Type{Pyramid}) = VTKCellTypes.VTK_PYRAMID
 
-nodes_to_vtkorder(cell::AbstractCell) = collect(cell.nodes)
-nodes_to_vtkorder(cell::Pyramid) = cell.nodes[[1, 2, 4, 3, 5]]
-nodes_to_vtkorder(cell::QuadraticHexahedron) = [
-    cell.nodes[1], # faces
-    cell.nodes[2],
-    cell.nodes[3],
-    cell.nodes[4],
-    cell.nodes[5],
-    cell.nodes[6],
-    cell.nodes[7],
-    cell.nodes[8],
-    cell.nodes[9], # edges
-    cell.nodes[10],
-    cell.nodes[11],
-    cell.nodes[12],
-    cell.nodes[13],
-    cell.nodes[14],
-    cell.nodes[15],
-    cell.nodes[16],
-    cell.nodes[17],
-    cell.nodes[18],
-    cell.nodes[19],
-    cell.nodes[20],
-    cell.nodes[25], # faces
-    cell.nodes[23],
-    cell.nodes[22],
-    cell.nodes[24],
-    cell.nodes[21],
-    cell.nodes[26],
-    cell.nodes[27], # interior
+# Permutations from the Ferrite node order to the VTK node order, for the cells where they differ
+const VTK_PYRAMID_ORDER = [1, 2, 4, 3, 5]
+const VTK_QUADRATIC_WEDGE_ORDER = [
+    1, 2, 3, 4, 5, 6, # vertices
+    7, 10, 8, 13, 15, 14, 9, 11, 12, # edges
+    16, 18, 17, # faces
 ]
+const VTK_QUADRATIC_HEXAHEDRON_ORDER = [
+    1, 2, 3, 4, 5, 6, 7, 8, # vertices
+    9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, # edges
+    25, 23, 22, 24, 21, 26, # faces
+    27, # interior
+]
+# The permutation for `cell`, or `nothing` if the node orders are the same. This is internal to
+# Ferrite; cell types defined outside of Ferrite give their VTK node order by overloading
+# `nodes_to_vtkorder` instead.
+vtk_node_order(::AbstractCell) = nothing
+vtk_node_order(::Pyramid) = VTK_PYRAMID_ORDER
+vtk_node_order(::QuadraticWedge) = VTK_QUADRATIC_WEDGE_ORDER
+vtk_node_order(::QuadraticHexahedron) = VTK_QUADRATIC_HEXAHEDRON_ORDER
+
+# The node numbers of `cell` in VTK order. Downstream packages overload this to give the VTK
+# node order of their own cell types.
+# TODO: Deprecate in favor of `nodes_to_vtkorder!` once downstream packages have moved to it
+# (which requires them to bump their Ferrite compat).
+function nodes_to_vtkorder(cell::AbstractCell)
+    nodes = collect(get_node_ids(cell))
+    order = vtk_node_order(cell)
+    return order === nothing ? nodes : nodes[order]
+end
+
+# The cell types defined in Ferrite, which append their nodes without allocating
+const FerriteCell = Union{
+    Line, QuadraticLine,
+    Triangle, QuadraticTriangle, Quadrilateral, QuadraticQuadrilateral, SerendipityQuadraticQuadrilateral,
+    Tetrahedron, QuadraticTetrahedron, Hexahedron, QuadraticHexahedron, SerendipityQuadraticHexahedron,
+    Wedge, QuadraticWedge, Pyramid,
+}
+
+# Append the node numbers of `cell`, in VTK order, to `connectivity`. Other cell types fall back
+# to `nodes_to_vtkorder`.
+function nodes_to_vtkorder!(connectivity::Vector{Int}, cell::FerriteCell)
+    nodes = get_node_ids(cell)
+    order = vtk_node_order(cell)
+    @assert order === nothing || length(order) == length(nodes)
+    for i in eachindex(nodes)
+        push!(connectivity, order === nothing ? nodes[i] : nodes[order[i]])
+    end
+    return connectivity
+end
+nodes_to_vtkorder!(connectivity::Vector{Int}, cell::AbstractCell) = append!(connectivity, nodes_to_vtkorder(cell))
+
+const VTKMeshCell = WriteVTK.MeshCell{VTKCellTypes.VTKCellType, SubArray{Int, 1, Vector{Int}, Tuple{UnitRange{Int}}, true}}
+
+# Append the node numbers of `cell`, in VTK order, to `connectivity`, and the VTK cell, which
+# refers to a view of these node numbers, to `vtk_cells`.
+function push_vtk_cell!(vtk_cells::Vector{VTKMeshCell}, connectivity::Vector{Int}, cell::AbstractCell)
+    offset = length(connectivity)
+    nodes_to_vtkorder!(connectivity, cell)
+    vtk_nodes = view(connectivity, (offset + 1):length(connectivity))
+    push!(vtk_cells, WriteVTK.MeshCell(cell_to_vtkcell(typeof(cell)), vtk_nodes))
+    return
+end
+
+# Create the WriteVTK cells for `cells`. The node numbers of all cells, in VTK order, are
+# stored in a single vector and each cell refers to a view of it. This gives a concrete element
+# type, also for mixed cell types, without allocating a vector for each cell.
+function create_vtk_cells(cells)
+    # The type assert keeps the sum concrete for mixed cell types
+    connectivity = sizehint!(Int[], sum(cell -> nnodes(cell)::Int, cells))
+    vtk_cells = sizehint!(VTKMeshCell[], length(cells))
+    for cell in cells
+        push_vtk_cell!(vtk_cells, connectivity, cell) # function barrier
+    end
+    return vtk_cells
+end
 
 function create_vtk_griddata(grid::AbstractGrid{sdim}) where {sdim}
-    cls = WriteVTK.MeshCell[]
-    for cell in getcells(grid)
-        celltype = cell_to_vtkcell(typeof(cell))
-        push!(cls, WriteVTK.MeshCell(celltype, nodes_to_vtkorder(cell)))
-    end
+    cls = create_vtk_cells(getcells(grid))
     T = get_coordinate_eltype(grid)
     nodes_flat = reinterpret(T, getnodes(grid))
     coords = reshape(nodes_flat, (sdim, getnnodes(grid)))
@@ -195,18 +237,17 @@ function component_names(::Type{S}) where {S}
 end
 
 """
-    write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix = "")
+    write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector; prefix = "", suffix = "")
 
-Save the values at the nodes in the degree of freedom vector `u` to `vtk`.
-Each field in `dh` will be saved separately, and `suffix` can be used to append
-to the fieldname.
+Save the interpolated values of the degree of freedom vector `u` at the grid nodes to `vtk`.
+Each field in `dh` is saved separately with the field name prepended by `prefix` and appended by `suffix`.
 
 `u` can also contain tensorial values, but each entry in `u` must correspond to a
 degree of freedom in `dh`, see [`write_node_data`](@ref write_node_data) for details.
 Use `write_node_data` directly when exporting values that are already
 sorted by the nodes in the grid.
 """
-function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix = "")
+function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector; prefix = "", suffix = "")
     fieldnames = getfieldnames(dh)  # all primary fields
     for name in fieldnames
         if write_discontinuous(vtk)
@@ -214,7 +255,7 @@ function write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVec
         else
             data = _evaluate_at_grid_nodes(dh, u, name, #=vtk=# Val(true))
         end
-        _vtk_write_node_data(vtk.vtk, data, string(name, suffix))
+        _vtk_write_node_data(vtk.vtk, data, string(prefix, name, suffix))
     end
     return vtk
 end
@@ -240,9 +281,22 @@ end
     write_cell_data(vtk::VTKGridFile, celldata::AbstractVector, name::String)
 
 Write the `celldata` that is ordered by the cells in the grid to the vtk file.
+
+When `celldata` contains `Tensors.Vec`s or second order tensors, each component is exported
+in the same way as for [`write_node_data`](@ref).
 """
 function write_cell_data(vtk::VTKGridFile, celldata, name)
     WriteVTK.vtk_cell_data(vtk.vtk, celldata, name)
+    return vtk
+end
+function write_cell_data(vtk::VTKGridFile, celldata::AbstractVector{S}, name) where {O, D, T, M, S <: Union{Tensor{O, D, T, M}, SymmetricTensor{O, D, T, M}}}
+    noutputs = S <: Vec{2} ? 3 : M # Pad 2D Vec to 3D
+    npoints = length(celldata)
+    out = zeros(T, noutputs, npoints)
+    for i in 1:npoints
+        toparaview!(@view(out[:, i]), celldata[i])
+    end
+    WriteVTK.vtk_cell_data(vtk.vtk, out, name; component_names = component_names(eltype(celldata)))
     return vtk
 end
 
@@ -269,24 +323,30 @@ function write_node_data(vtk::VTKGridFile, nodedata, name)
 end
 
 """
-    write_nodeset(vtk::VTKGridFile, grid::AbstractGrid, nodeset::String)
+    write_nodeset(vtk::VTKGridFile, grid::AbstractGrid, nodeset::String; prefix = "", suffix = "")
 
-Write nodal values of 1 for nodes in `nodeset`, and 0 otherwise
+Write a value of 1 for nodes belonging to `nodeset` and 0 for all other nodes.
+
+The `prefix` and `suffix` keyword arguments can be used to add text before and
+after the exported data name, respectively.
 """
-function write_nodeset(vtk, grid::AbstractGrid, nodeset::String)
+function write_nodeset(vtk, grid::AbstractGrid, nodeset::String; prefix = "", suffix = "")
     z = zeros(getnnodes(grid))
     z[collect(getnodeset(grid, nodeset))] .= 1.0
-    write_node_data(vtk, z, nodeset)
+    write_node_data(vtk, z, string(prefix, nodeset, suffix))
     return vtk
 end
 
 """
-    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetsetname::String)
-    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetset::AbstractVecOrSet{FacetIndex}, facetsetname::String)
+    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetsetname::String; prefix = "", suffix = "")
+    write_facetset(vtk::VTKGridFile, grid::AbstractGrid, facetset::AbstractVecOrSet{FacetIndex}, facetsetname::String; prefix = "", suffix = "")
 
-Write nodal values of 1 for nodes of the faces in `facetset`, and 0 otherwise
+Write a value of 1 for nodes belonging to the facets in `facetset` and 0 for all
+other nodes.
+The `prefix` and `suffix` keyword arguments can be used to add text before and
+after the exported data name, respectively.
 """
-function write_facetset(vtk, grid::AbstractGrid, facetset::AbstractVecOrSet{FacetIndex}, facetsetname::String)
+function write_facetset(vtk, grid::AbstractGrid, facetset::AbstractVecOrSet{FacetIndex}, facetsetname::String; prefix = "", suffix = "")
     z = zeros(getnnodes(grid))
     for (cellid, lfi) in facetset
         cell = getcells(grid, cellid)
@@ -297,30 +357,30 @@ function write_facetset(vtk, grid::AbstractGrid, facetset::AbstractVecOrSet{Face
             z[i] = 1.0
         end
     end
-    write_node_data(vtk, z, facetsetname)
+    write_node_data(vtk, z, string(prefix, facetsetname, suffix))
     return vtk
 end
-write_facetset(vtk, grid::AbstractGrid, facetsetname::String) = write_facetset(vtk, grid, getfacetset(grid, facetsetname), facetsetname)
+write_facetset(vtk, grid::AbstractGrid, facetsetname::String; kwargs...) = write_facetset(vtk, grid, getfacetset(grid, facetsetname), facetsetname; kwargs...)
 
 """
-    write_cellset(vtk, grid::AbstractGrid)
-    write_cellset(vtk, grid::AbstractGrid, cellset::String)
-    write_cellset(vtk, grid::AbstractGrid, cellsets::Union{AbstractVector{String},AbstractSet{String})
+    write_cellset(vtk::VTKGridFile, grid::AbstractGrid; prefix = "", suffix = "")
+    write_cellset(vtk::VTKGridFile, grid::AbstractGrid, cellset::String; prefix = "", suffix = "")
+    write_cellset(vtk::VTKGridFile, grid::AbstractGrid, cellsets::Union{AbstractVector{String}, AbstractSet{String}}; prefix = "", suffix = "")
 
-Write all cell sets in the grid with name according to their keys and
-celldata 1 if the cell is in the set, and 0 otherwise. It is also possible to
-only export a single `cellset`, or multiple `cellsets`.
+Write cell data for each `cellset` in `cellsets`: 1 if the cell is in `cellset` and 0 otherwise.
+If `cellset` or `cellsets` are not provided, default to all cell sets in the grid.
+The data name is the name of the cellset, prepended by `prefix` and appended by `suffix`.
 """
-function write_cellset(vtk, grid::AbstractGrid, cellsets = keys(getcellsets(grid)))
+function write_cellset(vtk, grid::AbstractGrid, cellsets = keys(getcellsets(grid)); prefix = "", suffix = "")
     z = zeros(getncells(grid))
     for cellset in cellsets
         fill!(z, 0)
         z[collect(getcellset(grid, cellset))] .= 1.0
-        write_cell_data(vtk, z, cellset)
+        write_cell_data(vtk, z, string(prefix, cellset, suffix))
     end
     return vtk
 end
-write_cellset(vtk, grid::AbstractGrid, cellset::String) = write_cellset(vtk, grid, [cellset])
+write_cellset(vtk, grid::AbstractGrid, cellset::String; kwargs...) = write_cellset(vtk, grid, [cellset]; kwargs...)
 
 """
     write_constraints(vtk::VTKGridFile, ch::ConstraintHandler)
@@ -383,28 +443,26 @@ end
 # A discontinuous vtk grid data duplicates nodes such that each vtk node only belongs to
 # a single cell. `cellnodes[i]` give the indices of these nodes for cell `i`.
 function create_discontinuous_vtk_griddata(grid::Grid{dim, C, T}) where {dim, C, T}
-    cls = Vector{WriteVTK.MeshCell}(undef, getncells(grid))
     cellnodes = Vector{UnitRange{Int}}(undef, getncells(grid))
     ncoords = sum(nnodes, getcells(grid))
     coords = zeros(T, dim, ncoords)
     node_mapping = zeros(Int, ncoords)
     icoord = 0
     for cell in CellIterator(grid)
-        CT = getcelltype(grid, cellid(cell))
-        vtk_celltype = cell_to_vtkcell(CT)
         cell_coords = getcoordinates(cell)
         n = length(cell_coords)
         cellnodes[cellid(cell)] = (1:n) .+ icoord
-        let icoord = icoord
-            vtk_cellnodes = nodes_to_vtkorder(CT((ntuple(i -> i + icoord, n))))
-            cls[cellid(cell)] = WriteVTK.MeshCell(vtk_celltype, vtk_cellnodes)
-        end
         for (x, node_idx) in zip(cell_coords, getnodes(cell))
             icoord += 1
             coords[:, icoord] = x
             node_mapping[icoord] = node_idx
         end
     end
+    # The cells with nodes renumbered to the duplicated vtk nodes
+    vtk_cells = map(getcells(grid), cellnodes) do cell, nodes
+        return typeof(cell)(ntuple(i -> first(nodes) + i - 1, length(cell.nodes)))
+    end
+    cls = create_vtk_cells(vtk_cells)
     return coords, cls, cellnodes, node_mapping
 end
 

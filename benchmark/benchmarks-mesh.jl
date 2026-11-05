@@ -76,8 +76,8 @@ end
 
 # Grid coloring, used to set up threaded assembly. The 3D grids gather many more
 # node-sharing neighbor candidates per cell than the 2D grid (quadrilateral ~12,
-# hexahedron ~56, tetrahedron ~92), so they weight the sort/dedup path of the incidence
-# matrix construction differently.
+# hexahedron ~56, tetrahedron ~92), so they weight the deduplication in the construction
+# of the (node based) cell conflict graph differently.
 SUITE["mesh"]["coloring"] = BenchmarkGroup()
 let g = SUITE["mesh"]["coloring"]
     quadgrid = generate_grid(Quadrilateral, (50, 50))
@@ -89,4 +89,36 @@ let g = SUITE["mesh"]["coloring"]
     tetgrid = generate_grid(Tetrahedron, (8, 8, 8))
     g["workstream (Tetrahedron 8×8×8)"] = @benchmarkable create_coloring($tetgrid; alg = ColoringAlgorithm.WorkStream) evals = 1
     g["greedy (Tetrahedron 8×8×8)"] = @benchmarkable create_coloring($tetgrid; alg = ColoringAlgorithm.Greedy) evals = 1
+
+    # Dof based (exact) cell conflicts: a vector field has many dofs per shared node
+    # (grouped by their set of writing cells), a discontinuous field has no shared dofs
+    # at all, and periodic constraints add (remote) master dofs to the write sets.
+    dh_vector = DofHandler(hexgrid)
+    add!(dh_vector, :u, Lagrange{RefHexahedron, 1}()^3)
+    close!(dh_vector)
+    g["AssemblyConflicts(dh) (Hexahedron 15×15×15, Lagrange^3)"] = @benchmarkable AssemblyConflicts($dh_vector) evals = 1
+    dh_dg = DofHandler(hexgrid)
+    add!(dh_dg, :u, DiscontinuousLagrange{RefHexahedron, 1}())
+    close!(dh_dg)
+    g["AssemblyConflicts(dh) (Hexahedron 15×15×15, DiscontinuousLagrange)"] = @benchmarkable AssemblyConflicts($dh_dg) evals = 1
+    dh_periodic = DofHandler(quadgrid)
+    add!(dh_periodic, :u, Lagrange{RefQuadrilateral, 1}())
+    close!(dh_periodic)
+    ch = ConstraintHandler(dh_periodic)
+    add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(quadgrid, "left", "right")))
+    close!(ch)
+    g["AssemblyConflicts(dh, ch) (Quadrilateral 50×50, PeriodicDirichlet)"] = @benchmarkable AssemblyConflicts($dh_periodic, $ch) evals = 1
+
+    # Coloring of facets and interfaces from precomputed conflicts, which gathers the
+    # conflicts per item through the cells (unlike the cell coloring which uses the cell
+    # conflict graph directly). The interface conflict graph is much denser than the cell
+    # one, which weights the two algorithms differently.
+    hexgrid12 = generate_grid(Hexahedron, (12, 12, 12))
+    conflicts12 = AssemblyConflicts(hexgrid12)
+    skeleton = interfaceskeleton(ExclusiveTopology(hexgrid12), hexgrid12)
+    g["interfaces workstream (Hexahedron 12×12×12)"] = @benchmarkable create_coloring($conflicts12, $skeleton; alg = ColoringAlgorithm.WorkStream) evals = 1
+    g["interfaces greedy (Hexahedron 12×12×12)"] = @benchmarkable create_coloring($conflicts12, $skeleton; alg = ColoringAlgorithm.Greedy) evals = 1
+    conflicts15 = AssemblyConflicts(hexgrid)
+    boundary = union(values(hexgrid.facetsets)...)
+    g["facets workstream (Hexahedron 15×15×15, boundary)"] = @benchmarkable create_coloring($conflicts15, $boundary; alg = ColoringAlgorithm.WorkStream) evals = 1
 end

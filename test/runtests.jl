@@ -18,6 +18,8 @@ testsuite = find_tests(TESTDIR)
 # Drop files that are discovered but are not standalone test files to run here:
 for name in (
         "test_utils",       # shared helpers, `include`d by the tests that need them
+        "vtk_test_utils",   # shared helpers for reading back VTK files
+        "multifield_cellvalues_utils", # shared with the GPU tests, `include`d by test_multifield_cellvalues
         "interpolation_test_utils",           # shared helpers for the test_interpolations* files
         "integration/convergence_test_utils", # shared helpers for the integration convergence tests
         "jet",              # JET tests, run separately
@@ -38,9 +40,14 @@ push!(ARGS, "--jobs=$(Sys.CPU_THREADS)")
 # `Main`: loading these there makes type names print unqualified (e.g.
 # `Lagrange`, `SparseMatrixCSC`), matching a normal `using Ferrite` session,
 # which the `show`/`repr` tests rely on.
+#
+# ParallelTestRunner starts the workers with `JULIA_NUM_THREADS=1`, so pass the thread
+# count of this process explicitly with `--threads` (which takes precedence) to make sure
+# that the threaded tests actually run with multiple threads.
 runtests(
     Ferrite, ARGS;
     testsuite,
+    exeflags = ["--threads=$(Threads.nthreads())"],
     init_code = :(using Ferrite),
     init_worker_code = :(using Ferrite, LinearAlgebra, SparseArrays, SparseMatricesCSR),
 )

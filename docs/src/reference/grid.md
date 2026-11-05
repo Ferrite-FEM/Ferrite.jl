@@ -46,6 +46,7 @@ Ferrite.entity_codim
 ExclusiveTopology
 getneighborhood
 facetskeleton
+interfaceskeleton
 vertex_star_stencils
 getstencil
 ```
@@ -64,4 +65,5 @@ addnodeset!
 ### Multithreaded assembly
 ```@docs
 create_coloring
+AssemblyConflicts
 ```

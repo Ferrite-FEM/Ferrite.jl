@@ -4,7 +4,7 @@ using BlockArrays: Block, BlockArray, BlockIndex, BlockMatrix, BlockVector, bloc
     blockaxes, blockindex, blocks, blocksize, findblockindex, undef_blocks
 using Ferrite:
     Ferrite, BlockSparsityPattern, ConstraintHandler, addindex!, allocate_matrix, assemble!,
-    fillzero!, DofCoefficients, _is_atomic
+    fillzero!, DofCoefficients, _is_atomic, task_local_copy
 using SparseArrays: SparseMatrixCSC
 
 
@@ -76,6 +76,14 @@ Base.@constprop :aggressive function Ferrite.start_assemble(K::BlockMatrix{Tv}, 
     Ferrite._check_atomic_eltype(atomic, eltype(K))
     fillzero && (fillzero!(K); fillzero!(f))
     return BlockAssembler{eltype(K), typeof(K), typeof(f), atomic}(K, f, Int[], Int[], Int[])
+end
+
+# The global matrix and vector are shared, only the buffers are duplicated
+function Ferrite.task_local_copy(ba::BA) where {BA <: BlockAssembler}
+    return BA(
+        ba.K, ba.f, task_local_copy(ba.sorteddofs),
+        task_local_copy(ba.permutation), task_local_copy(ba.blockstops)
+    )
 end
 
 # The global index range of block `B` along axis `d`.

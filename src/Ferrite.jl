@@ -8,7 +8,7 @@ using Base:
 using EnumX:
     EnumX, @enumx
 using LinearAlgebra:
-    LinearAlgebra, Symmetric, cholesky, cholesky!, det, ldiv!, norm, tr, mul!, normalize
+    LinearAlgebra, PosDefException, Symmetric, cholesky, cholesky!, det, ldiv!, norm, tr, mul!, normalize, diag, dot
 using NearestNeighbors:
     NearestNeighbors, KDTree, knn
 using OrderedCollections:
@@ -31,6 +31,9 @@ using .CollectionsOfViews:
 
 include("exports.jl")
 include("refshapes.jl")
+
+# Task based multithreading support
+include("multithreading.jl")
 
 """
     Ferrite.getrefdim(RefShape::Type{<:AbstractRefShape})
@@ -126,7 +129,6 @@ include("Grid/grid.jl")
 include("Grid/topology.jl")
 include("Grid/utils.jl")
 include("Grid/grid_generators.jl")
-include("Grid/coloring.jl")
 
 # Dofs
 include("Dofs/algebraic_variables.jl")
@@ -136,9 +138,14 @@ include("Dofs/apply_analytical.jl")
 include("Dofs/sparsity_pattern.jl")
 include("Dofs/block_sparsity_pattern.jl")
 include("Dofs/DofRenumbering.jl")
+include("Dofs/affine_constraint_graph.jl")
+include("Dofs/untangling_affine_constraints.jl")
 
 include("iterators.jl")
 include("Dofs/algebraic_coupling.jl")
+
+# Grid coloring
+include("coloring.jl")
 
 # Assembly
 include("assembler.jl")

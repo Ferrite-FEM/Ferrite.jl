@@ -9,7 +9,6 @@ end
 UpdateFlags(; nodes::Bool = true, coords::Bool = true, dofs::Bool = true) =
     UpdateFlags(nodes, coords, dofs)
 
-
 ###############
 ## CellCache ##
 ###############
@@ -86,6 +85,13 @@ function reinit!(cc::CellCache, i::Integer)
     return cc
 end
 
+function task_local_copy(cc::CellCache)
+    return CellCache(
+        cc.flags, cc.grid, task_local_copy(cc.cellid), task_local_copy(cc.nodes),
+        task_local_copy(cc.coords), cc.dh, task_local_copy(cc.dofs)
+    )
+end
+
 # reinit! FEValues with CellCache
 function reinit!(cv::AbstractCellValues, cc::CellCache)
     cell = reinit_needs_cell(cv) ? getcells(cc.grid, cellid(cc)) : nothing
@@ -134,6 +140,11 @@ function FacetCache(args...)
     return FacetCache(cc, cc.dofs, 0)
 end
 
+function task_local_copy(fc::FacetCache)
+    cc = task_local_copy(fc.cc)
+    return FacetCache(cc, cc.dofs, fc.current_facet_id) # Preserve aliasing of dofs
+end
+
 function reinit!(fc::FacetCache, facet::BoundaryIndex)
     cellid, facetid = facet
     reinit!(fc.cc, cellid)
@@ -165,24 +176,44 @@ interface. The cache is updated for a new cell by calling `reinit!(cache, facet_
 **Struct fields of `InterfaceCache`**
  - `ic.a :: FacetCache`: facet cache for the first facet of the interface
  - `ic.b :: FacetCache`: facet cache for the second facet of the interface
- - `ic.dofs :: Vector{Int}`: global dof ids for the interface (union of `ic.a.dofs` and `ic.b.dofs`)
+ - `ic.dofs :: Vector{Int}`: global dof ids for the interface in the *stacked* layout
+   `[celldofs(ic.a); celldofs(ic.b)]`. Note that this is a concatenation, not a union: a
+   dof carried by both cells (e.g. for an interpolation with dofs on the shared facet)
+   appears once per side.
 
 **Methods with `InterfaceCache`**
  - `reinit!(cache::InterfaceCache, facet_a::FacetIndex, facet_b::FacetIndex)`: reinitialize the cache for a new interface
- - `interfacedofs(ic)`: get the global dof ids of the interface
+ - `interfacedofs(ic)`: get the global dof ids of the interface in the stacked layout
+ - `ndofs_per_interface(ic)`: the size of the stacked layout (the local matrix dimension)
+ - `interface_dof_range(ic, field)`: positions of a field's dofs in the stacked layout
+
+Note that a dof shared between the two cells (e.g. for a field with a continuous
+interpolation) appears *twice* in the stacked layout, once per side; without shared dofs
+(e.g. pure discontinuous interpolations) the stacked vector can be passed directly to
+[`assemble!`](@ref).
 
 See also [`InterfaceIterator`](@ref).
 """
 struct InterfaceCache{FC <: FacetCache}
     a::FC
     b::FC
-    dofs::Vector{Int}
+    dofs::Vector{Int} # stacked layout: [celldofs(a); celldofs(b)]
 end
 
 function InterfaceCache(gridordh::Union{AbstractGrid, AbstractDofHandler})
     fc_a = FacetCache(gridordh)
     fc_b = FacetCache(gridordh)
     return InterfaceCache(fc_a, fc_b, Int[])
+end
+
+function task_local_copy(ic::InterfaceCache)
+    return InterfaceCache(
+        task_local_copy(ic.a), task_local_copy(ic.b), task_local_copy(ic.dofs)
+    )
+end
+
+function reinit!(cache::InterfaceCache, (facet_a, facet_b)::NTuple{2, FacetIndex})
+    return reinit!(cache, facet_a, facet_b)
 end
 
 function reinit!(cache::InterfaceCache, facet_a::BoundaryIndex, facet_b::BoundaryIndex)
@@ -210,9 +241,76 @@ function reinit!(iv::InterfaceValues, ic::InterfaceCache)
     )
 end
 
+"""
+    interfacedofs(ic::InterfaceCache) -> Vector{Int}
+
+Return the global dof ids of the interface, in the *stacked* layout.
+
+The stacked layout is `[celldofs(ic.a); celldofs(ic.b)]`: a concatenation, not a union, so
+a dof carried by both cells appears once per side, matching the basis layout of
+[`InterfaceValues`](@ref). When no dofs are shared between the two cells the stacked vector can be passed directly
+to [`assemble!`](@ref); with shared dofs it contains repeated entries.
+"""
 interfacedofs(ic::InterfaceCache) = ic.dofs
-dof_range(ic::InterfaceCache, field::Symbol) = (dof_range(ic.a.cc.dh, field), dof_range(ic.b.cc.dh, field) .+ length(celldofs(ic.a)))
+
+"""
+    ndofs_per_interface(ic::InterfaceCache) -> Int
+
+Return the number of dofs of the interface, in the stacked layout.
+
+This is `length(interfacedofs(ic))`, the size of the local matrix/vector that interface
+kernels fill, matching the number of
+basis functions of [`InterfaceValues`](@ref), and is used to view the active part of an
+upfront-allocated local matrix/vector. Unlike cell assembly, where
+[`ndofs_per_cell`](@ref) is known per subdomain, the size varies per interface when the
+two cells belong to different `SubDofHandler`s. Valid after `reinit!` of the cache.
+
+For a `DofHandler` with a single `SubDofHandler` the size is the same for every interface
+and available without a cache as `ndofs_per_interface(dh)`.
+"""
+ndofs_per_interface(ic::InterfaceCache) = length(ic.dofs)
+
 getcoordinates(ic::InterfaceCache) = (getcoordinates(ic.a), getcoordinates(ic.b))
+
+"""
+    interface_dof_range(ic::InterfaceCache, field::Symbol) -> InterfaceDofRange
+
+Return the positions of `field`'s dofs in the stacked interface layout.
+
+The positions refer to the stacked layout of [`interfacedofs`](@ref) and are returned as
+an [`InterfaceDofRange`](@ref). Valid after `reinit!` of the cache, also when the two
+cells belong to different `SubDofHandler`s.
+
+Fields that exist on only one side of the interface are not supported and throw an error.
+
+See also [`interface_dof_range(::DofHandler, ::Symbol)`](@ref): for a `DofHandler` with a
+single `SubDofHandler` the range is the same for every interface and can be computed once,
+outside the interface loop.
+"""
+function interface_dof_range(ic::InterfaceCache, field::Symbol)
+    cache_dh = ic.a.cc.dh
+    if cache_dh === nothing
+        error("this InterfaceCache was constructed from a Grid: no dof information available")
+    end
+    dh = cache_dh isa SubDofHandler ? cache_dh.dh : cache_dh
+    sdh_index_a = dh.cell_to_subdofhandler[cellid(ic.a)]
+    sdh_index_b = dh.cell_to_subdofhandler[cellid(ic.b)]
+    if sdh_index_a == 0 || sdh_index_b == 0
+        error("the DofHandler is not defined on both cells of the interface")
+    end
+    sdh_a = dh.subdofhandlers[sdh_index_a]
+    sdh_b = dh.subdofhandlers[sdh_index_b]
+    if _find_field(sdh_a, field) === nothing || _find_field(sdh_b, field) === nothing
+        error(
+            "field :$field is not present on both cells of the interface (fields on the " *
+                "here side: $(sdh_a.field_names), on the there side: $(sdh_b.field_names)). " *
+                "Interfaces where a field exists on only one side are not supported."
+        )
+    end
+    here = dof_range(sdh_a, field)
+    there = dof_range(sdh_b, field) .+ ndofs_per_cell(sdh_a)
+    return InterfaceDofRange(here, there)
+end
 
 ####################
 ## Grid iterators ##
@@ -326,45 +424,39 @@ end
 """
     InterfaceIterator(grid::Grid, [topology::ExclusiveTopology])
     InterfaceIterator(dh::AbstractDofHandler, [topology::ExclusiveTopology])
+    InterfaceIterator(grid::Grid, set)
+    InterfaceIterator(dh::AbstractDofHandler, set)
 
-Create an `InterfaceIterator` to conveniently iterate over all the interfaces in a
-grid. The elements of the iterator are [`InterfaceCache`](@ref)s which are properly
-`reinit!`ialized. See [`InterfaceCache`](@ref) for more details.
+Create an `InterfaceIterator` to conveniently iterate over all, or a subset, of the
+interfaces in a grid. The elements of the iterator are [`InterfaceCache`](@ref)s which
+are properly `reinit!`ialized. See [`InterfaceCache`](@ref) for more details.
 Looping over an `InterfaceIterator`, i.e.:
 ```julia
 for ic in InterfaceIterator(grid, topology)
     # ...
 end
 ```
-is thus simply convenience for the following equivalent snippet for grids of dimensions > 1:
+is thus simply convenience for the following equivalent snippet:
 ```julia
 ic = InterfaceCache(grid)
-neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
-for facet in facetskeleton(topology, grid)
-    neighbors = neighborhood[facet[1], facet[2]]
-    isempty(neighbors) && continue
-    neighbor_facet = neighbors[1]
-    reinit!(ic, facet, neighbor_facet)
+for (facet_here, facet_there) in interfaceskeleton(topology, grid)
+    reinit!(ic, facet_here, facet_there)
     # ...
 end
 ```
+The methods taking an explicit `set` of interfaces (an iterable of facet pairs
+`(facet_here, facet_there)`, e.g. a subset of [`interfaceskeleton`](@ref)) iterate
+exactly the given interfaces, analogously to passing a cellset to
+[`CellIterator`](@ref). This is useful e.g. for iterating one color from
+[`create_coloring`](@ref).
 !!! warning
     `InterfaceIterator` is stateful and should not be used for things other than `for`-looping
     (e.g. broadcasting over, or collecting the iterator may yield unexpected results).
     Construct a new iterator after changing the grid or its topology.
 """
-struct InterfaceIterator{IC <: InterfaceCache, G <: AbstractGrid, TopologyType <: AbstractTopology, N, S}
+struct InterfaceIterator{IC <: InterfaceCache, S}
     cache::IC
-    grid::G
-    topology::TopologyType
-    neighborhood::N
-    skeleton::S
-end
-
-function InterfaceIterator(cache::InterfaceCache, grid::AbstractGrid, topology::AbstractTopology)
-    neighborhood = get_facet_facet_neighborhood(topology, grid)
-    skeleton = facetskeleton(topology, grid)
-    return InterfaceIterator(cache, grid, topology, neighborhood, skeleton)
+    set::S
 end
 
 function InterfaceIterator(
@@ -372,25 +464,15 @@ function InterfaceIterator(
         topology::ExclusiveTopology = ExclusiveTopology(gridordh isa Grid ? gridordh : get_grid(gridordh))
     )
     grid = gridordh isa Grid ? gridordh : get_grid(gridordh)
-    return InterfaceIterator(InterfaceCache(gridordh), grid, topology)
+    return InterfaceIterator(InterfaceCache(gridordh), interfaceskeleton(topology, grid))
 end
 
-# Iterator interface
-@inline function Base.iterate(ii::InterfaceIterator, i::Integer)
-    neighborhood = ii.neighborhood
-    skeleton = ii.skeleton
-    while i <= length(skeleton)
-        facet_a = skeleton[i]; i += 1
-        neighbors = neighborhood[facet_a[1], facet_a[2]]
-        isempty(neighbors) && continue
-        length(neighbors) > 1 && error("multiple neighboring facets not supported yet")
-        facet_b = neighbors[1]
-        reinit!(ii.cache, facet_a, facet_b)
-        return ii.cache, i
-    end
-    return nothing
+function InterfaceIterator(gridordh::Union{Grid, AbstractDofHandler}, set)
+    return InterfaceIterator(InterfaceCache(gridordh), set)
 end
-@inline Base.iterate(ii::InterfaceIterator) = iterate(ii, 1)
+
+@inline _getcache(ii::InterfaceIterator) = ii.cache
+@inline _getset(ii::InterfaceIterator) = ii.set
 
 # Iterator interface for CellIterator/FacetIterator
 const GridIterators{C} = Union{CellIterator{C}, FacetIterator{C}, InterfaceIterator{C}}

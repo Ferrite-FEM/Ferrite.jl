@@ -134,4 +134,50 @@ using Ferrite, Test
         @test_throws Ferrite.DeprecationError celldofs!(v, fc)
     end
 
+    # Ferrite v2
+    @testset "Base.copy -> task_local_copy" begin
+        ip = Lagrange{RefQuadrilateral, 1}()
+        @test_deprecated copy(ip)
+        qr = QuadratureRule{RefQuadrilateral}(2)
+        @test_deprecated copy(qr)
+        cv = CellValues(qr, ip)
+        @test_deprecated copy(cv)
+        cmv = MultiFieldCellValues(qr, (u = ip, p = ip))
+        @test_deprecated copy(cmv)
+        fqr = FacetQuadratureRule{RefQuadrilateral}(2)
+        @test_deprecated copy(fqr)
+        fv = FacetValues(fqr, ip)
+        @test_deprecated copy(fv)
+        iv = InterfaceValues(fqr, ip)
+        @test_deprecated copy(iv)
+    end
+
+    @testset "dof_range(::InterfaceCache) -> interface_dof_range" begin
+        grid = generate_grid(Quadrilateral, (2, 1))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefQuadrilateral, 1}())
+        close!(dh)
+        ic = first(InterfaceIterator(dh, ExclusiveTopology(grid)))
+        r = interface_dof_range(ic, :u)
+        @test (@test_deprecated dof_range(ic, :u)) == (r.here, r.there)
+        # function_* with two separate ranges -> pass the InterfaceDofRange
+        iv = InterfaceValues(FacetQuadratureRule{RefQuadrilateral}(2), Lagrange{RefQuadrilateral, 1}())
+        reinit!(iv, ic)
+        ue = rand(ndofs_per_interface(ic))
+        for here in (true, false)
+            @test (@test_deprecated function_value(iv, 1, ue, r.here, r.there; here = here)) ==
+                function_value(iv, 1, ue, r; here = here)
+            @test (@test_deprecated function_gradient(iv, 1, ue, r.here, r.there; here = here)) ==
+                function_gradient(iv, 1, ue, r; here = here)
+        end
+        @test (@test_deprecated function_value_average(iv, 1, ue, r.here, r.there)) ==
+            function_value_average(iv, 1, ue, r)
+        @test (@test_deprecated function_value_jump(iv, 1, ue, r.here, r.there)) ==
+            function_value_jump(iv, 1, ue, r)
+        @test (@test_deprecated function_gradient_average(iv, 1, ue, r.here, r.there)) ==
+            function_gradient_average(iv, 1, ue, r)
+        @test (@test_deprecated function_gradient_jump(iv, 1, ue, r.here, r.there)) ==
+            function_gradient_jump(iv, 1, ue, r)
+    end
+
 end # testset deprecations

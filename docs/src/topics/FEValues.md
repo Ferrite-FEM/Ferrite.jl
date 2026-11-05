@@ -1,6 +1,5 @@
 # [FEValues](@id fevalues_topicguide)
-A key type of object in Ferrite is the so-called `FEValues`, where the most common ones are `CellValues` and `FacetValues`. These objects are used inside the element routines and are used to query the integration weights, shape function values and gradients, and much more; see [`CellValues`](@ref),
-[`MultiFieldCellValues`](@ref), and [`FacetValues`](@ref). For these values to be correct, it is necessary to reinitialize these for the current cell by using the [`reinit!`](@ref) function. This function maps the values from the reference cell to the actual cell, a process described in detail below, see [Mapping of finite elements](@ref mapping_theory). After that, we show an implementation of a [`SimpleCellValues`](@ref SimpleCellValues) type to illustrate how `CellValues` work for the most standard case, excluding the generalizations and optimization that complicates the actual code.
+A key type of object in Ferrite is the so-called `FEValues`, where the most common ones are `CellValues` and `FacetValues`. These objects are used inside the element routines and are used to query the integration weights, shape function values and gradients, and much more; see [`CellValues`](@ref) and [`FacetValues`](@ref). For these values to be correct, it is necessary to reinitialize these for the current cell by using the [`reinit!`](@ref) function. This function maps the values from the reference cell to the actual cell, a process described in detail below, see [Mapping of finite elements](@ref mapping_theory). After that, we show an implementation of a [`SimpleCellValues`](@ref SimpleCellValues) type to illustrate how `CellValues` work for the most standard case, excluding the generalizations and optimization that complicates the actual code.
 
 ## [Mapping of finite elements](@id mapping_theory)
 The shape functions and gradients stored in an `FEValues` object, are reinitialized for each cell by calling the `reinit!` function.
@@ -100,6 +99,27 @@ Second order gradients of the shape functions are computed as
     \frac{\mathrm{d}J^{-1}_{ri}}{\mathrm{d}\xi_s} = - J^{-1}_{rk}\frac{\mathrm{d}J_{kp}}{\mathrm{d}\xi_s} J^{-1}_{pi} = - J^{-1}_{rk}\mathcal{H}_{kps} J^{-1}_{pi}\\
     \end{align*}
     ```
+
+!!! details "Embedded elements"
+    For embedded elements (e.g. curves in 2D/3D or surfaces in 3D), $\boldsymbol{J}$ is not square, and
+    $\boldsymbol{J}^{-1}$ is replaced by the pseudo-inverse $\boldsymbol{J}^+ = (\boldsymbol{J}^\mathrm{T}\cdot\boldsymbol{J})^{-1}\cdot\boldsymbol{J}^\mathrm{T}$,
+    such that $\mathrm{grad}$ is the tangential gradient. The derivative of the pseudo-inverse contains an additional term,
+    ```math
+    \begin{align*}
+        \frac{\mathrm{d}J^{+}_{ri}}{\mathrm{d}\xi_s} = - J^{+}_{rk}\mathcal{H}_{kps} J^{+}_{pi} + G^{-1}_{rp}\mathcal{H}_{kps} P_{ki},
+        \quad \boldsymbol{G} = \boldsymbol{J}^\mathrm{T}\cdot\boldsymbol{J}, \quad \boldsymbol{P} = \boldsymbol{I} - \boldsymbol{J}\cdot\boldsymbol{J}^+
+    \end{align*}
+    ```
+    which vanishes for square $\boldsymbol{J}$. Here, $\boldsymbol{P}$ projects onto the normal space, and $\boldsymbol{J}\cdot\boldsymbol{J}^+ = \boldsymbol{I} - \boldsymbol{P}$ onto the tangent space.
+    The second order gradient, i.e. the tangential gradient of the tangential gradient, thus becomes
+    ```math
+    \begin{align*}
+        \frac{\mathrm{d}^2 N}{\mathrm{d}x_i \mathrm{d}x_j} = J^{+}_{pi}\left[\frac{\mathrm{d}^2 \hat N}{\mathrm{d} \xi_p\mathrm{d} \xi_s} - \frac{\mathrm{d} N}{\mathrm{d} x_k}\mathcal{H}_{kps}\right] J^{+}_{sj} + \frac{\mathrm{d} \hat N}{\mathrm{d} \xi_r} G^{-1}_{rp} P_{ik}\mathcal{H}_{kps} J^{+}_{sj}
+    \end{align*}
+    ```
+    The first term is the tangential part, $(\boldsymbol{I} - \boldsymbol{P})\cdot\mathrm{grad}(\mathrm{grad}(N))$, which is the symmetric covariant hessian. The second term is the normal part, $\boldsymbol{P}\cdot\mathrm{grad}(\mathrm{grad}(N))$, which accounts for the curvature.
+    Hence, the second order gradient is in general not symmetric, its trace (the Laplace–Beltrami operator) is not affected by the normal part,
+    and the covariant hessian is recovered as $\boldsymbol{J}\cdot\boldsymbol{J}^+\cdot\mathrm{grad}(\mathrm{grad}(N))$.
 
 ### Covariant Piola mapping, H(curl)
 `Ferrite.CovariantPiolaMapping`

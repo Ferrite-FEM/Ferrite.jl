@@ -325,13 +325,14 @@ function doassemble!(cellvalues::CellValues, facetvalues::FacetValues, K::Sparse
 
     re = zeros(nu) # local residual vector
     Ke = zeros(nu, nu) # local stiffness matrix
+    ue = zeros(eltype(u), nu) # local solution vector
 
     for (element, state) in zip(CellIterator(dh), states)
         fill!(Ke, 0)
         fill!(re, 0)
 
         eldofs = celldofs(element)
-        ue = u[eldofs]
+        ue .= @view u[eldofs]
 
         elmt!(Ke, re, element, cellvalues, facetvalues, grid, mp, ue, state)
         assemble!(assembler, celldofs(element), Ke, re)

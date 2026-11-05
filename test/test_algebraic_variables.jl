@@ -629,7 +629,7 @@ end
             Threads.@spawn begin
                 # Each task owns its assembler, buffers, and iterator
                 assembler = start_assemble(K, f; fillzero = false, atomic = atomic)
-                dofs = Vector{Int}(undef, nl)
+                local dofs = Vector{Int}(undef, nl)
                 dofs[nl] = only(algebraic_dofs(dh, :p0))
                 for cc in CellIterator(dh, chunk)
                     copyto!(dofs, celldofs(cc))

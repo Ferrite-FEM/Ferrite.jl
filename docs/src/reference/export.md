@@ -5,10 +5,12 @@ DocTestSetup = :(using Ferrite)
 
 ## Projection of quadrature point data
 ```@docs
-L2Projector(::Ferrite.AbstractGrid)
+L2Projector(::Ferrite.AbstractGrid; kwargs...)
 add!(::L2Projector, ::Ferrite.AbstractVecOrSet{Int}, ::Interpolation; kwargs...)
 close!(::L2Projector)
 L2Projector(::Interpolation, ::Ferrite.AbstractGrid; kwargs...)
+Ferrite.L2SolverCholesky
+Ferrite.L2SolverCG
 project
 ```
 

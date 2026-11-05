@@ -9,3 +9,9 @@ start_assemble
 assemble!
 finish_assemble
 ```
+
+## Multithreading
+
+```@docs
+task_local_copy
+```

@@ -27,7 +27,7 @@ jobs:
       - uses: julia-actions/cache@v3
       - uses: fredrikekre/runic-action@v1
         with:
-          version: "1.7" # Keep version in sync with .pre-commit-config.yaml
+          version: "1.11" # Keep version in sync with .pre-commit-config.yaml
           docstrings: true
           extensions: 'jl,md'
 
@@ -36,9 +36,9 @@ jobs:
     name: "ExplicitImports.jl"
     steps:
       - uses: actions/checkout@v7
-      # - uses: julia-actions/setup-julia@v3
-      #   with:
-      #     version: '1'
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1'
       - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
       - name: Install dependencies

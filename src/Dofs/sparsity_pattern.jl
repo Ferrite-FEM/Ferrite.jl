@@ -354,19 +354,24 @@ function add_sparsity_entries!(
     keep_constrained || _check_keep_constrained_args(dh, ch)
     # Add all entries
     add_diagonal_entries!(sp)
-    _add_cell_entries!(sp, dh, ch, keep_constrained, _coupling_to_local_dof_coupling(dh, coupling))
+    couplings = _coupling_to_local_dof_coupling(dh, coupling)
+    _add_cell_entries!(sp, dh, ch, keep_constrained, couplings)
+    keep_constrained || _add_condensed_cell_entries!(sp, dh, ch, couplings)
     if interface_coupling !== nothing
         add_interface_entries!(sp, dh, ch; topology, keep_constrained, interface_coupling)
     end
-    return _add_post_cell_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
+    _add_algebraic_coupling_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
+    # The constraint entries depend on all other entries and must be added last
+    ch !== nothing && add_constraint_entries!(sp, ch; keep_constrained)
+    return sp
 end
 
 # Specialized method for the concrete SparsityPattern.
 # This builds the pattern in bulk: cell entries (including the diagonal, respecting
 # `coupling` and `keep_constrained`), interface entries (interface_coupling), and any
 # pre-existing entries are exactly counted, the buffer is presized in one allocation, and
-# rows are filled with a marker-dedup append. Only the coupling descriptor entries and the
-# constraint entries layer on afterwards through add_entry!.
+# rows are filled with a marker-dedup append. Only the constraint entries layer on afterwards
+# through add_entry!.
 function add_sparsity_entries!(
         sp::SparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing} = nothing;
         keep_constrained::Bool = true,
@@ -392,19 +397,15 @@ function add_sparsity_entries!(
         neighbor_cells = create_cell_to_neighbors(dh.grid, topology)
         interface_couplings = _interface_coupling_to_local_dof_couplings(dh, interface_coupling)
     end
+    # The algebraic coupling entries and the condensed entries for keep_constrained = false do
+    # not depend on the other entries, so they are added first and merged by the counting
+    # build (through `oldbuffer`). This avoids growing the exactly presized rows of the build
+    # afterwards.
+    _add_algebraic_coupling_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
+    keep_constrained || _add_condensed_cell_entries!(sp, dh, ch, couplings)
     oldbuffer = isempty(sp.buffer.data) ? nothing : sp.buffer
     _build_pattern!(sp, dh, couplings, isconstrained, neighbor_cells, interface_couplings; oldbuffer)
-    return _add_post_cell_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
-end
-
-# Layers applied after the cell entries, shared by the add_sparsity_entries! methods.
-# Coupling descriptor entries must be added before the constraint entries since constraint
-# expansion depends on all pre-existing structural entries.
-function _add_post_cell_entries!(
-        sp::AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing},
-        @nospecialize(algebraic_couplings), keep_constrained::Bool,
-    )
-    _add_algebraic_coupling_entries!(sp, dh, ch, algebraic_couplings, keep_constrained)
+    # The constraint entries depend on all other entries and must be added last
     ch !== nothing && add_constraint_entries!(sp, ch; keep_constrained)
     return sp
 end
@@ -468,7 +469,9 @@ function add_cell_entries!(
     # TODO: Perhaps this can be done in the loop over SubDofHandlers instead.
     coupling = _coupling_to_local_dof_coupling(dh, coupling)
     keep_constrained || _check_keep_constrained_args(dh, ch)
-    return _add_cell_entries!(sp, dh, ch, keep_constrained, coupling)
+    _add_cell_entries!(sp, dh, ch, keep_constrained, coupling)
+    keep_constrained || _add_condensed_cell_entries!(sp, dh, ch, coupling)
+    return sp
 end
 
 # Argument checking for methods with `keep_constrained = false`
@@ -543,7 +546,7 @@ function add_constraint_entries!(
         sp::AbstractSparsityPattern, ch::ConstraintHandler;
         keep_constrained::Bool = true,
     )
-    return _add_constraint_entries!(sp, ch.dofcoefficients, ch.dofmapping, keep_constrained)
+    return _add_constraint_entries!(sp, ch, keep_constrained)
 end
 
 function add_diagonal_entries!(sp::AbstractSparsityPattern)
@@ -772,59 +775,137 @@ function _add_cell_entries!(
     return sp
 end
 
-# Sorted, de-duplicating insert into a plain Vector (used for the constraint scratch below).
-@inline function insert_sorted!(v::Vector{Int}, item::Int)
-    k = searchsortedfirst(v, item)
-    (k == length(v) + 1 || @inbounds(v[k]) != item) && insert!(v, k, item)
-    return v
+# With `keep_constrained = false` the entries of constrained dofs are not added to the
+# pattern, which means that `add_constraint_entries!` (which expands *existing* entries)
+# can not distribute them to the master dofs. Instead, for every cell with affinely
+# constrained dofs, map each (coupled) local entry `(i, j)` to the entries `(i′, j′)` where
+# `i′` (`j′`) is `i` (`j`) if it is not constrained, and the master dofs of `i` (`j`) if it
+# is affinely constrained. These are exactly the entries that local condensation (e.g.
+# `apply_assemble!`) writes to. Prescribed dofs, and prescribed master dofs, are dropped.
+function _add_condensed_cell_entries!(
+        sp::AbstractSparsityPattern, dh::DofHandler, ch::ConstraintHandler,
+        coupling::Union{Vector{<:AbstractMatrix{Bool}}, Nothing},
+    )
+    # Mark the dofs that are affinely constrained (i.e. have master dofs)
+    isaffine = falses(ndofs(dh))
+    for (d, idx) in ch.dofmapping
+        coeffs = ch.dofcoefficients[idx]
+        (coeffs === nothing || isempty(coeffs) || d > ndofs(dh)) && continue
+        isaffine[d] = true
+    end
+    any(isaffine) || return sp
+    # The unconstrained dofs that `dof` is mapped to by the constraints
+    function mapped_dofs!(out::Vector{Int}, dof::Int)
+        empty!(out)
+        idx = get(ch.dofmapping, dof, 0)
+        if idx == 0
+            push!(out, dof)
+        else
+            coeffs = ch.dofcoefficients[idx]
+            coeffs === nothing && return out
+            for (m, _) in coeffs
+                haskey(ch.dofmapping, m) || push!(out, m)
+            end
+        end
+        return out
+    end
+    rows, cols = Int[], Int[]
+    cc = CellCache(dh, UpdateFlags(nodes = false, coords = false, dofs = true))
+    for (sdhi, sdh) in pairs(dh.subdofhandlers)
+        coupling === nothing || (coupling_sdh = coupling[sdhi])
+        for cell_id in sdh.cellset
+            reinit!(cc, cell_id)
+            dofs = celldofs(cc)
+            any(d -> d <= ndofs(dh) && isaffine[d], dofs) || continue
+            for (i, row) in pairs(dofs)
+                mapped_dofs!(rows, row)
+                isempty(rows) && continue
+                for (j, col) in pairs(dofs)
+                    coupling === nothing || coupling_sdh[i, j] || continue
+                    # Entries between unconstrained dofs are already in the pattern
+                    (isaffine[row] || isaffine[col]) || continue
+                    mapped_dofs!(cols, col)
+                    for r in rows, c in cols
+                        add_entry!(sp, r, c)
+                    end
+                end
+            end
+        end
+    end
+    return sp
 end
 
 function _add_constraint_entries!(
-        sp::AbstractSparsityPattern, dofcoefficients::Vector{Union{DofCoefficients{T, Ti}, Nothing}},
-        dofmapping::Dict{Int, Int}, keep_constrained::Bool,
-    ) where {T, Ti}
+        sp::AbstractSparsityPattern, ch::ConstraintHandler, keep_constrained::Bool,
+    )
+    dofcoefficients = ch.dofcoefficients
 
     # Return early if there are no non-trivial affine constraints
-    any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return
+    any(i -> !(i === nothing || isempty(i)), dofcoefficients) || return sp
 
-    # New entries tracked separately and inserted after since it is not possible to modify
-    # the datastructure while looping over it.
-    sp′ = Dict{Int, Vector{Int}}()
+    # Dense dof -> constraint index map (0 for unconstrained dofs) to avoid a Dict lookup for
+    # every stored entry. The constraint index of `ch.prescribed_dofs[idx]` is `idx` (cf.
+    # `ch.dofmapping`).
+    nrows = getnrows(sp)
+    constraint_idx = zeros(Int, max(nrows, getncols(sp)))
+    for (idx, dof) in pairs(ch.prescribed_dofs)
+        dof <= length(constraint_idx) && (constraint_idx[dof] = idx)
+    end
+    # The coefficients of an affinely constrained dof, `nothing` otherwise (also for prescribed
+    # dofs without master dofs, cf. `coefficients_for_dof`)
+    @inline function coefficients(dof)
+        idx = @inbounds constraint_idx[dof]
+        return idx == 0 ? nothing : @inbounds dofcoefficients[idx]
+    end
+    @inline isconstrained(dof) = @inbounds(constraint_idx[dof]) != 0
 
-    for (row, colidxs) in zip(1:getnrows(sp), eachrow(sp)) # pairs(eachrow(sp))
-        row_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, row)
+    # New entries are collected and inserted after the loop since it is not possible to modify
+    # the pattern while looping over it.
+    new_rows = Int[]
+    new_cols = Int[]
+
+    # The rows are read through _eachrow_anyorder since the order of the columns does not
+    # matter here, and for SparsityPattern this avoids sorting the pattern first.
+    # Note: The rows are independent, so this loop could be parallelized by letting each task
+    # collect its own new entries. This is not done since the loop is cheap compared to the
+    # rest of the pattern construction.
+    for (row, colidxs) in zip(1:nrows, _eachrow_anyorder(sp))
+        row_coeffs = coefficients(row)
         if row_coeffs === nothing
             # This row is _not_ constrained, check columns of this row...
-            !keep_constrained && haskey(dofmapping, row) && continue
+            !keep_constrained && isconstrained(row) && continue
             for col in colidxs
-                col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
+                col_coeffs = coefficients(col)
                 if col_coeffs === nothing
                     # ... this column is _not_ constrained, done.
                     continue
                 else
                     # ... this column _is_ constrained, distribute to columns.
                     for (col′, _) in col_coeffs
-                        insert_sorted!(get!(() -> Int[], sp′, row), col′)
+                        push!(new_rows, row)
+                        push!(new_cols, col′)
                     end
                 end
             end
         else
             # This row _is_ constrained, check columns of this row...
             for col in colidxs
-                col_coeffs = coefficients_for_dof(dofmapping, dofcoefficients, col)
+                col_coeffs = coefficients(col)
                 if col_coeffs === nothing
                     # ... this column is _not_ constrained, distribute to rows.
-                    !keep_constrained && haskey(dofmapping, col) && continue
+                    !keep_constrained && isconstrained(col) && continue
                     for (row′, _) in row_coeffs
-                        insert_sorted!(get!(() -> Int[], sp′, row′), col)
+                        push!(new_rows, row′)
+                        push!(new_cols, col)
                     end
                 else
                     # ... this column _is_ constrained, double-distribute to columns/rows.
                     for (row′, _) in row_coeffs
-                        !keep_constrained && haskey(dofmapping, row′) && continue
+                        !keep_constrained && isconstrained(row′) && continue
                         for (col′, _) in col_coeffs
-                            !keep_constrained && haskey(dofmapping, col′) && continue
-                            insert_sorted!(get!(() -> Int[], sp′, row′), col′)
+                            !keep_constrained && isconstrained(col′) && continue
+                            push!(new_rows, row′)
+                            push!(new_cols, col′)
                         end
                     end
                 end
@@ -833,11 +914,8 @@ function _add_constraint_entries!(
     end
 
     # Insert new entries into the sparsity pattern
-    for (row, colidxs) in sp′
-        # TODO: Extract row here and just insert_sorted
-        for col in colidxs
-            add_entry!(sp, row, col)
-        end
+    for (row, col) in zip(new_rows, new_cols)
+        add_entry!(sp, row, col)
     end
 
     return sp

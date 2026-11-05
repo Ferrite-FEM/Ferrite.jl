@@ -101,8 +101,11 @@ function precompute_values!(gm::GeometryMapping{2}, qr_points::AbstractVector{<:
     return reference_shape_hessians_gradients_and_values!(gm.d2Mdξ2, gm.dMdξ, gm.M, gm.ip, qr_points)
 end
 
-function Base.copy(v::GeometryMapping)
-    return GeometryMapping(copy(v.ip), copy(v.M), _copy_or_nothing(v.dMdξ), _copy_or_nothing(v.d2Mdξ2))
+function task_local_copy(v::GeometryMapping)
+    return GeometryMapping(
+        task_local_copy(v.ip), task_local_copy(v.M),
+        task_local_copy(v.dMdξ), task_local_copy(v.d2Mdξ2)
+    )
 end
 
 getngeobasefunctions(geo_mapping::GeometryMapping) = size(geo_mapping.M, 1)
@@ -131,8 +134,6 @@ end
 
 @inline function calculate_mapping(geo_mapping::GeometryMapping{2}, q_point::Int, x::AbstractVector{<:Vec})
     J = zero(otimes_returntype(eltype(x), eltype(geo_mapping.dMdξ)))
-    sdim, rdim = size(J)
-    (rdim != sdim) && error("hessian for embedded elements not implemented (rdim=$rdim, sdim=$sdim)")
     H = zero(otimes_returntype(eltype(x), eltype(geo_mapping.d2Mdξ2)))
     @inbounds for j in 1:getngeobasefunctions(geo_mapping)
         J += x[j] ⊗ geo_mapping.dMdξ[j, q_point]
@@ -160,9 +161,8 @@ end
 @inline function calculate_mapping(gip::ScalarInterpolation, ξ::Vec{rdim, T}, x::AbstractVector{<:Vec{sdim}}, ::Val{2}) where {T, rdim, sdim}
     n_basefuncs = getnbasefunctions(gip)
     @boundscheck checkbounds(x, Base.OneTo(n_basefuncs))
-    (rdim != sdim) && error("hessian for embedded elements not implemented (rdim=$rdim, sdim=$sdim)")
     J = zero(otimes_returntype(Vec{sdim, T}, Vec{rdim, T}))
-    H = zero(otimes_returntype(eltype(x), typeof(J)))
+    H = zero(otimes_returntype(eltype(x), Tensor{2, rdim, T}))
     @inbounds for j in 1:n_basefuncs
         d2Mdξ2, dMdξ, _ = reference_shape_hessian_gradient_and_value(gip, ξ, j)
         J += x[j] ⊗ dMdξ

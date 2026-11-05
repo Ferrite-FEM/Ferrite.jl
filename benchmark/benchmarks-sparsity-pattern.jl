@@ -47,6 +47,15 @@ function build_pattern_dg(; kwargs...)
     return add_sparsity_entries!(init_sparsity_pattern(SP_DH_DG), SP_DH_DG; topology = SP_TOPOLOGY, kwargs...)
 end
 
+# For the algebraic coupling benchmark: a spatial field coupled to an algebraic variable over
+# all cells (e.g. a homogenized strain), which adds algebraic columns to every spatial row.
+const SP_DH_ALG = let dh = DofHandler(SP_GRID)
+    add!(dh, :u, Lagrange{RefHexahedron, 1}()^3)
+    add!(dh, :εbar, AlgebraicVariable{SymmetricTensor{2, 3}}())
+    close!(dh)
+end
+const SP_ALG_COUPLING = CellCoupling(1:getncells(SP_GRID); algebraic_coupling = ((:u, :εbar), (:εbar, :εbar)))
+
 # Pattern construction, i.e. everything except the final matrix allocation.
 SPARSITY_PATTERN_SUITE["pattern"] = BenchmarkGroup()
 let SP = SPARSITY_PATTERN_SUITE["pattern"]
@@ -60,6 +69,12 @@ let SP = SPARSITY_PATTERN_SUITE["pattern"]
     SP["cells, keep_constrained=false"] = @benchmarkable build_pattern($SP_CH; keep_constrained = false) evals = 1 seconds = 1.0
     # The generic per-entry construction (the path taken when entries already exist)
     SP["cells, per-entry"] = @benchmarkable build_pattern_per_entry() evals = 1 seconds = 1.0
+    # Algebraic coupling entries (dense algebraic rows, and algebraic columns in every
+    # spatial row)
+    SP["cells+algebraic couplings"] = @benchmarkable(
+        add_sparsity_entries!(init_sparsity_pattern($SP_DH_ALG), $SP_DH_ALG; algebraic_couplings = ($SP_ALG_COUPLING,)),
+        evals = 1, seconds = 1.0
+    )
     # The affine-constraint pass in isolation (depends on the already-built pattern)
     SP["constraints-onto-cells"] = @benchmarkable(
         add_constraint_entries!(sp, $SP_CH), setup = (sp = build_pattern()), evals = 1, seconds = 1.0

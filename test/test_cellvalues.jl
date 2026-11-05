@@ -159,19 +159,6 @@ end
             for (i, qp_x) in pairs(Ferrite.getpoints(quad_rule))
                 @test spatial_coordinate(cv, i, coords) ≈ qp_x
             end
-
-            @testset "copy(::CellValues)" begin
-                cvc = copy(cv)
-                @test typeof(cv) == typeof(cvc)
-
-                test_equal_but_unaliased(cv.fun_values, cvc.fun_values)
-                test_equal_but_unaliased(cv.geo_mapping, cvc.geo_mapping)
-                # qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
-                @test cvc.qr === cv.qr
-                # While detJdV is copied
-                @test cvc.detJdV !== cv.detJdV
-                @test cvc.detJdV == cv.detJdV
-            end
         end
     end
 
@@ -243,7 +230,7 @@ end
             end
         end
         test_ips = [
-            Lagrange{RefTriangle, 2}(), Lagrange{RefQuadrilateral, 2}(), Lagrange{RefHexahedron, 2}()^3, # Test should also work for identity mapping
+            Lagrange{RefTriangle, 2}(), Lagrange{RefQuadrilateral, 2}(), Lagrange{RefHexahedron, 2}()^3, Lagrange{RefPrism, 2}(), # Test should also work for identity mapping
             Nedelec{RefTriangle, 1}(), Nedelec{RefTriangle, 2}(),
             RaviartThomas{RefTriangle, 1}(), RaviartThomas{RefTriangle, 2}(), BrezziDouglasMarini{RefTriangle, 1}(),
         ]
@@ -251,6 +238,7 @@ end
         cell_from_refshape(::Type{RefTriangle}) = QuadraticTriangle((ntuple(identity, 6)))
         cell_from_refshape(::Type{RefQuadrilateral}) = QuadraticQuadrilateral((ntuple(identity, 9)))
         cell_from_refshape(::Type{RefHexahedron}) = QuadraticHexahedron((ntuple(identity, 27)))
+        cell_from_refshape(::Type{RefPrism}) = QuadraticWedge((ntuple(identity, 18)))
         for ip in test_ips
             cell = cell_from_refshape(getrefshape(ip))
             @testset "$ip" begin
@@ -295,6 +283,14 @@ end
         cmv_u = MultiFieldCellValues(qr, (u = ipu,)) # Case with a single interpolation
         cmv_rt = MultiFieldCellValues(qr, (u = ipu, r = iprt))
         cmv3 = MultiFieldCellValues(qr, (u = ipu, T = Lagrange{RefQuadrilateral, 2}(), p = ipp)) # Case with 3 unique IPs
+
+        # MultiFieldCellValues is an alias for CellValues constructed with a NamedTuple
+        @test cmv isa CellValues
+        @test cmv isa MultiFieldCellValues
+        @test !(cvu isa MultiFieldCellValues)
+        @test typeof(CellValues(qr, (u = ipu, p = ipp, T = ipT))) === typeof(cmv)
+        @test typeof(CellValues(Float64, qr, (u = ipu,))) === typeof(cmv_u)
+        @test propertynames(cmv) == (:u, :p, :T)
 
         @test cmv.p === cmv.T # Correct aliasing for identical interpolations
         # Correctly inferred geometric interpolation:
@@ -361,8 +357,8 @@ end
                 end
             end
         end
-        @testset "copy(::MultiFieldCellValues)" begin
-            cmv_copy = @inferred copy(cmv)
+        @testset "task_local_copy(::MultiFieldCellValues)" begin
+            cmv_copy = @inferred task_local_copy(cmv)
             @test cmv_copy isa typeof(cmv)
 
             # Test that all mutable types in FunctionValues and GeometryMapping have been copied
@@ -374,9 +370,10 @@ end
             # Test that aliasing is preserved between equal interpolations
             @test cmv_copy.p === cmv_copy.T
 
-            # qr remain aliased, as defined by `copy(qr)=qr`, see quadrature.jl.
-            @test Ferrite.get_quadrature_rule(cmv_copy) === Ferrite.get_quadrature_rule(cmv)
-            # While detJdV is copied
+            # qr and detJdV are copied
+            @test Ferrite.get_quadrature_rule(cmv_copy) !== Ferrite.get_quadrature_rule(cmv)
+            @test Ferrite.getweights(Ferrite.get_quadrature_rule(cmv_copy)) == Ferrite.getweights(Ferrite.get_quadrature_rule(cmv))
+            @test Ferrite.getpoints(Ferrite.get_quadrature_rule(cmv_copy)) == Ferrite.getpoints(Ferrite.get_quadrature_rule(cmv))
             @test Ferrite.getdetJdVs(cmv_copy) !== Ferrite.getdetJdVs(cmv)
             @test Ferrite.getdetJdVs(cmv_copy) == Ferrite.getdetJdVs(cmv)
         end
@@ -581,16 +578,41 @@ end
             end
         end
 
-        @testset "CellValues with hessians" begin
-            ip = Lagrange{RefQuadrilateral, 2}()
-            qr = QuadratureRule{RefQuadrilateral}(2)
-
-            cv_vector = CellValues(qr, ip^2, ip^3; update_hessians = true)
-            cv_scalar = CellValues(qr, ip, ip^3; update_hessians = true)
-
-            coords = [Vec{3}((x[1], x[2], 0.0)) for x in Ferrite.reference_coordinates(ip)]
-            @test_throws ErrorException reinit!(cv_vector, coords) # Not implemented for embedded elements
-            @test_throws ErrorException reinit!(cv_scalar, coords)
+        @testset "CellValues with hessians (rdim = $(Ferrite.getrefdim(ip_geo)), sdim = $sdim)" for (ip_geo, sdim) in (
+                (Lagrange{RefLine, 2}(), 2), (Lagrange{RefLine, 2}(), 3),
+                (Lagrange{RefTriangle, 2}(), 3), (Lagrange{RefQuadrilateral, 2}(), 3),
+            )
+            qr = QuadratureRule{getrefshape(ip_geo)}(3)
+            for ip in (ip_geo, ip_geo^2, ip_geo^3)
+                # Rotated and perturbed reference element, curved out of plane
+                Q = Tensor{2, sdim}(Matrix(LinearAlgebra.qr(randn(sdim, sdim)).Q))
+                x = [Q ⋅ Vec{sdim}(d -> d <= length(ξ) ? ξ[d] : 0.0) + 0.1 * rand(Vec{sdim}) for ξ in Ferrite.reference_coordinates(ip_geo)]
+                cv = CellValues(qr, ip, ip_geo^sdim; update_hessians = true)
+                reinit!(cv, x)
+                cv32 = CellValues(Float32, qr, ip, ip_geo^sdim; update_hessians = true)
+                reinit!(cv32, [Vec{sdim, Float32}(Tuple(xi)) for xi in x])
+                ue = rand(getnbasefunctions(ip))
+                Jinv(ξ) = Ferrite.calculate_Jinv(Ferrite.calculate_mapping(ip_geo, ξ, x, Val(1)).J)
+                # Tangential gradient of the tangential gradient
+                dNdx(ξ, i) = Ferrite.reference_shape_gradient(ip, ξ, i) ⋅ Jinv(ξ)
+                dudx(ξ) = sum(i -> dNdx(ξ, i) * ue[i], 1:getnbasefunctions(ip))
+                for (q, ξ) in pairs(Ferrite.getpoints(qr))
+                    @test Ferrite.calculate_mapping(ip_geo, ξ, x, Val(2)).H ≈ Ferrite.calculate_mapping(cv.geo_mapping, q, x).H
+                    for i in 1:getnbasefunctions(ip)
+                        @test shape_gradient(cv, q, i) ≈ dNdx(ξ, i)
+                        @test shape_hessian(cv, q, i) ≈ Tensors.gradient(ξ -> dNdx(ξ, i), ξ) ⋅ Jinv(ξ)
+                        @test shape_hessian(cv32, q, i) ≈ shape_hessian(cv, q, i) rtol = 1.0e-3
+                    end
+                    if ip isa ScalarInterpolation
+                        # Tangential part is the symmetric covariant hessian
+                        J = Ferrite.calculate_mapping(ip_geo, ξ, x, Val(1)).J
+                        Hcov = J ⋅ Jinv(ξ) ⋅ Ferrite.function_hessian(cv, q, ue)
+                        @test Hcov ≈ Hcov'
+                    end
+                    @test function_gradient(cv, q, ue) ≈ dudx(ξ)
+                    @test Ferrite.function_hessian(cv, q, ue) ≈ Tensors.gradient(dudx, ξ) ⋅ Jinv(ξ)
+                end
+            end
         end
     end
 
@@ -651,7 +673,7 @@ end
 
         cmv = MultiFieldCellValues(QuadratureRule{RefPrism}(2), (u = Lagrange{RefPrism, 2}(), v = Lagrange{RefPrism, 1}()^3))
         showstring = sprint(show, MIME"text/plain"(), cmv)
-        @test startswith(showstring, "MultiFieldCellValues with 5 quadrature points")
+        @test startswith(showstring, "CellValues with 5 quadrature points")
         @test contains(showstring, "Geometric interpolation: Lagrange{RefPrism, 1}()")
         @test contains(showstring, "u: Lagrange{RefPrism, 2}()")
         @test contains(showstring, "v: Lagrange{RefPrism, 1}()^3")

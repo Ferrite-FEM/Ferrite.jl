@@ -9,12 +9,7 @@ function checkquadpoint(fe_v::AbstractValues, qp::Int)
     return nothing
 end
 
-@inline function reinit_needs_cell(fe_values::AbstractValues)
-    # TODO: Might need better logic for this, but for current implementations this
-    # is ok. If someone implements a non-identity mapping that doesn't require the cell
-    # as input, this is only a slight performance issue in some cases.
-    return !isa(mapping_type(get_fun_values(fe_values)), IdentityMapping)
-end
+@inline reinit_needs_cell(fe_values::AbstractValues) = reinit_needs_cell(get_fun_values(fe_values))
 
 @noinline function throw_incompatible_dof_length(length_ue, n_base_funcs)
     msg = "the number of base functions ($(n_base_funcs)) does not match the length " *
@@ -261,6 +256,11 @@ end
 
     Compute the hessian of the function in a quadrature point. `u` is a vector with values
     for the degrees of freedom.
+
+    For embedded elements (e.g. curves in 2D/3D or surfaces in 3D), this is the tangential
+    gradient of the tangential gradient, which in general is not symmetric. Its tangential
+    part, `(J ⋅ J⁺) ⋅ H` with `J⁺` the pseudo-inverse of the jacobian, is the symmetric
+    covariant hessian, while the remaining normal part accounts for the curvature.
 """
 function function_hessian(fe_v::AbstractValues, q_point::Int, u::AbstractVector, dof_range = eachindex(u))
     n_base_funcs = getnbasefunctions(fe_v)
@@ -389,10 +389,6 @@ function spatial_coordinate(interpolation::ScalarInterpolation, ξ::Vec, x::Abst
     end
     return vec
 end
-
-# Utility functions used by GeometryMapping, FunctionValues
-_copy_or_nothing(x) = copy(x)
-_copy_or_nothing(::Nothing) = nothing
 
 function reference_shape_values!(values::AbstractMatrix, ip, qr_points::AbstractVector{<:Vec})
     for (qp, ξ) in pairs(qr_points)

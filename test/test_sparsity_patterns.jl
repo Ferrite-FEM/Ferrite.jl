@@ -352,6 +352,52 @@ end
     sp_ic = add_sparsity_entries!(SparsityPattern(ndofs(dh), ndofs(dh)), dh; interface_coupling = trues(2, 2))
     sp_ic_topo = add_sparsity_entries!(SparsityPattern(ndofs(dh), ndofs(dh)), dh; interface_coupling = trues(2, 2), topology = ExclusiveTopology(grid))
     compare_patterns(sp_ic, sp_ic_topo)
+    # Passing only a topology (no interface_coupling) should not error
+    # (https://github.com/Ferrite-FEM/Ferrite.jl/issues/1029)
+    K_topo = allocate_matrix(dh; topology = ExclusiveTopology(grid))
+    @test K_topo == allocate_matrix(dh)
+end
+
+@testset "add_constraint_entries! reference" begin
+    # Compare against a direct implementation of the definition: every stored entry (i, j)
+    # is distributed through the constraint coefficients of i and/or j. Constrained dofs are
+    # skipped for keep_constrained = false.
+    function reference_constraint_entries(sp, ch, keep_constrained)
+        coeffs(d) = Ferrite.coefficients_for_dof(ch.dofmapping, ch.dofcoefficients, d)
+        skip(d) = !keep_constrained && haskey(ch.dofmapping, d)
+        entries = Set((r, c) for r in 1:Ferrite.getnrows(sp) for c in Ferrite.eachrow(sp, r))
+        new = Set{Tuple{Int, Int}}()
+        for (r, c) in entries
+            rc, cc = coeffs(r), coeffs(c)
+            rows = rc === nothing ? (skip(r) ? Int[] : [r]) : [r′ for (r′, _) in rc if !skip(r′)]
+            cols = cc === nothing ? (skip(c) ? Int[] : [c]) : [c′ for (c′, _) in cc if !skip(c′)]
+            # Entries between unconstrained dofs are already stored
+            (rc === nothing && cc === nothing) && continue
+            for r′ in rows, c′ in cols
+                push!(new, (r′, c′))
+            end
+        end
+        return union(entries, new)
+    end
+    grid = generate_grid(Quadrilateral, (4, 4))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefQuadrilateral, 2}())
+    close!(dh)
+    ch = ConstraintHandler(dh)
+    add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid, "left", "right")))
+    add!(ch, Dirichlet(:u, getfacetset(grid, "bottom"), x -> 0.0))
+    # An affine constraint with multiple masters, one of them prescribed
+    d1, d2, d3 = celldofs(dh, 6)[1:3]
+    bottom_dof = celldofs(dh, 1)[1]
+    add!(ch, AffineConstraint(d1, [d2 => 2.0, d3 => -1.0, bottom_dof => 0.5], 1.0))
+    close!(ch)
+    for keep_constrained in (true, false), P in (SparsityPattern, TestPattern)
+        nd = ndofs(dh)
+        sp = add_cell_entries!(P(nd, nd), dh, ch; keep_constrained)
+        reference = reference_constraint_entries(sp, ch, keep_constrained)
+        add_constraint_entries!(sp, ch; keep_constrained)
+        @test Set((r, c) for r in 1:nd for c in Ferrite.eachrow(sp, r)) == reference
+    end
 end
 
 @testset "SparsityPattern counting build" begin
@@ -400,10 +446,12 @@ end
     # Coupling and keep_constrained are handled during the counting build (masked/filtered
     # candidate enumeration);
     # compare against the generic path for the same arguments.
-    for CT in (Quadrilateral, Tetrahedron)
+    for CT in (Quadrilateral, Tetrahedron), periodic in (false, true)
         dh = fsp_test_create_dh(CT)
         ch = ConstraintHandler(dh)
         add!(ch, Dirichlet(:a, getfacetset(dh.grid, "left"), x -> 0))
+        # Affine constraints with master dofs in other cells (#1470)
+        periodic && add!(ch, PeriodicDirichlet(:b, collect_periodic_facets(dh.grid, "bottom", "top")))
         close!(ch)
         for kwargs in (
                 (; coupling = [true true; false true]),
@@ -413,6 +461,45 @@ end
             )
             sp_fast = add_sparsity_entries!(init_sparsity_pattern(dh), dh, ch; kwargs...)
             sp_gen = fsp_test_build_generic(dh, ch; kwargs...)
+            compare_matrices(allocate_matrix(sp_fast), allocate_matrix(sp_gen))
+            # Same pattern when built from the individual pieces
+            keep_constrained = get(kwargs, :keep_constrained, true)
+            sp_pieces = init_sparsity_pattern(dh)
+            Ferrite.add_diagonal_entries!(sp_pieces)
+            add_cell_entries!(sp_pieces, dh, ch; kwargs...)
+            add_constraint_entries!(sp_pieces, ch; keep_constrained)
+            compare_matrices(allocate_matrix(sp_fast), allocate_matrix(sp_pieces))
+        end
+    end
+    # Algebraic coupling entries are added before the counting build (and merged by it), and
+    # the generic path adds them after the cell entries; both must give the same pattern.
+    let grid = generate_grid(Quadrilateral, (4, 4))
+        dh = DofHandler(grid)
+        add!(dh, :u, Lagrange{RefQuadrilateral, 2}()^2)
+        add!(dh, :p, Lagrange{RefQuadrilateral, 1}())
+        add!(dh, :λ, AlgebraicVariable{Vec{2}}())
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid, "left", "right"), [1, 2]))
+        add!(ch, Dirichlet(:p, getfacetset(grid, "bottom"), x -> 0.0))
+        close!(ch)
+        algebraic_couplings = (
+            CellCoupling(1:8; algebraic_coupling = ((:u, :λ), (:λ, :λ))),
+            FacetCoupling(getfacetset(grid, "top"); algebraic_coupling = ((:p, :λ),)),
+        )
+        nd = ndofs(dh)
+        for keep_constrained in (true, false), coupling in (nothing, [true true; false true]), seed in (false, true)
+            # Optionally start from a pattern with an existing entry (merged by the build)
+            function init()
+                sp = SparsityPattern(nd, nd)
+                seed && Ferrite.add_entry!(sp, 1, nd)
+                return sp
+            end
+            sp_fast = add_sparsity_entries!(init(), dh, ch; keep_constrained, coupling, algebraic_couplings)
+            sp_gen = Base.@invoke add_sparsity_entries!(
+                init()::Ferrite.AbstractSparsityPattern, dh::DofHandler, ch::Union{ConstraintHandler, Nothing};
+                keep_constrained, coupling, algebraic_couplings
+            )
             compare_matrices(allocate_matrix(sp_fast), allocate_matrix(sp_gen))
         end
     end

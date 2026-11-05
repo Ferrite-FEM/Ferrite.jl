@@ -26,4 +26,5 @@ Ferrite._find_field
 Ferrite._close_subdofhandler!
 Ferrite._distribute_dofs_for_cell!
 Ferrite.permute_and_push!
+Ferrite.InterfaceDofRange
 ```

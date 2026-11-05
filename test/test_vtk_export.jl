@@ -1,7 +1,73 @@
 # Imports for parallel (isolated) test execution:
-import SHA
+include("vtk_test_utils.jl")
+
+# Cell types defined outside of Ferrite, as in downstream packages, with and without a custom
+# VTK node order
+struct VTKTestCell <: Ferrite.AbstractCell{RefQuadrilateral}
+    nodes::NTuple{4, Int}
+end
+Ferrite.cell_to_vtkcell(::Type{VTKTestCell}) = Ferrite.VTKCellTypes.VTK_QUAD
+Ferrite.nodes_to_vtkorder(cell::VTKTestCell) = [cell.nodes[1], cell.nodes[2], cell.nodes[4], cell.nodes[3]]
+struct VTKTestCellDefaultOrder <: Ferrite.AbstractCell{RefQuadrilateral}
+    nodes::NTuple{4, Int}
+end
+Ferrite.cell_to_vtkcell(::Type{VTKTestCellDefaultOrder}) = Ferrite.VTKCellTypes.VTK_QUAD
 
 @testset "VTKGridFile" begin #TODO: Move all vtk tests here
+    @testset "VTK cells" begin
+        connectivity(c) = collect(Int, c.connectivity)
+        # The node numbers of the cell in VTK order (cf. vtk_test_utils.jl)
+        expected(cell) = collect(cell.nodes)[vtk_node_order(cell)]
+        # A single cell type
+        for (CT, n) in ((Quadrilateral, 4), (Pyramid, 5), (QuadraticWedge, 18), (QuadraticHexahedron, 27))
+            cells = [CT(ntuple(i -> 100k + i, n)) for k in 1:3]
+            cls = Ferrite.create_vtk_cells(cells)
+            @test isconcretetype(eltype(cls))
+            @test all(c -> c.ctype == Ferrite.cell_to_vtkcell(CT), cls)
+            @test map(connectivity, cls) == map(expected, cells)
+        end
+        # Mixed cell types
+        cells = Ferrite.AbstractCell[Quadrilateral((1, 2, 3, 4)), Triangle((2, 5, 3)), Pyramid((1, 2, 3, 4, 5))]
+        cls = Ferrite.create_vtk_cells(cells)
+        @test isconcretetype(eltype(cls))
+        @test map(c -> c.ctype, cls) == map(c -> Ferrite.cell_to_vtkcell(typeof(c)), cells)
+        @test map(connectivity, cls) == map(expected, cells)
+        # Full grid data, also for discontinuous export, on a mixed grid
+        nodes = [Node((0.0, 0.0)), Node((1.0, 0.0)), Node((1.0, 1.0)), Node((0.0, 1.0)), Node((2.0, 0.0))]
+        grid = Grid(Union{Quadrilateral, Triangle}[Quadrilateral((1, 2, 3, 4)), Triangle((2, 5, 3))], nodes)
+        coords, cls = Ferrite.create_vtk_griddata(grid)
+        @test isconcretetype(eltype(cls))
+        @test map(connectivity, cls) == [[1, 2, 3, 4], [2, 5, 3]]
+        coords, cls, cellnodes, node_mapping = Ferrite.create_discontinuous_vtk_griddata(grid)
+        @test isconcretetype(eltype(cls))
+        @test map(connectivity, cls) == [[1, 2, 3, 4], [5, 6, 7]]
+        @test node_mapping == [1, 2, 3, 4, 2, 5, 3]
+        # Discontinuous export of a single cell type with reordered nodes
+        grid = generate_grid(Pyramid, (1, 1, 1))
+        coords, cls, cellnodes, node_mapping = Ferrite.create_discontinuous_vtk_griddata(grid)
+        @test isconcretetype(eltype(cls))
+        @test map(connectivity, cls) == [collect(r)[VTK_NODE_ORDER[Pyramid]] for r in cellnodes]
+        # The cells can be given as a tuple
+        cells = (Quadrilateral((1, 2, 3, 4)), Pyramid((1, 2, 3, 4, 5)))
+        @test map(connectivity, Ferrite.create_vtk_cells(cells)) == map(expected, collect(cells))
+        # nodes_to_vtkorder gives the VTK node order of a single cell
+        @test Ferrite.nodes_to_vtkorder(Pyramid((1, 2, 3, 4, 5))) == [1, 2, 4, 3, 5]
+        @test Ferrite.nodes_to_vtkorder(Quadrilateral((1, 2, 3, 4))) == [1, 2, 3, 4]
+        # All cell types of Ferrite that can be exported use the non-allocating path
+        for m in methods(Ferrite.cell_to_vtkcell)
+            m.module === Ferrite || continue
+            @test m.sig.parameters[2].parameters[1] <: Ferrite.FerriteCell
+        end
+        # Cell types defined outside of Ferrite use nodes_to_vtkorder
+        cells = Ferrite.AbstractCell[VTKTestCell((1, 2, 3, 4)), VTKTestCellDefaultOrder((1, 2, 3, 4)), Quadrilateral((1, 2, 3, 4))]
+        cls = Ferrite.create_vtk_cells(cells)
+        @test isconcretetype(eltype(cls))
+        @test map(connectivity, cls) == [[1, 2, 4, 3], [1, 2, 3, 4], [1, 2, 3, 4]]
+        grid = Grid([VTKTestCell((1, 2, 3, 4))], [Node((0.0, 0.0)), Node((1.0, 0.0)), Node((0.0, 1.0)), Node((1.0, 1.0))])
+        coords, cls, cellnodes, node_mapping = Ferrite.create_discontinuous_vtk_griddata(grid)
+        @test map(connectivity, cls) == [[1, 2, 4, 3]]
+    end
+
     @testset "show(::VTKGridFile)" begin
         mktempdir() do tmp
             grid = generate_grid(Quadrilateral, (2, 2))
@@ -24,7 +90,10 @@ import SHA
                 @test Ferrite.write_cell_colors(vtk, grid, colors) === vtk
             end
             @test v isa VTKGridFile
-            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "960aa8323da524f642376bba6ff7d8f7c349b218"
+            data = read_vtk(fname * ".vtu")
+            test_vtk_grid(data, grid)
+            @test keys(data.cell_data) == Set(["coloring"])
+            @test data.cell_data["coloring"] == [findfirst(c -> cell in c, colors) for cell in 1:getncells(grid)]
         end
     end
     @testset "constraints" begin
@@ -43,7 +112,10 @@ import SHA
                 @test Ferrite.write_constraints(vtk, ch) === vtk
             end
             @test v isa VTKGridFile
-            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "31b506bd9729b11992f8bcb79a2191eb65d223bf"
+            data = read_vtk(fname * ".vtu")
+            test_vtk_grid(data, grid)
+            @test keys(data.point_data) == Set(["u_bc"])
+            @test data.point_data["u_bc"] == [abs(x[1]) ≈ 1 for x in get_node_coordinate.(getnodes(grid))]
         end
     end
 
@@ -60,7 +132,11 @@ import SHA
                 write_solution(vtk, dh, a)
             end
             @test Ferrite.write_discontinuous(v)
-            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "4039e17bf22ba76b377d65e455af059a658257de"
+            data = read_vtk(fname * ".vtu")
+            point_nodes = test_vtk_grid(data, grid; discontinuous = true)
+            xs = get_node_coordinate.(getnodes(grid))[point_nodes]
+            @test keys(data.point_data) == Set(["u"])
+            @test data.point_data["u"] ≈ [round(Int, sum(y -> y^2, x)) for x in xs]
         end
 
         ip = DiscontinuousLagrange{RefTetrahedron, 1}()
@@ -82,19 +158,39 @@ import SHA
             fname = joinpath(tmp, "discontinuous_exports_of_continuous_field")
             v = VTKGridFile(fname, dh) do vtk::VTKGridFile
                 write_solution(vtk, dh, a)
-                write_solution(vtk, dh, a2, "_bc")
+                write_solution(vtk, dh, a2, "_applied")
                 write_node_data(vtk, nodedata_v, "nodedata_v")
                 Ferrite.write_constraints(vtk, ch)
             end
             @test Ferrite.write_discontinuous(v)
-            @test bytes2hex(open(SHA.sha1, fname * ".vtu")) == "8c0af3927f844cd9260640ece23296f06b24bfc4"
+            data = read_vtk(fname * ".vtu")
+            point_nodes = test_vtk_grid(data, grid; discontinuous = true)
+            xs = get_node_coordinate.(getnodes(grid))[point_nodes]
+            on_left = [x[1] ≈ -1 for x in xs]
+            on_right = [x[1] ≈ 1 for x in xs]
+            @test keys(data.point_data) == Set(["u", "v", "u_applied", "v_applied", "nodedata_v", "u_bc", "v_bc"])
+            @test data.point_data["u"] ≈ [round(Int, sum(y -> y^2, x)) for x in xs]
+            @test data.point_data["v"] ≈ data.point_data["u"]
+            @test data.point_data["nodedata_v"] ≈ data.point_data["u"]
+            # The discontinuous field :u is only constrained in the cells with a facet in the set
+            u_applied = zeros(length(point_nodes))
+            point_offsets = cumsum([0; [Ferrite.nnodes(cell) for cell in getcells(grid)]])
+            for (cellid, facetid) in getfacetset(grid, "left")
+                facetnodes = Ferrite.facets(getcells(grid, cellid))[facetid]
+                for (i, node) in enumerate(Ferrite.get_node_ids(getcells(grid, cellid)))
+                    node in facetnodes && (u_applied[point_offsets[cellid] + i] = 1)
+                end
+            end
+            @test data.point_data["u_applied"] == u_applied
+            @test data.point_data["v_applied"] == 2 .* on_right
+            @test data.point_data["u_bc"] == on_left
+            @test data.point_data["v_bc"] == on_right
         end
 
         # Produce a u such that the overall shape is f(x, xc) = 2 * (x[1]^2 - x[2]^2) - (xc[1]^2 - xc[2]^2)
-        # where xc is the center point of the cell. To avoid floating point issues for the hash,
-        # we test that all values are approximately an integer, and round to integers before storing.
+        # where xc is the center point of the cell.
+        f(z) = z[1]^2 - z[2]^2
         function calculate_u(dh)
-            f(z) = z[1]^2 - z[2]^2
             u = zeros(ndofs(dh))
             ip = Ferrite.getfieldinterpolation(dh, (1, 1)) # Only one subdofhandler and one field.
             cv = CellValues(QuadratureRule{RefQuadrilateral}(:lobatto, 2), ip)
@@ -106,12 +202,7 @@ import SHA
                     x = spatial_coordinate(cv, q_point, getcoordinates(cell))
                     for i in 1:getnbasefunctions(cv)
                         δu = shape_value(cv, q_point, i)
-                        val = δu * (f(x) * 2 - f(xc))
-                        intval = round(Int, val)
-                        # Ensure output unaffected by floating point errors,
-                        # as we will compare vtk output with a hash
-                        @assert abs(val - intval) < sqrt(eps())
-                        u[celldofs(cell)[i]] += intval
+                        u[celldofs(cell)[i]] += δu * (f(x) * 2 - f(xc))
                     end
                 end
             end
@@ -129,19 +220,26 @@ import SHA
 
             u_dg = calculate_u(dh_dg)
 
-            testhash = "f72a6106e1b0ea8f035e0116871857b25b079d9d"
-
             fname1 = joinpath(tmp, "discont_kwarg")
             VTKGridFile(fname1, grid; write_discontinuous = true) do vtk
                 write_solution(vtk, dh_dg, u_dg)
             end
-            @test bytes2hex(open(SHA.sha1, fname1 * ".vtu")) == testhash
+            data = read_vtk(fname1 * ".vtu")
+            point_nodes = test_vtk_grid(data, grid; discontinuous = true)
+            expected_u = Float64[]
+            for cell in getcells(grid)
+                xs = get_node_coordinate.(getnodes(grid, collect(cell.nodes)))
+                xc = sum(xs) / length(xs)
+                append!(expected_u, [2 * f(x) - f(xc) for x in xs])
+            end
+            @test keys(data.point_data) == Set(["u"])
+            @test data.point_data["u"] ≈ expected_u
 
             fname2 = joinpath(tmp, "discont_auto")
             VTKGridFile(fname2, dh_dg) do vtk
                 write_solution(vtk, dh_dg, u_dg)
             end
-            @test bytes2hex(open(SHA.sha1, fname2 * ".vtu")) == testhash
+            @test isequal(read_vtk(fname2 * ".vtu"), data)
         end
     end
 
@@ -162,7 +260,88 @@ import SHA
                 @test Ferrite.write_cellset(vtk, grid) === vtk
             end
             @test v isa VTKGridFile
-            @test bytes2hex(open(SHA.sha1, manual * ".vtu")) == bytes2hex(open(SHA.sha1, auto * ".vtu"))
+            data = read_vtk(manual * ".vtu")
+            test_vtk_grid(data, grid)
+            @test keys(data.cell_data) == Set(["set1", "set2"])
+            @test data.cell_data["set1"] == [1, 1, 0, 0]
+            @test data.cell_data["set2"] == [1, 1, 1, 1]
+            @test isequal(read_vtk(auto * ".vtu"), data)
+
+            # Test prefix and suffix for all cell sets.
+            prefixed = joinpath(tmp, "prefixed")
+            VTKGridFile(prefixed, grid) do vtk
+                @test Ferrite.write_cellset(vtk, grid; prefix = "run1_") === vtk
+            end
+            prefixed_data = read_vtk(prefixed * ".vtu")
+            @test keys(prefixed_data.cell_data) == Set(["run1_set1", "run1_set2"])
+            @test prefixed_data.cell_data["run1_set1"] == [1, 1, 0, 0]
+            @test prefixed_data.cell_data["run1_set2"] == [1, 1, 1, 1]
+
+            suffixed = joinpath(tmp, "suffixed")
+            VTKGridFile(suffixed, grid) do vtk
+                @test Ferrite.write_cellset(vtk, grid; suffix = "_final") === vtk
+            end
+            suffixed_data = read_vtk(suffixed * ".vtu")
+            @test keys(suffixed_data.cell_data) == Set(["set1_final", "set2_final"])
+
+            prefixed_suffixed = joinpath(tmp, "prefixed_suffixed")
+            VTKGridFile(prefixed_suffixed, grid) do vtk
+                @test Ferrite.write_cellset(vtk, grid; prefix = "run1_", suffix = "_final") === vtk
+            end
+            prefixed_suffixed_data = read_vtk(prefixed_suffixed * ".vtu")
+            @test keys(prefixed_suffixed_data.cell_data) == Set(["run1_set1_final", "run1_set2_final"])
+
+            # Test the single-cell-set overload forwards keyword arguments.
+            single = joinpath(tmp, "single")
+            VTKGridFile(single, grid) do vtk
+                @test Ferrite.write_cellset(vtk, grid, "set1"; prefix = "run1_", suffix = "_final") === vtk
+            end
+            single_data = read_vtk(single * ".vtu")
+            @test keys(single_data.cell_data) == Set(["run1_set1_final"])
+            @test single_data.cell_data["run1_set1_final"] == [1, 1, 0, 0]
+        end
+    end
+    @testset "quadratic cells without grid generator" begin
+        # Parametric coordinates of the VTK cells in [0, 1]^3, as returned by
+        # `vtkCell::GetParametricCoords` (vtkQuadraticTetra, vtkTriQuadraticHexahedron and
+        # vtkBiQuadraticQuadraticWedge).
+        vtk_coords = [
+            QuadraticTetrahedron => [
+                (0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1),
+                (0.5, 0, 0), (0.5, 0.5, 0), (0, 0.5, 0), (0, 0, 0.5), (0.5, 0, 0.5), (0, 0.5, 0.5),
+            ],
+            QuadraticHexahedron => [
+                (0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 1, 0), (0, 0, 1), (1, 0, 1), (1, 1, 1), (0, 1, 1),
+                (0.5, 0, 0), (1, 0.5, 0), (0.5, 1, 0), (0, 0.5, 0), (0.5, 0, 1), (1, 0.5, 1),
+                (0.5, 1, 1), (0, 0.5, 1), (0, 0, 0.5), (1, 0, 0.5), (1, 1, 0.5), (0, 1, 0.5),
+                (0, 0.5, 0.5), (1, 0.5, 0.5), (0.5, 0, 0.5), (0.5, 1, 0.5), (0.5, 0.5, 0), (0.5, 0.5, 1),
+                (0.5, 0.5, 0.5),
+            ],
+            QuadraticWedge => [
+                (0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 1), (0, 1, 1),
+                (0.5, 0, 0), (0.5, 0.5, 0), (0, 0.5, 0), (0.5, 0, 1), (0.5, 0.5, 1), (0, 0.5, 1),
+                (0, 0, 0.5), (1, 0, 0.5), (0, 1, 0.5), (0.5, 0, 0.5), (0.5, 0.5, 0.5), (0, 0.5, 0.5),
+            ],
+        ]
+        mktempdir() do tmp
+            for (C, coords) in vtk_coords
+                @testset "$C" begin
+                    # A single cell with the nodes placed at the reference coordinates, mapped
+                    # to [0, 1]^3, such that each node's position identifies it.
+                    ip = geometric_interpolation(C)
+                    ξs = Ferrite.reference_coordinates(ip)
+                    to_unit(ξ) = getrefshape(ip) === RefHexahedron ? (ξ + ones(ξ)) / 2 : ξ
+                    grid = Grid([C(ntuple(identity, length(ξs)))], [Node(to_unit(ξ)) for ξ in ξs])
+                    fname = joinpath(tmp, string(C))
+                    VTKGridFile(fname, grid) do vtk
+                    end
+                    data = read_vtk(fname * ".vtu")
+                    @test data.celltypes == [Ferrite.cell_to_vtkcell(C).vtk_id]
+                    connectivity = only(data.cells)
+                    @test length(connectivity) == length(coords)
+                    @test data.points[:, connectivity] ≈ reduce(hcat, collect.(coords))
+                end
+            end
         end
     end
     @testset "type promotion" begin
@@ -188,22 +367,21 @@ import SHA
         add!(dofhandler, :displacement, ip^3)
         close!(dofhandler)
         u = rand(ndofs(dofhandler))
-        dofhandlerfilename = "dofhandler-no-views"
+        tmp = mktempdir()
+        dofhandlerfilename = joinpath(tmp, "dofhandler-no-views")
         VTKGridFile(dofhandlerfilename, grid) do vtk::VTKGridFile
             @test write_solution(vtk, dofhandler, u) === vtk
         end
-        dofhandler_views_filename = "dofhandler-views"
+        dofhandler_views_filename = joinpath(tmp, "dofhandler-views")
         VTKGridFile(dofhandler_views_filename, grid) do vtk::VTKGridFile
             @test write_solution(vtk, dofhandler, (@view u[1:end])) === vtk
         end
 
-        # test the sha of the file
-        sha = bytes2hex(open(SHA.sha1, dofhandlerfilename * ".vtu"))
-        sha_views = bytes2hex(open(SHA.sha1, dofhandler_views_filename * ".vtu"))
-
-        @test sha == sha_views
-        rm(dofhandlerfilename * ".vtu")
-        rm(dofhandler_views_filename * ".vtu")
+        # test that the content of the files is the same
+        data = read_vtk(dofhandlerfilename * ".vtu")
+        @test keys(data.point_data) == Set(["temperature", "displacement"])
+        @test data.point_data["temperature"] ≈ evaluate_at_grid_nodes(dofhandler, u, :temperature)
+        @test isequal(read_vtk(dofhandler_views_filename * ".vtu"), data)
     end
     @testset "discontinuous_projection" begin
         mktempdir() do tmp
@@ -245,8 +423,72 @@ import SHA
                 write_solution(vtk, dh, u)
             end
 
-            sha = bytes2hex(open(SHA.sha1, joinpath(tmp, "output") * ".vtu"))
-            @test sha == "571c8a348d8e34bb0a1e0b9a2d9343e973d7c1f9"
+            data = read_vtk(joinpath(tmp, "output") * ".vtu")
+            test_vtk_grid(data, grid; discontinuous = true)
+            # The vector dofs of each cell are ordered by node, 2D vectors are padded with zeros
+            expected_u = reduce(hcat, [reshape(u[celldofs(dh, i)], 2, :); 0 0] for i in 1:getncells(grid))
+            @test keys(data.point_data) == Set(["u"])
+            @test data.point_data["u"] ≈ expected_u
         end
     end
+
+    @testset "VTK export prefix and suffix" begin
+        mktempdir() do tmp
+            grid = generate_grid(Quadrilateral, (1, 1))
+            addcellset!(grid, "cells", 1:1)
+            addnodeset!(grid, "right", x -> x[1] ≈ 1.0)
+
+            dh = DofHandler(grid)
+            add!(dh, :temperature, Lagrange{RefQuadrilateral, 1}())
+            close!(dh)
+
+            u = collect(1.0:ndofs(dh))
+            facetset = getfacetset(grid, "left")
+
+            cases = [
+                ("default", "", "", "temperature", "cells", "left", "right"),
+                ("prefix", "run1_", "", "run1_temperature", "run1_cells", "run1_left", "run1_right"),
+                ("suffix", "", "_final", "temperature_final", "cells_final", "left_final", "right_final"),
+                ("both", "run1_", "_final", "run1_temperature_final", "run1_cells_final", "run1_left_final", "run1_right_final"),
+            ]
+
+            baseline = nothing
+
+            for (filename, prefix, suffix, solution_name, cellset_name, facetset_name, nodeset_name) in cases
+                filepath = joinpath(tmp, filename)
+
+                VTKGridFile(filepath, grid) do vtk
+                    write_solution(vtk, dh, u; prefix, suffix)
+                    Ferrite.write_cellset(vtk, grid; prefix, suffix)
+                    Ferrite.write_facetset(vtk, grid, facetset, "left"; prefix, suffix)
+                    Ferrite.write_nodeset(vtk, grid, "right"; prefix, suffix)
+                end
+
+                data = read_vtk(filepath * ".vtu")
+
+                @test solution_name in keys(data.point_data)
+                @test cellset_name in keys(data.cell_data)
+                @test facetset_name in keys(data.point_data)
+                @test nodeset_name in keys(data.point_data)
+
+                @test data.point_data[solution_name] ≈ u[[1, 2, 4, 3]]
+                @test data.cell_data[cellset_name] == [1]
+
+                if baseline === nothing
+                    baseline = (
+                        solution = copy(data.point_data[solution_name]),
+                        facetset = copy(data.point_data[facetset_name]),
+                        nodeset = copy(data.point_data[nodeset_name]),
+                        cellset = copy(data.cell_data[cellset_name]),
+                    )
+                else
+                    @test data.point_data[solution_name] ≈ baseline.solution
+                    @test data.point_data[facetset_name] == baseline.facetset
+                    @test data.point_data[nodeset_name] == baseline.nodeset
+                    @test data.cell_data[cellset_name] == baseline.cellset
+                end
+            end
+        end
+    end
+
 end

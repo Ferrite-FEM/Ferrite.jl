@@ -1,16 +1,7 @@
 # Imports for parallel (isolated) test execution:
 using LinearAlgebra
 using WriteVTK
-import SHA
-
-# to test vtk-files
-OVERWRITE_CHECKSUMS = false
-checksums_file = joinpath(dirname(@__FILE__), "checksums.sha1")
-if OVERWRITE_CHECKSUMS
-    csio = open(checksums_file, "w")
-else
-    csio = open(checksums_file, "r")
-end
+include("vtk_test_utils.jl")
 
 @testset "Grid, DofHandler, vtk" begin
     @testset "$celltype" for (celltype, dim) in (
@@ -28,8 +19,8 @@ end
         )
 
         # create test grid, do some operations on it and then test
-        # the resulting sha1 of the stored vtk file
-        # after manually checking the exported vtk
+        # the content of the stored vtk file
+        tmp = mktempdir()
         nels = ntuple(x -> 5, dim)
         right = Vec{dim, Float64}(ntuple(x -> 1.5, dim))
         left = -right
@@ -44,7 +35,7 @@ end
         addfacetset!(grid, "right-facetset", getfacetset(grid, "right"))
         addnodeset!(grid, "middle-nodes", x -> norm(x) < radius)
 
-        gridfilename = "grid-$(repr(celltype))"
+        gridfilename = joinpath(tmp, "grid-$(repr(celltype))")
         VTKGridFile(gridfilename, grid) do vtk::VTKGridFile
             @test Ferrite.write_cellset(vtk, grid, "cell-1") === vtk
             @test Ferrite.write_cellset(vtk, grid, "middle-cells") === vtk
@@ -52,14 +43,18 @@ end
             @test Ferrite.write_facetset(vtk, grid, "right") === vtk
         end
 
-        # test the sha of the file
-        sha = bytes2hex(open(SHA.sha1, gridfilename * ".vtu"))
-        if OVERWRITE_CHECKSUMS
-            write(csio, sha, "\n")
-        else
-            @test sha in split(chomp(readline(csio)))
-            rm(gridfilename * ".vtu")
-        end
+        # test the content of the file
+        data = read_vtk(gridfilename * ".vtu")
+        test_vtk_grid(data, grid)
+        xs = get_node_coordinate.(getnodes(grid))
+        on_left = [x[1] ≈ 2left[1] for x in xs]
+        on_right = [x[1] ≈ 2right[1] for x in xs]
+        @test keys(data.cell_data) == Set(["cell-1", "middle-cells"])
+        @test data.cell_data["cell-1"] == [i == 1 for i in 1:getncells(grid)]
+        @test data.cell_data["middle-cells"] == [all(n -> norm(xs[n]) < radius, cell.nodes) for cell in getcells(grid)]
+        @test keys(data.point_data) == Set(["middle-nodes", "right"])
+        @test data.point_data["middle-nodes"] == [norm(x) < radius for x in xs]
+        @test data.point_data["right"] == on_right
 
         # Create a DofHandler, add some things, write to file and
         # then check the resulting sha
@@ -85,20 +80,30 @@ end
         apply_analytical!(u, dofhandler, :displacement, x -> -2x)
         apply!(u, ch)
 
-        dofhandlerfilename = "dofhandler-$(repr(celltype))"
+        dofhandlerfilename = joinpath(tmp, "dofhandler-$(repr(celltype))")
         VTKGridFile(dofhandlerfilename, grid) do vtk::VTKGridFile
             @test Ferrite.write_constraints(vtk, ch) === vtk
             @test write_solution(vtk, dofhandler, u) === vtk
         end
 
-        # test the sha of the file
-        sha = bytes2hex(open(SHA.sha1, dofhandlerfilename * ".vtu"))
-        if OVERWRITE_CHECKSUMS
-            write(csio, sha, "\n")
-        else
-            @test sha in split(chomp(readline(csio)))
-            rm(dofhandlerfilename * ".vtu")
+        # test the content of the file
+        data = read_vtk(dofhandlerfilename * ".vtu")
+        test_vtk_grid(data, grid)
+        @test isempty(data.cell_data)
+        @test keys(data.point_data) == Set(["temperature", "displacement", "temperature_bc", "displacement_bc"])
+        # The Dirichlet conditions override the analytical values on the boundaries
+        temperature = [r ? 1.0 : l ? 4.0 : 2x[1] for (x, l, r) in zip(xs, on_left, on_right)]
+        displacement = [l ? Vec{dim}(d -> d) : -2x for (x, l) in zip(xs, on_left)]
+        @test data.point_data["temperature"] ≈ temperature
+        @test data.point_data["displacement"] ≈ vtk_values(displacement)
+        # write_constraints only marks the vertices of the constrained facets
+        is_vertex = falses(getnnodes(grid))
+        for cell in getcells(grid)
+            is_vertex[collect(Ferrite.vertices(cell))] .= true
         end
+        @test data.point_data["temperature_bc"] == (on_left .| on_right) .& is_vertex
+        left_vertices = on_left .& is_vertex
+        @test data.point_data["displacement_bc"] == (dim == 1 ? left_vertices : repeat(left_vertices', dim))
 
         minv, maxv = Ferrite.bounding_box(grid)
         @test minv ≈ 2left
@@ -113,16 +118,8 @@ end
 
 end # of testset
 
-close(csio)
-
 @testset "vtk tensor export" begin
-    # open files
-    checksums_file_tensors = joinpath(dirname(@__FILE__), "checksums2.sha1")
-    if OVERWRITE_CHECKSUMS
-        csio = open(checksums_file_tensors, "w")
-    else
-        csio = open(checksums_file_tensors, "r")
-    end
+    tmp = mktempdir()
 
     # 3D grid
     grid = generate_grid(Hexahedron, (1, 1, 1))
@@ -131,7 +128,7 @@ close(csio)
     tensor_data = [Tensor{2, 3}(ntuple(i -> i, 9)) for j in 1.0:8.0]
     vector_data = [Vec{3}(ntuple(i -> i, 3)) for j in 1:8]
 
-    filename_3d = "test_vtk_3d"
+    filename_3d = joinpath(tmp, "test_vtk_3d")
     VTKGridFile(filename_3d, grid) do vtk::VTKGridFile
         @test write_node_data(vtk, sym_tensor_data, "symmetric tensor") === vtk
         @test write_node_data(vtk, tensor_data, "tensor") === vtk
@@ -146,7 +143,7 @@ close(csio)
     tensor_data_1D = [SymmetricTensor{2, 1}(ntuple(i -> i, 1)) for j in 1.0:4.0]
     vector_data = [Vec{2}(ntuple(i -> i, 2)) for j in 1:4]
 
-    filename_2d = "test_vtk_2d"
+    filename_2d = joinpath(tmp, "test_vtk_2d")
     VTKGridFile(filename_2d, grid) do vtk::VTKGridFile
         @test write_node_data(vtk, sym_tensor_data, "symmetric tensor") === vtk
         @test write_node_data(vtk, tensor_data, "tensor") === vtk
@@ -154,19 +151,30 @@ close(csio)
         @test write_node_data(vtk, vector_data, "vector") === vtk
     end
 
-    # test the shas of the files
-    files = [filename_3d, filename_2d]
-    for filename in files
-        sha = bytes2hex(open(SHA.sha1, filename * ".vtu"))
-        if OVERWRITE_CHECKSUMS
-            write(csio, sha, "\n")
-        else
-            @test sha in split(chomp(readline(csio)))
-            rm(filename * ".vtu")
-        end
-    end
+    # test the content of the files, the tensors are written in Voigt order:
+    # [11, 22, 33, 23, 13, 12, 32, 31, 21]
+    data = read_vtk(filename_3d * ".vtu")
+    @test keys(data.point_data) == Set(["symmetric tensor", "tensor", "vector"])
+    # SymmetricTensor{2, 3}((1, ..., 6)) has the components (11, 21, 31, 22, 32, 33) = (1, ..., 6)
+    @test data.point_data["symmetric tensor"] == repeat([1, 4, 6, 5, 3, 2], 1, 8)
+    @test data.component_names["symmetric tensor"] == ["xx", "yy", "zz", "yz", "xz", "xy"]
+    # Tensor{2, 3}((1, ..., 9)) is column major
+    @test data.point_data["tensor"] == repeat([1, 5, 9, 8, 7, 4, 6, 3, 2], 1, 8)
+    @test data.component_names["tensor"] == ["xx", "yy", "zz", "yz", "xz", "xy", "zy", "zx", "yx"]
+    @test data.point_data["vector"] == repeat([1, 2, 3], 1, 8)
+    @test data.component_names["vector"] == ["x", "y", "z"]
 
-    close(csio)
+    data = read_vtk(filename_2d * ".vtu")
+    @test keys(data.point_data) == Set(["symmetric tensor", "tensor", "tensor_1d", "vector"])
+    @test data.point_data["symmetric tensor"] == repeat([1, 3, 2], 1, 4)
+    @test data.component_names["symmetric tensor"] == ["xx", "yy", "xy"]
+    @test data.point_data["tensor"] == repeat([1, 4, 3, 2], 1, 4)
+    @test data.component_names["tensor"] == ["xx", "yy", "xy", "yx"]
+    @test data.point_data["tensor_1d"] == ones(4)
+    @test data.component_names["tensor_1d"] == ["xx"]
+    # 2D vectors are padded with zeros
+    @test data.point_data["vector"] == repeat([1, 2, 0], 1, 4)
+    @test data.component_names["vector"] == ["x", "y", "z"]
 end
 
 @testset "Grid utils" begin
@@ -716,46 +724,64 @@ end
     @test isapprox(jump_int, 0.0, atol = 1.0e-6)
 end
 
-@testset "grid coloring" begin
-    function test_coloring(grid, cellset = 1:getncells(grid))
-        for alg in (ColoringAlgorithm.Greedy, ColoringAlgorithm.WorkStream)
-            color_vectors = create_coloring(grid, cellset; alg = alg)
-            @test sum(length, color_vectors, init = 0) == length(cellset)
-            @test union!(Set{Int}(), color_vectors...) == Set(cellset)
-            conn = Ferrite.create_incidence_matrix(grid, cellset)
-            for color in color_vectors, c1 in color, c2 in color
-                @test !conn[c1, c2]
-            end
+@testset "interfaceskeleton" begin
+    # Interfaces of the grid, independently derived from the facet skeleton and the
+    # facet neighborhood
+    function reference_interfaces(grid, topology)
+        ref = NTuple{2, FacetIndex}[]
+        neighborhood = Ferrite.get_facet_facet_neighborhood(topology, grid)
+        for facet in Ferrite.facetskeleton(topology, grid)
+            neighbors = neighborhood[facet[1], facet[2]]
+            isempty(neighbors) && continue
+            fb = neighbors[1]
+            push!(ref, (FacetIndex(facet[1], facet[2]), FacetIndex(fb[1], fb[2])))
         end
+        return ref
     end
-    test_coloring(generate_grid(Line, (5,)))
-    test_coloring(generate_grid(QuadraticLine, (5,)))
-    test_coloring(generate_grid(Triangle, (5, 5)))
-    test_coloring(generate_grid(QuadraticTriangle, (5, 5)))
-    test_coloring(generate_grid(Quadrilateral, (5, 5)))
-    test_coloring(generate_grid(QuadraticQuadrilateral, (5, 5)))
-    test_coloring(generate_grid(Tetrahedron, (5, 5, 5)))
-    # test_coloring(generate_grid(QuadraticTetrahedron, (5, 5, 5)))
-    test_coloring(generate_grid(Hexahedron, (5, 5, 5)))
-    # test_coloring(generate_grid(QuadraticHexahedron, (5, 5, 5)))
+    # The skeleton matches the reference enumeration (content *and* order), is cached
+    # in the topology, and is what InterfaceIterator visits
+    for grid in (
+            generate_grid(Quadrilateral, (5, 4)),
+            generate_grid(Triangle, (3, 3)),
+            generate_grid(Tetrahedron, (2, 2, 2)),
+            generate_grid(Hexahedron, (2, 2, 2)),
+            generate_grid(Line, (5,)),
+        )
+        topology = ExclusiveTopology(grid)
+        skeleton = @inferred interfaceskeleton(topology, grid)
+        @test skeleton == reference_interfaces(grid, topology)
+        @test (@inferred interfaceskeleton(topology, grid)) === skeleton # cached
+        @test length(InterfaceIterator(grid, topology)) == length(skeleton)
+        visited = NTuple{2, FacetIndex}[]
+        for ic in InterfaceIterator(grid, topology)
+            fa = FacetIndex(cellid(ic.a), ic.a.current_facet_id)
+            fb = FacetIndex(cellid(ic.b), ic.b.current_facet_id)
+            push!(visited, (fa, fb))
+        end
+        @test visited == skeleton
+    end
 
-    # color only a subset
-    test_coloring(generate_grid(Line, (5,)), 1:3)
-    test_coloring(generate_grid(Triangle, (5, 5)), Set{Int}(1:(3^2)))
-    test_coloring(generate_grid(Quadrilateral, (5, 5)), Set{Int}(1:(3^2)))
-    test_coloring(generate_grid(Tetrahedron, (5, 5, 5)), Set{Int}(1:(3^3)))
-    test_coloring(generate_grid(Hexahedron, (5, 5, 5)), Set{Int}(1:(3^3)))
-    # unconnected subset
-    test_coloring(generate_grid(Triangle, (10, 10)), union(Set(1:10), Set(70:80)))
-
-    #Special case with one and zero elements in the sets
-    test_coloring(generate_grid(Quadrilateral, (2, 2)), [1])
-    test_coloring(generate_grid(Quadrilateral, (2, 2)), [])
-
-    # duplicate entries in the cellset are ignored
-    let grid = generate_grid(Quadrilateral, (3, 3))
-        @test create_coloring(grid, [2, 2, 4]) == create_coloring(grid, [2, 4])
-        @test create_coloring(grid, [5, 5]) == create_coloring(grid, [5])
+    # InterfaceIterator over an explicit subset of the skeleton
+    let grid = generate_grid(Quadrilateral, (5, 4)), topology = ExclusiveTopology(grid)
+        dh = DofHandler(grid)
+        add!(dh, :u, DiscontinuousLagrange{RefQuadrilateral, 1}())
+        close!(dh)
+        skeleton = interfaceskeleton(topology, grid)
+        subset = skeleton[1:2:end]
+        n = 0
+        for ic in InterfaceIterator(dh, subset)
+            n += 1
+            @test length(interfacedofs(ic)) == 8
+            fa = FacetIndex(cellid(ic.a), ic.a.current_facet_id)
+            fb = FacetIndex(cellid(ic.b), ic.b.current_facet_id)
+            @test (fa, fb) == subset[n]
+        end
+        @test n == length(subset)
+        # Grid based iterator with a subset works too
+        @test length(InterfaceIterator(grid, subset)) == length(subset)
+        @test count(Returns(true), InterfaceIterator(grid, subset)) == length(subset)
+        # The set is duck typed: any iterable of facet pairs works
+        @test count(Returns(true), InterfaceIterator(grid, Iterators.take(subset, 3))) == 3
     end
 end
 
@@ -872,10 +898,16 @@ end
 
     @testset "paraview_collection" begin
         grid = generate_grid(Triangle, (2, 2))
-        celldata = rand(getncells(grid))
+        celldata1 = rand(getncells(grid))
+        celldata2 = [rand(Tensor{2, 3}) for _ in 1:getncells(grid)]
+        celldata3 = [rand(SymmetricTensor{2, 3}) for _ in 1:getncells(grid)]
+        celldata4 = rand(3, getncells(grid)) # (ncomponents, ncells)
         pvd = WriteVTK.paraview_collection("collection")
         vtk1 = VTKGridFile("file1", grid)
-        @test write_cell_data(vtk1, celldata, "celldata") === vtk1
+        @test write_cell_data(vtk1, celldata1, "celldata1") === vtk1
+        @test write_cell_data(vtk1, celldata2, "celldata2") === vtk1
+        @test write_cell_data(vtk1, celldata3, "celldata3") === vtk1
+        @test write_cell_data(vtk1, celldata4, "celldata4") === vtk1
         @assert isopen(vtk1.vtk)
         pvd[0.5] = vtk1
         @test !isopen(vtk1.vtk) # Should be closed when adding it

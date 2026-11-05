@@ -1374,6 +1374,56 @@ end # testset
 
 end # testset
 
+@testset "periodic bc: legacy facet pairs" begin
+    # The legacy constructor, which takes facetset name pairs, also locks the corners with
+    # a Dirichlet constraint. Check that this gives the same constraints as the
+    # `collect_periodic_facets` constructor with a Dirichlet on the corners added after.
+    function get_constraints(ch)
+        return Dict(
+            d => (ch.inhomogeneities[i], ch.dofcoefficients[i] === nothing ? nothing : sort(ch.dofcoefficients[i]))
+                for (i, d) in pairs(ch.prescribed_dofs)
+        )
+    end
+    function compare_with_legacy(grid, ip, facet_pairs; f = nothing, components = nothing)
+        dh = DofHandler(grid)
+        add!(dh, :u, ip)
+        close!(dh)
+        # Legacy
+        ch_legacy = ConstraintHandler(dh)
+        pdbc = PeriodicDirichlet(:u, facet_pairs, f, components)
+        @test_deprecated r"legacy code for PeriodicDirichlet" add!(ch_legacy, pdbc)
+        close!(ch_legacy)
+        # Explicit corners
+        facet_map = collect_periodic_facets(grid, facet_pairs[1]...)
+        for facet_pair in facet_pairs[2:end]
+            collect_periodic_facets!(facet_map, grid, facet_pair...)
+        end
+        corners = Set(i for (i, n) in pairs(getnodes(grid)) if all(x -> abs(x) ≈ 1, get_node_coordinate(n)))
+        @test length(corners) == 2^Ferrite.getspatialdim(grid)
+        n = components === nothing ? 1 : length(components)
+        g = f === nothing ? (x, t) -> (n == 1 ? 0.0 : zeros(n)) : f
+        ch = ConstraintHandler(dh)
+        add!(ch, PeriodicDirichlet(:u, facet_map, f, components))
+        add!(ch, Dirichlet(:u, corners, g, components))
+        close!(ch)
+        @test get_constraints(ch_legacy) == get_constraints(ch)
+        return
+    end
+
+    # 2D, scalar
+    grid = generate_grid(Quadrilateral, (3, 3))
+    ip = Lagrange{RefQuadrilateral, 1}()
+    compare_with_legacy(grid, ip, ["left" => "right", "bottom" => "top"])
+    # 2D, vector, all and some components
+    compare_with_legacy(grid, ip^2, ["left" => "right", "bottom" => "top"]; components = [1, 2])
+    compare_with_legacy(grid, ip^2, ["left" => "right", "bottom" => "top"]; components = [2])
+    # 2D, inhomogeneous
+    compare_with_legacy(grid, ip, ["left" => "right", "bottom" => "top"]; f = (x, t) -> x[1] + 2x[2])
+    # 3D
+    grid = generate_grid(Hexahedron, (2, 2, 2))
+    compare_with_legacy(grid, Lagrange{RefHexahedron, 1}(), ["left" => "right", "bottom" => "top", "front" => "back"])
+end # testset
+
 @testset "Affine constraints with master dofs that are prescribed" begin
     grid = generate_grid(Quadrilateral, (2, 2))
     dh = DofHandler(grid); add!(dh, :u, Lagrange{RefQuadrilateral, 1}()); close!(dh)
@@ -1500,14 +1550,278 @@ end # testset
     end # subtestset
 
 
-    @testset "error paths" begin
+    # Below we test if the untangling in close! can untangle the following system:
+    #
+    # u1 = u2 + u5
+    # u2 = u3 + 4*u10 + 4.0
+    # u9 = 3*u2 - 2.0
+    #
+    # A * u_c = C * u_f + g
+    # | 1  -1  ⋅ | |u1|   |1  ⋅||u5|   | 1.0|
+    # | ⋅   1  ⋅ | |u2| = |⋅  1||u3| + | 4.0|
+    # | ⋅  -3  1 | |u9|   |⋅  ⋅|        |-2.0|
+    #
+    # Solving this system we get
+    # |u1|   |1  1||u5|   | 5.0|
+    # |u2| = |0  1||u3| + | 4.0|
+    # |u9|   |0  3|       |10.0|
+
+    @testset "untangle constraints" begin
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, [2 => 1.0, 5 => 1.0], 1.0))
+        add!(ch, AffineConstraint(2, [3 => 1.0], 4.0))
+        add!(ch, AffineConstraint(9, [2 => 3.0], -2.0))
+        close!(ch)
+
+        correct_dc = [
+            [Pair(3, 1.0), Pair(5, 1.0)],
+            [Pair(3, 1.0)],
+            [Pair(3, 3.0)],
+        ]
+        correct_inhomogeneities = [5.0, 4.0, 10.0]
+
+        @test ch.dofcoefficients == correct_dc
+        @test ch.inhomogeneities ≈ correct_inhomogeneities
+
+        # Chain through a Dirichlet dof: the Dirichlet master is kept and its (time
+        # dependent) value enters the inhomogeneity in update!
+        ch = ConstraintHandler(dh)
+        add!(ch, Dirichlet(:u, getfacetset(grid, "left"), (x, t) -> 2.0 * t))
+        ldof = first(ch.prescribed_dofs)
+        @test ldof ∉ (6, 7, 9)
+        add!(ch, AffineConstraint(9, [6 => 1.0, ldof => 1.0], 0.0))
+        add!(ch, AffineConstraint(6, [7 => 2.0, ldof => 1.0], 1.0))
+        close!(ch)
+        update!(ch, 1.0)
+        i9, i6 = ch.dofmapping[9], ch.dofmapping[6]
+        @test ch.dofcoefficients[i9] == [ldof => 2.0, 7 => 2.0]
+        @test ch.dofcoefficients[i6] == [7 => 2.0, ldof => 1.0] # not tangled: untouched
+        @test ch.inhomogeneities[i9] ≈ 1.0 + 2 * 2.0
+        @test ch.inhomogeneities[i6] ≈ 1.0 + 2.0
+    end # subtestset
+
+    @testset "untangle edge cases" begin
+        # A constraint that simplifies to a constant must still be substituted:
+        # u1 = u2, u2 = u3 - 2 u4, u3 = u7 + 10, u4 = 0.5 u7 + 2  =>  u2 = 6, u1 = 6
         ch = ConstraintHandler(dh)
         add!(ch, AffineConstraint(1, [2 => 1.0], 0.0))
-        add!(ch, AffineConstraint(2, [3 => 1.0], 0.0))
-        @test_throws ErrorException("nested affine constraints currently not supported") close!(ch)
+        add!(ch, AffineConstraint(2, [3 => 1.0, 4 => -2.0], 0.0))
+        add!(ch, AffineConstraint(3, [7 => 1.0], 10.0))
+        add!(ch, AffineConstraint(4, [7 => 0.5], 2.0))
+        close!(ch)
+        @test ch.dofcoefficients[1:2] == [[], []]
+        @test ch.inhomogeneities[1:2] ≈ [6.0, 6.0]
+
+        # Coefficient vectors shared between constraints (or with the user) are not modified
+        entries = [3 => 1.0]
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, entries, 0.0))
+        add!(ch, AffineConstraint(2, entries, 0.0))
+        add!(ch, AffineConstraint(3, [4 => 1.0], 5.0))
+        close!(ch)
+        @test entries == [3 => 1.0]
+        @test ch.dofcoefficients[1:2] == [[4 => 1.0], [4 => 1.0]]
+        @test ch.inhomogeneities[1:2] ≈ [5.0, 5.0]
+
+        # Duplicate masters are summed, zero coefficients are dropped
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, [2 => 1.0, 5 => 1.0, 2 => 3.0], 0.0))
+        add!(ch, AffineConstraint(2, [5 => -0.25, 6 => 1.0], 0.0))
+        close!(ch)
+        @test ch.dofcoefficients[1] == [6 => 4.0]
+
+        # Solvable self loop: u1 = 0.5 u1 + u2 + 1  =>  u1 = 2 u2 + 2
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, [1 => 0.5, 2 => 1.0], 1.0))
+        close!(ch)
+        @test ch.dofcoefficients[1] == [2 => 2.0]
+        @test ch.inhomogeneities[1] ≈ 2.0
+
+        # Non-Int index type
+        ch = ConstraintHandler(Float64, Int32, dh)
+        add!(ch, AffineConstraint(Int32(1), [Int32(2) => 1.0], 1.0))
+        add!(ch, AffineConstraint(Int32(2), [Int32(3) => 2.0], 1.0))
+        close!(ch)
+        @test ch.dofcoefficients[1] == [Int32(3) => 2.0]
+        @test ch.dofcoefficients[1] isa Vector{Pair{Int32, Float64}}
+        @test ch.inhomogeneities[1] ≈ 2.0
+    end # subtestset
+
+    # Cyclic constraints are solvable when they are not redundant:
+    # u1 = 2 u2 + 1, u2 = u1 + u7 + 1  =>  u1 = -2 u7 - 3, u2 = -u7 - 2
+    @testset "untangle cyclic constraints" begin
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, [2 => 2.0], 1.0))
+        add!(ch, AffineConstraint(2, [1 => 1.0, 7 => 1.0], 1.0))
+        close!(ch)
+        @test ch.dofcoefficients == [[7 => -2.0], [7 => -1.0]]
+        @test ch.inhomogeneities ≈ [-3.0, -2.0]
+
+        # Large sparse cycles, with and without an external master. Each ring has
+        # u_i = 0.5 u_{i+1} + b, so all slaves equal 2b. Also check the promoted
+        # sparse factorization for Float32 and preservation of the stored types.
+        n = 128
+        ring_dh = DofHandler(generate_grid(Line, (n,)))
+        add!(ring_dh, :u, Lagrange{RefLine, 1}())
+        close!(ring_dh)
+        for T in (Float32, Float64), with_master in (false, true)
+            ring_ch = ConstraintHandler(T, Int32, ring_dh)
+            for i in 1:n
+                entries = [Int32(mod1(i + 1, n)) => T(0.5)]
+                with_master && push!(entries, Int32(n + 1) => one(T))
+                add!(ring_ch, AffineConstraint(Int32(i), entries, one(T)))
+            end
+            close!(ring_ch)
+            @test ring_ch.inhomogeneities ≈ fill(T(2), n)
+            expected = with_master ? [Int32(n + 1) => T(2)] : Pair{Int32, T}[]
+            @test all(c -> first.(c) == first.(expected), ring_ch.dofcoefficients)
+            @test all(c -> last.(c) ≈ last.(expected), ring_ch.dofcoefficients)
+            @test all(c -> c isa Vector{Pair{Int32, T}}, ring_ch.dofcoefficients)
+        end
+
+        # Singular large cycles must report the same error as small cycles.
+        ring_ch = ConstraintHandler(ring_dh)
+        for i in 1:n
+            add!(ring_ch, AffineConstraint(i, [mod1(i + 1, n) => 1.0], 0.0))
+        end
+        @test_throws ArgumentError close!(ring_ch)
+    end # subtestset
+
+    @testset "ill defined constraints error on close!" begin
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, [1 => 1.0], 0.0))
+        @test_throws ArgumentError close!(ch)
+
+        # redundant cycle: u1 = 2 u2, u2 = u1 / 2
+        ch = ConstraintHandler(dh)
+        add!(ch, AffineConstraint(1, [2 => 2.0], 0.0))
+        add!(ch, AffineConstraint(2, [1 => 0.5], 0.0))
+        @test_throws ArgumentError close!(ch)
     end # subtestset
 
 end # testset
+
+@testset "AffineConstraint without constrained dof" begin
+    grid = generate_grid(Line, (8,))
+    dh = DofHandler(grid); add!(dh, :u, Lagrange{RefLine, 1}()); close!(dh)
+
+    # Same as an AffineConstraint when the eliminated dof is preferred
+    ch1 = ConstraintHandler(dh)
+    add!(ch1, AffineConstraint(1, [2 => 2.0, 3 => 1.0], 1.0)); close!(ch1)
+    ch2 = ConstraintHandler(dh)
+    add!(ch2, AffineConstraint([1 => 1.0, 2 => -2.0, 3 => -1.0], 1.0; prefer = 1)); close!(ch2)
+    @test ch1.prescribed_dofs == ch2.prescribed_dofs
+    @test ch1.dofcoefficients == ch2.dofcoefficients
+    @test ch1.inhomogeneities == ch2.inhomogeneities
+
+    # Already constrained dofs are skipped, also when preferred
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:u, getfacetset(grid, "left"), x -> 2.0))
+    add!(ch, AffineConstraint([1 => 1.0, 2 => 1.0, 3 => 1.0], 6.0; prefer = 1))
+    close!(ch)
+    @test 1 in ch.prescribed_dofs && length(ch.prescribed_dofs) == 2
+    u = zeros(ndofs(dh)); u[2] = 1.5; apply!(u, ch)
+    @test u[1] ≈ 2 && u[1] + u[2] + u[3] ≈ 6
+
+    # Short rows first: u1 = 0 is eliminated before u1 + u2 = 0
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint([1 => 1.0, 2 => 1.0], 1.0))
+    add!(ch, AffineConstraint([1 => 2.0], 1.0))
+    close!(ch)
+    @test ch.prescribed_dofs == [1, 2]
+    u = zeros(ndofs(dh)); apply!(u, ch)
+    @test u[1:2] ≈ [0.5, 0.5]
+
+    # Cyclic pivots are untangled: u1 + u2 = 1, u1 - u2 = 0
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint([1 => 1.0, 2 => 1.0], 1.0))
+    add!(ch, AffineConstraint([1 => 1.0, 2 => -1.0], 0.0))
+    close!(ch)
+    u = zeros(ndofs(dh)); apply!(u, ch)
+    @test u[1:2] ≈ [0.5, 0.5]
+
+    # Duplicates merged, zeros dropped, threshold pivoting
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint([4 => 1.0, 5 => 1.0e-3, 4 => 1.0, 6 => 0.0], 2.0))
+    @test ch.unpivoted_constraints[1].entries == [4 => 2.0, 5 => 1.0e-3]
+    close!(ch)
+    @test ch.prescribed_dofs == [4]
+
+    # Redundant / inconsistent / no free dof
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint([1 => 1.0, 1 => -1.0], 0.0)); close!(ch)
+    @test isempty(ch.prescribed_dofs)
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint([1 => 1.0, 1 => -1.0], 1.0))
+    @test_throws ArgumentError close!(ch)
+    ch = ConstraintHandler(dh)
+    add!(ch, Dirichlet(:u, getfacetset(grid, "left"), x -> 0.0))
+    add!(ch, AffineConstraint(2, [3 => 1.0], 0.0))
+    add!(ch, AffineConstraint([1 => 1.0, 2 => 1.0], 1.0))
+    @test_throws ArgumentError close!(ch)
+
+    # Argument checks
+    @test_throws ArgumentError AffineConstraint([1 => 1.0, 2 => 1.0], 1.0; prefer = 3)
+    @test_throws ArgumentError AffineConstraint{Float64, Int}(1, [2 => 1.0], 1.0, 2)
+    @test_throws ArgumentError add!(ConstraintHandler(dh), AffineConstraint([ndofs(dh) + 1 => 1.0], 1.0))
+    @test_throws ArgumentError add!(ConstraintHandler(dh), AffineConstraint([0 => 1.0], 1.0))
+    # A preferred dof with a small coefficient is not used
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint([1 => 1.0, 2 => 0.05], 1.0; prefer = 2))
+    close!(ch)
+    @test ch.prescribed_dofs == [1]
+end
+
+@testset "AffineConstraint without constrained dof: zero mean on periodic Poisson" begin
+    grid = generate_grid(Quadrilateral, (8, 8))
+    ip = Lagrange{RefQuadrilateral, 1}()
+    dh = DofHandler(grid); add!(dh, :u, ip); close!(dh)
+    cv = CellValues(QuadratureRule{RefQuadrilateral}(2), ip)
+    function doassemble(K)
+        f = zeros(ndofs(dh)); w = zeros(ndofs(dh))
+        assembler = start_assemble(K, f)
+        ke = zeros(4, 4); fe = zeros(4)
+        for cell in CellIterator(dh)
+            reinit!(cv, cell)
+            fill!(ke, 0); fill!(fe, 0)
+            for qp in 1:getnquadpoints(cv)
+                dΩ = getdetJdV(cv, qp)
+                x = spatial_coordinate(cv, qp, getcoordinates(cell))
+                for i in 1:4
+                    δu = shape_value(cv, qp, i)
+                    fe[i] += sinpi(x[1]) * cospi(x[2]) * δu * dΩ
+                    w[celldofs(cell)[i]] += δu * dΩ
+                    for j in 1:4
+                        ke[i, j] += shape_gradient(cv, qp, i) ⋅ shape_gradient(cv, qp, j) * dΩ
+                    end
+                end
+            end
+            assemble!(assembler, celldofs(cell), ke, fe)
+        end
+        return K, f, w
+    end
+    _, _, w = doassemble(allocate_matrix(dh))
+    ch = ConstraintHandler(dh)
+    add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid)))
+    # ∫ u dΩ = 0, i.e. w ⋅ u = 0 with w_i = ∫ N_i dΩ
+    add!(ch, AffineConstraint([i => w[i] for i in 1:ndofs(dh)], 0.0))
+    close!(ch)
+    K, f, _ = doassemble(allocate_matrix(dh, ch))
+    K0 = copy(K); f0 = copy(f)
+    apply!(K, f, ch)
+    u = K \ f
+    apply!(u, ch)
+    @test abs(w ⋅ u) < 1.0e-12
+    # Periodic constraints are untouched (single master each) and only one dense row added
+    lens = sort(length.(ch.dofcoefficients))
+    @test lens[end] == length(ch.free_dofs) && all(==(1), lens[1:(end - 1)])
+    # The eliminated dof is not periodic
+    @test count(!isnothing, ch.dofcoefficients) == length(ch.prescribed_dofs)
+    # Weak form holds for constraint-satisfying test functions: C' (K u - f) = 0
+    C, _ = Ferrite.create_constraint_matrix(ch)
+    @test norm(C' * (K0 * u - f0)) < 1.0e-10
+    @test norm(u) > 0.01
+end
 
 @testset "local application of bc" begin
     grid = generate_grid(Quadrilateral, (5, 5))
@@ -1777,6 +2091,83 @@ end
     end
     @test K ≈ Kc ≈ Kfull
 end # testset
+
+@testset "keep_constrained = false with affine constraints" begin
+    # Regression test for https://github.com/Ferrite-FEM/Ferrite.jl/issues/1470: the
+    # entries that local condensation writes to for master dofs in other cells must be in
+    # the pattern also when the constrained dofs are eliminated from it.
+    function assemble_poisson(dh, ch, cv; keep_constrained)
+        K = allocate_matrix(dh, ch; keep_constrained)
+        f = zeros(ndofs(dh))
+        assembler = start_assemble(K, f)
+        n = ndofs_per_cell(dh)
+        Ke = zeros(n, n)
+        fe = zeros(n)
+        for cell in CellIterator(dh)
+            reinit!(cv, cell)
+            fill!(Ke, 0)
+            fill!(fe, 0)
+            for qp in 1:getnquadpoints(cv)
+                dΩ = getdetJdV(cv, qp)
+                for i in 1:n
+                    fe[i] += shape_value(cv, qp, i) * dΩ
+                    for j in 1:n
+                        Ke[i, j] += shape_gradient(cv, qp, i) ⋅ shape_gradient(cv, qp, j) * dΩ
+                    end
+                end
+            end
+            apply_assemble!(assembler, ch, celldofs(cell), Ke, fe)
+        end
+        return K, f
+    end
+    function compare_keep_constrained(dh, ch, cv)
+        K, f = assemble_poisson(dh, ch, cv; keep_constrained = true)
+        Kc, fc = assemble_poisson(dh, ch, cv; keep_constrained = false)
+        free = setdiff(1:ndofs(dh), ch.prescribed_dofs)
+        @test Kc[free, free] ≈ K[free, free]
+        @test fc[free] ≈ f[free]
+        # Rows and columns of constrained dofs only store the diagonal
+        for d in ch.prescribed_dofs
+            @test Base.isstored(Kc, d, d)
+            @test all(i -> i == d || !Base.isstored(Kc, i, d), 1:ndofs(dh))
+            @test all(j -> j == d || !Base.isstored(Kc, d, j), 1:ndofs(dh))
+        end
+        # Same solution
+        u = K \ f
+        apply!(u, ch)
+        uc = Kc \ fc
+        apply!(uc, ch)
+        @test uc ≈ u
+        return
+    end
+
+    # 1D: periodic-style constraint between the two boundary dofs, which are not in the
+    # same cell, and a Dirichlet condition on an interior dof
+    grid = generate_grid(Line, (3,))
+    dh = DofHandler(grid)
+    add!(dh, :u, Lagrange{RefLine, 1}())
+    close!(dh)
+    slave = only(setdiff(celldofs(dh, 1), celldofs(dh, 2)))
+    master = only(setdiff(celldofs(dh, 3), celldofs(dh, 2)))
+    ch = ConstraintHandler(dh)
+    add!(ch, AffineConstraint(slave, [master => 1.0], 0.0))
+    add!(ch, Dirichlet(:u, Set([2]), x -> 0.0))
+    close!(ch)
+    compare_keep_constrained(dh, ch, CellValues(QuadratureRule{RefLine}(2), Lagrange{RefLine, 1}()))
+
+    # 2D: periodic boundary conditions
+    grid = generate_grid(Quadrilateral, (4, 4))
+    for ip in (Lagrange{RefQuadrilateral, 1}(), Lagrange{RefQuadrilateral, 2}())
+        dh = DofHandler(grid)
+        add!(dh, :u, ip)
+        close!(dh)
+        ch = ConstraintHandler(dh)
+        add!(ch, PeriodicDirichlet(:u, collect_periodic_facets(grid, "left", "right")))
+        add!(ch, Dirichlet(:u, getfacetset(grid, "bottom"), x -> 0.0))
+        close!(ch)
+        compare_keep_constrained(dh, ch, CellValues(QuadratureRule{RefQuadrilateral}(3), ip))
+    end
+end
 
 @testset "apply!(::Symmetric, ...)" begin
     # Specifically this test that values below the diagonal of K2::Symmetric aren't touched
