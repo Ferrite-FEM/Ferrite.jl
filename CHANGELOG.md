@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `ROCSparseMatrixCSC`/`ROCSparseMatrixCSR`, `oneSparseMatrixCSC`/`oneSparseMatrixCSR` and
    the backend agnostic `GenericSparseMatrixCSC`/`GenericSparseMatrixCSR`, the latter being
    the way to assemble a global matrix on Metal, which has no sparse matrix type of its own.
-   ([#1493])
+   Applying constraints on the device (`apply!` with an adapted `ConstraintHandler`)
+   requires CSC storage. ([#1496])
  - `write_solution`, `write_cellset`, `write_facetset`, and `write_nodeset` now support
    `prefix` and `suffix` keyword arguments to customize exported data names. ([#1308])
  - New cell type `QuadraticWedge` (18 nodes) with geometric interpolation
@@ -1664,7 +1665,7 @@ poking into Ferrite internals:
 [#1541]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1541
 [#1489]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1489
 [#1490]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1490
-[#1493]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1493
+[#1496]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1496
 [#1556]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1556
 [#1469]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1469
 [#1472]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1472

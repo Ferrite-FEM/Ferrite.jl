@@ -30,11 +30,13 @@ steps:
     plugins:
       - JuliaCI/julia#v1:
           version: "1"
+      - JuliaCI/julia-coverage#v1:
+          dirs: ["src", "ext"]
     env:
       FERRITE_GPU_BACKEND: "amdgpu"
     command: |
-      julia --project=test/GPU/amdgpu -e 'using Pkg; Pkg.instantiate()'
-      julia --project=test/GPU/amdgpu test/GPU/runtests.jl
+      julia --code-coverage=@ --project=test/GPU/amdgpu -e 'using Pkg; Pkg.instantiate()'
+      julia --code-coverage=@ --project=test/GPU/amdgpu test/GPU/runtests.jl
     agents:
       queue: "rocm"
       rocmgpu: "*"
@@ -49,11 +51,13 @@ steps:
     plugins:
       - JuliaCI/julia#v1:
           version: "1"
+      - JuliaCI/julia-coverage#v1:
+          dirs: ["src", "ext"]
     env:
       FERRITE_GPU_BACKEND: "oneapi"
     command: |
-      julia --project=test/GPU/oneapi -e 'using Pkg; Pkg.instantiate()'
-      julia --project=test/GPU/oneapi test/GPU/runtests.jl
+      julia --code-coverage=@ --project=test/GPU/oneapi -e 'using Pkg; Pkg.instantiate()'
+      julia --code-coverage=@ --project=test/GPU/oneapi test/GPU/runtests.jl
     agents:
       queue: "oneapi"
     soft_fail: true
@@ -67,11 +71,13 @@ steps:
     plugins:
       - JuliaCI/julia#v1:
           version: "1"
+      - JuliaCI/julia-coverage#v1:
+          dirs: ["src", "ext"]
     env:
       FERRITE_GPU_BACKEND: "metal"
     command: |
-      julia --project=test/GPU/metal -e 'using Pkg; Pkg.instantiate()'
-      julia --project=test/GPU/metal test/GPU/runtests.jl
+      julia --code-coverage=@ --project=test/GPU/metal -e 'using Pkg; Pkg.instantiate()'
+      julia --code-coverage=@ --project=test/GPU/metal test/GPU/runtests.jl
     agents:
       queue: "metal"
       os: "macos"

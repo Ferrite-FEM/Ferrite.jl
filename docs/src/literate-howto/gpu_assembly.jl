@@ -188,6 +188,7 @@ f_gpu = KA.zeros(backend, Float32, (ndofs(dh),))
 #     [GenericSparseArrays.jl](https://github.com/albertomercurio/GenericSparseArrays.jl) can be
 #     used instead. Those are allocated on the host and moved to the device explicitly:
 #     `K_gpu = adapt(backend, allocate_matrix(GenericSparseMatrixCSC{Float32, Int32}, dh))`.
+#     Note that `apply!` on the device (see below) requires CSC storage.
 
 # Furthermore, the individual GPU workers need local buffers.
 # Ferrite comes with a helper, `Ferrite.distribute_to_workers`, which transforms common buffers

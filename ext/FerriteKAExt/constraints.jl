@@ -106,12 +106,24 @@ meandiag(K::AbstractGPUSparseMatrixCSC) = _meandiag_ka(K)
 # discriminator for the kernel based implementation. The matrix must have CSC storage; it
 # may live on the host (`KA.CPU`) or on a device.
 function Ferrite.apply!(K::AbstractSparseMatrix{T}, f::AbstractVector{T}, ch::DeviceConstraintHandler{T}, applyzero::Bool = false) where {T}
+    _check_csc_storage(K)
     _apply_ka_csc!(K, f, ch, applyzero)
     return
 end
 
 function Ferrite.apply_zero!(K::AbstractSparseMatrix{T}, f::AbstractVector{T}, ch::DeviceConstraintHandler{T}) where {T}
+    _check_csc_storage(K)
     _apply_ka_csc!(K, f, ch, true)
+    return
+end
+
+# The kernels walk the columns of the CSC storage. The sparse matrix types with CSC storage
+# (also the ones not subtyping `AbstractSparseMatrixCSC`, see the vendor extensions) define
+# `getcolptr`, which CSR matrices do not.
+function _check_csc_storage(K::AbstractSparseMatrix)
+    if !applicable(SparseArrays.getcolptr, K)
+        throw(ArgumentError("applying constraints with a device constraint handler requires a sparse matrix with CSC storage, got $(typeof(K))"))
+    end
     return
 end
 

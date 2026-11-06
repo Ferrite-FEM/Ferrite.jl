@@ -123,6 +123,8 @@ end
     assemble_global_ka!(backend, cv_device, K_device, f_device, cc_device, colors_device, Kes_device, fes_device, n_workers)
     @test SparseMatrixCSC(K_device) ≈ K_ref
     @test Vector(f_device) ≈ f_ref
+    @test_throws ArgumentError apply!(K_device, f_device, adapt(backend, ch))
+    @test_throws ArgumentError apply_zero!(K_device, f_device, adapt(backend, ch))
 end
 
 @testset "KernelAbstractions heat problem on mixed grid ($backend, $(nameof(sparse_type(Float32, Int32))))" begin
