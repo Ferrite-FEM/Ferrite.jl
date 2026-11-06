@@ -425,7 +425,7 @@ function VTKFile(args...)
 end
 
 # Deprecation of positional suffix in write_solution
-Base.@deprecate write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix::AbstractString) write_solution(vtk, dh, u; suffix)
+Base.@deprecate write_solution(vtk::VTKGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix) write_solution(vtk, dh, u; suffix)
 
 # assemble with vector first
 function assemble!(::AbstractAssembler, ::AbstractVector{<:Integer}, ::AbstractVector, ::AbstractMatrix)
