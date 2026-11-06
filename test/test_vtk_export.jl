@@ -158,7 +158,7 @@ Ferrite.cell_to_vtkcell(::Type{VTKTestCellDefaultOrder}) = Ferrite.VTKCellTypes.
             fname = joinpath(tmp, "discontinuous_exports_of_continuous_field")
             v = VTKGridFile(fname, dh) do vtk::VTKGridFile
                 write_solution(vtk, dh, a)
-                write_solution(vtk, dh, a2, "_applied")
+                write_solution(vtk, dh, a2; suffix = "_applied")
                 write_node_data(vtk, nodedata_v, "nodedata_v")
                 Ferrite.write_constraints(vtk, ch)
             end
@@ -266,39 +266,6 @@ Ferrite.cell_to_vtkcell(::Type{VTKTestCellDefaultOrder}) = Ferrite.VTKCellTypes.
             @test data.cell_data["set1"] == [1, 1, 0, 0]
             @test data.cell_data["set2"] == [1, 1, 1, 1]
             @test isequal(read_vtk(auto * ".vtu"), data)
-
-            # Test prefix and suffix for all cell sets.
-            prefixed = joinpath(tmp, "prefixed")
-            VTKGridFile(prefixed, grid) do vtk
-                @test Ferrite.write_cellset(vtk, grid; prefix = "run1_") === vtk
-            end
-            prefixed_data = read_vtk(prefixed * ".vtu")
-            @test keys(prefixed_data.cell_data) == Set(["run1_set1", "run1_set2"])
-            @test prefixed_data.cell_data["run1_set1"] == [1, 1, 0, 0]
-            @test prefixed_data.cell_data["run1_set2"] == [1, 1, 1, 1]
-
-            suffixed = joinpath(tmp, "suffixed")
-            VTKGridFile(suffixed, grid) do vtk
-                @test Ferrite.write_cellset(vtk, grid; suffix = "_final") === vtk
-            end
-            suffixed_data = read_vtk(suffixed * ".vtu")
-            @test keys(suffixed_data.cell_data) == Set(["set1_final", "set2_final"])
-
-            prefixed_suffixed = joinpath(tmp, "prefixed_suffixed")
-            VTKGridFile(prefixed_suffixed, grid) do vtk
-                @test Ferrite.write_cellset(vtk, grid; prefix = "run1_", suffix = "_final") === vtk
-            end
-            prefixed_suffixed_data = read_vtk(prefixed_suffixed * ".vtu")
-            @test keys(prefixed_suffixed_data.cell_data) == Set(["run1_set1_final", "run1_set2_final"])
-
-            # Test the single-cell-set overload forwards keyword arguments.
-            single = joinpath(tmp, "single")
-            VTKGridFile(single, grid) do vtk
-                @test Ferrite.write_cellset(vtk, grid, "set1"; prefix = "run1_", suffix = "_final") === vtk
-            end
-            single_data = read_vtk(single * ".vtu")
-            @test keys(single_data.cell_data) == Set(["run1_set1_final"])
-            @test single_data.cell_data["run1_set1_final"] == [1, 1, 0, 0]
         end
     end
     @testset "quadratic cells without grid generator" begin
@@ -443,51 +410,29 @@ Ferrite.cell_to_vtkcell(::Type{VTKTestCellDefaultOrder}) = Ferrite.VTKCellTypes.
             close!(dh)
 
             u = collect(1.0:ndofs(dh))
-            facetset = getfacetset(grid, "left")
 
-            cases = [
-                ("default", "", "", "temperature", "cells", "left", "right"),
-                ("prefix", "run1_", "", "run1_temperature", "run1_cells", "run1_left", "run1_right"),
-                ("suffix", "", "_final", "temperature_final", "cells_final", "left_final", "right_final"),
-                ("both", "run1_", "_final", "run1_temperature_final", "run1_cells_final", "run1_left_final", "run1_right_final"),
-            ]
-
-            baseline = nothing
-
-            for (filename, prefix, suffix, solution_name, cellset_name, facetset_name, nodeset_name) in cases
-                filepath = joinpath(tmp, filename)
-
+            for (prefix, suffix) in (("", ""), ("run1_", ""), ("", "_final"), ("run1_", "_final"))
+                filepath = joinpath(tmp, "prefix_suffix")
                 VTKGridFile(filepath, grid) do vtk
                     write_solution(vtk, dh, u; prefix, suffix)
-                    Ferrite.write_cellset(vtk, grid; prefix, suffix)
-                    Ferrite.write_facetset(vtk, grid, facetset, "left"; prefix, suffix)
+                    Ferrite.write_cellset(vtk, grid, "cells"; prefix, suffix)
+                    Ferrite.write_facetset(vtk, grid, "left"; prefix, suffix)
                     Ferrite.write_nodeset(vtk, grid, "right"; prefix, suffix)
                 end
-
                 data = read_vtk(filepath * ".vtu")
-
-                @test solution_name in keys(data.point_data)
-                @test cellset_name in keys(data.cell_data)
-                @test facetset_name in keys(data.point_data)
-                @test nodeset_name in keys(data.point_data)
-
-                @test data.point_data[solution_name] ≈ u[[1, 2, 4, 3]]
-                @test data.cell_data[cellset_name] == [1]
-
-                if baseline === nothing
-                    baseline = (
-                        solution = copy(data.point_data[solution_name]),
-                        facetset = copy(data.point_data[facetset_name]),
-                        nodeset = copy(data.point_data[nodeset_name]),
-                        cellset = copy(data.cell_data[cellset_name]),
-                    )
-                else
-                    @test data.point_data[solution_name] ≈ baseline.solution
-                    @test data.point_data[facetset_name] == baseline.facetset
-                    @test data.point_data[nodeset_name] == baseline.nodeset
-                    @test data.cell_data[cellset_name] == baseline.cellset
-                end
+                name(n) = string(prefix, n, suffix)
+                @test data.point_data[name("temperature")] ≈ u[[1, 2, 4, 3]]
+                @test data.cell_data[name("cells")] == [1]
+                @test data.point_data[name("left")] == [1, 0, 1, 0]
+                @test data.point_data[name("right")] == [0, 1, 0, 1]
             end
+
+            # Positional suffix is deprecated
+            filepath = joinpath(tmp, "deprecated_suffix")
+            VTKGridFile(filepath, grid) do vtk
+                @test_deprecated write_solution(vtk, dh, u, "_final")
+            end
+            @test haskey(read_vtk(filepath * ".vtu").point_data, "temperature_final")
         end
     end
 
