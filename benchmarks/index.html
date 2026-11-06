@@ -1,0 +1,1581 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tachometer — benchmark history</title>
+<link rel="stylesheet" href="uPlot.min.css">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f7f8; --card: #ffffff; --ink: #16202a; --muted: #62707d; --faint: #8a97a3;
+    --hairline: #e4e9ed; --grid: #edf0f3;
+    --series: #0a7ea6; --series-soft: rgba(10,126,166,.10);
+    --release: #4a3aa7; --good: #067647; --bad: #b42318;
+    --chip-good: rgba(6,118,71,.09); --chip-bad: rgba(180,35,24,.08); --chip-flat: rgba(98,112,125,.10);
+    --scrim: rgba(22,32,42,.45);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --bg: #0d1116; --card: #151b22; --ink: #e7edf3; --muted: #93a1ae; --faint: #6e7b87;
+      --hairline: #232c35; --grid: #1c242d;
+      --series: #2ea3c9; --series-soft: rgba(46,163,201,.13);
+      --release: #9085e9; --good: #57cf8f; --bad: #f2766b;
+      --chip-good: rgba(87,207,143,.12); --chip-bad: rgba(242,118,107,.12); --chip-flat: rgba(147,161,174,.12);
+      --scrim: rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0d1116; --card: #151b22; --ink: #e7edf3; --muted: #93a1ae; --faint: #6e7b87;
+    --hairline: #232c35; --grid: #1c242d;
+    --series: #2ea3c9; --series-soft: rgba(46,163,201,.13);
+    --release: #9085e9; --good: #57cf8f; --bad: #f2766b;
+    --chip-good: rgba(87,207,143,.12); --chip-bad: rgba(242,118,107,.12); --chip-flat: rgba(147,161,174,.12);
+    --scrim: rgba(0,0,0,.6);
+  }
+  * { box-sizing: border-box; }
+  html { scrollbar-gutter: stable; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace; }
+  a { color: var(--series); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  header { max-width: 1360px; margin: 0 auto; padding: 20px 20px 10px;
+           display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  header .gauge { align-self: center; flex: none; }
+  header h1 { font-size: 19px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+  header h1 .dim { color: var(--muted); font-weight: 400; }
+  header .fp { margin-left: auto; color: var(--faint); font-size: 11.5px;
+               font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+  .bar { position: sticky; top: 0; z-index: 5; border-block: 1px solid var(--hairline);
+         background: color-mix(in srgb, var(--bg) 82%, transparent);
+         backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .bar-inner { max-width: 1360px; margin: 0 auto; padding: 8px 20px;
+               display: flex; flex-direction: column; gap: 7px; }
+  .bar-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .tabs { display: flex; gap: 2px; background: var(--card); border: 1px solid var(--hairline);
+          border-radius: 8px; padding: 2px; }
+  .tabs button { border: 0; background: none; padding: 4px 12px; border-radius: 6px;
+                 color: var(--muted); cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; }
+  .tabs button[aria-pressed=true] { background: color-mix(in srgb, var(--series) 12%, transparent);
+                                    color: var(--ink); }
+  .bar input[type=search] { flex: 1 1 220px; min-width: 150px; max-width: 340px;
+    padding: 6px 10px; border: 1px solid var(--hairline); border-radius: 8px;
+    background: var(--card); color: var(--ink); font: inherit; font-size: 13px; }
+  .seg { display: inline-flex; border: 1px solid var(--hairline); border-radius: 8px;
+         background: var(--card); overflow: hidden; }
+  .seg button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 12.5px;
+                padding: 6px 10px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--hairline); }
+  .seg button[aria-pressed=true] { color: var(--ink); font-weight: 600;
+    background: color-mix(in srgb, var(--series) 10%, transparent); }
+  .dates { display: inline-flex; gap: 4px; align-items: center; color: var(--faint); font-size: 12px; }
+  .dates input { border: 1px solid var(--hairline); border-radius: 8px; background: var(--card);
+                 color: var(--ink); font: inherit; font-size: 12px; padding: 4px 6px; width: 108px; }
+  .bar .meta { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+  input:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--series); outline-offset: 1px; }
+  body[data-page="compare"] #viewSeg, body[data-page="compare"] #linkSeg,
+  body[data-page="compare"] #xSeg,
+  body[data-page="compare"] #rangeSeg, body[data-page="compare"] .dates { display: none; }
+  body[data-page="commits"] #viewSeg, body[data-page="commits"] #linkSeg,
+  body[data-page="commits"] #xSeg { display: none; }
+
+  main { max-width: 1360px; margin: 0 auto; padding: 16px 20px 40px; }
+  .card { background: var(--card); border: 1px solid var(--hairline); border-radius: 10px; }
+
+  .overview { display: flex; align-items: stretch; margin-bottom: 22px; overflow: hidden; }
+  .readout { flex: 0 0 218px; padding: 18px 20px; border-right: 1px solid var(--hairline);
+             display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+  .readout .big { font-size: 34px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1;
+                  font-variant-numeric: tabular-nums; }
+  .readout .big.good { color: var(--good); } .readout .big.bad { color: var(--bad); }
+  .readout .what { font-size: 12px; color: var(--muted); }
+  .readout .since { font-size: 11.5px; color: var(--faint); }
+  .ov-chart { flex: 1; min-width: 0; padding: 12px 14px 6px; }
+  .ov-note { color: var(--faint); font-size: 11.5px; margin: -14px 0 20px 4px; }
+
+  .group h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+              color: var(--muted); margin: 26px 4px 10px; font-weight: 650; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  /* Group jump navigation on the graphs page */
+  .gwrap { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 4px 20px;
+           align-items: start; }
+  /* --barh tracks the sticky bar's height (set from JS) so jump targets and
+     the sidenav clear it instead of sliding underneath. */
+  .gwrap .group { scroll-margin-top: calc(var(--barh, 44px) + 10px); }
+  .sidenav { position: sticky; top: calc(var(--barh, 44px) + 12px);
+             display: flex; flex-direction: column; gap: 2px;
+             max-height: calc(100vh - var(--barh, 44px) - 24px); overflow-y: auto; padding-top: 18px; }
+  .sidenav a { color: var(--muted); font-size: 12.5px; padding: 5px 10px; border-radius: 6px; }
+  .sidenav a:hover { color: var(--ink); text-decoration: none;
+                     background: color-mix(in srgb, var(--series) 6%, transparent); }
+  .sidenav a.on { color: var(--ink); font-weight: 600; background: var(--series-soft); }
+  .sidenav .cnt { color: var(--faint); font-size: 11px; }
+  @media (max-width: 1000px){
+    .gwrap { grid-template-columns: 1fr; }
+    .sidenav { display: none; }
+  }
+  .bench { padding: 10px 12px 4px; min-width: 0; }
+  .bench-head { display: flex; align-items: baseline; gap: 8px; margin: 0 2px 4px; }
+  .bench-head .name { font-size: 12.5px; font-weight: 600; min-width: 0; overflow: hidden;
+                      text-overflow: ellipsis; white-space: nowrap; }
+  .bench-head .val { margin-left: auto; color: var(--muted); font-size: 12px;
+                     font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fsbtn { flex: none; border: 0; background: none; color: var(--faint); cursor: pointer;
+           font-size: 13px; line-height: 1; padding: 1px 2px; border-radius: 4px; opacity: 0;
+           align-self: center; }
+  .bench:hover .fsbtn, .fsbtn:focus-visible { opacity: 1; }
+  .fsbtn:hover { color: var(--ink); }
+  @media (hover: none) { .fsbtn { opacity: .6; } }
+  .chip { flex: none; font-size: 11px; font-weight: 650; border-radius: 5px; padding: 1px 6px;
+          font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .chip.good { color: var(--good); background: var(--chip-good); }
+  .chip.bad  { color: var(--bad);  background: var(--chip-bad); }
+  .chip.flat { color: var(--muted); background: var(--chip-flat); }
+  .chip.rel  { color: var(--release); background: color-mix(in srgb, var(--release) 12%, transparent); }
+  .bench .plot { height: 148px; }
+  .ov-chart .plot { height: 240px; }
+  /* pan-y: vertical swipes still scroll the page; horizontal drags drive the cursor */
+  .plot .u-over { cursor: crosshair; touch-action: pan-y; }
+
+  /* Fullscreen chart overlay */
+  .overlay { position: fixed; inset: 0; z-index: 15; background: var(--scrim);
+             display: flex; align-items: center; justify-content: center; padding: 4vh 3vw; }
+  .modal { width: min(1200px, 100%); max-height: 92vh; padding: 14px 18px 10px; display: flex;
+           flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+  .modal-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .modal-head .name { font-size: 14px; font-weight: 650; }
+  .modal-head .val { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .modal-head .close { margin-left: auto; border: 0; background: none; color: var(--muted);
+                       font-size: 18px; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+  .modal-head .close:hover { color: var(--ink); }
+  .modal .plot { height: 62vh; }
+
+  /* Compare */
+  .cmp-head { display: grid; grid-template-columns: 1fr auto 1fr; gap: 4px 18px;
+              align-items: center; padding: 14px 16px; margin-bottom: 14px; }
+  .cmp-side { min-width: 0; }
+  .cmp-side .role { color: var(--faint); font-size: 11px; text-transform: uppercase;
+                    letter-spacing: .08em; }
+  .cmp-side .id { font-size: 15px; margin: 3px 0 1px; }
+  .cmp-side .id .chip { margin-left: 8px; }
+  .cmp-side .cmsg { color: var(--muted); font-size: 12.5px; overflow: hidden;
+                    text-overflow: ellipsis; white-space: nowrap; margin-bottom: 8px; }
+  .cmp-head select { width: 100%; border: 1px solid var(--hairline); border-radius: 8px;
+    background: var(--card); color: var(--ink); font-size: 12.5px; padding: 6px 26px 6px 8px;
+    font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .cmp-head .swap { border: 1px solid var(--hairline); background: var(--card); color: var(--muted);
+                    border-radius: 8px; padding: 5px 9px; cursor: pointer; font-size: 13px; }
+  @media (max-width: 640px){
+    .cmp-head { grid-template-columns: 1fr; }
+    .cmp-head .swap { justify-self: start; }
+  }
+  .cmp-ctl { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  /* Pinned so the sort and filter controls stay reachable while scrolled into a
+     long table. Not on phones, where the row wraps to three lines and would cost
+     a third of the screen on top of the already-sticky bar. */
+  @media (min-width: 641px){
+    .cmp-ctl { position: sticky; top: var(--barh, 44px); z-index: 4;
+               padding: 8px 0 10px; margin-bottom: 4px;
+               background: color-mix(in srgb, var(--bg) 82%, transparent);
+               backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  }
+  .cmp-ctl .lbl { color: var(--muted); font-size: 12px; }
+  .cmp-ctl .cat { border: 1px solid var(--hairline); background: none; color: var(--ink);
+                  font-size: 12px; border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+  .cmp-ctl .cat[aria-pressed=false] { color: var(--faint); opacity: .55; }
+  .cmp-ctl .cat.all { font-weight: 600; margin-right: 2px; }
+  .cmp-ctl .div { width: 1px; align-self: stretch; min-height: 18px; background: var(--hairline); }
+  .cmp-summary { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap;
+                 padding: 12px 16px; margin-bottom: 14px; }
+  .cmp-summary .big { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .cmp-summary .big.good { color: var(--good); } .cmp-summary .big.bad { color: var(--bad); }
+  .cmp-summary .lbl { color: var(--muted); font-size: 12px; }
+  table.cmp { border-collapse: collapse; width: 100%; font-size: 13px; }
+  table.cmp th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+                 color: var(--muted); font-weight: 650; padding: 8px 12px; border-bottom: 1px solid var(--hairline); }
+  table.cmp th.num, table.cmp td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.cmp td { padding: 6px 12px; border-bottom: 1px solid var(--grid); }
+  table.cmp tr:hover td { background: color-mix(in srgb, var(--series) 4%, transparent); }
+  table.cmp td.key { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+  table.cmp td .chip { font-size: 11.5px; }
+  table.cmp th.num, table.cmp td.num { white-space: nowrap; }
+  /* Horizontal-only so the card still clips the table to its rounded corners. */
+  .cmp-wrap { overflow-x: auto; overflow-y: hidden; }
+  @media (max-width: 640px){
+    /* Narrow enough that Δ — the point of the page — would be pushed off the
+       edge, so drop the "before" values; the after column keeps the magnitude. */
+    table.cmp th:nth-child(2), table.cmp td:nth-child(2) { display: none; }
+    table.cmp th, table.cmp td { padding-left: 8px; padding-right: 8px; }
+    table.cmp td.key { font-size: 11.5px; overflow-wrap: anywhere; }
+  }
+
+  /* Commits timeline */
+  .timeline { padding: 4px 0; }
+  .commit { display: flex; gap: 12px; align-items: baseline; padding: 7px 16px;
+            border-bottom: 1px solid var(--grid); }
+  .commit:last-child { border-bottom: 0; }
+  .commit:hover { background: color-mix(in srgb, var(--series) 4%, transparent); }
+  .commit .date { flex: none; color: var(--faint); font-size: 12px; width: 82px;
+                  font-variant-numeric: tabular-nums; }
+  .commit .sha { flex: none; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  .commit .msg { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .commit .spacer { flex: 1; }
+  .commit .chip { font-size: 11px; }
+  .commit .cmpbtn { flex: none; border: 1px solid var(--hairline); background: none;
+                    color: var(--muted); cursor: pointer; font-size: 12px; line-height: 1;
+                    padding: 3px 7px; border-radius: 6px; align-self: center; }
+  .commit .cmpbtn:hover { color: var(--ink); border-color: var(--faint); }
+  .tl-hint { color: var(--faint); font-size: 11.5px; margin: 8px 4px 12px; }
+
+  #tooltip { position: fixed; pointer-events: none; z-index: 20; display: none; max-width: 360px;
+             background: var(--card); border: 1px solid var(--hairline); border-radius: 8px;
+             padding: 8px 10px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+  #tooltip .sha { color: var(--muted); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; }
+  #tooltip .tag { color: var(--release); font-weight: 650; margin-left: 6px; }
+  #tooltip .msg { margin: 3px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #tooltip .env { margin: 5px 0; padding: 2px 8px; border-left: 2px solid var(--faint);
+                  color: var(--muted); font-size: 11.5px; }
+  #tooltip .env b { display: block; color: var(--ink); font-weight: 650; }
+  #tooltip .num { font-variant-numeric: tabular-nums; }
+  #tooltip .delta.good { color: var(--good); } #tooltip .delta.bad { color: var(--bad); }
+
+  .empty { color: var(--muted); max-width: 560px; padding: 40px 4px; }
+  .empty code { background: var(--card); border: 1px solid var(--hairline); padding: 1px 5px; border-radius: 4px; }
+  footer { max-width: 1360px; margin: 0 auto; padding: 0 20px 28px; color: var(--faint); font-size: 11.5px; }
+  .u-legend { display: none; }
+  @media (max-width: 720px) {
+    .overview { flex-direction: column; }
+    .readout { border-right: 0; border-bottom: 1px solid var(--hairline); flex-basis: auto; }
+    .commit .date { width: auto; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .seg button, .tabs button { transition: background .12s ease, color .12s ease; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <svg class="gauge" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 17 A9 9 0 1 1 20 17" fill="none" stroke="var(--series)" stroke-width="2.4" stroke-linecap="round"/>
+    <line x1="12" y1="14.5" x2="17" y2="8" stroke="var(--bad)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="12" cy="15" r="1.6" fill="var(--ink)"/>
+  </svg>
+  <h1 id="title">Tachometer <span class="dim">— benchmark history</span></h1>
+  <span class="fp" id="fpmeta"></span>
+</header>
+<div class="bar">
+  <div class="bar-inner">
+    <div class="bar-row">
+      <nav class="tabs" id="tabs" aria-label="Pages"></nav>
+      <input type="search" id="search" placeholder="Filter benchmarks…" autocomplete="off" aria-label="Filter benchmarks">
+      <span class="meta" id="submeta"></span>
+    </div>
+    <div class="bar-row">
+      <div class="seg" id="statSeg" role="group" aria-label="Statistic"></div>
+      <div class="seg" id="viewSeg" role="group" aria-label="Scale">
+        <button id="vPct" aria-pressed="true">% change</button>
+        <button id="vAbs" aria-pressed="false">Absolute</button>
+      </div>
+      <div class="seg" id="xSeg" role="group" aria-label="X-axis spacing">
+        <button id="xDate" aria-pressed="true" title="Space commits by their commit date">Date</button>
+        <button id="xEven" aria-pressed="false" title="Space commits evenly — one step per commit, regardless of date">Even</button>
+      </div>
+      <div class="seg" id="linkSeg" role="group" aria-label="Environment changes" hidden>
+        <button id="vLink" aria-pressed="false"
+          title="Draw lines through environment changes (dotted lines) instead of breaking, with percent changes relative to the range's first commit">Link env</button>
+      </div>
+      <div class="seg" id="rangeSeg" role="group" aria-label="Time range"></div>
+      <span class="dates">
+        <input type="date" id="dFrom" aria-label="From date">–<input type="date" id="dTo" aria-label="To date">
+      </span>
+    </div>
+  </div>
+</div>
+<main>
+  <div id="content"></div>
+  <div class="empty" id="empty" hidden></div>
+</main>
+<footer id="foot"></footer>
+<div id="tooltip"></div>
+<script src="uPlot.iife.min.js"></script>
+<script>
+"use strict";
+
+const PAGES = [ ["graphs","Graphs"], ["compare","Compare"], ["commits","Commits"] ];
+const STATS = [
+  { key: "instructions", label: "Instructions", fmt: fmtCount },
+  { key: "time",         label: "Time",         fmt: fmtTime  },
+  { key: "memory",       label: "Memory",       fmt: fmtBytes },
+  { key: "allocs",       label: "Allocs",       fmt: fmtCount },
+];
+const RANGES = [
+  { key: "all", label: "All", days: Infinity },
+  { key: "1y",  label: "1y",  days: 365 },
+  { key: "3m",  label: "3m",  days: 91 },
+  { key: "1m",  label: "1m",  days: 30 },
+];
+const CHIP_EPS = 1.0;   // |Δ%| below this renders as neutral (likely noise)
+const SYNC_KEY = "tach";
+// Touch devices get larger axis/marker type — 10.5px canvas text is
+// unreadable at phone viewing distances.
+const COARSE = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+
+const state = { page: "graphs", stat: null, view: "pct", xmode: "date", range: "all", from: "", to: "",
+                q: "", before: "", after: "", fs: "", sort: "delta", sortdir: "desc", hideflat: false,
+                hidecats: "", link: false, data: null,
+                releasesBySha: Object.create(null), cards: [], overview: null, modal: null };
+
+const $ = id => document.getElementById(id);
+const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
+const getVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+function fmtTime(ns){ if(ns==null||!isFinite(ns)) return "—";
+  if(ns<1e3) return trim3(ns)+" ns"; if(ns<1e6) return trim3(ns/1e3)+" µs";
+  if(ns<1e9) return trim3(ns/1e6)+" ms"; return trim3(ns/1e9)+" s"; }
+function fmtBytes(b){ if(b==null||!isFinite(b)) return "—";
+  if(b<1024) return trim3(b)+" B"; if(b<1048576) return trim3(b/1024)+" KiB";
+  if(b<1073741824) return trim3(b/1048576)+" MiB"; return trim3(b/1073741824)+" GiB"; }
+function fmtCount(n){ if(n==null||!isFinite(n)) return "—";
+  if(n<1e3) return trim3(n); if(n<1e6) return trim3(n/1e3)+" k";
+  if(n<1e9) return trim3(n/1e6)+" M"; return trim3(n/1e9)+" G"; }
+function trim3(v){ return String(Number(v.toPrecision(3))); }
+function fmtPct(v){ if(v==null||!isFinite(v)) return "—";
+  return (v>0?"+":"") + v.toFixed(Math.abs(v)<10?1:0) + "%"; }
+const statDef = () => STATS.find(s => s.key === state.stat) || STATS[1];
+const fmtAbs = v => statDef().fmt(v);
+const shortName = k => k.includes("/") ? k.slice(k.indexOf("/")+1) : k;
+
+// Only build a commit URL from a validated repo URL and a hex sha.
+function commitURL(sha){
+  const base = state.data && state.data.repo_url || "";
+  if(!/^https:\/\/[^\s"'<>]+$/.test(base)) return null;
+  if(!/^[0-9a-f]{7,40}$/.test(sha)) return null;
+  return base.replace(/\/+$/,"") + "/commit/" + sha;
+}
+
+// Fingerprint identity of a record's measurement regime (hardware/OS/Julia).
+// The suite hash is deliberately left out — editing the benchmark script does
+// not invalidate the history of the benchmarks that didn't change — and Julia
+// is coarsened to major.minor since patch releases rarely shift timings.
+const REGIME_FIELDS = [
+  ["os", f => f.os], ["arch", f => f.arch],
+  ["julia", f => String(f.julia == null ? "" : f.julia).split(".").slice(0, 2).join(".")],
+  ["cpu", f => f.cpu], ["threads", f => f.threads], ["backend", f => f.backend],
+];
+function regimeKey(r){
+  const f = r.fingerprint || {};
+  return REGIME_FIELDS.map(([, get]) => get(f)).join("|");
+}
+
+// Human-readable summary of what changed in the regime between two records,
+// e.g. "cpu: Apple M1 (Virtual) → ARM Neoverse-N2".
+function envChangeDesc(prev, r){
+  const fa = (prev || {}).fingerprint || {}, fb = (r || {}).fingerprint || {};
+  const parts = [];
+  for(const [name, get] of REGIME_FIELDS){
+    const a = get(fa), b = get(fb);
+    if(String(a ?? "") !== String(b ?? ""))
+      parts.push(name + ": " + (a ?? "?") + " → " + (b ?? "?"));
+  }
+  return parts.join(", ");
+}
+
+// --- data loading ------------------------------------------------------------
+
+// Favicon: prefer the Documenter docs' icon — the docs live as siblings of the
+// benchmarks/ subdir on gh-pages — falling back to the header gauge.
+async function setFavicon(){
+  const link = document.createElement("link");
+  link.rel = "icon";
+  for(const p of ["../stable/assets/favicon.ico", "../dev/assets/favicon.ico"]){
+    try {
+      const r = await fetch(p, { method: "HEAD" });
+      if(r.ok && /image|icon/.test(r.headers.get("content-type") || "")){
+        link.href = p; link.type = "image/x-icon";
+        document.head.appendChild(link);
+        return;
+      }
+    } catch(_){}
+  }
+  link.href = "data:image/svg+xml," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
+    '<path d="M4 17 A9 9 0 1 1 20 17" fill="none" stroke="#0a7ea6" stroke-width="2.4" stroke-linecap="round"/>' +
+    '<line x1="12" y1="14.5" x2="17" y2="8" stroke="#b42318" stroke-width="2" stroke-linecap="round"/>' +
+    '<circle cx="12" cy="15" r="1.6" fill="#62707d"/></svg>');
+  document.head.appendChild(link);
+}
+
+async function load(){
+  setFavicon();
+  const theme = new URLSearchParams(location.search).get("theme");
+  if(theme === "dark" || theme === "light") document.documentElement.dataset.theme = theme;
+  let doc;
+  if(window.__TACHOMETER_DATA__){
+    doc = window.__TACHOMETER_DATA__;           // standalone preview build
+  } else {
+    try {
+      // Manifest (always fresh) lists the shard files. Past-year shards are
+      // normally unchanged, so they are fetched with default browser caching.
+      const idxRes = await fetch("./data/index.json?_=" + Date.now(), { cache: "no-store" });
+      if(!idxRes.ok) throw new Error("data/index.json returned HTTP " + idxRes.status);
+      const idx = await idxRes.json();
+      if(idx.schema !== "tachometer-timeseries" || ![2, 3].includes(idx.version))
+        throw new Error("data/index.json has an unsupported schema or version");
+      const shards = Array.isArray(idx.shards) ? [...idx.shards] : [];
+      if(!shards.every(s => typeof s === "string" && /^shard-\d+$/.test(s)))
+        throw new Error("data/index.json has an invalid shard list");
+      if(new Set(shards).size !== shards.length)
+        throw new Error("data/index.json lists a shard more than once");
+      shards.sort();
+      const latest = shards[shards.length - 1];
+      const ver = encodeURIComponent(idx.generated_at || "");
+      const docs = await Promise.all(shards.map(s =>
+        fetch("./data/" + s + ".json" + (s === latest && ver ? "?v=" + ver : ""))
+          .then(r => {
+            if(!r.ok) throw new Error(s + ".json returned HTTP " + r.status);
+            return r.json();
+          })
+          .then(d => {
+            if(!d || !Array.isArray(d.records)) throw new Error(s + ".json is malformed");
+            return d;
+          })));
+      const records = [].concat(...docs.map(d => (d && Array.isArray(d.records)) ? d.records : []));
+      doc = { package: idx.package, repo_url: idx.repo_url,
+              releases: Array.isArray(idx.releases) ? idx.releases : [],
+              fingerprint: idx.latest_fingerprint || {}, generated_at: idx.generated_at, records };
+    } catch(e){
+      console.error("Could not load dashboard data:", e);
+      const hint = location.protocol === "file:"
+        ? " Browsers block local data files. Run <code>python3 -m http.server 8000</code> in this directory and open <code>http://localhost:8000/</code>."
+        : " Check <code>data/index.json</code> and every shard it lists.";
+      return showEmpty("Could not load the dashboard data." + hint);
+    }
+  }
+  if(!doc || !Array.isArray(doc.records) || doc.records.length === 0)
+    return showEmpty("No benchmark history yet. Add a record to <code>data/</code> and reload the page.");
+  if(!doc.records.every(r => r && r.benchmarks && typeof r.benchmarks === "object" &&
+      !Array.isArray(r.benchmarks) &&
+      (r.coverage == null || r.coverage === "snapshot" || r.coverage === "partial") &&
+      (r.removed_benchmarks == null || (Array.isArray(r.removed_benchmarks) &&
+        r.removed_benchmarks.every(k => typeof k === "string" && k.length > 0)))))
+    return showEmpty("The dashboard history contains a malformed record.");
+  doc.records.sort((a,b) => (a.date_unix||0) - (b.date_unix||0));
+  for(const rel of (doc.releases || [])) if(rel && rel.commit) state.releasesBySha[rel.commit] = rel.tag;
+  state.data = doc;
+
+  const name = doc.package || "Tachometer";
+  document.title = name + " — benchmark history";
+  $("title").innerHTML = "";
+  $("title").append(name, Object.assign(el("span","dim"), { textContent: " — benchmark history" }));
+  const fp = doc.fingerprint || {};
+  $("fpmeta").textContent = [fp.os, fp.arch, fp.julia && ("julia "+fp.julia), fp.cpu].filter(Boolean).join(" · ");
+  $("submeta").textContent = "";
+  $("submeta").append(doc.records.length + " commits");
+  if(/^https:\/\/[^\s"'<>]+$/.test(doc.repo_url || "")){
+    const a = el("a"); a.href = doc.repo_url; a.textContent = "repository"; a.target = "_blank"; a.rel = "noopener";
+    $("submeta").append(" · ", a);
+  }
+  if(doc.generated_at) $("foot").textContent = "Updated " + doc.generated_at.slice(0,10) + " · made with Tachometer.jl";
+
+  readHash();
+  // The toggle is pointless when the whole history was measured in one environment.
+  $("linkSeg").hidden = !doc.records.some((r, i) => i > 0 && regimeKey(r) !== regimeKey(doc.records[i-1]));
+  buildTabs(); buildStatSeg(); buildRangeSeg(); initDates(); syncControls();
+  rebuild();
+}
+
+function showEmpty(html){ $("empty").hidden = false; $("empty").innerHTML = html; $("content").hidden = true; }
+
+// --- controls ----------------------------------------------------------------
+
+function availableStats(){
+  const present = new Set();
+  const active = new Set(currentKeys());
+  for(const r of state.data.records) for(const k in r.benchmarks)
+    if(active.has(k)) for(const s in r.benchmarks[k]) present.add(s);
+  return STATS.filter(s => present.has(s.key));
+}
+
+function buildTabs(){
+  const nav = $("tabs"); nav.textContent = "";
+  for(const [key, label] of PAGES){
+    const b = el("button"); b.textContent = label; b.dataset.page = key;
+    b.addEventListener("click", () => { state.page = key; onControlChange(); });
+    nav.appendChild(b);
+  }
+}
+
+function buildStatSeg(){
+  const stats = availableStats();
+  if(!stats.some(s => s.key === state.stat))
+    state.stat = stats.some(s => s.key === "instructions") ? "instructions" : (stats[0] ? stats[0].key : "time");
+  const seg = $("statSeg"); seg.textContent = "";
+  for(const s of stats){
+    const b = el("button"); b.textContent = s.label; b.dataset.stat = s.key;
+    b.addEventListener("click", () => { state.stat = s.key; onControlChange(); });
+    seg.appendChild(b);
+  }
+}
+
+// Newest release with a usable date (the list is sorted by version).
+function latestRelease(){
+  const rels = state.data.releases || [];
+  for(let i = rels.length-1; i >= 0; i--)
+    if(rels[i] && rels[i].date_unix != null) return rels[i];
+  return null;
+}
+
+function buildRangeSeg(){
+  const seg = $("rangeSeg"); seg.textContent = "";
+  for(const r of RANGES){
+    const b = el("button"); b.textContent = r.label; b.dataset.range = r.key;
+    b.addEventListener("click", () => { state.range = r.key; state.from = ""; state.to = ""; onControlChange(); });
+    seg.appendChild(b);
+  }
+  const rel = latestRelease();
+  if(rel){
+    const b = el("button"); b.textContent = rel.tag; b.dataset.range = "rel";
+    b.title = "since " + rel.tag;
+    b.addEventListener("click", () => { state.range = "rel"; state.from = ""; state.to = ""; onControlChange(); });
+    seg.appendChild(b);
+  }
+}
+
+function initDates(){
+  const recs = state.data.records;
+  const iso = u => new Date(u*1000).toISOString().slice(0,10);
+  const min = iso(recs[0].date_unix || 0), max = iso(recs[recs.length-1].date_unix || 0);
+  for(const id of ["dFrom","dTo"]){ $(id).min = min; $(id).max = max; }
+  const onDate = () => {
+    state.from = $("dFrom").value; state.to = $("dTo").value;
+    state.range = (state.from || state.to) ? "custom" : "all";
+    onControlChange();
+  };
+  $("dFrom").addEventListener("change", onDate);
+  $("dTo").addEventListener("change", onDate);
+}
+
+function syncControls(){
+  document.body.dataset.page = state.page;
+  for(const b of $("tabs").children) b.ariaPressed = b.dataset.page === state.page;
+  for(const b of $("statSeg").children) b.ariaPressed = b.dataset.stat === state.stat;
+  for(const b of $("rangeSeg").children) b.ariaPressed = b.dataset.range === state.range;
+  $("vPct").ariaPressed = state.view === "pct";
+  $("vAbs").ariaPressed = state.view === "abs";
+  $("xDate").ariaPressed = state.xmode === "date";
+  $("xEven").ariaPressed = state.xmode === "even";
+  $("vLink").ariaPressed = state.link;
+  if($("dFrom").value !== state.from) $("dFrom").value = state.from;
+  if($("dTo").value !== state.to) $("dTo").value = state.to;
+  if($("search").value !== state.q) $("search").value = state.q;
+}
+
+function onControlChange(){ syncControls(); writeHash(); rebuild(); }
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/, SHA_RE = /^[0-9a-f]{7,40}$/;
+// Direction each sort key starts in: biggest regression first, names A→Z.
+const SORT_DIR = { delta: "desc", name: "asc" };
+function readHash(){
+  const p = new URLSearchParams(location.hash.slice(1));
+  if(PAGES.some(pg => pg[0] === p.get("page"))) state.page = p.get("page");
+  if(p.get("stat")) state.stat = p.get("stat");
+  if(p.get("view") === "abs") state.view = "abs";
+  if(p.get("x") === "even") state.xmode = "even";
+  if(RANGES.some(r => r.key === p.get("range")) || p.get("range") === "rel") state.range = p.get("range");
+  if(DATE_RE.test(p.get("from") || "")) { state.from = p.get("from"); state.range = "custom"; }
+  if(DATE_RE.test(p.get("to") || "")) { state.to = p.get("to"); state.range = "custom"; }
+  if(p.get("q")) state.q = p.get("q");
+  if(SHA_RE.test(p.get("before") || "")) state.before = p.get("before");
+  if(SHA_RE.test(p.get("after") || "")) state.after = p.get("after");
+  if(p.get("fs")) state.fs = p.get("fs");
+  if(p.get("sort") === "name") state.sort = "name";
+  state.sortdir = SORT_DIR[state.sort];
+  if(p.get("dir") === "asc" || p.get("dir") === "desc") state.sortdir = p.get("dir");
+  if(p.get("hideflat") === "1") state.hideflat = true;
+  if(p.get("hide")) state.hidecats = p.get("hide");
+  if(p.get("link") === "1") state.link = true;
+}
+function writeHash(){
+  const p = new URLSearchParams();
+  p.set("page", state.page); p.set("stat", state.stat);
+  p.set("view", state.view); p.set("range", state.range);
+  if(state.xmode === "even") p.set("x", "even");
+  if(state.from) p.set("from", state.from);
+  if(state.to) p.set("to", state.to);
+  if(state.q) p.set("q", state.q);
+  if(state.before) p.set("before", state.before);
+  if(state.after) p.set("after", state.after);
+  if(state.fs) p.set("fs", state.fs);
+  if(state.sort !== "delta") p.set("sort", state.sort);
+  if(state.sortdir !== SORT_DIR[state.sort]) p.set("dir", state.sortdir);
+  if(state.hideflat) p.set("hideflat", "1");
+  if(state.hidecats) p.set("hide", state.hidecats);
+  if(state.link) p.set("link", "1");
+  history.replaceState(null, "", "#" + p.toString());
+}
+
+$("vPct").addEventListener("click", () => { state.view = "pct"; onControlChange(); });
+$("vAbs").addEventListener("click", () => { state.view = "abs"; onControlChange(); });
+$("xDate").addEventListener("click", () => { state.xmode = "date"; onControlChange(); });
+$("xEven").addEventListener("click", () => { state.xmode = "even"; onControlChange(); });
+$("vLink").addEventListener("click", () => { state.link = !state.link; onControlChange(); });
+let qTimer;
+$("search").addEventListener("input", e => {
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => { state.q = e.target.value.trim(); writeHash(); rebuild(); }, 150);
+});
+
+// --- series building ---------------------------------------------------------
+
+function visibleRecords(){
+  const recs = state.data.records;
+  if(state.range === "custom"){
+    const lo = state.from ? Date.parse(state.from + "T00:00:00Z")/1000 : -Infinity;
+    const hi = state.to ? Date.parse(state.to + "T23:59:59Z")/1000 : Infinity;
+    return recs.filter(r => (r.date_unix||0) >= lo && (r.date_unix||0) <= hi);
+  }
+  if(state.range === "rel"){
+    const rel = latestRelease();
+    return rel ? recs.filter(r => (r.date_unix||0) >= rel.date_unix) : recs;
+  }
+  const days = (RANGES.find(r => r.key === state.range) || RANGES[0]).days;
+  if(!isFinite(days)) return recs;
+  const last = recs[recs.length-1].date_unix || 0;
+  return recs.filter(r => (r.date_unix||0) >= last - days*86400);
+}
+
+// Records without an explicit coverage field predate partial uploads and are
+// complete snapshots. Partial records update the active set without making
+// unmeasured benchmarks disappear.
+function recordCoverage(r){ return r.coverage === "partial" ? "partial" : "snapshot"; }
+function removedBenchmarks(r){
+  return Array.isArray(r.removed_benchmarks) ? r.removed_benchmarks : [];
+}
+function activeKeysAt(lastIndex){
+  const active = new Set();
+  const all = state.data.records;
+  const end = lastIndex == null ? all.length - 1 : lastIndex;
+  for(let i = 0; i <= end; i++){
+    const r = all[i];
+    if(recordCoverage(r) === "snapshot") active.clear();
+    for(const key of Object.keys(r.benchmarks)) active.add(key);
+    for(const key of removedBenchmarks(r)) active.delete(key);
+  }
+  return [...active].sort();
+}
+
+// Benchmarks active after replaying snapshots, partial additions, and explicit
+// removals through the newest record.
+function currentKeys(){
+  return activeKeysAt();
+}
+
+function filteredKeys(){
+  const q = state.q.toLowerCase();
+  return currentKeys().filter(k => !q || k.toLowerCase().includes(q));
+}
+
+// Per-benchmark values for the current stat over `recs`; null where absent.
+// `bases[i]` is the first value recorded in the same environment segment as
+// record i, so percent views re-baseline at each regime change instead of
+// comparing against a different machine. `base`/`last` belong to the newest
+// segment with data (what the chips report).
+function seriesFor(recs, key, seg){
+  const vals = recs.map(r => {
+    const b = hasOwn(r.benchmarks, key) ? r.benchmarks[key] : null;
+    const v = b ? b[state.stat] : null;
+    return (typeof v === "number" && isFinite(v)) ? v : null;
+  });
+  const segBase = [], bases = new Array(vals.length).fill(null);
+  let base = null, last = null, lastIndex = null;
+  for(let i = 0; i < vals.length; i++){
+    const s = seg[i];
+    if(segBase[s] == null && vals[i] != null) segBase[s] = vals[i];
+    bases[i] = segBase[s] == null ? null : segBase[s];
+    if(vals[i] != null){ last = vals[i]; base = segBase[s]; lastIndex = i; }
+  }
+  return { vals, bases, base, last, lastIndex };
+}
+
+const toPct = (vals, bases) =>
+  vals.map((v, i) => (v != null && bases[i] > 0) ? (v/bases[i] - 1) * 100 : null);
+
+// Geomean of per-benchmark ratios (each vs its first value in the same
+// environment segment), as % change.
+function overviewSeries(recs, series){
+  return recs.map((r, i) => {
+    if(recordCoverage(r) === "partial") return null;
+    let logSum = 0, n = 0;
+    for(const s of series){
+      const v = s.vals[i], b = s.bases[i];
+      if(v != null && b > 0){ logSum += Math.log(v / b); n++; }
+    }
+    return n ? (Math.exp(logSum / n) - 1) * 100 : null;
+  });
+}
+
+// Indices where a release was tagged / the measurement regime changed, plus
+// each record's environment-segment id (`seg[i]` increments at every change).
+// With state.link everything stays in segment 0: the dotted markers remain but
+// lines connect through them and percent baselines don't restart.
+function markerIndices(recs){
+  const rel = [], env = [], seg = new Array(recs.length).fill(0);
+  for(let i = 0; i < recs.length; i++){
+    if(state.releasesBySha[recs[i].commit]) rel.push(i);
+    if(i > 0){
+      seg[i] = seg[i-1];
+      if(regimeKey(recs[i]) !== regimeKey(recs[i-1])){ env.push(i); if(!state.link) seg[i]++; }
+    }
+  }
+  return { rel, env, seg };
+}
+
+function statValue(rec, key){
+  const b = hasOwn(rec.benchmarks, key) ? rec.benchmarks[key] : null;
+  const v = b ? b[state.stat] : null;
+  return (typeof v === "number" && isFinite(v)) ? v : null;
+}
+
+// --- page dispatch -----------------------------------------------------------
+
+let observer = null, roTimer = null;
+
+function teardown(){
+  $("tooltip").style.display = "none";
+  if(state.scrollFn){ window.removeEventListener("scroll", state.scrollFn); state.scrollFn = null; }
+  if(state.unpinFn){
+    window.removeEventListener("wheel", state.unpinFn);
+    window.removeEventListener("touchstart", state.unpinFn);
+    state.unpinFn = null;
+  }
+  closeModal(false);
+  for(const c of state.cards) if(c.chart) c.chart.destroy();
+  if(state.overview && state.overview.chart) state.overview.chart.destroy();
+  state.cards = []; state.overview = null;
+  if(observer) observer.disconnect();
+  observer = new IntersectionObserver(onIntersect, { rootMargin: "300px 0px" });
+}
+
+function rebuild(){
+  teardown();
+  const host = $("content"); host.textContent = ""; host.hidden = false; $("empty").hidden = true;
+  if(state.page === "compare") return renderComparePage(host);
+  if(state.page === "commits") return renderCommitsPage(host);
+  renderGraphsPage(host);
+}
+
+// --- graphs page -------------------------------------------------------------
+
+function renderGraphsPage(host){
+  const recs = visibleRecords();
+  if(recs.length === 0) return showEmpty("No records in this time range.");
+  // Even mode plots one step per commit (x = record index); date mode plots by
+  // commit time. Either way the date filters above chose which records show.
+  const xs = state.xmode === "even" ? recs.map((_, i) => i)
+    : recs.map(r => r.date_unix != null ? r.date_unix : Date.parse(r.date)/1000);
+  const markers = markerIndices(recs);
+  const series = [];
+  for(const k of filteredKeys()){
+    const s = seriesFor(recs, k, markers.seg);
+    if(s.base != null) series.push(Object.assign(s, { key: k }));
+  }
+  if(series.length === 0)
+    return showEmpty(state.q ? "No benchmarks match the filter." : "No data for this statistic in this range.");
+  state.ctx = { recs, xs, markers, byKey: new Map(series.map(s => [s.key, s])) };
+
+  const partialCount = recs.filter(r => recordCoverage(r) === "partial").length;
+  const snapshotCount = recs.length - partialCount;
+  if(snapshotCount) host.appendChild(renderOverview(recs, xs, series, markers));
+  else {
+    const n = el("div","ov-note");
+    n.textContent = "Overview unavailable: this range contains only partial uploads. Individual charts show every measured point.";
+    host.appendChild(n);
+  }
+  if(partialCount){
+    const n = el("div","ov-note");
+    n.textContent = partialCount + " partial upload" + (partialCount>1?"s":"") +
+      " in range — omitted from the aggregate overview; individual benchmark charts include them";
+    host.appendChild(n);
+  }
+  if(markers.env.length){
+    const n = el("div","ov-note");
+    n.textContent = markers.env.length + " environment change" + (markers.env.length>1?"s":"") +
+      " in range (dotted lines) — " + (state.link
+        ? "lines connect through them and percent changes are vs the range's first commit"
+        : "percent changes restart from each environment's own first commit; \"Link env\" draws through them");
+    host.appendChild(n);
+  }
+
+  // Group by "prefix/" of the benchmark key; ungrouped keys come first.
+  const groups = new Map();
+  for(const s of series){
+    const g = s.key.includes("/") ? s.key.slice(0, s.key.indexOf("/")) : "";
+    if(!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(s);
+  }
+  const ordered = [...groups.keys()].sort((a,b) => (b==="")-(a==="") || (a<b?-1:1));
+  const wrap = el("div","gwrap");
+  const main = el("div");
+  const nav = ordered.length > 1 ? el("nav","sidenav") : null;
+  if(nav) nav.setAttribute("aria-label", "Benchmark groups");
+  const sections = [];
+  for(const g of ordered){
+    const sec = el("section","group");
+    if(g){ const h = el("h2"); h.textContent = g; sec.appendChild(h); }
+    const grid = el("div","grid");
+    for(const s of groups.get(g)) grid.appendChild(renderCard(recs, xs, s, markers));
+    sec.appendChild(grid);
+    main.appendChild(sec);
+    if(nav){
+      const a = el("a"); a.href = "#";
+      a.append((g || "other") + " ");
+      const c = el("span","cnt"); c.textContent = groups.get(g).length;
+      a.appendChild(c);
+      const pair = [sec, a];
+      // scrollIntoView instead of an anchor href — the hash carries app state.
+      // Pin the clicked group: sections near the bottom may never reach the
+      // scroll-spy threshold, which would highlight an earlier group instead.
+      a.addEventListener("click", e => {
+        e.preventDefault();
+        state.navPin = pair;
+        for(const s of sections) s[1].classList.toggle("on", s === pair);
+        sec.scrollIntoView({ behavior: "smooth" });
+      });
+      nav.appendChild(a);
+      sections.push(pair);
+    }
+  }
+  if(nav) wrap.appendChild(nav);
+  wrap.appendChild(main);
+  host.appendChild(wrap);
+  if(nav){
+    state.navPin = null;
+    const onScroll = () => {
+      let cur = sections[0];
+      for(const s of sections) if(s[0].getBoundingClientRect().top <= barH + 48) cur = s;
+      if(state.navPin){
+        if(cur !== state.navPin) cur = state.navPin;   // hold until the spy agrees
+        else state.navPin = null;
+      }
+      for(const s of sections) s[1].classList.toggle("on", s === cur);
+    };
+    // The smooth scroll from a click also fires "scroll", so only user input
+    // (wheel/touch) releases the pin early.
+    const unpin = () => { if(state.navPin){ state.navPin = null; onScroll(); } };
+    state.scrollFn = onScroll;
+    state.unpinFn = unpin;
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("wheel", unpin, { passive: true });
+    window.addEventListener("touchstart", unpin, { passive: true });
+    onScroll();
+  }
+  if(state.fs && state.ctx.byKey.has(state.fs)) openModal(state.fs);
+  else if(state.fs){ state.fs = ""; writeHash(); }
+}
+
+function renderOverview(recs, xs, series, markers){
+  const box = el("section","card overview");
+  const ys = overviewSeries(recs, series);
+  let lastPct = null, lastPctIndex = null;
+  for(let i = 0; i < ys.length; i++) if(ys[i] != null){ lastPct = ys[i]; lastPctIndex = i; }
+
+  const ro = el("div","readout");
+  const big = el("div","big mono");
+  big.textContent = lastPct == null ? "—" : fmtPct(lastPct);
+  if(lastPct != null && Math.abs(lastPct) >= CHIP_EPS) big.classList.add(lastPct > 0 ? "bad" : "good");
+  const what = el("div","what");
+  what.textContent = statDef().label.toLowerCase() + ", geomean of " + series.length +
+                     " benchmark" + (series.length>1?"s":"");
+  const since = el("div","since");
+  // Baseline of the newest environment segment, not necessarily the range start.
+  const s0 = recs[markers.seg.indexOf(markers.seg[markers.seg.length-1])];
+  since.textContent = "vs " + (s0.date || "").slice(0,10) + " · " + recs.length + " commits";
+  if(lastPctIndex != null && lastPctIndex < recs.length - 1)
+    since.textContent += " · complete through " + (recs[lastPctIndex].date || "").slice(0,10);
+  ro.append(big, what, since);
+
+  const wrap = el("div","ov-chart"); const plot = el("div","plot");
+  wrap.appendChild(plot); box.append(ro, wrap);
+  state.overview = { kind: "overview", plotEl: plot, recs, xs, ys, markers, chart: null };
+  observer.observe(plot);
+  return box;
+}
+
+function renderCard(recs, xs, s, markers){
+  const card = el("div","card bench");
+  const head = el("div","bench-head");
+  const name = el("span","name mono"); name.textContent = shortName(s.key); name.title = s.key;
+  head.append(name, deltaChip(s), fullscreenBtn(s.key));
+  const val = el("span","val mono"); val.textContent = fmtAbs(s.last);
+  if(s.lastIndex != null && s.lastIndex < recs.length - 1){
+    const n = recs.length - 1 - s.lastIndex;
+    val.title = "Last measured " + ((recs[s.lastIndex].date || "").slice(0,10) || n + " commits ago") +
+      " (" + n + " later commit" + (n>1?"s":"") + " did not measure it)";
+  }
+  head.insertBefore(val, head.lastChild);
+  const plot = el("div","plot");
+  card.append(head, plot);
+  const c = { kind: "bench", key: s.key, plotEl: plot, recs, xs, bases: s.bases,
+              ys: state.view === "pct" ? toPct(s.vals, s.bases) : s.vals, markers, chart: null };
+  state.cards.push(c); plot.dataset.card = String(state.cards.length - 1);
+  observer.observe(plot);
+  return card;
+}
+
+function deltaChip(s){
+  const chip = el("span","chip mono");
+  const pct = (s.base > 0 && s.last != null) ? (s.last/s.base - 1) * 100 : null;
+  if(pct == null || Math.abs(pct) < CHIP_EPS){ chip.classList.add("flat"); chip.textContent = pct == null ? "—" : "· " + fmtPct(pct); }
+  else if(pct > 0){ chip.classList.add("bad"); chip.textContent = "▲ " + fmtPct(pct); }
+  else { chip.classList.add("good"); chip.textContent = "▼ " + fmtPct(pct); }
+  chip.title = state.link ? "vs first value in range"
+                          : "vs first value in the current environment (within range)";
+  return chip;
+}
+
+function fullscreenBtn(key){
+  const b = el("button","fsbtn"); b.textContent = "⛶"; b.title = "Expand chart";
+  b.setAttribute("aria-label", "Expand chart for " + key);
+  b.addEventListener("click", e => { e.stopPropagation(); openModal(key); });
+  return b;
+}
+
+function onIntersect(entries){
+  for(const e of entries){
+    if(!e.isIntersecting) continue;
+    observer.unobserve(e.target);
+    if(state.overview && e.target === state.overview.plotEl) initChart(state.overview);
+    else { const c = state.cards[Number(e.target.dataset.card)]; if(c) initChart(c); }
+  }
+}
+
+// --- fullscreen modal --------------------------------------------------------
+
+function openModal(key){
+  closeModal(false);
+  const s = state.ctx && state.ctx.byKey.get(key);
+  if(!s) return;
+  const { recs, xs, markers } = state.ctx;
+  const overlay = el("div","overlay");
+  const modal = el("div","card modal");
+  const head = el("div","modal-head");
+  const name = el("span","name mono"); name.textContent = s.key;
+  const val = el("span","val mono"); val.textContent = fmtAbs(s.last);
+  if(s.lastIndex != null && s.lastIndex < recs.length - 1)
+    val.title = "Last measured " + (recs[s.lastIndex].date || "").slice(0,10);
+  const close = el("button","close"); close.textContent = "✕"; close.setAttribute("aria-label","Close");
+  close.addEventListener("click", () => closeModal(true));
+  head.append(name, deltaChip(s), val, close);
+  const plot = el("div","plot");
+  modal.append(head, plot); overlay.appendChild(modal);
+  overlay.addEventListener("click", e => { if(e.target === overlay) closeModal(true); });
+  document.body.appendChild(overlay);
+  const c = { kind: "bench", labeled: true, key: s.key, plotEl: plot, recs, xs, bases: s.bases,
+              ys: state.view === "pct" ? toPct(s.vals, s.bases) : s.vals, markers, chart: null };
+  state.modal = { overlay, c, key };
+  initChart(c);
+  close.focus();
+  state.fs = key; writeHash();
+}
+
+function closeModal(updateHash){
+  if(!state.modal) return;
+  if(state.modal.c.chart) state.modal.c.chart.destroy();
+  state.modal.overlay.remove();
+  state.modal = null;
+  if(updateHash){ state.fs = ""; writeHash(); }
+}
+
+document.addEventListener("keydown", e => { if(e.key === "Escape") closeModal(true); });
+
+// --- compare page ------------------------------------------------------------
+
+function recBySha(sha){ return state.data.records.find(r => r.commit === sha) || null; }
+
+function defaultCompareShas(){
+  const recs = state.data.records;
+  const after = recs[recs.length-1].commit;
+  const rels = (state.data.releases || []).filter(r => r.commit && r.commit !== after && recBySha(r.commit));
+  const before = rels.length ? rels[rels.length-1].commit : recs[0].commit;
+  return { before, after };
+}
+
+function renderComparePage(host){
+  const recs = state.data.records;
+  const def = defaultCompareShas();
+  if(!state.before || !recBySha(state.before)) state.before = def.before;
+  if(!state.after || !recBySha(state.after)) state.after = def.after;
+
+  const head = el("div","card cmp-head");
+  const mkSel = (which) => {
+    const sel = el("select");
+    sel.setAttribute("aria-label", which + " commit");
+    for(let i = recs.length-1; i >= 0; i--){
+      const r = recs[i];
+      const o = el("option"); o.value = r.commit;
+      const tag = state.releasesBySha[r.commit];
+      o.textContent = r.commit.slice(0,7) + "  " + (r.date||"").slice(0,10) +
+        (tag ? "  [" + tag + "]" : "") + "  " + (r.message||"").slice(0,42);
+      sel.appendChild(o);
+    }
+    sel.value = state[which];
+    sel.addEventListener("change", () => { state[which] = sel.value; onControlChange(); });
+    return sel;
+  };
+  const mkSide = (which) => {
+    const side = el("div","cmp-side");
+    const role = el("div","role"); role.textContent = which;
+    const rec = recBySha(state[which]);
+    const idr = el("div","id mono");
+    const url = commitURL(rec.commit);
+    if(url){
+      const a = el("a"); a.href = url; a.target = "_blank"; a.rel = "noopener";
+      a.textContent = rec.commit.slice(0,7);
+      idr.appendChild(a);
+    } else idr.append(rec.commit.slice(0,7));
+    idr.append(" · " + (rec.date||"").slice(0,10));
+    const tag = state.releasesBySha[rec.commit];
+    if(tag){ const t = el("span","chip rel mono"); t.textContent = tag; idr.appendChild(t); }
+    if(recordCoverage(rec) === "partial"){
+      const t = el("span","chip flat"); t.textContent = "partial"; t.title = "Only selected benchmarks were measured";
+      idr.appendChild(t);
+    }
+    const msg = el("div","cmsg"); msg.textContent = rec.message || ""; msg.title = rec.message || "";
+    side.append(role, idr, msg, mkSel(which));
+    return side;
+  };
+  const swap = el("button","swap"); swap.textContent = "⇄"; swap.title = "Swap commits";
+  swap.addEventListener("click", () => {
+    const t = state.before; state.before = state.after; state.after = t; onControlChange();
+  });
+  head.append(mkSide("before"), swap, mkSide("after"));
+  host.appendChild(head);
+
+  const rb = recBySha(state.before), ra = recBySha(state.after);
+  const q = state.q.toLowerCase();
+  let keys = Object.keys(ra.benchmarks).sort().filter(k => !q || k.toLowerCase().includes(q));
+
+  // Sort order and per-category toggles for the table.
+  const catOf = k => k.includes("/") ? k.slice(0, k.indexOf("/")) : "other";
+  const counts = new Map();
+  for(const k of keys) counts.set(catOf(k), (counts.get(catOf(k)) || 0) + 1);
+  const hidden = new Set(state.hidecats.split(",").filter(c => counts.has(c)));
+  keys = keys.filter(k => !hidden.has(catOf(k)));
+  const rows = [];
+  let logSum = 0, n = 0, worse = 0, better = 0;
+  for(const k of keys){
+    const va = statValue(ra, k), vb = statValue(rb, k);
+    const pct = (vb > 0 && va != null) ? (va/vb - 1) * 100 : null;
+    if(pct != null){ logSum += Math.log(va/vb); n++;
+      if(pct >= CHIP_EPS) worse++; else if(pct <= -CHIP_EPS) better++; }
+    rows.push({ key: k, vb, va, pct });
+  }
+  // Unmeasured rows have no delta to order by, so they stay grouped first either way.
+  const asc = state.sortdir === "asc";
+  if(state.sort === "name")
+    rows.sort((a,b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0) * (asc ? 1 : -1));
+  else
+    rows.sort((a,b) => (b.pct == null) - (a.pct == null) || ((b.pct||0) - (a.pct||0)) * (asc ? -1 : 1));
+
+  const ctl = el("div","cmp-ctl");
+  const slbl = el("span","lbl"); slbl.textContent = "sort";
+  const sortSeg = el("div","seg");
+  for(const [key, label] of [["delta", "Δ"], ["name", "name"]]){
+    const on = state.sort === key;
+    const b = el("button");
+    b.textContent = on ? label + " " + (state.sortdir === "asc" ? "↑" : "↓") : label;
+    b.ariaPressed = on;
+    b.title = on ? "Reverse sort direction" : "Sort by " + (key === "delta" ? "Δ" : "name");
+    b.addEventListener("click", () => {
+      if(state.sort === key) state.sortdir = state.sortdir === "asc" ? "desc" : "asc";
+      else { state.sort = key; state.sortdir = SORT_DIR[key]; }
+      onControlChange();
+    });
+    sortSeg.appendChild(b);
+  }
+  ctl.append(slbl, sortSeg);
+  // Purely a display filter — the summary above still counts every benchmark.
+  // Rendered even at a count of zero: hiding every category would otherwise
+  // make the button vanish and shift the whole control row.
+  {
+    const flat = rows.filter(r => r.pct != null && Math.abs(r.pct) < CHIP_EPS).length;
+    ctl.appendChild(el("span","div"));
+    const b = el("button","cat"); b.textContent = "· invariant (" + flat + ")";
+    b.ariaPressed = !state.hideflat;
+    b.title = (state.hideflat ? "Show" : "Hide") + " benchmarks within ±" + CHIP_EPS + "%";
+    b.addEventListener("click", () => { state.hideflat = !state.hideflat; onControlChange(); });
+    ctl.appendChild(b);
+  }
+  if(counts.size > 1){
+    ctl.appendChild(el("span","div"));
+    // Master toggle: behaves like a "select all" checkbox for the categories.
+    const allOn = hidden.size === 0;
+    const all = el("button","cat all"); all.textContent = "all";
+    all.ariaPressed = allOn;
+    all.title = allOn ? "Hide all categories" : "Show all categories";
+    all.addEventListener("click", () => {
+      state.hidecats = allOn ? [...counts.keys()].join(",") : "";
+      onControlChange();
+    });
+    ctl.appendChild(all);
+    for(const c of [...counts.keys()].sort()){
+      const b = el("button","cat"); b.textContent = c + " (" + counts.get(c) + ")";
+      b.ariaPressed = !hidden.has(c);
+      b.title = (hidden.has(c) ? "Show " : "Hide ") + c + " benchmarks";
+      b.addEventListener("click", () => {
+        hidden.has(c) ? hidden.delete(c) : hidden.add(c);
+        state.hidecats = [...hidden].join(","); onControlChange();
+      });
+      ctl.appendChild(b);
+    }
+  }
+  const shown = state.hideflat
+    ? rows.filter(r => r.pct == null || Math.abs(r.pct) >= CHIP_EPS)
+    : rows;
+
+  // Always rendered — even with every row filtered out — so toggling
+  // categories doesn't make the summary pop in and out and reflow the page.
+  {
+    const sum = el("div","card cmp-summary");
+    const g = n ? (Math.exp(logSum/n) - 1) * 100 : null;
+    const big = el("span","big mono"); big.textContent = fmtPct(g);
+    if(g != null && Math.abs(g) >= CHIP_EPS) big.classList.add(g > 0 ? "bad" : "good");
+    const lbl = el("span","lbl");
+    lbl.textContent = statDef().label.toLowerCase() + " geomean · " + n + " benchmarks · " +
+      worse + " regressed · " + better + " improved (≥" + CHIP_EPS + "%)";
+    sum.append(big, lbl);
+    if(regimeKey(rb) !== regimeKey(ra)){
+      const warn = el("span","lbl"); warn.style.color = getVar("--bad");
+      warn.textContent = "⚠ different measurement environments — not directly comparable (" +
+        envChangeDesc(rb, ra) + ")";
+      sum.appendChild(warn);
+    }
+    if(recordCoverage(rb) === "partial" || recordCoverage(ra) === "partial"){
+      const warn = el("span","lbl");
+      warn.textContent = "Partial upload selected — comparison uses only measurements present at those commits.";
+      sum.appendChild(warn);
+    }
+    host.appendChild(sum);
+  }
+  host.appendChild(ctl);
+  if(shown.length === 0){
+    const msg = rows.length
+      ? "No benchmark moved by more than ±" + CHIP_EPS + "%."
+      : recordCoverage(ra) === "partial" && Object.keys(ra.benchmarks).length === 0
+        ? "This partial upload contains only explicit benchmark removals."
+        : "No benchmarks match.";
+    return host.appendChild(Object.assign(el("div","empty"), { textContent: msg }));
+  }
+
+  const wrap = el("div","card cmp-wrap");
+  const tbl = el("table","cmp");
+  const thead = el("thead"); const trh = el("tr");
+  const mkTh = (txt, cls) => { const th = el("th", cls); th.textContent = txt; return th; };
+  const mkShaTh = (sha, rec) => {
+    const th = el("th","num");
+    const url = commitURL(sha);
+    if(url){
+      const a = el("a"); a.href = url; a.target = "_blank"; a.rel = "noopener";
+      a.textContent = sha.slice(0,7);
+      th.appendChild(a);
+    } else th.append(sha.slice(0,7));
+    th.append(" · " + (rec.date||"").slice(0,10));
+    return th;
+  };
+  trh.append(mkTh("Benchmark"), mkShaTh(state.before, rb), mkShaTh(state.after, ra), mkTh("Δ", "num"));
+  thead.appendChild(trh); tbl.appendChild(thead);
+  const tbody = el("tbody");
+  for(const r of shown){
+    const tr = el("tr");
+    const tdk = el("td","key"); tdk.textContent = r.key;
+    const tdb = el("td","num mono"); tdb.textContent = fmtAbs(r.vb);
+    const tda = el("td","num mono"); tda.textContent = fmtAbs(r.va);
+    const tdd = el("td","num");
+    const chip = el("span","chip mono");
+    if(r.pct == null){
+      chip.classList.add("flat");
+      chip.textContent = r.vb == null && recordCoverage(rb) === "snapshot" ? "new" : "not measured";
+    }
+    else if(Math.abs(r.pct) < CHIP_EPS){ chip.classList.add("flat"); chip.textContent = "· " + fmtPct(r.pct); }
+    else if(r.pct > 0){ chip.classList.add("bad"); chip.textContent = "▲ " + fmtPct(r.pct); }
+    else { chip.classList.add("good"); chip.textContent = "▼ " + fmtPct(r.pct); }
+    tdd.appendChild(chip);
+    tr.append(tdk, tdb, tda, tdd);
+    tbody.appendChild(tr);
+  }
+  tbl.appendChild(tbody); wrap.appendChild(tbl); host.appendChild(wrap);
+}
+
+// --- commits page ------------------------------------------------------------
+
+function renderCommitsPage(host){
+  const recs = visibleRecords();
+  if(recs.length === 0) return showEmpty("No records in this time range.");
+  const q = state.q.toLowerCase();
+  const keys = currentKeys().filter(k => !q || k.toLowerCase().includes(q));
+  const previousSnapshot = [];
+  let snapshot = null;
+  for(const r of recs){
+    previousSnapshot.push(snapshot);
+    if(recordCoverage(r) === "snapshot") snapshot = r;
+  }
+
+  const hint = el("div","tl-hint");
+  hint.textContent = "Snapshot Δ is the " + statDef().label.toLowerCase() +
+    " geomean vs the previous complete snapshot" + (state.q ? " (filtered benchmarks)" : "") +
+    "; partial uploads show — because their aggregate coverage is incomplete — ⇄ compares measured results with that snapshot.";
+  host.appendChild(hint);
+
+  const list = el("div","card timeline");
+  for(let i = recs.length-1; i >= 0; i--){
+    const r = recs[i], prev = i > 0 ? recs[i-1] : null, baseline = previousSnapshot[i];
+    const row = el("div","commit");
+    const date = el("span","date"); date.textContent = (r.date||"").slice(0,10);
+    const sha = el("a","sha"); sha.textContent = (r.commit||"").slice(0,7);
+    const url = commitURL(r.commit);
+    if(url){ sha.href = url; sha.target = "_blank"; sha.rel = "noopener"; }
+    const msg = el("span","msg"); msg.textContent = r.message || ""; msg.title = r.message || "";
+    row.append(date, sha);
+    if(baseline){
+      const cmp = el("button","cmpbtn"); cmp.textContent = "⇄";
+      cmp.title = "Compare against previous complete snapshot";
+      cmp.setAttribute("aria-label", "Compare " + (r.commit||"").slice(0,7) + " against the previous complete snapshot");
+      cmp.addEventListener("click", () => {
+        state.before = baseline.commit; state.after = r.commit; state.page = "compare"; onControlChange();
+        window.scrollTo(0, 0);
+      });
+      row.appendChild(cmp);
+    }
+    row.append(msg);
+    const tag = state.releasesBySha[r.commit];
+    if(tag){ const t = el("span","chip rel mono"); t.textContent = tag; row.appendChild(t); }
+    if(recordCoverage(r) === "partial"){
+      const t = el("span","chip flat"); t.textContent = "partial";
+      t.title = "Only selected benchmarks were measured at this commit";
+      row.appendChild(t);
+    }
+    if(prev && regimeKey(prev) !== regimeKey(r)){
+      const t = el("span","chip flat"); t.textContent = "env";
+      t.title = "measurement environment changed — " + envChangeDesc(prev, r);
+      row.appendChild(t);
+    }
+    row.appendChild(el("span","spacer"));
+    let pct = null;
+    if(baseline && recordCoverage(r) === "snapshot"){
+      let logSum = 0, n = 0;
+      for(const k of keys){
+        const va = statValue(r, k), vb = statValue(baseline, k);
+        if(va != null && vb > 0){ logSum += Math.log(va/vb); n++; }
+      }
+      if(n) pct = (Math.exp(logSum/n) - 1) * 100;
+    }
+    const chip = el("span","chip mono");
+    if(pct == null){ chip.classList.add("flat"); chip.textContent = "—"; }
+    else if(Math.abs(pct) < CHIP_EPS){ chip.classList.add("flat"); chip.textContent = "· " + fmtPct(pct); }
+    else if(pct > 0){ chip.classList.add("bad"); chip.textContent = "▲ " + fmtPct(pct); }
+    else { chip.classList.add("good"); chip.textContent = "▼ " + fmtPct(pct); }
+    row.appendChild(chip);
+    list.appendChild(row);
+  }
+  host.appendChild(list);
+}
+
+// --- charts ------------------------------------------------------------------
+
+// X tick labels: a second line anchors coarse ticks to their period — the
+// year under months/days, the date under hours — but only where it adds
+// information: at period boundaries, and on the first tick when the period
+// isn't the current one. "Jun Jul" in a recent 3-month view needs no year;
+// the same view of an old year gets one.
+const X_FMT = {
+  y: uPlot.fmtDate("{YYYY}"), mo: uPlot.fmtDate("{MMM}"), d: uPlot.fmtDate("{D} {MMM}"),
+  hm: uPlot.fmtDate("{HH}:{mm}"), s: uPlot.fmtDate("{HH}:{mm}:{ss}"),
+  dmy: uPlot.fmtDate("{D} {MMM} {YYYY}"),
+};
+function xTickValues(u, splits, axisIdx, foundSpace, foundIncr){
+  const now = new Date();
+  let prev = null;
+  return splits.map(t => {
+    const d = new Date(t * 1000);
+    let label, sub = "";
+    const yearNews = prev ? d.getFullYear() !== prev.getFullYear()
+                          : d.getFullYear() !== now.getFullYear();
+    if(foundIncr >= 31536000) label = X_FMT.y(d);
+    else if(foundIncr >= 2419200){
+      label = X_FMT.mo(d);
+      if(yearNews) sub = "\n" + d.getFullYear();
+    } else if(foundIncr >= 86400){
+      label = X_FMT.d(d);
+      if(yearNews) sub = "\n" + d.getFullYear();
+    } else {
+      label = foundIncr >= 60 ? X_FMT.hm(d) : X_FMT.s(d);
+      const dayNews = !prev || d.getDate() !== prev.getDate() ||
+                      d.getMonth() !== prev.getMonth() || d.getFullYear() !== prev.getFullYear();
+      if(dayNews) sub = "\n" + (yearNews ? X_FMT.dmy(d) : X_FMT.d(d));
+    }
+    prev = d;
+    return label + sub;
+  });
+}
+
+// Even-x mode: splits are record indices. Ticks are still labeled with the
+// commit's date — the axis just doesn't scale by it — and a label is drawn
+// only where the day changes, so a burst of same-day commits isn't a run of
+// identical labels. Year sublines follow the same rules as the time axis.
+function evenTickValues(recs){
+  return (u, splits) => {
+    const now = new Date();
+    let prev = null;
+    return splits.map(ix => {
+      const r = recs[ix];
+      if(!Number.isInteger(ix) || !r) return "";
+      const u0 = r.date_unix != null ? r.date_unix : Date.parse(r.date)/1000;
+      const d = new Date(u0 * 1000);
+      const sameDay = prev && d.getFullYear() === prev.getFullYear() &&
+                      d.getMonth() === prev.getMonth() && d.getDate() === prev.getDate();
+      const yearNews = prev ? d.getFullYear() !== prev.getFullYear()
+                            : d.getFullYear() !== now.getFullYear();
+      const label = sameDay ? "" : X_FMT.d(d) + (yearNews ? "\n" + d.getFullYear() : "");
+      prev = d;
+      return label;
+    });
+  };
+}
+
+function initChart(c){
+  if(c.chart) return;
+  const isOverview = c.kind === "overview";
+  const labeled = isOverview || c.labeled;
+  const pctMode = isOverview || state.view === "pct";
+  const fmtY = pctMode ? fmtPct : fmtAbs;
+  // Integer px only: uPlot rescales the size for high-DPR canvases with
+  // /(\d+)px/, which mangles fractional sizes ("10.5px" -> "10.10px"), leaving
+  // the labels at roughly 1/dpr of the intended size on retina/phone screens.
+  const axisFont = (COARSE ? 13 : 11) + "px ui-monospace, Menlo, Consolas, monospace";
+  const w = c.plotEl.clientWidth || 320, h = c.plotEl.clientHeight || 130;
+  // One uPlot series per environment segment (identically styled), so the line
+  // breaks at regime changes instead of drawing a misleading connector.
+  const seg = c.markers.seg;
+  const nSeg = seg.length ? seg[seg.length-1] + 1 : 1;
+  const ysSplit = nSeg === 1 ? [c.ys] :
+    Array.from({ length: nSeg }, (_, s) => c.ys.map((v, i) => seg[i] === s ? v : null));
+  const mkSeries = ys => ({
+    stroke: getVar("--series"), width: 1.5, spanGaps: false,
+    points: {
+      show: ys.reduce((n, v) => n + (v != null), 0) === 1,
+      filter: (u, seriesIdx, show) => {
+        if(show || isOverview) return null;
+        const plotted = u.data[seriesIdx], idxs = [];
+        for(let i = 0; i < plotted.length; i++){
+          if(plotted[i] != null &&
+             ((i > 0 && c.ys[i-1] == null) || (i + 1 < c.ys.length && c.ys[i+1] == null)))
+            idxs.push(i);
+        }
+        return idxs.length ? idxs : null;
+      },
+      size: 5,
+    },
+    fill: pctMode ? undefined : getVar("--series-soft"),
+  });
+  const even = state.xmode === "even";
+  const xAxis = { stroke: getVar("--faint"), font: axisFont, size: COARSE ? 58 : 42,
+    space: COARSE ? 100 : 80,
+    grid: { show: false }, ticks: { stroke: getVar("--hairline"), size: 4 },
+    values: even ? evenTickValues(c.recs) : xTickValues };
+  // Integer increments only, so every tick lands on an actual commit.
+  if(even) xAxis.incrs = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
+  const opts = {
+    width: w, height: h, legend: { show: false }, pxAlign: 1,
+    cursor: { sync: { key: SYNC_KEY, setSeries: false }, points: { size: 6 },
+              drag: { x: false, y: false } },
+    scales: { x: { time: !even } },
+    series: [ {}, ...ysSplit.map(mkSeries) ],
+    axes: [
+      xAxis,
+      { stroke: getVar("--faint"), font: axisFont, size: autoAxisSize,
+        space: labeled ? (COARSE ? 42 : 34) : (COARSE ? 38 : 30), gap: 4,
+        grid: { stroke: getVar("--grid"), width: 1 }, ticks: { show: false },
+        values: (u, vals) => vals.map(fmtY) },
+    ],
+    plugins: [ markerPlugin(c, labeled), zeroLinePlugin(pctMode), hoverPlugin(c) ],
+  };
+  c.chart = new uPlot(opts, [c.xs, ...ysSplit], c.plotEl);
+  const over = c.plotEl.querySelector(".u-over");
+  // Touch: press/drag scrubs the cursor (snapping to commits) instead of
+  // navigating; the synthesized click after a tap is suppressed so inspecting
+  // a point doesn't open its commit.
+  let lastTouch = 0;
+  const touchCursor = e => {
+    const t = e.touches[0]; if(!t) return;
+    lastTouch = performance.now();
+    const r = over.getBoundingClientRect();
+    c.touch = true;
+    c.chart.setCursor({ left: t.clientX - r.left, top: t.clientY - r.top });
+  };
+  over.addEventListener("touchstart", touchCursor, { passive: true });
+  over.addEventListener("touchmove", touchCursor, { passive: true });
+  over.addEventListener("touchend", () => { lastTouch = performance.now(); c.touch = false; }, { passive: true });
+  over.addEventListener("touchcancel", () => { c.touch = false; }, { passive: true });
+  // Clicking a point opens the predecessor comparison for that commit; the
+  // GitHub links live on the compare and commits pages.
+  over.addEventListener("click", () => {
+    if(performance.now() - lastTouch < 700) return;
+    const idx = c.chart.cursor.idx; if(idx == null) return;
+    const all = state.data.records;
+    const i = all.findIndex(r => r.commit === c.recs[idx].commit);
+    if(i <= 0) return;
+    closeModal(true);
+    state.before = all[i-1].commit; state.after = all[i].commit; state.page = "compare";
+    onControlChange(); window.scrollTo(0, 0);
+  });
+}
+
+// Fit the y axis to its widest tick label (fixed widths clip e.g. "20.8 ms").
+function autoAxisSize(u, values, axisIdx, cycleNum){
+  const axis = u.axes[axisIdx];
+  if(cycleNum > 1) return axis._size;
+  let size = axis.gap + 4;
+  const longest = (values || []).reduce((a,b) => (a.length > b.length ? a : b), "");
+  if(longest !== ""){
+    u.ctx.font = axis.font[0];
+    size += u.ctx.measureText(longest).width / devicePixelRatio;
+  }
+  return Math.ceil(size);
+}
+
+// Vertical annotation lines: releases (dashed, labeled on large charts) and
+// measurement-regime changes (dotted) — regime changes can look like perf changes.
+function markerPlugin(c, labeled){
+  return { hooks: { draw: u => {
+    // The draw hook works in raw canvas pixels, so scale by devicePixelRatio.
+    const ctx = u.ctx, dpr = devicePixelRatio || 1;
+    ctx.save();
+    const draw = (idxs, color, dash, label) => {
+      ctx.strokeStyle = color; ctx.fillStyle = color;
+      ctx.setLineDash(dash.map(d => d * dpr)); ctx.lineWidth = dpr;
+      ctx.font = Math.round((COARSE ? 12 : 10) * dpr) + "px ui-monospace, Menlo, Consolas, monospace";
+      for(const i of idxs){
+        const x = Math.round(u.valToPos(u.data[0][i], "x", true));
+        if(x < u.bbox.left || x > u.bbox.left + u.bbox.width) continue;
+        ctx.beginPath(); ctx.moveTo(x, u.bbox.top); ctx.lineTo(x, u.bbox.top + u.bbox.height); ctx.stroke();
+        if(labeled && label) ctx.fillText(label(i), x + 4*dpr, u.bbox.top + 10*dpr);
+      }
+    };
+    draw(c.markers.env, getVar("--faint"), [1,3], labeled ? (() => "env") : null);
+    draw(c.markers.rel, getVar("--release"), [4,3],
+         labeled ? (i => state.releasesBySha[c.recs[i].commit] || "") : null);
+    ctx.restore();
+  } } };
+}
+
+// Solid baseline at 0 in percent mode (when 0 is inside the y range).
+function zeroLinePlugin(pctMode){
+  return { hooks: { draw: u => {
+    if(!pctMode) return;
+    const sc = u.scales.y;
+    if(sc.min == null || sc.min > 0 || sc.max < 0) return;
+    const y = Math.round(u.valToPos(0, "y", true));
+    const ctx = u.ctx;
+    ctx.save(); ctx.strokeStyle = getVar("--faint");
+    ctx.lineWidth = devicePixelRatio || 1; ctx.setLineDash([]);
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath(); ctx.moveTo(u.bbox.left, y); ctx.lineTo(u.bbox.left + u.bbox.width, y); ctx.stroke();
+    ctx.restore();
+  } } };
+}
+
+function hoverPlugin(c){
+  const tt = $("tooltip");
+  return { hooks: {
+    setCursor: u => {
+      if(!c.touch && !u.over.matches(":hover")){ return; }
+      const idx = u.cursor.idx;
+      if(idx == null || u.cursor.left < 0){ tt.style.display = "none"; return; }
+      const r = c.recs[idx];
+      tt.textContent = "";
+      const head = el("div","sha");
+      head.textContent = (r.commit || "").slice(0,7) + " · " + (r.date || "").slice(0,10);
+      const tag = state.releasesBySha[r.commit];
+      if(tag){ const t = el("span","tag"); t.textContent = tag; head.appendChild(t); }
+      tt.appendChild(head);
+      if(r.message){ const m = el("div","msg"); m.textContent = r.message; tt.appendChild(m); }
+      // Only for the commit that actually changed environment: matching nearby
+      // markers by pixel distance made the note follow the cursor across
+      // several commits, reading as if they had all changed environment.
+      if(c.markers.env.includes(idx)){
+        const e = el("div","env");
+        const b = el("b"); b.textContent = "measurement environment changed at this commit";
+        e.append(b, envChangeDesc(c.recs[idx-1], c.recs[idx]));
+        tt.appendChild(e);
+      }
+      const row = el("div","num");
+      if(c.kind === "overview"){
+        row.textContent = "geomean " + fmtPct(c.ys[idx]);
+      } else {
+        const v = statValue(r, c.key);
+        row.append(shortName(c.key) + ": " + fmtAbs(v));
+        const base = c.bases ? c.bases[idx] : null;
+        const pv = (base > 0 && v != null) ? (v/base - 1)*100 : null;
+        if(pv != null){
+          const d = el("span","delta " + (Math.abs(pv) < CHIP_EPS ? "" : pv > 0 ? "bad" : "good"));
+          d.textContent = "  " + fmtPct(pv) + (!state.link && c.markers.env.length ? " vs env start" : " vs start");
+          row.append(d);
+        }
+      }
+      tt.appendChild(row);
+      tt.style.display = "block";
+      const rect = u.over.getBoundingClientRect();
+      let left = rect.left + u.cursor.left + 14;
+      if(left + tt.offsetWidth > window.innerWidth - 8) left = rect.left + u.cursor.left - tt.offsetWidth - 14;
+      let top = rect.top + Math.max(0, u.cursor.top) - 10;
+      if(top + tt.offsetHeight > window.innerHeight - 8) top = window.innerHeight - tt.offsetHeight - 8;
+      tt.style.left = Math.max(8, left) + "px"; tt.style.top = Math.max(8, top) + "px";
+    },
+  } };
+}
+
+document.addEventListener("mouseout", e => {
+  if(!e.relatedTarget) $("tooltip").style.display = "none";
+});
+document.addEventListener("touchstart", e => {
+  if(!e.target.closest || !e.target.closest(".u-over")) $("tooltip").style.display = "none";
+}, { passive: true });
+document.addEventListener("mousemove", e => {
+  if(!e.target.closest || !e.target.closest(".u-over")) $("tooltip").style.display = "none";
+});
+
+// Keep --barh in sync with the sticky bar's real height (it wraps on narrow
+// screens), so scroll-margin-top, the sidenav offset and the scroll spy all
+// clear it.
+let barH = 0;
+{
+  const bar = document.querySelector(".bar");
+  const setBarH = () => {
+    barH = bar.offsetHeight;
+    document.documentElement.style.setProperty("--barh", barH + "px");
+    if(state.scrollFn) state.scrollFn();
+  };
+  new ResizeObserver(setBarH).observe(bar);
+  setBarH();
+}
+
+window.addEventListener("resize", () => {
+  clearTimeout(roTimer);
+  roTimer = setTimeout(() => {
+    const all = [state.overview, ...state.cards, state.modal && state.modal.c].filter(Boolean);
+    for(const c of all) if(c.chart)
+      c.chart.setSize({ width: c.plotEl.clientWidth, height: c.plotEl.clientHeight });
+  }, 100);
+});
+if(window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rebuild);
+
+load();
+</script>
+</body>
+</html>

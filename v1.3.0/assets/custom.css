@@ -1,0 +1,13 @@
+html.theme--documenter-light body div#documenter nav.docs-sidebar a.docs-logo img,
+html.theme--documenter-dark body div#documenter nav.docs-sidebar a.docs-logo img,
+html.theme--catppuccin-latte body div#documenter nav.docs-sidebar a.docs-logo img,
+html.theme--catppuccin-frappe body div#documenter nav.docs-sidebar a.docs-logo img,
+html.theme--catppuccin-macchiato body div#documenter nav.docs-sidebar a.docs-logo img,
+html.theme--catppuccin-mocha body div#documenter nav.docs-sidebar a.docs-logo img {
+    max-height: 10rem;
+}
+div.docs-package-name {
+    font-family: "JuliaMono";
+    font-weight: normal !important;
+    font-size: 1.7rem !important;
+}

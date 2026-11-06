@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 274" width="620" height="274">
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+        orient="auto-start-reverse"><path d="M0,0.6 L10,5 L0,9.4 z" fill="#dfe4ea"/></marker>
+<pattern id="hatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+<line x1="0" y1="0" x2="0" y2="7" stroke="#98a2b0" stroke-width="1.1"/></pattern>
+</defs>
+<rect x="78.0" y="66.0" width="120.0" height="120.0" rx="0" fill="#56b4e9" fill-opacity="0.05" stroke="none" stroke-width="2.0"/>
+<path d="M78.0,66.0 H198.0 V186.0 H78.0 Z" fill="none" stroke="#dfe4ea" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<line x1="138.0" y1="126.0" x2="224.0" y2="126.0" stroke="#98a2b0" stroke-width="1.4" stroke-linecap="round" marker-end="url(#arrow)"/>
+<line x1="138.0" y1="126.0" x2="138.0" y2="40.0" stroke="#98a2b0" stroke-width="1.4" stroke-linecap="round" marker-end="url(#arrow)"/>
+<text x="230.0" y="131.0" fill="#98a2b0" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="17" font-weight="400" font-style="italic" text-anchor="start">ξ<tspan font-size="0.7em" dy="0.22em">1</tspan></text>
+<text x="144.0" y="36.0" fill="#98a2b0" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="17" font-weight="400" font-style="italic" text-anchor="start">ξ<tspan font-size="0.7em" dy="0.22em">2</tspan></text>
+<circle cx="78.0" cy="186.0" r="6.0" fill="#56b4e9"/>
+<text x="69.0" y="208.0" fill="#56b4e9" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="18" font-weight="700" font-style="italic" text-anchor="end">ξ̂<tspan font-size="0.7em" dy="0.22em">1</tspan></text>
+<circle cx="198.0" cy="186.0" r="6.0" fill="#56b4e9"/>
+<text x="207.0" y="208.0" fill="#56b4e9" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="18" font-weight="700" font-style="italic" text-anchor="start">ξ̂<tspan font-size="0.7em" dy="0.22em">2</tspan></text>
+<circle cx="198.0" cy="66.0" r="6.0" fill="#56b4e9"/>
+<text x="209.0" y="56.0" fill="#56b4e9" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="18" font-weight="700" font-style="italic" text-anchor="start">ξ̂<tspan font-size="0.7em" dy="0.22em">3</tspan></text>
+<circle cx="78.0" cy="66.0" r="6.0" fill="#56b4e9"/>
+<text x="67.0" y="56.0" fill="#56b4e9" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="18" font-weight="700" font-style="italic" text-anchor="end">ξ̂<tspan font-size="0.7em" dy="0.22em">4</tspan></text>
+<text x="138.0" y="260.0" fill="#98a2b0" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="400" font-style="normal" text-anchor="middle">reference cell</text>
+<path d="M392.0,208.0 Q460,190 528.0,182.0 Q556,132 556.0,68.0 Q482,84 416.0,52.0 Q386,132 392.0,208.0 Z" fill="#56b4e9" fill-opacity="0.05" stroke="none"/>
+<path d="M392.0,208.0 Q460,190 528.0,182.0 Q556,132 556.0,68.0 Q482,84 416.0,52.0 Q386,132 392.0,208.0 Z" fill="none" stroke="#dfe4ea" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="392.0" cy="208.0" r="6.0" fill="#56b4e9"/>
+<text x="392.0" y="232.0" fill="#56b4e9" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="18" font-weight="700" font-style="italic" text-anchor="middle">x̂<tspan font-size="0.7em" dy="0.22em">1</tspan></text>
+<circle cx="528.0" cy="182.0" r="6.0" fill="#56b4e9"/>
+<text x="542.0" y="198.0" fill="#56b4e9" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="18" font-weight="700" font-style="italic" text-anchor="start">x̂<tspan font-size="0.7em" dy="0.22em">2</tspan></text>
+<circle cx="556.0" cy="68.0" r="6.0" fill="#56b4e9"/>
+<text x="570.0" y="60.0" fill="#56b4e9" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="18" font-weight="700" font-style="italic" text-anchor="start">x̂<tspan font-size="0.7em" dy="0.22em">3</tspan></text>
+<circle cx="416.0" cy="52.0" r="6.0" fill="#56b4e9"/>
+<text x="412.0" y="38.0" fill="#56b4e9" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="18" font-weight="700" font-style="italic" text-anchor="end">x̂<tspan font-size="0.7em" dy="0.22em">4</tspan></text>
+<line x1="336.0" y1="250.0" x2="382.0" y2="250.0" stroke="#98a2b0" stroke-width="1.4" stroke-linecap="round" marker-end="url(#arrow)"/>
+<line x1="336.0" y1="250.0" x2="336.0" y2="204.0" stroke="#98a2b0" stroke-width="1.4" stroke-linecap="round" marker-end="url(#arrow)"/>
+<text x="388.0" y="255.0" fill="#98a2b0" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="17" font-weight="400" font-style="italic" text-anchor="start">x<tspan font-size="0.7em" dy="0.22em">1</tspan></text>
+<text x="329.0" y="200.0" fill="#98a2b0" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="17" font-weight="400" font-style="italic" text-anchor="end">x<tspan font-size="0.7em" dy="0.22em">2</tspan></text>
+<text x="490.0" y="260.0" fill="#98a2b0" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="15" font-weight="400" font-style="normal" text-anchor="middle">physical cell</text>
+<path d="M232,104 Q290,66 348,104" fill="none" stroke="#00c9a0" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M348,104 l-11.5,-4.6 l1.6,9.6 z" fill="#00c9a0" transform="rotate(28 348 104)"/>
+<text x="290.0" y="56.0" fill="#00c9a0" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="19" font-weight="700" font-style="italic" text-anchor="middle">x(ξ)</text>
+</svg>
