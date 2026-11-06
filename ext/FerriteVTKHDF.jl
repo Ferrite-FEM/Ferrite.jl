@@ -103,6 +103,8 @@ function write_solution(vtk::VTKHDFGridFile, dh::AbstractDofHandler, u::Abstract
     end
     return vtk
 end
+# Deprecation of positional suffix in write_solution
+Base.@deprecate write_solution(vtk::VTKHDFGridFile, dh::AbstractDofHandler, u::AbstractVector, suffix) write_solution(vtk, dh, u; suffix) false
 
 function write_projection(vtk::VTKHDFGridFile, proj::L2Projector, vals, name)
     if Ferrite.write_discontinuous(vtk)
