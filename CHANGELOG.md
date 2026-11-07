@@ -114,6 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+ - `addcellset!` now supports `condition=:all`, `condition=:single`, and `condition=:center` for selecting cells based on all nodes, any node, or the physical cell center, respectively. (#1463)
  - `Lagrange` (and thus `DiscontinuousLagrange`) interpolations of order 3 and higher now
    use Gauss–Lobatto–Legendre (GLL) based nodes instead of equispaced nodes:
    tensor-product GLL nodes for `Lagrange{RefQuadrilateral, 3}` and
