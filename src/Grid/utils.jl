@@ -5,25 +5,32 @@ _warn_emptyset(set, name) = length(set) == 0 && @warn("no entities added to the 
 
 """
     addcellset!(grid::AbstractGrid, name::String, cellid::AbstractVecOrSet{Int})
-    addcellset!(grid::AbstractGrid, name::String, f::function; all::Bool=true)
+    addcellset!(grid::AbstractGrid, name::String, f::Function; condition::Symbol = :all)
 
-Adds a cellset to the grid with key `name`.
-Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
-The `DofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
-`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` in the cell if the cell
-should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node.
+    Adds a cellset to the grid with key `name`.
+    Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
+    The `DofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
 
-```julia
-addcellset!(grid, "left", Set((1, 3))) #add cells with id 1 and 3 to cellset left
-addcellset!(grid, "right", x -> norm(x[1]) < 2.0) #add cell to cellset right, if x[1] of each cell's node is smaller than 2.0
-```
+    `condition=:all` implies that `f(x)` must return `true` for all nodal coordinates
+    `x` in the cell if the cell should be added to the set.
+
+    `condition=:single` adds the cell if `f(x)` returns `true` for at least one
+    nodal coordinate `x`.
+
+    `condition=:center` evaluates `f(x)` at the physical center of the cell.
+
+    ```julia
+    addcellset!(grid, "left", Set((1, 3))) #add cells with id 1 and 3 to cellset left
+    addcellset!(grid, "right", x -> norm(x[1]) < 2.0) #add cell to cellset right, if x[1] of each cell's node is smaller than 2.0
+    addcellset!(grid, "center", x -> norm(x) < 2.0; condition=:center)
+    ```
 """
 function addcellset!(grid::AbstractGrid, name::String, cellid::AbstractVecOrSet{Int})
     return _addset!(grid, name, cellid, getcellsets(grid))
 end
 
-function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool = true)
-    return _addset!(grid, name, create_cellset(grid, f; all), getcellsets(grid))
+function addcellset!(grid::AbstractGrid, name::String, f::Function; condition::Symbol = :all)
+    return _addset!(grid, name, create_cellset(grid, f; condition), getcellsets(grid))
 end
 
 """
@@ -185,19 +192,37 @@ function _create_boundaryset(f::Function, grid::AbstractGrid, top::ExclusiveTopo
     return _makeset(get_facet_facet_neighborhood(top, grid))::OrderedSet{BI}
 end
 
-function create_cellset(grid::AbstractGrid, f::Function; all::Bool = true)
+function create_cellset(grid::AbstractGrid, f::Function; condition::Symbol = :all)
+    condition in (:all, :single, :center) ||
+        throw(ArgumentError("unsupported cellset condition: $condition"))
+
     cells = OrderedSet{Int}()
-    # Since we loop over the cells in order the resulting set will be sorted
+
     for (i, cell) in enumerate(getcells(grid))
-        pass = all
-        for node_idx in get_node_ids(cell)
-            v = f(get_node_coordinate(grid, node_idx))
-            all ? (!v && (pass = false; break)) : (v && (pass = true; break))
+        if condition === :center
+            node_ids = get_node_ids(cell)
+            cell_coordinates = [get_node_coordinate(grid, node_id) for node_id in node_ids]
+
+            interpolation = geometric_interpolation(cell)
+            T = eltype(cell_coordinates[1])
+            ξ = cellcenter(getrefshape(interpolation), T)
+            x = spatial_coordinate(interpolation, ξ, cell_coordinates)
+
+            f(x) && push!(cells, i)
+        else
+            pass = condition === :all
+
+            for node_idx in get_node_ids(cell)
+                v = f(get_node_coordinate(grid, node_idx))
+                condition === :all ? (!v && (pass = false; break)) : (v && (pass = true; break))
+            end
+
+            pass && push!(cells, i)
         end
-        pass && push!(cells, i)
     end
     return cells
 end
+
 function create_nodeset(grid::AbstractGrid, f::Function)
     nodes = OrderedSet{Int}()
     for (i, n) in pairs(getnodes(grid))

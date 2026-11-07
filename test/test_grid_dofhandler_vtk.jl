@@ -293,6 +293,43 @@ end
     std_grid = generate_grid(Quadrilateral, (getncells(mixed_grid), 1))
     @test Ferrite._check_same_celltype(std_grid, cellset) === nothing
     @test Ferrite._check_same_celltype(std_grid, facetset) === nothing
+
+    @testset "Cellset conditions" begin
+        grid = generate_grid(Quadrilateral, (10, 10))
+
+        f = x -> x[1] ≤ 0
+
+        addcellset!(grid, "all", f; condition = :all)
+        addcellset!(grid, "single", f; condition = :single)
+
+        all_cells = getcellset(grid, "all")
+        single_cells = getcellset(grid, "single")
+
+        @test all(
+            all(
+                get_node_coordinate(grid, node)[1] ≤ 0
+                    for node in Ferrite.get_node_ids(getcells(grid, cell))
+            )
+                for cell in all_cells
+        )
+
+        @test all(
+            any(
+                get_node_coordinate(grid, node)[1] ≤ 0
+                    for node in Ferrite.get_node_ids(getcells(grid, cell))
+            )
+                for cell in single_cells
+        )
+
+        addcellset!(grid, "inside", x -> norm(x) ≤ 1; condition = :center)
+        addcellset!(grid, "outside", x -> norm(x) > 1; condition = :center)
+
+        inside = getcellset(grid, "inside")
+        outside = getcellset(grid, "outside")
+
+        @test isempty(intersect(inside, outside))
+        @test length(inside) + length(outside) == getncells(grid)
+    end
 end
 
 @testset "Grid sets" begin
