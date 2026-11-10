@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Incompressible Navier-Stokes Equations via DifferentialEquations.jl · Ferrite.jl</title><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.044/juliamono.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">Ferrite.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><a class="tocitem" href="../../manual/fe_intro/">Introduction to FEM</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../../manual/degrees_of_freedom/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../manual/assembly/">Assembly</a></li><li><a class="tocitem" href="../../manual/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../manual/constraints/">Constraints</a></li><li><a class="tocitem" href="../../manual/grid/">Grid</a></li><li><a class="tocitem" href="../../manual/export/">Export</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../heat_equation/">Heat Equation</a></li><li><a class="tocitem" href="../postprocessing/">Postprocessing</a></li><li><a class="tocitem" href="../helmholtz/">Helmholtz equation</a></li><li><a class="tocitem" href="../incompressible_elasticity/">Incompressible Elasticity</a></li><li><a class="tocitem" href="../hyperelasticity/">Hyperelasticity</a></li><li><a class="tocitem" href="../threaded_assembly/">Threaded Assembly</a></li><li><a class="tocitem" href="../plasticity/">von Mises plasticity</a></li><li><a class="tocitem" href="../transient_heat_equation/">Time Dependent Problems</a></li><li><a class="tocitem" href="../landau/">Ginzburg-Landau model energy minimization</a></li><li><a class="tocitem" href="../linear_shell/">Linear shell</a></li><li><a class="tocitem" href="../quasi_incompressible_hyperelasticity/">Nearly Incompressible Hyperelasticity</a></li><li class="is-active"><a class="tocitem" href>Incompressible Navier-Stokes Equations via DifferentialEquations.jl</a><ul class="internal"><li><a class="tocitem" href="#Remarks-on-DifferentialEquations.jl"><span>Remarks on DifferentialEquations.jl</span></a></li><li><a class="tocitem" href="#Some-Theory-on-the-Incompressible-Navier-Stokes-Equations"><span>Some Theory on the Incompressible Navier-Stokes Equations</span></a></li><li><a class="tocitem" href="#Commented-Implementation"><span>Commented Implementation</span></a></li><li><a class="tocitem" href="#ns_vs_diffeq-plain-program"><span>Plain program</span></a></li></ul></li><li><a class="tocitem" href="../computational_homogenization/">Computational homogenization</a></li></ul></li><li><span class="tocitem">API Reference</span><ul><li><a class="tocitem" href="../../reference/quadrature/">Quadrature</a></li><li><a class="tocitem" href="../../reference/interpolations/">Interpolation</a></li><li><a class="tocitem" href="../../reference/fevalues/">FEValues</a></li><li><a class="tocitem" href="../../reference/dofhandler/">Degrees of Freedom</a></li><li><a class="tocitem" href="../../reference/assembly/">Assembly</a></li><li><a class="tocitem" href="../../reference/boundary_conditions/">Boundary Conditions</a></li><li><a class="tocitem" href="../../reference/grid/">Grid &amp; AbstractGrid</a></li><li><a class="tocitem" href="../../reference/export/">Postprocessing</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href>Incompressible Navier-Stokes Equations via DifferentialEquations.jl</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Incompressible Navier-Stokes Equations via DifferentialEquations.jl</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/Ferrite-FEM/Ferrite.jl/blob/master/docs/src/literate/ns_vs_diffeq.jl" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Incompressible-Navier-Stokes-Equations-via-DifferentialEquations.jl"><a class="docs-heading-anchor" href="#Incompressible-Navier-Stokes-Equations-via-DifferentialEquations.jl">Incompressible Navier-Stokes Equations via DifferentialEquations.jl</a><a id="Incompressible-Navier-Stokes-Equations-via-DifferentialEquations.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Incompressible-Navier-Stokes-Equations-via-DifferentialEquations.jl" title="Permalink"></a></h1><p><img src="https://user-images.githubusercontent.com/9196588/134514213-76d91d34-19ab-47c2-957e-16bb0c8669e1.gif" alt/></p><p>In this example we focus on a simple but visually appealing problem from fluid dynamics, namely vortex shedding. This problem is also known as <a href="https://en.wikipedia.org/wiki/K%C3%A1rm%C3%A1n_vortex_street">von-Karman vortex streets</a>. Within this example, we show how to utilize <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations.jl</a> in tandem with Ferrite.jl to solve this space-time problem. To keep things simple we use a naive approach to discretize the system.</p><h2 id="Remarks-on-DifferentialEquations.jl"><a class="docs-heading-anchor" href="#Remarks-on-DifferentialEquations.jl">Remarks on DifferentialEquations.jl</a><a id="Remarks-on-DifferentialEquations.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Remarks-on-DifferentialEquations.jl" title="Permalink"></a></h2><p>Many &quot;time step solvers&quot; of <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations.jl</a> assume that that the problem is provided in mass matrix form. The incompressible Navier-Stokes equations as stated above yield a DAE in this form after applying a spatial discretization technique - in our case FEM. The mass matrix form of ODEs and DAEs is given as:</p><p class="math-container">\[  M(t) \mathrm{d}_t u = f(u,t)\]</p><p>where <span>$M$</span> is a possibly time-dependent and not necessarily invertible mass matrix, <span>$u$</span> the vector of unknowns and <span>$f$</span> the right-hand-side (RHS). For us <span>$f$</span> can be interpreted as the spatial discretization of all linear and nonlinear operators depending on <span>$u$</span> and <span>$t$</span>, but not on the time derivative of <span>$u$</span>.</p><h2 id="Some-Theory-on-the-Incompressible-Navier-Stokes-Equations"><a class="docs-heading-anchor" href="#Some-Theory-on-the-Incompressible-Navier-Stokes-Equations">Some Theory on the Incompressible Navier-Stokes Equations</a><a id="Some-Theory-on-the-Incompressible-Navier-Stokes-Equations-1"></a><a class="docs-heading-anchor-permalink" href="#Some-Theory-on-the-Incompressible-Navier-Stokes-Equations" title="Permalink"></a></h2><h3 id="Problem-Description-in-Strong-Form"><a class="docs-heading-anchor" href="#Problem-Description-in-Strong-Form">Problem Description in Strong Form</a><a id="Problem-Description-in-Strong-Form-1"></a><a class="docs-heading-anchor-permalink" href="#Problem-Description-in-Strong-Form" title="Permalink"></a></h3><p>The incompressible Navier-Stokes equations can be stated as the system</p><p class="math-container">\[ \begin{aligned}
+   \partial_t v &amp;= \underbrace{\nu \Delta v}_{\text{viscosity}} - \underbrace{(v \cdot \nabla) v}_{\text{advection}} - \underbrace{\nabla p}_{\text{pressure}} \\
+              0 &amp;= \underbrace{\nabla \cdot v}_{\text{incompressibility}}
+ \end{aligned}\]</p><p>where <span>$v$</span> is the unknown velocity field, <span>$p$</span> the unknown pressure field, <span>$\nu$</span> the dynamic viscosity and <span>$\Delta$</span> the Laplacian. In the derivation we assumed a constant density of 1 for the fluid and negligible coupling between the velocity components. Finally we see that the pressure term appears only in combination with the gradient operator, so for any solution <span>$p$</span> the function <span>$p + c$</span> is also an admissible solution, if we do not impose Dirichlet conditions on the pressure. To resolve this we introduce the implicit constraint that $ \int_\Omega p = 0 $.</p><p>Our setup is derived from <a href="http://www.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark1_re20.html">Turek&#39;s DFG benchmark</a>. We model a channel with size <span>$0.41 \times 2.2$</span> and a hole of radius <span>$0.05$</span> centered at <span>$(0.2, 0.2)$</span>. The left side has a parabolic inflow profile, which is ramped up over time, modeled as the time dependent Dirichlet condition</p><p class="math-container">\[ v(x,y,t)
+ =
+ \begin{bmatrix}
+     4 v_{in}(t) y (0.41-y)/0.41^2 \\
+     0
+ \end{bmatrix}\]</p><p>where <span>$v_{in}(t) = \text{clamp}(t, 0.0, 1.0)$</span>. With a dynamic viscosity of <span>$\nu = 0.001$</span> this is enough to induce turbulence behind the cylinder which leads to vortex shedding. The top and bottom of our channel have no-slip conditions, i.e. <span>$v = [0,0]^{\textrm{T}}$</span>, while the right boundary has the do-nothing boundary condtion <span>$\nu \partial_{\textrm{n}} v - p n = 0$</span> to model outflow. With these boundary conditions we can choose the zero solution as a feasible initial condition.</p><h3 id="Derivation-of-Semi-Discrete-Weak-Form"><a class="docs-heading-anchor" href="#Derivation-of-Semi-Discrete-Weak-Form">Derivation of Semi-Discrete Weak Form</a><a id="Derivation-of-Semi-Discrete-Weak-Form-1"></a><a class="docs-heading-anchor-permalink" href="#Derivation-of-Semi-Discrete-Weak-Form" title="Permalink"></a></h3><p>By multiplying test functions <span>$\varphi$</span> and <span>$\psi$</span> from a suitable test function space on the strong form, followed by integrating over the domain and applying partial integration to the pressure and viscosity terms we can obtain the following weak form</p><p class="math-container">\[ \begin{aligned}
+   \int_\Omega \partial_t v \cdot \varphi &amp;= - \int_\Omega \nu \nabla v : \nabla \varphi - \int_\Omega (v \cdot \nabla) v \cdot \varphi + \int_\Omega p (\nabla \cdot \varphi) + \int_{\partial \Omega_{N}} \underbrace{(\nu \partial_n v - p n )}_{=0} \cdot \varphi \\
+                                 0 &amp;= \int_\Omega (\nabla \cdot v) \psi
+ \end{aligned}\]</p><p>for all possible test functions from the suitable space.</p><p>Now we can discretize the problem as usual with the finite element method utilizing Taylor-Hood elements (Q2Q1) to yield a stable discretization in mass matrix form:</p><p class="math-container">\[ \underbrace{\begin{bmatrix}
+     M_v &amp; 0 \\
+      0  &amp; 0
+ \end{bmatrix}}_{:=M}
+ \begin{bmatrix}
+     \mathrm{d}_t\hat{v} \\
+     \mathrm{d}_t\hat{p}
+ \end{bmatrix}
+ =
+ \underbrace{\begin{bmatrix}
+      A &amp; B^{\textrm{T}} \\
+      B &amp; 0
+ \end{bmatrix}}_{:=K}
+ \begin{bmatrix}
+     \hat{v} \\
+     \hat{p}
+ \end{bmatrix}
+ +
+ \begin{bmatrix}
+     N(\hat{v}, \hat{v}, \hat{\varphi}) \\
+     0
+ \end{bmatrix}\]</p><p>Here <span>$M$</span> is the singular block mass matrix, <span>$K$</span> is the discretized Stokes operator and <span>$N$</span> the nonlinear advection term, which is also called trilinear form. <span>$\hat{v}$</span> and <span>$\hat{p}$</span> represent the time-dependent vectors of nodal values of the discretizations of <span>$v$</span> and <span>$p$</span> respectively, while <span>$\hat{\varphi}$</span> is the choice for the test function in the discretization. The hats are dropped in the implementation and only stated for clarity in this section.</p><h2 id="Commented-Implementation"><a class="docs-heading-anchor" href="#Commented-Implementation">Commented Implementation</a><a id="Commented-Implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Commented-Implementation" title="Permalink"></a></h2><p>Now we solve the problem with Ferrite and <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations.jl</a>. What follows is a program spliced with comments. The full program, without comments, can be found in the next <a href="#ns_vs_diffeq-plain-program">section</a>.</p><p>First we load Ferrite and some other packages we need</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack</code></pre><p>Since we do not need the complete DifferentialEquations suite, we just load the required ODE infrastructure, which can also handle DAEs in mass matrix form.</p><pre><code class="language-julia hljs">using OrdinaryDiffEq</code></pre><p>We start off by defining our only material parameter.</p><pre><code class="language-julia hljs">ν = 1.0/1000.0; #dynamic viscosity</code></pre><p>Next a fine 2D rectangular grid has to be generated. We leave the cell size parametric for flexibility when playing around with the code. Note that the mesh is pretty fine, leading to a high memory consumption when feeding the equation system to direct solvers.</p><pre><code class="language-julia hljs">dim = 2
+cell_scale_factor = 2.0
+x_cells = round(Int, cell_scale_factor*220)
+y_cells = round(Int, cell_scale_factor*41)
+grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 0.41)));</code></pre><p>Next we carve a hole <span>$B_{0.05}(0.2,0.2)$</span> in the mesh by deleting the cells and update the boundary face sets. This code will be replaced once a proper mesh interface is avaliable.</p><pre><code class="language-julia hljs">cell_indices = filter(ci-&gt;norm(mean(map(i-&gt;grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))&gt;0.05, 1:length(grid.cells))
+hole_cell_indices = filter(ci-&gt;norm(mean(map(i-&gt;grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))&lt;=0.05, 1:length(grid.cells));
+hole_face_ring = Set{FaceIndex}()
+for hci ∈ hole_cell_indices
+    push!(hole_face_ring, FaceIndex((hci+1, 4)))
+    push!(hole_face_ring, FaceIndex((hci-1, 2)))
+    push!(hole_face_ring, FaceIndex((hci-x_cells, 3)))
+    push!(hole_face_ring, FaceIndex((hci+x_cells, 1)))
+end
+grid.facesets[&quot;hole&quot;] = Set(filter(x-&gt;x.idx[1] ∉ hole_cell_indices, collect(hole_face_ring)));
+cell_indices_map = map(ci-&gt;norm(mean(map(i-&gt;grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))&gt;0.05 ? indexin([ci], cell_indices)[1] : 0, 1:length(grid.cells))
+grid.cells = grid.cells[cell_indices]
+for facesetname in keys(grid.facesets)
+    grid.facesets[facesetname] = Set(map(fi -&gt; FaceIndex( cell_indices_map[fi.idx[1]] ,fi.idx[2]), collect(grid.facesets[facesetname])))
+end;</code></pre><h3 id="Function-Space"><a class="docs-heading-anchor" href="#Function-Space">Function Space</a><a id="Function-Space-1"></a><a class="docs-heading-anchor-permalink" href="#Function-Space" title="Permalink"></a></h3><p>To ensure stability we utilize the Taylor-Hood element pair Q2-Q1. We have to utilize the same quadrature rule for the pressure as for the velocity, because in the weak form the linear pressure term is tested against a quadratic function.</p><pre><code class="language-julia hljs">ip_v = Lagrange{dim, RefCube, 2}()
+ip_geom = Lagrange{dim, RefCube, 1}()
+qr = QuadratureRule{dim, RefCube}(4)
+cellvalues_v = CellVectorValues(qr, ip_v, ip_geom);
+
+ip_p = Lagrange{dim, RefCube, 1}()
+cellvalues_p = CellScalarValues(qr, ip_p, ip_geom);
+
+dh = DofHandler(grid)
+push!(dh, :v, dim, ip_v)
+push!(dh, :p, 1, ip_p)
+close!(dh);</code></pre><h3 id="Boundary-Conditions"><a class="docs-heading-anchor" href="#Boundary-Conditions">Boundary Conditions</a><a id="Boundary-Conditions-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-Conditions" title="Permalink"></a></h3><p>As in the DFG benchmark we apply no-slip conditions to the top, bottom and cylinder boundary. The no-slip condition states that the velocity of the fluid on this portion of the boundary is fixed to be zero.</p><pre><code class="language-julia hljs">ch = ConstraintHandler(dh);
+
+nosplip_face_names = [&quot;top&quot;, &quot;bottom&quot;, &quot;hole&quot;];
+∂Ω_noslip = union(getfaceset.((grid, ), nosplip_face_names)...);
+noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -&gt; [0,0], [1,2])
+add!(ch, noslip_bc);</code></pre><p>The left boundary has a parabolic inflow with peak velocity of 1.0. This ensures that for the given geometry the Reynolds number is 100, which is already enough to obtain some simple vortex streets. By increasing the velocity further we can obtain stronger vortices - which may need additional refinement of the grid.</p><pre><code class="language-julia hljs">∂Ω_inflow = getfaceset(grid, &quot;left&quot;);
+
+vᵢₙ(t) = clamp(t, 0.0, 1.0)*1.0 #inflow velocity
+parabolic_inflow_profile((x,y),t) = [4*vᵢₙ(t)*y*(0.41-y)/0.41^2,0]
+inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1,2])
+add!(ch, inflow_bc);</code></pre><p>The outflow boundary condition has been applied on the right side of the cylinder when the weak form has been derived by setting the boundary integral to zero. It is also called the do-nothing condition. Other outflow conditions are also possible.</p><pre><code class="language-julia hljs">∂Ω_free = getfaceset(grid, &quot;right&quot;);
+
+close!(ch)
+update!(ch, 0.0);</code></pre><h3 id="Linear-System-Assembly"><a class="docs-heading-anchor" href="#Linear-System-Assembly">Linear System Assembly</a><a id="Linear-System-Assembly-1"></a><a class="docs-heading-anchor-permalink" href="#Linear-System-Assembly" title="Permalink"></a></h3><p>Next we describe how the block mass matrix and the Stokes matrix are assembled.</p><p>For the block mass matrix <span>$M$</span> we remember that only the first equation had a time derivative and that the block mass matrix corresponds to the term arising from discretizing the time derivatives. Hence, only the upper left block has non-zero components.</p><pre><code class="language-julia hljs">function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, M::SparseMatrixCSC, dh::DofHandler) where {dim}
+    # Allocate a buffer for the local matrix and some helpers, together with the assembler.
+    n_basefuncs_v = getnbasefunctions(cellvalues_v)
+    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs = n_basefuncs_v + n_basefuncs_p
+    v▄, p▄ = 1, 2
+    Mₑ = PseudoBlockArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
+
+    # It follows the assembly loop as explained in the basic tutorials.
+    mass_assembler = start_assemble(M)
+    @inbounds for cell in CellIterator(dh)
+        fill!(Mₑ, 0)
+        Ferrite.reinit!(cellvalues_v, cell)
+
+        for q_point in 1:getnquadpoints(cellvalues_v)
+            dΩ = getdetJdV(cellvalues_v, q_point)
+            # Remember that we assemble a vector mass term, hence the dot product.
+            for i in 1:n_basefuncs_v
+                φᵢ = shape_value(cellvalues_v, q_point, i)
+                for j in 1:n_basefuncs_v
+                    φⱼ = shape_value(cellvalues_v, q_point, j)
+                    Mₑ[BlockIndex((v▄, v▄), (i, j))] += φᵢ ⋅ φⱼ * dΩ
+                end
+            end
+        end
+        assemble!(mass_assembler, celldofs(cell), Mₑ)
+    end
+
+    return M
+end;</code></pre><p>Next we discuss the assembly of the Stokes matrix. Remember that we use the same function spaces for trial and test, hence the matrix has the following block form</p><p class="math-container">\[  K = \begin{bmatrix}
+      A &amp; B^{\textrm{T}} \\
+      B &amp; 0
+  \end{bmatrix}\]</p><p>which is also called saddle point matrix. These problems are known to have a non-trivial kernel, which is a reflection of the strong form as discussed in the theory portion if this example.</p><pre><code class="language-julia hljs">function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, ν, K::SparseMatrixCSC, dh::DofHandler) where {dim}
+    # Again, some buffers and helpers
+    n_basefuncs_v = getnbasefunctions(cellvalues_v)
+    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs = n_basefuncs_v + n_basefuncs_p
+    v▄, p▄ = 1, 2
+    Kₑ = PseudoBlockArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
+
+    # Assembly loop
+    stiffness_assembler = start_assemble(K)
+    @inbounds for cell in CellIterator(dh)
+        # Don&#39;t forget to initialize everything
+        fill!(Kₑ, 0)
+
+        Ferrite.reinit!(cellvalues_v, cell)
+        Ferrite.reinit!(cellvalues_p, cell)
+
+        for q_point in 1:getnquadpoints(cellvalues_v)
+            dΩ = getdetJdV(cellvalues_v, q_point)</code></pre><p>Assemble local viscosity block of <span>$A$</span></p><pre><code class="language-julia hljs">            for i in 1:n_basefuncs_v
+                ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
+                for j in 1:n_basefuncs_v
+                    ∇φⱼ = shape_gradient(cellvalues_v, q_point, j)
+                    Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇φᵢ ⊡ ∇φⱼ * dΩ
+                end
+            end</code></pre><p>Assemble local pressure and incompressibility blocks of <span>$B^{\textrm{T}}$</span> and <span>$B$</span>.</p><pre><code class="language-julia hljs">            for j in 1:n_basefuncs_p
+                ψ = shape_value(cellvalues_p, q_point, j)
+                for i in 1:n_basefuncs_v
+                    divφ = shape_divergence(cellvalues_v, q_point, i)
+                    Kₑ[BlockIndex((v▄, p▄), (i, j))] += (divφ * ψ) * dΩ
+                    Kₑ[BlockIndex((p▄, v▄), (j, i))] += (ψ * divφ) * dΩ
+                end
+            end
+        end
+
+        # Assemble `Kₑ` into the Stokes matrix `K`.
+        assemble!(stiffness_assembler, celldofs(cell), Kₑ)
+    end
+    return K
+end;</code></pre><h3 id="Solution-of-the-semi-discretized-system-via-DifferentialEquations.jl"><a class="docs-heading-anchor" href="#Solution-of-the-semi-discretized-system-via-DifferentialEquations.jl">Solution of the semi-discretized system via DifferentialEquations.jl</a><a id="Solution-of-the-semi-discretized-system-via-DifferentialEquations.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Solution-of-the-semi-discretized-system-via-DifferentialEquations.jl" title="Permalink"></a></h3><p>First we assemble the linear portions for efficiency. These matrices are assumed to be constant over time.</p><pre><code class="language-julia hljs">T = 10.0
+Δt₀ = 0.01
+Δt_save = 0.1
+
+M = create_sparsity_pattern(dh);
+M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
+
+K = create_sparsity_pattern(dh);
+K = assemble_stokes_matrix(cellvalues_v, cellvalues_p, ν, K, dh);</code></pre><p>These are our initial conditions. We start from the zero solution, because it is trivially admissible if the Dirichlet conditions are zero everywhere on the Dirichlet boundary for <span>$t=0$</span>. Note that the time stepper is also doing fine if the Dirichlet condition is non-zero and not too pathological.</p><pre><code class="language-julia hljs">u₀ = zeros(ndofs(dh))
+apply!(u₀, ch);</code></pre><p>DifferentialEquations assumes dense matrices by default, which is not feasible for semi-discretization of finite element models. We communicate that a sparse matrix with specified pattern should be utilized through the <code>jac_prototyp</code> argument. It is simple to see that the Jacobian and the stiffness matrix share the same sparsity pattern, since they share the same relation between trial and test functions.</p><pre><code class="language-julia hljs">jac_sparsity = sparse(K);</code></pre><p>To apply the nonlinear portion of the Navier-Stokes problem we simply hand over the dof handler and cell values to the right-hand-side (RHS) as a parameter. Further the pre-assembled linear part (which is time independent) is passed to save some runtime. To apply the time-dependent Dirichlet BCs, we also hand over the constraint handler. The basic idea to apply the Dirichlet BCs consistently is that we copy the current solution <code>u</code>, apply the Dirichlet BCs on the copy, evaluate the discretized RHS of the Navier-Stokes equations with this vector and finally set the RHS to zero on every constraint. This way we obtain a correct solution for all dofs which are not Dirichlet constrained. These dofs are then corrected in a post-processing step, when evaluating the solution vector at specific time points. It should be finally noted that this <strong>trick does not work</strong> out of the box <strong>for constraining algebraic portion</strong> of the DAE, i.e. if we would like to put a Dirichlet BC on pressure dofs. As a workaround we have to set <span>$f_{\textrm{i}} = 1$</span> instead of <span>$f_{\textrm{i}} = 0$</span>, because otherwise the equation system gets singular. This is obvious when we remember that our mass matrix is zero for these dofs, such that we obtain the equation <span>$0 \cdot \mathrm{d}_t p_{\textrm{i}} = 1 \cdot p_{\textrm{i}}$</span>, which now has a unique solution.</p><pre><code class="language-julia hljs">struct RHSparams
+    K::SparseMatrixCSC
+    ch::ConstraintHandler
+    dh::DofHandler
+    cellvalues_v::CellVectorValues
+end
+p = RHSparams(K, ch, dh, cellvalues_v)
+
+function navierstokes!(du,u_uc,p,t)</code></pre><p>Unpack the struct to save some allocations.</p><pre><code class="language-julia hljs">    @unpack K,ch,dh,cellvalues_v = p</code></pre><p>We start by applying the time-dependent Dirichlet BCs. Note that we are not allowed to mutate <code>u_uc</code>! We also can not pre-allocate this variable if we want to use AD to derive the Jacobian matrix, which appears in the utilized implicit Euler. If we hand over the Jacobian analytically to the solver, or when utilizing a method which does not require building the Jacobian, then we could also hand over a buffer for <code>u</code> in our RHSparams structure to save the allocations made here.</p><pre><code class="language-julia hljs">    u = copy(u_uc)
+    update!(ch, t)
+    apply!(u, ch)</code></pre><p>Now we apply the rhs of the Navier-Stokes equations</p><pre><code class="language-julia hljs">    # Linear contribution (Stokes operator)
+    mul!(du, K, u) # du .= K * u
+
+    # nonlinear contribution
+    n_basefuncs = getnbasefunctions(cellvalues_v)
+    for cell in CellIterator(dh)
+        Ferrite.reinit!(cellvalues_v, cell)
+        all_celldofs = celldofs(cell)
+        v_celldofs = all_celldofs[dof_range(dh, :v)]
+        v_cell = u[v_celldofs]
+        for q_point in 1:getnquadpoints(cellvalues_v)
+            dΩ = getdetJdV(cellvalues_v, q_point)
+            ∇v = function_gradient(cellvalues_v, q_point, v_cell)
+            v = function_value(cellvalues_v, q_point, v_cell)
+            for j in 1:n_basefuncs
+                φⱼ = shape_value(cellvalues_v, q_point, j)</code></pre><p>Note that in Tensors.jl the definition <span>$\textrm{grad} v = \nabla v$</span> holds. With this information it can be quickly shown in index notation that</p><p class="math-container">\[[(v \cdot \nabla) v]_{\textrm{i}} = v_{\textrm{j}} (\partial_{\textrm{j}} v_{\textrm{i}}) = [v (\nabla v)^{\textrm{T}}]_{\textrm{i}}\]</p><p>where we should pay attentation to the transpose of the gradient.</p><pre><code class="language-julia hljs">                du[v_celldofs[j]] -= v ⋅ ∇v&#39; ⋅ φⱼ * dΩ
+            end
+        end
+    end</code></pre><p>For now we have to ingore the evolution of the Dirichlet BCs. The DBC dofs in the solution vector will be corrected in a post-processing step.</p><pre><code class="language-julia hljs">    apply_zero!(du, ch)
+end;</code></pre><p>Finally, together with our pre-assembled mass matrix, we are now able to define our problem in mass matrix form.</p><pre><code class="language-julia hljs">rhs = ODEFunction(navierstokes!, mass_matrix=M; jac_prototype=jac_sparsity)
+problem = ODEProblem(rhs, u₀, (0.0,T), p);</code></pre><p>Now we can put everything together by specifying how to solve the problem. We want to use the adaptive implicit Euler method with our custom linear solver, which helps in the enforcement of the Dirichlet BCs. Further we enable the progress bar with the <code>progess</code> and <code>progress_steps</code> arguments. Finally we have to communicate the time step length and initialization algorithm. Since we start with a valid initial state we do not use one of DifferentialEquations.jl initialization algorithms. NOTE: At the time of writing this <a href="https://github.com/SciML/OrdinaryDiffEq.jl/issues/1019">no Hessenberg index 2 initialization is implemented</a>.</p><p>To visualize the result we export the grid and our fields to VTK-files, which can be viewed in <a href="https://www.paraview.org/">ParaView</a> by utilizing the corresponding pvd file.</p><pre><code class="language-julia hljs">timestepper = ImplicitEuler()
+integrator = init(
+    problem, timestepper, initializealg=NoInit(), dt=Δt₀,
+    adaptive=true, abstol=1e-3, reltol=1e-3,
+    progress=true, progress_steps=1,
+    saveat=Δt_save);
+
+pvd = paraview_collection(&quot;vortex-street.pvd&quot;);
+integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
+for (u_uc,t) in integrator</code></pre><p>We ignored the Dirichlet constraints in the solution vector up to now, so we have to bring them back now.</p><pre><code class="language-julia hljs">    update!(ch, t)
+    u = copy(u_uc)
+    apply!(u, ch)
+    vtk_grid(&quot;vortex-street-$t.vtu&quot;, dh) do vtk
+        vtk_point_data(vtk,dh,u)
+        vtk_save(vtk)
+        pvd[t] = vtk
+    end
+end
+vtk_save(pvd);</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Test Summary:      | Pass  Total
+INS OrdinaryDiffEq |    2      2</code></pre><h2 id="ns_vs_diffeq-plain-program"><a class="docs-heading-anchor" href="#ns_vs_diffeq-plain-program">Plain program</a><a id="ns_vs_diffeq-plain-program-1"></a><a class="docs-heading-anchor-permalink" href="#ns_vs_diffeq-plain-program" title="Permalink"></a></h2><p>Here follows a version of the program without any comments. The file is also available here: <a href="../ns_vs_diffeq.jl"><code>ns_vs_diffeq.jl</code></a>.</p><pre><code class="language-julia hljs">using Ferrite, SparseArrays, BlockArrays, LinearAlgebra, UnPack
+
+using OrdinaryDiffEq
+
+ν = 1.0/1000.0; #dynamic viscosity
+
+dim = 2
+cell_scale_factor = 2.0
+x_cells = round(Int, cell_scale_factor*220)
+y_cells = round(Int, cell_scale_factor*41)
+grid = generate_grid(Quadrilateral, (x_cells, y_cells), Vec{2}((0.0, 0.0)), Vec{2}((2.2, 0.41)));
+
+cell_indices = filter(ci-&gt;norm(mean(map(i-&gt;grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))&gt;0.05, 1:length(grid.cells))
+hole_cell_indices = filter(ci-&gt;norm(mean(map(i-&gt;grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))&lt;=0.05, 1:length(grid.cells));
+hole_face_ring = Set{FaceIndex}()
+for hci ∈ hole_cell_indices
+    push!(hole_face_ring, FaceIndex((hci+1, 4)))
+    push!(hole_face_ring, FaceIndex((hci-1, 2)))
+    push!(hole_face_ring, FaceIndex((hci-x_cells, 3)))
+    push!(hole_face_ring, FaceIndex((hci+x_cells, 1)))
+end
+grid.facesets[&quot;hole&quot;] = Set(filter(x-&gt;x.idx[1] ∉ hole_cell_indices, collect(hole_face_ring)));
+cell_indices_map = map(ci-&gt;norm(mean(map(i-&gt;grid.nodes[i].x-[0.2,0.2], Ferrite.vertices(grid.cells[ci]))))&gt;0.05 ? indexin([ci], cell_indices)[1] : 0, 1:length(grid.cells))
+grid.cells = grid.cells[cell_indices]
+for facesetname in keys(grid.facesets)
+    grid.facesets[facesetname] = Set(map(fi -&gt; FaceIndex( cell_indices_map[fi.idx[1]] ,fi.idx[2]), collect(grid.facesets[facesetname])))
+end;
+
+
+ip_v = Lagrange{dim, RefCube, 2}()
+ip_geom = Lagrange{dim, RefCube, 1}()
+qr = QuadratureRule{dim, RefCube}(4)
+cellvalues_v = CellVectorValues(qr, ip_v, ip_geom);
+
+ip_p = Lagrange{dim, RefCube, 1}()
+cellvalues_p = CellScalarValues(qr, ip_p, ip_geom);
+
+dh = DofHandler(grid)
+push!(dh, :v, dim, ip_v)
+push!(dh, :p, 1, ip_p)
+close!(dh);
+
+ch = ConstraintHandler(dh);
+
+nosplip_face_names = [&quot;top&quot;, &quot;bottom&quot;, &quot;hole&quot;];
+∂Ω_noslip = union(getfaceset.((grid, ), nosplip_face_names)...);
+noslip_bc = Dirichlet(:v, ∂Ω_noslip, (x, t) -&gt; [0,0], [1,2])
+add!(ch, noslip_bc);
+
+∂Ω_inflow = getfaceset(grid, &quot;left&quot;);
+
+vᵢₙ(t) = clamp(t, 0.0, 1.0)*1.0 #inflow velocity
+parabolic_inflow_profile((x,y),t) = [4*vᵢₙ(t)*y*(0.41-y)/0.41^2,0]
+inflow_bc = Dirichlet(:v, ∂Ω_inflow, parabolic_inflow_profile, [1,2])
+add!(ch, inflow_bc);
+
+∂Ω_free = getfaceset(grid, &quot;right&quot;);
+
+close!(ch)
+update!(ch, 0.0);
+
+function assemble_mass_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, M::SparseMatrixCSC, dh::DofHandler) where {dim}
+    # Allocate a buffer for the local matrix and some helpers, together with the assembler.
+    n_basefuncs_v = getnbasefunctions(cellvalues_v)
+    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs = n_basefuncs_v + n_basefuncs_p
+    v▄, p▄ = 1, 2
+    Mₑ = PseudoBlockArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
+
+    # It follows the assembly loop as explained in the basic tutorials.
+    mass_assembler = start_assemble(M)
+    @inbounds for cell in CellIterator(dh)
+        fill!(Mₑ, 0)
+        Ferrite.reinit!(cellvalues_v, cell)
+
+        for q_point in 1:getnquadpoints(cellvalues_v)
+            dΩ = getdetJdV(cellvalues_v, q_point)
+            # Remember that we assemble a vector mass term, hence the dot product.
+            for i in 1:n_basefuncs_v
+                φᵢ = shape_value(cellvalues_v, q_point, i)
+                for j in 1:n_basefuncs_v
+                    φⱼ = shape_value(cellvalues_v, q_point, j)
+                    Mₑ[BlockIndex((v▄, v▄), (i, j))] += φᵢ ⋅ φⱼ * dΩ
+                end
+            end
+        end
+        assemble!(mass_assembler, celldofs(cell), Mₑ)
+    end
+
+    return M
+end;
+
+function assemble_stokes_matrix(cellvalues_v::CellVectorValues{dim}, cellvalues_p::CellScalarValues{dim}, ν, K::SparseMatrixCSC, dh::DofHandler) where {dim}
+    # Again, some buffers and helpers
+    n_basefuncs_v = getnbasefunctions(cellvalues_v)
+    n_basefuncs_p = getnbasefunctions(cellvalues_p)
+    n_basefuncs = n_basefuncs_v + n_basefuncs_p
+    v▄, p▄ = 1, 2
+    Kₑ = PseudoBlockArray(zeros(n_basefuncs, n_basefuncs), [n_basefuncs_v, n_basefuncs_p], [n_basefuncs_v, n_basefuncs_p])
+
+    # Assembly loop
+    stiffness_assembler = start_assemble(K)
+    @inbounds for cell in CellIterator(dh)
+        # Don&#39;t forget to initialize everything
+        fill!(Kₑ, 0)
+
+        Ferrite.reinit!(cellvalues_v, cell)
+        Ferrite.reinit!(cellvalues_p, cell)
+
+        for q_point in 1:getnquadpoints(cellvalues_v)
+            dΩ = getdetJdV(cellvalues_v, q_point)
+
+            for i in 1:n_basefuncs_v
+                ∇φᵢ = shape_gradient(cellvalues_v, q_point, i)
+                for j in 1:n_basefuncs_v
+                    ∇φⱼ = shape_gradient(cellvalues_v, q_point, j)
+                    Kₑ[BlockIndex((v▄, v▄), (i, j))] -= ν * ∇φᵢ ⊡ ∇φⱼ * dΩ
+                end
+            end
+
+            for j in 1:n_basefuncs_p
+                ψ = shape_value(cellvalues_p, q_point, j)
+                for i in 1:n_basefuncs_v
+                    divφ = shape_divergence(cellvalues_v, q_point, i)
+                    Kₑ[BlockIndex((v▄, p▄), (i, j))] += (divφ * ψ) * dΩ
+                    Kₑ[BlockIndex((p▄, v▄), (j, i))] += (ψ * divφ) * dΩ
+                end
+            end
+        end
+
+        # Assemble `Kₑ` into the Stokes matrix `K`.
+        assemble!(stiffness_assembler, celldofs(cell), Kₑ)
+    end
+    return K
+end;
+
+T = 10.0
+Δt₀ = 0.01
+Δt_save = 0.1
+
+M = create_sparsity_pattern(dh);
+M = assemble_mass_matrix(cellvalues_v, cellvalues_p, M, dh);
+
+K = create_sparsity_pattern(dh);
+K = assemble_stokes_matrix(cellvalues_v, cellvalues_p, ν, K, dh);
+
+u₀ = zeros(ndofs(dh))
+apply!(u₀, ch);
+
+jac_sparsity = sparse(K);
+
+struct RHSparams
+    K::SparseMatrixCSC
+    ch::ConstraintHandler
+    dh::DofHandler
+    cellvalues_v::CellVectorValues
+end
+p = RHSparams(K, ch, dh, cellvalues_v)
+
+function navierstokes!(du,u_uc,p,t)
+
+    @unpack K,ch,dh,cellvalues_v = p
+
+    u = copy(u_uc)
+    update!(ch, t)
+    apply!(u, ch)
+
+    # Linear contribution (Stokes operator)
+    mul!(du, K, u) # du .= K * u
+
+    # nonlinear contribution
+    n_basefuncs = getnbasefunctions(cellvalues_v)
+    for cell in CellIterator(dh)
+        Ferrite.reinit!(cellvalues_v, cell)
+        all_celldofs = celldofs(cell)
+        v_celldofs = all_celldofs[dof_range(dh, :v)]
+        v_cell = u[v_celldofs]
+        for q_point in 1:getnquadpoints(cellvalues_v)
+            dΩ = getdetJdV(cellvalues_v, q_point)
+            ∇v = function_gradient(cellvalues_v, q_point, v_cell)
+            v = function_value(cellvalues_v, q_point, v_cell)
+            for j in 1:n_basefuncs
+                φⱼ = shape_value(cellvalues_v, q_point, j)
+
+                du[v_celldofs[j]] -= v ⋅ ∇v&#39; ⋅ φⱼ * dΩ
+            end
+        end
+    end
+
+    apply_zero!(du, ch)
+end;
+
+rhs = ODEFunction(navierstokes!, mass_matrix=M; jac_prototype=jac_sparsity)
+problem = ODEProblem(rhs, u₀, (0.0,T), p);
+
+timestepper = ImplicitEuler()
+integrator = init(
+    problem, timestepper, initializealg=NoInit(), dt=Δt₀,
+    adaptive=true, abstol=1e-3, reltol=1e-3,
+    progress=true, progress_steps=1,
+    saveat=Δt_save);
+
+pvd = paraview_collection(&quot;vortex-street.pvd&quot;);
+integrator = TimeChoiceIterator(integrator, 0.0:Δt_save:T)
+for (u_uc,t) in integrator
+
+    update!(ch, t)
+    u = copy(u_uc)
+    apply!(u, ch)
+    vtk_grid(&quot;vortex-street-$t.vtu&quot;, dh) do vtk
+        vtk_point_data(vtk,dh,u)
+        vtk_save(vtk)
+        pvd[t] = vtk
+    end
+end
+vtk_save(pvd);</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../quasi_incompressible_hyperelasticity/">« Nearly Incompressible Hyperelasticity</a><a class="docs-footer-nextpage" href="../computational_homogenization/">Computational homogenization »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.19 on <span class="colophon-date" title="Thursday 30 June 2022 13:08">Thursday 30 June 2022</span>. Using Julia version 1.7.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
