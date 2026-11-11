@@ -76,6 +76,7 @@ export
     SerendipityQuadraticHexahedron,
     Wedge,
     QuadraticWedge,
+    SerendipityQuadraticWedge,
     Pyramid,
     CellIndex,
     FaceIndex,
