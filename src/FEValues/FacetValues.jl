@@ -113,6 +113,7 @@ end
 getngeobasefunctions(fv::FacetValues) = getngeobasefunctions(get_geo_mapping(fv))
 getnquadpoints(fv::FacetValues) = @inbounds getnquadpoints(getfield(fv, :fqr), getcurrentfacet(fv))
 @propagate_inbounds getdetJdV(fv::FacetValues, q_point) = getfield(fv, :detJdV)[q_point]
+getdetJdVs(fv::FacetValues) = getfield(fv, :detJdV)
 
 geometric_interpolation(fv::FacetValues) = geometric_interpolation(get_geo_mapping(fv))
 

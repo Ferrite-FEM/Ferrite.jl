@@ -21,6 +21,20 @@ function adapt_structure(to, cv::CellValues)
     )
 end
 
+function adapt_structure(to, fv::FacetValues)
+    fun_values = map(facet_fvs -> map(f -> adapt(to, f), facet_fvs), getfield(fv, :fun_values))
+    geo_mapping = map(gm -> adapt(to, gm), getfield(fv, :geo_mapping))
+    return FacetValues(
+        getfield(fv, :fun_values_nt),
+        fun_values,
+        geo_mapping,
+        adapt(to, getfield(fv, :fqr)),
+        adapt(to, Ferrite.getdetJdVs(fv)),
+        adapt(to, getfield(fv, :normals)),
+        Ferrite.getcurrentfacet(fv),
+    )
+end
+
 # This is adapted manually to ensure the aliasing is kept correctly
 function adapt_structure(d, fv::Ferrite.FunctionValues)
     Nξ = adapt(d, fv.Nξ)
@@ -38,4 +52,8 @@ end
 # This must be done manually, because of the custom constructor
 function adapt_structure(to, qr::QuadratureRule{shape}) where {shape}
     return QuadratureRule{shape}(adapt(to, qr.weights), adapt(to, qr.points))
+end
+
+function adapt_structure(to, fqr::FacetQuadratureRule{shape}) where {shape}
+    return FacetQuadratureRule{shape}(adapt(to, fqr.facet_rules))
 end

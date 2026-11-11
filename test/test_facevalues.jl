@@ -1,5 +1,7 @@
 # Imports for parallel (isolated) test execution:
-using LinearAlgebra
+using LinearAlgebra, GPUArrays
+import Adapt: adapt
+import KernelAbstractions as KA
 include(joinpath(@__DIR__, "test_utils.jl"))
 
 # Test that all values in the struct are equal,
@@ -321,4 +323,77 @@ end # of testset
 
     # Test unknown facet error path as its not yet tested in "test_quadrules.jl"
     @test_throws ArgumentError Ferrite.weighted_normal(zero(MixedTensor2{2, 1}), RefLine, 3)
+end
+
+@testset "FacetValues worker storage" begin
+    fqr = FacetQuadratureRule{RefQuadrilateral}(2)
+    ip = Lagrange{RefQuadrilateral, 1}()
+    fv_single = FacetValues(fqr, ip)
+
+    workers = Ferrite.distribute_to_workers(
+        KA.CPU(),
+        fv_single,
+        2,
+    )
+    @test workers isa Ferrite.SoAContainer
+    @test length(workers) == 2
+    @test eltype(workers) === typeof(Ferrite.get_substruct(workers.soa, 1))
+
+    # Test single-field and multi-field FacetValues
+    x = [Vec((0.0, 0.0)), Vec((1.0, 0.0)), Vec((1.0, 1.0)), Vec((0.0, 1.0))]
+    for ip_fun in (ip, (u = ip, p = ip)),
+            update_gradients in (false, true)
+        fv = FacetValues(fqr, ip_fun; update_gradients)
+        workers_obj = Ferrite.distribute_to_workers(KA.CPU(), fv, 2)
+        @test workers_obj isa Ferrite.SoAContainer
+        @test length(workers_obj) == 2
+
+        # Extraction through get_substruct
+        fv1 = @inferred workers_obj[1]
+        fv2 = @inferred workers_obj[Int32(2)]
+        @test typeof(fv1) === typeof(fv2) === eltype(workers_obj)
+        @test fv1 isa FacetValues
+        @test fv2 isa FacetValues
+
+        # Structural representation checks
+        @test getfield(fv1, :fun_values_nt) == getfield(fv, :fun_values_nt)
+        @test length(getfield(fv1, :fun_values)) == length(getfield(fv, :fun_values))
+        @test length(getfield(fv1, :geo_mapping)) == length(getfield(fv, :geo_mapping))
+        @test getfield(fv1, :fqr) === getfield(fv, :fqr)
+        @test getfield(fv1, :detJdV) isa AbstractVector
+        @test getfield(fv1, :normals) isa AbstractVector
+
+        for facet in 1:Ferrite.nfacets(ip)
+            reinit!(fv1, x, facet)
+            reinit!(fv2, 2.0 .* x, facet)
+            reinit!(fv, x, facet)
+
+            # Updating worker 2 must not overwrite worker 1 data
+            @test Ferrite.getdetJdVs(fv1) ≈ Ferrite.getdetJdVs(fv)
+            @test Ferrite.getdetJdVs(fv2) ≈ 2.0 .* Ferrite.getdetJdVs(fv)
+            for qp in 1:getnquadpoints(fv)
+                @test getdetJdV(fv1, qp) ≈ getdetJdV(fv, qp)
+                @test getdetJdV(fv2, qp) ≈ 2.0 * getdetJdV(fv, qp)
+                @test getnormal(fv1, qp) ≈ getnormal(fv, qp)
+                @test getnormal(fv2, qp) ≈ getnormal(fv, qp)
+            end
+
+            for (f1, f_ref) in zip(Ferrite.get_fun_values(fv1), Ferrite.get_fun_values(fv))
+                for qp in 1:getnquadpoints(fv), i in 1:getnbasefunctions(f_ref)
+                    @test shape_value(f1, qp, i) ≈ shape_value(f_ref, qp, i)
+                    if update_gradients
+                        @test shape_gradient(f1, qp, i) ≈ shape_gradient(f_ref, qp, i)
+                    end
+                end
+            end
+        end
+
+        # Worker independence across different facets
+        reinit!(fv1, x, 1)
+        reinit!(fv2, x, 2)
+        @test Ferrite.getcurrentfacet(fv1) == 1
+        @test Ferrite.getcurrentfacet(fv2) == 2
+        @test getnormal(fv1, 1) ≈ Vec((0.0, -1.0))
+        @test getnormal(fv2, 1) ≈ Vec((1.0, 0.0))
+    end
 end
