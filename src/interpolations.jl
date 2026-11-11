@@ -1606,6 +1606,43 @@ adjust_dofs_during_distribution(::Serendipity{<:Any, 1}) = false
 # Vertices for all Serendipity interpolations are the same
 vertexdof_indices(::Serendipity{RefQuadrilateral}) = ((1,), (2,), (3,), (4,))
 vertexdof_indices(::Serendipity{RefHexahedron}) = ((1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,))
+vertexdof_indices(::Serendipity{RefPrism}) = ((1,), (2,), (3,), (4,), (5,), (6,))
+
+getnbasefunctions(::Serendipity{RefPrism, 2}) = 15
+getlowerorder(::Serendipity{RefPrism, 2}) = Lagrange{RefPrism, 1}()
+edgedof_interior_indices(::Serendipity{RefPrism, 2}) = ((7,), (8,), (9,), (10,), (11,), (12,), (13,), (14,), (15,))
+
+function reference_coordinates(::Serendipity{RefPrism, 2})
+    return [
+        Vec{3, Float64}((0.0, 0.0, 0.0)), Vec{3, Float64}((1.0, 0.0, 0.0)), Vec{3, Float64}((0.0, 1.0, 0.0)),
+        Vec{3, Float64}((0.0, 0.0, 1.0)), Vec{3, Float64}((1.0, 0.0, 1.0)), Vec{3, Float64}((0.0, 1.0, 1.0)),
+        Vec{3, Float64}((0.5, 0.0, 0.0)), Vec{3, Float64}((0.0, 0.5, 0.0)), Vec{3, Float64}((0.0, 0.0, 0.5)),
+        Vec{3, Float64}((0.5, 0.5, 0.0)), Vec{3, Float64}((1.0, 0.0, 0.5)), Vec{3, Float64}((0.0, 1.0, 0.5)),
+        Vec{3, Float64}((0.5, 0.0, 1.0)), Vec{3, Float64}((0.0, 0.5, 1.0)), Vec{3, Float64}((0.5, 0.5, 1.0)),
+    ]
+end
+
+@inline function reference_shape_value(::Serendipity{RefPrism, 2}, ξ::Vec{3}, i::Int)
+    x, y, z = ξ
+    r, s, t = x, y, z
+    i == 1 && return 2 * (1 - r - s) * (1 - t) * (0.5 - r - s - t)
+    i == 2 && return 2 * r * (1 - t) * (r - t - 0.5)
+    i == 3 && return 2 * s * (1 - t) * (s - t - 0.5)
+    i == 4 && return 2 * (1 - r - s) * t * (t - r - s - 0.5)
+    i == 5 && return 2 * r * t * (r + t - 1.5)
+    i == 6 && return 2 * s * t * (s + t - 1.5)
+    # Edge nodes follow Ferrite's reference edge order.
+    i == 7 && return 4 * r * (1 - r - s) * (1 - t)
+    i == 8 && return 4 * (1 - r - s) * s * (1 - t)
+    i == 9 && return 4 * t * (1 - r - s) * (1 - t)
+    i == 10 && return 4 * r * s * (1 - t)
+    i == 11 && return 4 * t * r * (1 - t)
+    i == 12 && return 4 * t * s * (1 - t)
+    i == 13 && return 4 * r * (1 - r - s) * t
+    i == 14 && return 4 * (1 - r - s) * s * t
+    i == 15 && return 4 * r * s * t
+    throw(ArgumentError("no shape function $i for interpolation Serendipity{RefPrism, 2}()"))
+end
 
 ########################################
 # Serendipity RefQuadrilateral order 2 #

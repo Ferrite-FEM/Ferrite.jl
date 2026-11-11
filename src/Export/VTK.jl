@@ -93,6 +93,7 @@ cell_to_vtkcell(::Type{Tetrahedron}) = VTKCellTypes.VTK_TETRA
 cell_to_vtkcell(::Type{QuadraticTetrahedron}) = VTKCellTypes.VTK_QUADRATIC_TETRA
 cell_to_vtkcell(::Type{Wedge}) = VTKCellTypes.VTK_WEDGE
 cell_to_vtkcell(::Type{QuadraticWedge}) = VTKCellTypes.VTK_BIQUADRATIC_QUADRATIC_WEDGE
+cell_to_vtkcell(::Type{SerendipityQuadraticWedge}) = VTKCellTypes.VTK_QUADRATIC_WEDGE
 cell_to_vtkcell(::Type{Pyramid}) = VTKCellTypes.VTK_PYRAMID
 
 # Permutations from the Ferrite node order to the VTK node order, for the cells where they differ
@@ -114,6 +115,7 @@ const VTK_QUADRATIC_HEXAHEDRON_ORDER = [
 vtk_node_order(::AbstractCell) = nothing
 vtk_node_order(::Pyramid) = VTK_PYRAMID_ORDER
 vtk_node_order(::QuadraticWedge) = VTK_QUADRATIC_WEDGE_ORDER
+vtk_node_order(::SerendipityQuadraticWedge) = [1, 2, 3, 4, 5, 6, 7, 10, 8, 13, 15, 14, 9, 11, 12]
 vtk_node_order(::QuadraticHexahedron) = VTK_QUADRATIC_HEXAHEDRON_ORDER
 
 # The node numbers of `cell` in VTK order. Downstream packages overload this to give the VTK
@@ -131,7 +133,7 @@ const FerriteCell = Union{
     Line, QuadraticLine,
     Triangle, QuadraticTriangle, Quadrilateral, QuadraticQuadrilateral, SerendipityQuadraticQuadrilateral,
     Tetrahedron, QuadraticTetrahedron, Hexahedron, QuadraticHexahedron, SerendipityQuadraticHexahedron,
-    Wedge, QuadraticWedge, Pyramid,
+    Wedge, QuadraticWedge, SerendipityQuadraticWedge, Pyramid,
 }
 
 # Append the node numbers of `cell`, in VTK order, to `connectivity`. Other cell types fall back
