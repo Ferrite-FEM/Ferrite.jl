@@ -330,6 +330,11 @@ end
     ip = Lagrange{RefQuadrilateral, 1}()
     fv_single = FacetValues(fqr, ip)
 
+    # Test backend adaptation of FacetValues.
+    adapted = adapt(KA.CPU(), fv_single)
+    @test adapted isa FacetValues
+    @test Ferrite.getcurrentfacet(adapted) == Ferrite.getcurrentfacet(fv_single)
+
     workers = Ferrite.distribute_to_workers(
         KA.CPU(),
         fv_single,
