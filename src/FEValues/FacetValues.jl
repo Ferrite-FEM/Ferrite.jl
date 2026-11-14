@@ -47,17 +47,17 @@ with equal interpolations share the same `FunctionValues`.
 """
 FacetValues
 
-mutable struct FacetValues{NT, FV, GM, FQR, detT, nT, V_FV <: AbstractVector{FV}, V_GM <: AbstractVector{GM}} <: AbstractFacetValues
-    const fun_values_nt::NT # NamedTuple mapping field names to Val-indices into the fun_values tuples, or Nothing (single-field mode)
-    const fun_values::V_FV  # AbstractVector{<:Tuple}, one tuple of unique FunctionValues per facet
-    const geo_mapping::V_GM # AbstractVector{GeometryMapping}
-    const fqr::FQR          # FacetQuadratureRule
+struct FacetValues{NT, FV, GM, FQR, detT, nT, V_FV <: Union{AbstractVector{FV}, Tuple{Vararg{FV}}}, V_GM <: Union{AbstractVector{GM}, Tuple{Vararg{GM}}}, CF <: AbstractArray{Int}} <: AbstractFacetValues
+    fun_values_nt::NT # NamedTuple mapping field names to Val-indices into the fun_values tuples, or Nothing (single-field mode)
+    fun_values::V_FV  # AbstractVector or Tuple, one tuple of unique FunctionValues per facet
+    geo_mapping::V_GM # AbstractVector or Tuple of GeometryMapping, one per facet
+    fqr::FQR          # FacetQuadratureRule
     # FacetValues are only functional for the types in the comments for the fields below.
-    # However, e.g. for GPU support, we allow arrays of one order higher to be passed, allowing this type to be used as a struct-of-arrays (SoA) type.
+    # However, e.g. for GPU support, we allow arrays of one order higher to be passed, allowing this type to be used as a struct-of-arrays (SoA)
     # See `soa_utils.jl` for the SoA transformation infrastructure.
-    const detJdV::detT      # AbstractVector{<:Number}
-    const normals::nT       # AbstractVector{<:Vec}
-    current_facet::Int
+    detJdV::detT      # AbstractVector{<:Number}
+    normals::nT       # AbstractVector{<:Vec}
+    current_facet::CF # One-element array (a view into a shared array when used as SoA), as for `cellid` in `CellCache`
 end
 
 const SingleFieldFacetValues = FacetValues{Nothing}
@@ -75,7 +75,7 @@ function FacetValues(
     # detJdV always calculated, since we needed to calculate the jacobian anyways for the normal.
     detJdV = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
-    return FacetValues(nothing, fun_values, geo_mapping, fqr, detJdV, normals, 1)
+    return FacetValues(nothing, fun_values, geo_mapping, fqr, detJdV, normals, [1])
 end
 
 function FacetValues(
@@ -90,7 +90,7 @@ function FacetValues(
     max_nquadpoints = maximum(qr -> length(getweights(qr)), fqr.facet_rules)
     detJdV = fill(T(NaN), max_nquadpoints)
     normals = fill(zero(Vec{sdim, T}) * T(NaN), max_nquadpoints)
-    return FacetValues(fun_values_nt, fun_values, geo_mapping, fqr, detJdV, normals, 1)
+    return FacetValues(fun_values_nt, fun_values, geo_mapping, fqr, detJdV, normals, [1])
 end
 
 FacetValues(qr::FacetQuadratureRule, ip::Union{Interpolation, NamedTuple}, args...; kwargs...) = FacetValues(Float64, qr, ip, args...; kwargs...)
@@ -106,7 +106,7 @@ function task_local_copy(fv::FacetValues)
         getfield(fv, :fun_values_nt), task_local_copy(getfield(fv, :fun_values)),
         task_local_copy(getfield(fv, :geo_mapping)), task_local_copy(getfield(fv, :fqr)),
         task_local_copy(getfield(fv, :detJdV)), task_local_copy(getfield(fv, :normals)),
-        getcurrentfacet(fv)
+        task_local_copy(getfield(fv, :current_facet))
     )
 end
 
@@ -143,7 +143,7 @@ Base.propertynames(fv::MultiFieldFacetValues) = propertynames(getfield(fv, :fun_
 
 Return the current active facet of the `FacetValues` object (from last `reinit!`).
 """
-getcurrentfacet(fv::FacetValues) = getfield(fv, :current_facet)
+getcurrentfacet(fv::FacetValues) = only(getfield(fv, :current_facet))
 
 """
     getnormal(fv::FacetValues, qp::Int)
@@ -159,7 +159,7 @@ function set_current_facet!(fv::FacetValues, facet_nr::Int)
     # Checking facet_nr before setting current_facet allows us to use @inbounds
     # when indexing by getcurrentfacet(fv) in other places!
     checkbounds(Bool, 1:nfacets(fv), facet_nr) || throw(ArgumentError("Facet nr is out of range."))
-    setfield!(fv, :current_facet, facet_nr)
+    getfield(fv, :current_facet)[1] = facet_nr
     return
 end
 

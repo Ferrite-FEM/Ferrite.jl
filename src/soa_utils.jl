@@ -50,7 +50,7 @@ function get_substruct(fv::FacetValues, i)
         getfield(fv, :fqr),
         view_from_shared(getdetJdVs(fv), i),
         view_from_shared(getfield(fv, :normals), i),
-        getcurrentfacet(fv),
+        view_from_shared(getfield(fv, :current_facet), i),
     )
 end
 

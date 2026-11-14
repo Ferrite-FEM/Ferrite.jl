@@ -31,7 +31,7 @@ function adapt_structure(to, fv::FacetValues)
         adapt(to, getfield(fv, :fqr)),
         adapt(to, Ferrite.getdetJdVs(fv)),
         adapt(to, getfield(fv, :normals)),
-        Ferrite.getcurrentfacet(fv),
+        adapt(to, getfield(fv, :current_facet)),
     )
 end
 
@@ -55,5 +55,6 @@ function adapt_structure(to, qr::QuadratureRule{shape}) where {shape}
 end
 
 function adapt_structure(to, fqr::FacetQuadratureRule{shape}) where {shape}
-    return FacetQuadratureRule{shape}(adapt(to, fqr.facet_rules))
+    facet_rules = Tuple(map(qr -> adapt(to, qr), fqr.facet_rules))
+    return FacetQuadratureRule{shape}(facet_rules)
 end

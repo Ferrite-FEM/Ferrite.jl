@@ -364,7 +364,10 @@ end
         @test getfield(fv1, :fun_values_nt) == getfield(fv, :fun_values_nt)
         @test length(getfield(fv1, :fun_values)) == length(getfield(fv, :fun_values))
         @test length(getfield(fv1, :geo_mapping)) == length(getfield(fv, :geo_mapping))
-        @test getfield(fv1, :fqr) === getfield(fv, :fqr)
+        for (qr1, qr) in zip(getfield(fv1, :fqr).facet_rules, getfield(fv, :fqr).facet_rules)
+            @test qr1.weights === qr.weights
+            @test qr1.points === qr.points
+        end
         @test getfield(fv1, :detJdV) isa AbstractVector
         @test getfield(fv1, :normals) isa AbstractVector
 
@@ -402,3 +405,6 @@ end
         @test getnormal(fv2, 1) ≈ Vec((1.0, 0.0))
     end
 end
+
+include("facetvalues_utils.jl")
+test_facetvalues(KA.CPU())

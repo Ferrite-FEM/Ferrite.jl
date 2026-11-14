@@ -20,6 +20,7 @@ for name in (
         "test_utils",       # shared helpers, `include`d by the tests that need them
         "vtk_test_utils",   # shared helpers for reading back VTK files
         "multifield_cellvalues_utils", # shared with the GPU tests, `include`d by test_multifield_cellvalues
+        "facetvalues_utils",           # shared with the GPU tests, `include`d by test_facevalues
         "interpolation_test_utils",           # shared helpers for the test_interpolations* files
         "integration/convergence_test_utils", # shared helpers for the integration convergence tests
         "GPU/runtests",                    # GPU tests, run separately
