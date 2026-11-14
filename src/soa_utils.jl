@@ -41,6 +41,19 @@ function get_substruct(cv::CellValues, i)
     return CellValues(getfield(cv, :fun_values_nt), fun_values, get_geo_mapping(cv), get_quadrature_rule(cv), view_from_shared(getdetJdVs(cv), i))
 end
 
+function get_substruct(fv::FacetValues, i)
+    fun_values = map(facet_fvs -> map(f -> get_substruct(f, i), facet_fvs), getfield(fv, :fun_values))
+    return FacetValues(
+        getfield(fv, :fun_values_nt),
+        fun_values,
+        getfield(fv, :geo_mapping),
+        getfield(fv, :fqr),
+        view_from_shared(getdetJdVs(fv), i),
+        view_from_shared(getfield(fv, :normals), i),
+        view_from_shared(getfield(fv, :current_facet), i),
+    )
+end
+
 # In the SoA layout an unaliased Nx is batched with one dimension more than Nξ, so equal
 # types imply Nx === Nξ. Dispatch on this since a runtime `===` check is not inferable,
 # which breaks GPU kernel compilation.

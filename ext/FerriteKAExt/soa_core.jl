@@ -21,6 +21,20 @@ function as_structure_of_arrays(d, N, cv::CellValues)
     )
 end
 
+function as_structure_of_arrays(d, N, fv::Ferrite.FacetValues)
+    fun_values = Tuple(map(facet_fvs -> map(f -> as_structure_of_arrays(d, N, f), facet_fvs), getfield(fv, :fun_values)))
+    geo_mapping = Tuple(map(gm -> as_structure_of_arrays(d, N, gm), getfield(fv, :geo_mapping)))
+    return FacetValues(
+        getfield(fv, :fun_values_nt),
+        fun_values,
+        geo_mapping,
+        adapt(d, getfield(fv, :fqr)),
+        zeros_shared(d, Ferrite.getdetJdVs(fv), N),
+        zeros_shared(d, getfield(fv, :normals), N),
+        adapt(d, fill(Ferrite.getcurrentfacet(fv), N)),
+    )
+end
+
 function as_structure_of_arrays(d, N, fv::Ferrite.FunctionValues)
     Nξ = adapt(d, fv.Nξ)
     return Ferrite.FunctionValues(
