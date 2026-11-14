@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+ - `addcellset!` has a new keyword argument `condition` (`:all`, `:any` or `:center`) for
+   selecting cells based on all nodes, any node, or the physical cell center, respectively.
+   The `:center` condition makes complementary predicates partition the grid. The existing
+   `all` keyword argument is unchanged. ([#1463])
  - `write_solution`, `write_cellset`, `write_facetset`, and `write_nodeset` now support
    `prefix` and `suffix` keyword arguments to customize exported data names. ([#1308])
  - New cell type `QuadraticWedge` (18 nodes) with geometric interpolation
@@ -114,7 +118,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
- - `addcellset!` now supports `condition=:all`, `condition=:single`, and `condition=:center` for selecting cells based on all nodes, any node, or the physical cell center, respectively. (#1463)
+ - `FacetValues` now supports SoA distribution and worker-local substructure extraction
+   through `get_substruct`, for use with KernelAbstractions. `FacetValues` is now an
+   immutable struct: the current facet is stored in a one-element array (as `cellid` in
+   `CellCache`), and the per-facet values may be stored in tuples. ([#1562])
  - `Lagrange` (and thus `DiscontinuousLagrange`) interpolations of order 3 and higher now
    use Gauss–Lobatto–Legendre (GLL) based nodes instead of equispaced nodes:
    tensor-product GLL nodes for `Lagrange{RefQuadrilateral, 3}` and
@@ -1658,3 +1665,5 @@ poking into Ferrite internals:
 [#1469]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1469
 [#1472]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1472
 [#1561]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1561
+[#1562]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1562
+[#1463]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1463
