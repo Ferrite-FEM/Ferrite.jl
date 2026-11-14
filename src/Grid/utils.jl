@@ -5,25 +5,37 @@ _warn_emptyset(set, name) = length(set) == 0 && @warn("no entities added to the 
 
 """
     addcellset!(grid::AbstractGrid, name::String, cellid::AbstractVecOrSet{Int})
-    addcellset!(grid::AbstractGrid, name::String, f::function; all::Bool=true)
+    addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool = true, condition::Symbol = all ? :all : :any)
 
 Adds a cellset to the grid with key `name`.
 Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
 The `DofHandler` can construct different fields which live not on the whole domain, but rather on a cellset.
-`all=true` implies that `f(x)` must return `true` for all nodal coordinates `x` in the cell if the cell
-should be added to the set, otherwise it suffices that `f(x)` returns `true` for one node.
+
+When a function `f(x)` is given, the cell is added to the set depending on `condition`:
+
+ - `condition = :all`: `f(x)` must return `true` for all nodal coordinates `x` in the cell.
+ - `condition = :any`: it suffices that `f(x)` returns `true` for at least one nodal coordinate `x` in the cell.
+ - `condition = :center`: `f(x)` is evaluated at the physical center of the cell, i.e. the
+   reference center of the cell mapped by the geometric interpolation. This makes complementary
+   predicates (e.g. `norm(x) ≤ 1` and `norm(x) > 1`) partition the grid, whereas a cell cut by
+   the boundary would be in neither set for `:all`.
+
+The keyword `all` is kept for backwards compatibility: `all = true` is equivalent to
+`condition = :all` and `all = false` to `condition = :any`. If `condition` is given it takes
+precedence over `all`.
 
 ```julia
 addcellset!(grid, "left", Set((1, 3))) #add cells with id 1 and 3 to cellset left
 addcellset!(grid, "right", x -> norm(x[1]) < 2.0) #add cell to cellset right, if x[1] of each cell's node is smaller than 2.0
+addcellset!(grid, "inner", x -> norm(x) < 2.0; condition = :center) #add cell to cellset inner, if the cell center is inside the circle
 ```
 """
 function addcellset!(grid::AbstractGrid, name::String, cellid::AbstractVecOrSet{Int})
     return _addset!(grid, name, cellid, getcellsets(grid))
 end
 
-function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool = true)
-    return _addset!(grid, name, create_cellset(grid, f; all), getcellsets(grid))
+function addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool = true, condition::Symbol = all ? :all : :any)
+    return _addset!(grid, name, create_cellset(grid, f; condition), getcellsets(grid))
 end
 
 """
@@ -185,19 +197,37 @@ function _create_boundaryset(f::Function, grid::AbstractGrid, top::ExclusiveTopo
     return _makeset(get_facet_facet_neighborhood(top, grid))::OrderedSet{BI}
 end
 
-function create_cellset(grid::AbstractGrid, f::Function; all::Bool = true)
+function create_cellset(grid::AbstractGrid{dim}, f::Function; all::Bool = true, condition::Symbol = all ? :all : :any) where {dim}
+    condition in (:all, :any, :center) ||
+        throw(ArgumentError("unsupported cellset condition `:$condition`, expected `:all`, `:any` or `:center`"))
+
     cells = OrderedSet{Int}()
+    T = get_coordinate_eltype(grid)
+    # Only used for `condition = :center`. Allocated once and resized per cell, since the
+    # number of nodes can differ between cells in a mixed grid.
+    cell_coordinates = Vector{Vec{dim, T}}()
+
     # Since we loop over the cells in order the resulting set will be sorted
     for (i, cell) in enumerate(getcells(grid))
-        pass = all
-        for node_idx in get_node_ids(cell)
-            v = f(get_node_coordinate(grid, node_idx))
-            all ? (!v && (pass = false; break)) : (v && (pass = true; break))
+        if condition === :center
+            resize!(cell_coordinates, nnodes(cell))
+            getcoordinates!(cell_coordinates, grid, cell)
+            interpolation = geometric_interpolation(cell)
+            ξ = cellcenter(getrefshape(interpolation), T)
+            x = spatial_coordinate(interpolation, ξ, cell_coordinates)
+            f(x) && push!(cells, i)
+        else
+            pass = condition === :all
+            for node_idx in get_node_ids(cell)
+                v = f(get_node_coordinate(grid, node_idx))
+                condition === :all ? (!v && (pass = false; break)) : (v && (pass = true; break))
+            end
+            pass && push!(cells, i)
         end
-        pass && push!(cells, i)
     end
     return cells
 end
+
 function create_nodeset(grid::AbstractGrid, f::Function)
     nodes = OrderedSet{Int}()
     for (i, n) in pairs(getnodes(grid))
