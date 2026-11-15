@@ -129,6 +129,18 @@ function weighted_normal(J::Tensor{2, 2}, ::Type{RefQuadrilateral}, facet::Int)
     throw(ArgumentError("unknown facet number"))
 end
 
+# Weighted normals for two-dimensional surfaces embedded in 3D
+function weighted_normal(J::MixedTensor2{3, 2, T}, ::Type{RefQuadrilateral}, facet::Int) where {T}
+    unit_surface_normal = normalize(J[:, 1] × J[:, 2])
+    @inbounds begin
+        facet == 1 && return J[:, 1] × unit_surface_normal
+        facet == 2 && return J[:, 2] × unit_surface_normal
+        facet == 3 && return -(J[:, 1] × unit_surface_normal)
+        facet == 4 && return -(J[:, 2] × unit_surface_normal)
+    end
+    throw(ArgumentError("unknown facet number"))
+end
+
 ######################
 # All RefTriangle 2D #
 ######################
@@ -156,6 +168,17 @@ function weighted_normal(J::Tensor{2, 2}, ::Type{RefTriangle}, facet::Int)
         facet == 1 && return Vec{2}((-(J[2, 1] - J[2, 2]), J[1, 1] - J[1, 2]))
         facet == 2 && return Vec{2}((-J[2, 2], J[1, 2]))
         facet == 3 && return Vec{2}((J[2, 1], -J[1, 1]))
+    end
+    throw(ArgumentError("unknown facet number"))
+end
+
+# Weighted normals for two-dimensional surfaces embedded in 3D
+function weighted_normal(J::MixedTensor2{3, 2, T}, ::Type{RefTriangle}, facet::Int) where {T}
+    unit_surface_normal = normalize(J[:, 1] × J[:, 2])
+    @inbounds begin
+        facet == 1 && return (J[:, 2] - J[:, 1]) × unit_surface_normal
+        facet == 2 && return unit_surface_normal × J[:, 2]
+        facet == 3 && return J[:, 1] × unit_surface_normal
     end
     throw(ArgumentError("unknown facet number"))
 end
