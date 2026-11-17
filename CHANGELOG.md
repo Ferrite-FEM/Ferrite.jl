@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
  - `write_solution`, `write_cellset`, `write_facetset`, and `write_nodeset` now support
-   `prefix` and `suffix` keyword arguments to customize exported data names. ([#1308])
+   `prefix` and `suffix` keyword arguments to customize exported data names. ([#1308],
+   [#1570])
  - New cell type `QuadraticWedge` (18 nodes) with geometric interpolation
    `Lagrange{RefPrism, 2}()`, including VTK export. Gmsh "Prism 18" elements can be
    imported as `QuadraticWedge` with FerriteGmsh (see
@@ -110,7 +111,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - The `InterfaceValues` methods of `function_value`, `function_gradient` etc. that take
    two separate dof ranges are deprecated: pass the `InterfaceDofRange` from
    `interface_dof_range(ic, field)` instead. ([#1433], [#1556])
- - The positional `suffix` argument in `write_solution` is deprecated. ([#1308])
+ - The positional `suffix` argument of `write_solution` (for both `VTKGridFile` and
+   `VTKHDFGridFile`) is deprecated in favor of the `suffix` keyword argument, i.e.
+   `write_solution(vtk, dh, u, "_x")` should be replaced with
+   `write_solution(vtk, dh, u; suffix = "_x")`. ([#1308], [#1570], [#1574])
 
 ### Changed
 
