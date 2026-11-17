@@ -123,6 +123,7 @@ include("FEValues/InterfaceValues.jl")
 include("FEValues/PointValues.jl")
 include("FEValues/common_values.jl")
 include("FEValues/facet_integrals.jl")
+include("FEValues/geometric_quantities.jl")
 
 # Grid
 include("Grid/grid.jl")
