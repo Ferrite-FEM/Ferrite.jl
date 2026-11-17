@@ -1,5 +1,5 @@
 # Backend-generic test of multi-field CellValues in a KernelAbstractions kernel, shared by
-# test_multifield_cellvalues.jl (KA.CPU()) and GPU/runtests.jl (CUDABackend()).
+# test_multifield_cellvalues.jl (KA.CPU()) and GPU/runtests.jl (vendor backends).
 
 using Ferrite, GPUArrays, Test
 import Adapt: adapt
