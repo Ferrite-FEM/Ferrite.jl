@@ -50,8 +50,17 @@ function ValuesUpdateFlags( # For MultiFieldCellValues
         ip_fun::NamedTuple, ::Val{update_gradients}, ::Val{update_hessians}, ::Val{update_detJdV}
     ) where {update_gradients, update_hessians, update_detJdV}
     FunDiffOrder = update_hessians ? 2 : (update_gradients ? 1 : 0)
-    GeoDiffOrder = max(maximum(ip -> required_geo_diff_order(mapping_type(ip), FunDiffOrder), ip_fun), update_detJdV)
+    GeoDiffOrder = max(maximum(ip -> required_geo_diff_order(mapping_type(ip), FunDiffOrder), ip_fun; init = 0), update_detJdV)
     return ValuesUpdateFlags{FunDiffOrder, GeoDiffOrder, update_detJdV}()
+end
+
+# The field name used in the error messages for functions that are not applicable to
+# multi-field values. Values without function interpolations (constructed with an empty
+# `NamedTuple`) have no fields at all.
+function _example_field(v, fun)
+    names = propertynames(v)
+    isempty(names) && throw(ArgumentError("$fun isn't applicable to $(nameof(typeof(v))) without function interpolations"))
+    return first(names)
 end
 
 """

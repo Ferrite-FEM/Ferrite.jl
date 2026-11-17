@@ -97,6 +97,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Hessians in `CellValues` (`update_hessians = true`) are now supported for embedded
    elements, i.e. curves in 2D and 3D and surfaces in 3D.
    ([#1558])
+ - `CellValues`, `FacetValues` and `InterfaceValues` can now be constructed without any
+   function interpolations, by passing an empty `NamedTuple`, e.g.
+   `CellValues(qr, (;), ip_geo)`. Such values only evaluate the geometric mapping, for
+   when only geometric quantities (`getdetJdV`, `spatial_coordinate`, `getnormal`) are
+   needed. Previously, this errored. ([#1579])
 
 ### Deprecated
 
@@ -1661,3 +1666,4 @@ poking into Ferrite internals:
 [#1469]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1469
 [#1472]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1472
 [#1561]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1561
+[#1579]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1579

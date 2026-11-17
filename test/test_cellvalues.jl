@@ -648,6 +648,59 @@ end
         end
     end
 
+    @testset "Values without function interpolations" begin
+        # Values constructed with an empty NamedTuple, (;), of function interpolations only
+        # evaluate the geometric mapping, and agree with values with a function interpolation
+        grid = generate_grid(Quadrilateral, (2, 3))
+        topology = ExclusiveTopology(grid)
+        ip_geo = Lagrange{RefQuadrilateral, 1}()
+        ip = Lagrange{RefQuadrilateral, 2}()
+        qr = QuadratureRule{RefQuadrilateral}(2)
+        fqr = FacetQuadratureRule{RefQuadrilateral}(2)
+        cv, cv_ip = CellValues(qr, (;), ip_geo), CellValues(qr, ip, ip_geo)
+        fv, fv_ip = FacetValues(fqr, (;), ip_geo), FacetValues(fqr, ip, ip_geo)
+        iv, iv_ip = InterfaceValues(fqr, (;), ip_geo), InterfaceValues(fqr, ip, ip_geo)
+        @test isempty(Ferrite.get_fun_values(cv))
+        for cell in CellIterator(grid)
+            reinit!(cv, cell)
+            reinit!(cv_ip, cell)
+            x = getcoordinates(cell)
+            for qp in 1:getnquadpoints(cv)
+                @test getdetJdV(cv, qp) ≈ getdetJdV(cv_ip, qp)
+                @test spatial_coordinate(cv, qp, x) ≈ spatial_coordinate(cv_ip, qp, x)
+            end
+        end
+        for fc in FacetIterator(grid, getfacetset(grid, "left"))
+            reinit!(fv, fc)
+            reinit!(fv_ip, fc)
+            x = getcoordinates(fc)
+            for qp in 1:getnquadpoints(fv)
+                @test getdetJdV(fv, qp) ≈ getdetJdV(fv_ip, qp)
+                @test getnormal(fv, qp) ≈ getnormal(fv_ip, qp) ≈ Vec(-1.0, 0.0)
+                @test spatial_coordinate(fv, qp, x) ≈ spatial_coordinate(fv_ip, qp, x)
+            end
+        end
+        for ic in InterfaceIterator(grid, topology)
+            reinit!(iv, ic)
+            reinit!(iv_ip, ic)
+            x_here, x_there = getcoordinates(ic)
+            for qp in 1:getnquadpoints(iv)
+                @test getdetJdV(iv, qp) ≈ getdetJdV(iv_ip, qp)
+                @test getnormal(iv, qp) ≈ getnormal(iv_ip, qp)
+                @test spatial_coordinate(iv, qp, x_here, x_there; here = true) ≈
+                    spatial_coordinate(iv, qp, x_here, x_there; here = false)
+            end
+        end
+        # show
+        @test occursin("No function interpolations", sprint(show, MIME"text/plain"(), cv))
+        @test occursin("No function interpolations", sprint(show, MIME"text/plain"(), fv))
+        @test occursin("No function interpolations", sprint(show, MIME"text/plain"(), iv))
+        # Shape functions are not available
+        @test_throws "without function interpolations" getnbasefunctions(cv)
+        @test_throws "without function interpolations" shape_value(cv, 1, 1)
+        @test_throws "without function interpolations" function_value(fv, 1, Float64[])
+    end
+
     @testset "construction errors" begin
         @test_throws ArgumentError CellValues(QuadratureRule{RefTriangle}(1), Lagrange{RefQuadrilateral, 1}())
         @test_throws ArgumentError CellValues(QuadratureRule{RefTriangle}(1), Lagrange{RefTriangle, 1}(), Lagrange{RefQuadrilateral, 1}())
