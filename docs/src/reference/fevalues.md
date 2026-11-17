@@ -26,6 +26,8 @@ getnquadpoints
 getdetJdV
 spatial_coordinate
 geometric_value
+spatial_volume
+spatial_centroid
 ```
 
 Furthermore, the following functions are applicable to
@@ -49,6 +51,7 @@ In addition, there are some methods that are unique for `FacetValues`.
 ```@docs
 Ferrite.getcurrentfacet
 getnormal
+spatial_area_vector
 ```
 
 ## [InterfaceValues](@id reference-interfacevalues)

@@ -119,11 +119,22 @@
 # ```math
 #  \int_\Omega [\boldsymbol{\nabla} (u)] \cdot [\boldsymbol{\nabla} (\delta u)] \,\mathrm{d}\Omega - \int_{\Gamma^0} \llbracket u\rrbracket \cdot \{\boldsymbol{\nabla} (\delta u)\} + \llbracket \delta u\rrbracket  \cdot \{\boldsymbol{\nabla} (u)\}  \,\mathrm{d}\Gamma^0 + \int_{\Gamma^0} \frac{\eta}{h_e} \llbracket u\rrbracket \cdot \llbracket \delta u\rrbracket   \,\mathrm{d}\Gamma^0 = \int_\Omega \delta u \,\mathrm{d}\Omega + \int_{\partial \Omega_N} ([\boldsymbol{\nabla} (u)] \cdot \boldsymbol{n}) \delta u \,\mathrm{d} \partial \Omega_N,\\
 # ```
-# where $h_e$ is the characteristic size (the diameter of the interface), and $\eta$ is a large enough positive number independent of $h_e$ [Mu:2014:IP](@cite),
+# where $h_e$ is a characteristic length of the cells at the interface (defined below), and $\eta$ is a large enough positive number independent of $h_e$ [Mu:2014:IP](@cite),
 # $\delta u \in \mathbb{T}$ is a test function, and where $\mathbb{U}$ and $\mathbb{T}$ are suitable
 # trial and test function sets, respectively.
 # We use the value ``\eta = (1 + O)^{D}``, where ``O`` is the polynomial order and ``D`` the
-# dimension, in this tutorial.
+# dimension, in this tutorial. For the characteristic length we use
+# ```math
+#  h_e = \frac{\min(|\Omega^+|, |\Omega^-|)}{|\Gamma|},
+# ```
+# i.e. the ratio of the volume of the cells on the two sides of the interface,
+# ``|\Omega^\pm|``, and the area of the interface, ``|\Gamma|``. This is a measure of the
+# thickness of the cells in the direction normal to the interface, and is the length scale
+# that appears in the stability analysis of the method, through the inverse trace
+# inequality ``\|v\|^2_{\Gamma} \leq C \frac{|\Gamma|}{|\Omega|} \|v\|^2_{\Omega}`` for
+# polynomials ``v`` [Warburton:2003:trace](@cite). In contrast to e.g. the diameter of the
+# interface, this definition works in any dimension, and also for distorted or stretched
+# cells. For the uniform grid in this tutorial ``h_e`` is the side length of the cells.
 #
 # More details on DG formulations for elliptic problems can be found in [Cockburn:2002:unifiedanalysis](@cite).
 #-
@@ -156,9 +167,18 @@ cellvalues = CellValues(qr, ip);
 facetvalues = FacetValues(facet_qr, ip);
 interfacevalues = InterfaceValues(facet_qr, ip);
 # ### Penalty term parameters
-# We define functions to calculate the diameter of a set of points, used to calculate the characteristic size $h_e$ in the assembly routine.
-getdistance(p1::Vec{N, T}, p2::Vec{N, T}) where {N, T} = norm(p1 - p2);
-getdiameter(cell_coords::Vector{Vec{N, T}}) where {N, T} = maximum(getdistance.(cell_coords, reshape(cell_coords, (1, :))));
+# For the characteristic length ``h_e`` we need the cell volumes, which we compute once with
+# `spatial_volume` and store in a vector indexed by the cell number. (The interface areas
+# are computed in the assembly loop.)
+function compute_cell_volumes(cellvalues::CellValues, grid::Grid)
+    volumes = zeros(getncells(grid))
+    for cell in CellIterator(grid)
+        reinit!(cellvalues, cell)
+        volumes[cellid(cell)] = spatial_volume(cellvalues)
+    end
+    return volumes
+end
+volumes = compute_cell_volumes(cellvalues, grid);
 
 # ### Degrees of freedom
 # Degrees of freedom distribution is handled using `DofHandler` as usual
@@ -171,7 +191,7 @@ close!(dh);
 # discontinuous interpolations (by default DoFs of neighboring cells are not coupled). The
 # cross-element coupling matrix is of size 1 × 1 in this case as we have only one field.
 # The topology is also required, for locating the interfaces.
-K = allocate_matrix(dh, interface_coupling = [true;;], topology = topology);
+K = allocate_matrix(dh; interface_coupling = [true;;], topology = topology);
 
 # ### Boundary conditions
 # The Dirichlet boundary conditions are treated
@@ -280,7 +300,7 @@ end
 function assemble_global(
         cellvalues::CellValues, facetvalues::FacetValues, interfacevalues::InterfaceValues,
         K::SparseMatrixCSC, dh::DofHandler, topology::ExclusiveTopology,
-        order::Int, dim::Int
+        volumes::Vector{Float64}, order::Int, dim::Int
     )
     ## Allocate the element stiffness matrix and element force vector
     n_basefuncs = getnbasefunctions(cellvalues)
@@ -309,9 +329,9 @@ function assemble_global(
     for ic in InterfaceIterator(dh, topology)
         ## Reinitialize interfacevalues for this interface
         reinit!(interfacevalues, ic)
-        ## Calculate the characteristic size hₑ as the face diameter
-        interfacecoords = ∩(getcoordinates(ic)...)
-        hₑ = getdiameter(interfacecoords)
+        ## Calculate the characteristic length hₑ from the volumes of the two cells and
+        ## the area of the interface
+        hₑ = min(volumes[cellid(ic.a)], volumes[cellid(ic.b)]) / spatial_volume(interfacevalues.here)
         ## Calculate μ
         μ = (1 + order)^dim / hₑ
         fill!(Ki, 0)
@@ -333,7 +353,7 @@ function assemble_global(
     end
     return K, f
 end
-K, f = assemble_global(cellvalues, facetvalues, interfacevalues, K, dh, topology, order, dim);
+K, f = assemble_global(cellvalues, facetvalues, interfacevalues, K, dh, topology, volumes, order, dim);
 #md nothing # hide
 
 # ### Solution of the system

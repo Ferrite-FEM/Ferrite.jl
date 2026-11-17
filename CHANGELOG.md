@@ -102,6 +102,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `CellValues(qr, (;), ip_geo)`. Such values only evaluate the geometric mapping, for
    when only geometric quantities (`getdetJdV`, `spatial_coordinate`, `getnormal`) are
    needed. Previously, this errored. ([#1579])
+ - New functions `spatial_volume(cv)`, `spatial_centroid(cv, x)` and
+   `spatial_area_vector(fv)` computing the volume (area for facets), the centroid, and the
+   area vector ∫ n dΓ of the cell or facet that the values were last reinitialized for. The
+   results are computed by quadrature, and are exact if the quadrature rule integrates the
+   geometric mapping exactly, see the docstrings for sufficient rules. ([#1580])
 
 ### Deprecated
 
@@ -1667,3 +1672,4 @@ poking into Ferrite internals:
 [#1472]: https://github.com/Ferrite-FEM/Ferrite.jl/pull/1472
 [#1561]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1561
 [#1579]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1579
+[#1580]: https://github.com/Ferrite-FEM/Ferrite.jl/issues/1580
