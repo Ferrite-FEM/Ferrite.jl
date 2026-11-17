@@ -78,6 +78,10 @@ steps:
     command: |
       julia --code-coverage=@ --project=test/GPU/metal -e 'using Pkg; Pkg.instantiate()'
       julia --code-coverage=@ --project=test/GPU/metal test/GPU/runtests.jl
+    # The sandboxed Metal agents do not get the Codecov token, so the coverage plugin's
+    # upload fails. Its `lcov.info` is uploaded from .github/workflows/GPUCoverage.yml instead.
+    artifact_paths:
+      - "lcov.info"
     agents:
       queue: "metal"
       os: "macos"
