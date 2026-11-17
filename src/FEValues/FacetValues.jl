@@ -232,13 +232,14 @@ end
 
 function Base.show(io::IO, d::MIME"text/plain", fv::MultiFieldFacetValues)
     ip_geo = geometric_interpolation(fv)
-    GradT = shape_gradient_type(first(get_fun_values(fv)))
+    fun_values = get_fun_values(fv)
+    GradT = isempty(fun_values) ? nothing : shape_gradient_type(first(fun_values))
     sdim = GradT === nothing ? nothing : sdim_from_gradtype(GradT)
     print(io, "FacetValues with ")
     _show_nqp_per_facet(io, fv)
     print(io, "Geometric interpolation: ")
     sdim === nothing ? show(io, d, ip_geo) : show(io, d, ip_geo^sdim)
-    print(io, "\nFunction interpolations")
+    print(io, isempty(fun_values) ? "\nNo function interpolations" : "\nFunction interpolations")
     for key in propertynames(fv)
         ip = function_interpolation(getproperty(fv, key))
         print(io, "\n  ", key, ": "); show(io, d, ip)
@@ -248,20 +249,20 @@ end
 
 # Error messages for functions that should be called on individual `FunctionValues` to help users
 function getnbasefunctions(fv::MultiFieldFacetValues)
-    k = first(propertynames(fv)) # Pick the first function values to use in example
+    k = _example_field(fv, getnbasefunctions) # Pick the first function values to use in example
     throw(ArgumentError("getnbasefunctions isn't applicable to a multi-field FacetValues. Use on `FunctionValues` for the specific field, e.g. getnbasefunctions(fv.$k)"))
 end
 
 for f in (:shape_value, :shape_gradient, :shape_symmetric_gradient, :shape_divergence)
     @eval function $f(fv::MultiFieldFacetValues, ::Int, ::Int)
-        k = first(propertynames(fv)) # Pick the first function values to use in example
+        k = _example_field(fv, $f) # Pick the first function values to use in example
         fun = $f                       # Make the function name available to use in the error message
         throw(ArgumentError("$fun isn't applicable to a multi-field FacetValues. Use on `FunctionValues` for the specific field, e.g. $fun(fv.$k, q_point, shapenr)"))
     end
 end
 for f in (:function_value, :function_gradient, :function_symmetric_gradient, :function_divergence)
     @eval function $f(fv::MultiFieldFacetValues, ::Int, ::AbstractVector, args...)
-        k = first(propertynames(fv)) # Pick the first function values to use in example
+        k = _example_field(fv, $f) # Pick the first function values to use in example
         fun = $f                       # Make the function name available to use in the error message
         throw(ArgumentError("$fun isn't applicable to a multi-field FacetValues. Use on `FunctionValues` for the specific field, e.g. $fun(fv.$k, q_point, ae, [dofrange])"))
     end
