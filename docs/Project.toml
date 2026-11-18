@@ -30,7 +30,6 @@ ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 SciMLIterators = "efe4dcdd-3aed-4391-894d-a9dbd16a2f14"
 SciMLLogging = "a6db7da4-7206-11f0-1eab-35f2a5dbe1d1"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
-TaskLocalValues = "ed4db957-447d-4319-bfb6-7fa9ae7ecf34"
 Tensors = "48a634ad-e948-5137-8d70-aa71f2a747f4"
 TimerOutputs = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 VTKHDF = "45d8cf6f-ab5f-45bc-ab92-77e36ab192e6"
@@ -41,4 +40,5 @@ Ferrite = {path = ".."}
 
 [compat]
 Documenter = "1.18"
+OhMyThreads = "0.8.7"
 OrdinaryDiffEqRosenbrock = "2"
