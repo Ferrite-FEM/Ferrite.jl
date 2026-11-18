@@ -7,3 +7,5 @@ using Test
 include("heat_assembly.jl")
 include("../multifield_cellvalues_utils.jl")
 test_multifield_cellvalues(CUDABackend())
+include("../facetvalues_utils.jl")
+test_facetvalues(CUDABackend())
