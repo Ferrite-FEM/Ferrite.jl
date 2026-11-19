@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 300" width="620" height="300">
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+        orient="auto-start-reverse"><path d="M0,0.6 L10,5 L0,9.4 z" fill="#1c2024"/></marker>
+<pattern id="hatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+<line x1="0" y1="0" x2="0" y2="7" stroke="#5d6773" stroke-width="1.1"/></pattern>
+</defs>
+<rect x="76.0" y="218.0" width="260.0" height="50.0" rx="0" fill="url(#hatch)" fill-opacity="1" stroke="none" stroke-width="2.0"/>
+<rect x="76.0" y="218.0" width="260.0" height="50.0" rx="0" fill="none" fill-opacity="1" stroke="#5d6773" stroke-width="1.4"/>
+<line x1="76.0" y1="218.0" x2="336.0" y2="218.0" stroke="#1c2024" stroke-width="3.0" stroke-linecap="round"/>
+<line x1="76.0" y1="268.0" x2="76.0" y2="48.0" stroke="#1c2024" stroke-width="2.0" stroke-linecap="round" marker-end="url(#arrow)"/>
+<text x="88.0" y="62.0" fill="#1c2024" font-family="'Latin Modern Math','STIX Two Math','DejaVu Serif',Georgia,serif" font-size="20" font-weight="400" font-style="italic" text-anchor="start">f(x)</text>
+<path d="M76.0,125 Q206,72.5 336.0,200" fill="none" stroke="#009e73" stroke-width="3.0" stroke-linejoin="round" stroke-linecap="round"/>
+<line x1="76.0" y1="125.0" x2="336.0" y2="200.0" stroke="#d55e00" stroke-width="3.0" stroke-linecap="round" stroke-dasharray="1 7"/>
+<line x1="76.0" y1="95.0" x2="336.0" y2="170.0" stroke="#0072b2" stroke-width="3.0" stroke-linecap="round" stroke-dasharray="1 7"/>
+<circle cx="76.0" cy="125.0" r="7.0" fill="#d55e00"/>
+<circle cx="336.0" cy="200.0" r="7.0" fill="#d55e00"/>
+<circle cx="76.0" cy="95.0" r="7.0" fill="#0072b2"/>
+<circle cx="336.0" cy="170.0" r="7.0" fill="#0072b2"/>
+<circle cx="76.0" cy="218.0" r="6.0" fill="#1c2024"/>
+<circle cx="336.0" cy="218.0" r="6.0" fill="#1c2024"/>
+<line x1="386.0" y1="108.0" x2="432.0" y2="108.0" stroke="#009e73" stroke-width="3.0" stroke-linecap="round"/>
+<text x="444.0" y="113.0" fill="#1c2024" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="16" font-weight="400" font-style="normal" text-anchor="start">prescribed function</text>
+<line x1="386.0" y1="146.0" x2="432.0" y2="146.0" stroke="#0072b2" stroke-width="3.0" stroke-linecap="round" stroke-dasharray="1 7"/>
+<text x="444.0" y="151.0" fill="#1c2024" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="16" font-weight="400" font-style="normal" text-anchor="start">ProjectedDirichlet</text>
+<line x1="386.0" y1="184.0" x2="432.0" y2="184.0" stroke="#d55e00" stroke-width="3.0" stroke-linecap="round" stroke-dasharray="1 7"/>
+<text x="444.0" y="189.0" fill="#1c2024" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="16" font-weight="400" font-style="normal" text-anchor="start">Dirichlet</text>
+</svg>

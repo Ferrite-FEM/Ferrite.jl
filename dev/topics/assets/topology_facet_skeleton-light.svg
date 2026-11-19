@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 410" width="430" height="410">
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7"
+        orient="auto-start-reverse"><path d="M0,0.6 L10,5 L0,9.4 z" fill="#1c2024"/></marker>
+<pattern id="hatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+<line x1="0" y1="0" x2="0" y2="7" stroke="#5d6773" stroke-width="1.1"/></pattern>
+</defs>
+<line x1="65.0" y1="350.0" x2="65.0" y2="50.0" stroke="#5d6773" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="165.0" y1="350.0" x2="165.0" y2="50.0" stroke="#5d6773" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="265.0" y1="350.0" x2="265.0" y2="50.0" stroke="#5d6773" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="365.0" y1="350.0" x2="365.0" y2="50.0" stroke="#5d6773" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="65.0" y1="350.0" x2="365.0" y2="350.0" stroke="#5d6773" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="65.0" y1="250.0" x2="365.0" y2="250.0" stroke="#5d6773" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="65.0" y1="150.0" x2="365.0" y2="150.0" stroke="#5d6773" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="65.0" y1="50.0" x2="365.0" y2="50.0" stroke="#5d6773" stroke-width="1.2" stroke-linecap="round"/>
+<line x1="65.0" y1="341.0" x2="65.0" y2="259.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="65.0" y1="241.0" x2="65.0" y2="159.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="65.0" y1="141.0" x2="65.0" y2="59.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="165.0" y1="341.0" x2="165.0" y2="259.0" stroke="#d55e00" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="165.0" y1="241.0" x2="165.0" y2="159.0" stroke="#d55e00" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="165.0" y1="141.0" x2="165.0" y2="59.0" stroke="#d55e00" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="265.0" y1="341.0" x2="265.0" y2="259.0" stroke="#d55e00" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="265.0" y1="241.0" x2="265.0" y2="159.0" stroke="#d55e00" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="265.0" y1="141.0" x2="265.0" y2="59.0" stroke="#d55e00" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="365.0" y1="341.0" x2="365.0" y2="259.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="365.0" y1="241.0" x2="365.0" y2="159.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="365.0" y1="141.0" x2="365.0" y2="59.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="74.0" y1="350.0" x2="156.0" y2="350.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="174.0" y1="350.0" x2="256.0" y2="350.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="274.0" y1="350.0" x2="356.0" y2="350.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="74.0" y1="250.0" x2="156.0" y2="250.0" stroke="#d55e00" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="174.0" y1="250.0" x2="256.0" y2="250.0" stroke="#d55e00" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="274.0" y1="250.0" x2="356.0" y2="250.0" stroke="#d55e00" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="74.0" y1="150.0" x2="156.0" y2="150.0" stroke="#d55e00" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="174.0" y1="150.0" x2="256.0" y2="150.0" stroke="#d55e00" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="274.0" y1="150.0" x2="356.0" y2="150.0" stroke="#d55e00" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="74.0" y1="50.0" x2="156.0" y2="50.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="174.0" y1="50.0" x2="256.0" y2="50.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<line x1="274.0" y1="50.0" x2="356.0" y2="50.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<circle cx="65.0" cy="350.0" r="3.0" fill="#5d6773"/>
+<circle cx="65.0" cy="250.0" r="3.0" fill="#5d6773"/>
+<circle cx="65.0" cy="150.0" r="3.0" fill="#5d6773"/>
+<circle cx="65.0" cy="50.0" r="3.0" fill="#5d6773"/>
+<circle cx="165.0" cy="350.0" r="3.0" fill="#5d6773"/>
+<circle cx="165.0" cy="250.0" r="3.0" fill="#5d6773"/>
+<circle cx="165.0" cy="150.0" r="3.0" fill="#5d6773"/>
+<circle cx="165.0" cy="50.0" r="3.0" fill="#5d6773"/>
+<circle cx="265.0" cy="350.0" r="3.0" fill="#5d6773"/>
+<circle cx="265.0" cy="250.0" r="3.0" fill="#5d6773"/>
+<circle cx="265.0" cy="150.0" r="3.0" fill="#5d6773"/>
+<circle cx="265.0" cy="50.0" r="3.0" fill="#5d6773"/>
+<circle cx="365.0" cy="350.0" r="3.0" fill="#5d6773"/>
+<circle cx="365.0" cy="250.0" r="3.0" fill="#5d6773"/>
+<circle cx="365.0" cy="150.0" r="3.0" fill="#5d6773"/>
+<circle cx="365.0" cy="50.0" r="3.0" fill="#5d6773"/>
+<line x1="60.0" y1="390.0" x2="94.0" y2="390.0" stroke="#d55e00" stroke-width="3.5" stroke-linecap="round"/>
+<text x="104.0" y="395.0" fill="#5d6773" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" font-style="normal" text-anchor="start">interior facet</text>
+<line x1="235.0" y1="390.0" x2="269.0" y2="390.0" stroke="#009e73" stroke-width="3.5" stroke-linecap="round"/>
+<text x="279.0" y="395.0" fill="#5d6773" font-family="Lato,'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="14" font-weight="400" font-style="normal" text-anchor="start">boundary facet</text>
+</svg>
