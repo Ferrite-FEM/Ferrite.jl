@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
- - Added weighted facet-normal support for triangular and quadrilateral surfaces embedded in 3D. ([#1573])
+ - `FacetValues` now support triangles and quadrilaterals embedded in 3D, i.e. with a
+   geometric interpolation such as `Lagrange{RefTriangle, 1}()^3`. ([#1573])
  - `write_solution`, `write_cellset`, `write_facetset`, and `write_nodeset` now support
    `prefix` and `suffix` keyword arguments to customize exported data names. ([#1308])
  - New cell type `QuadraticWedge` (18 nodes) with geometric interpolation
