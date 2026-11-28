@@ -9,15 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-<<<<<<< HEAD
  - `addcellset!` has a new keyword argument `condition` (`:all`, `:any` or `:center`) for
    selecting cells based on all nodes, any node, or the physical cell center, respectively.
    The `:center` condition makes complementary predicates partition the grid. The existing
    `all` keyword argument is unchanged. ([#1463])
-=======
  - `FacetValues` now support triangles and quadrilaterals embedded in 3D, i.e. with a
    geometric interpolation such as `Lagrange{RefTriangle, 1}()^3`. ([#1573])
->>>>>>> upstream/master
  - `write_solution`, `write_cellset`, `write_facetset`, and `write_nodeset` now support
    `prefix` and `suffix` keyword arguments to customize exported data names. ([#1308],
    [#1570])
