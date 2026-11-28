@@ -47,6 +47,15 @@ using VTKHDF.HDF5
             @test !haskey(g, "PointData/u")
             @test !haskey(g, "PointData/v")
         end
+
+        # Positional suffix is deprecated
+        fn = joinpath(dir, "deprecated_suffix.vtkhdf")
+        VTKHDFGridFile(fn, dh) do vtk
+            @test_deprecated write_solution(vtk, dh, u, "_final")
+        end
+        h5open(fn) do f
+            @test haskey(f["VTKHDF"], "PointData/u_final")
+        end
     end
 
     @testset "temporal, grid stored once" begin

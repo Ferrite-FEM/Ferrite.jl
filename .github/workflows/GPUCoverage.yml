@@ -1,0 +1,86 @@
+# Uploads the coverage of the Metal GPU tests to Codecov. The Metal jobs run on sandboxed
+# Buildkite agents that do not receive the Codecov token, so the coverage plugin's upload
+# fails there. Instead the job stores `lcov.info` as a Buildkite artifact, which this workflow
+# downloads when Buildkite posts the job's commit status, and uploads to Codecov.
+#
+# Status events are delivered to this repository also for pull requests from forks, and
+# always run this workflow as it exists on the default branch, with access to secrets.
+# Nothing from the tested commit is executed here: the coverage file is untrusted data.
+name: GPU coverage
+
+on: status
+
+permissions: {}
+
+jobs:
+  upload:
+    name: Upload Metal coverage
+    if: |
+      github.event.context == 'Test GPU (Metal) / Julia 1' &&
+      github.event.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      SHA: ${{ github.event.sha }}
+    steps:
+      - name: Download the coverage from Buildkite
+        id: download
+        env:
+          # Token of a user in the julialang Buildkite organization with the read_builds and
+          # read_artifacts scopes
+          BUILDKITE_TOKEN: ${{ secrets.BUILDKITE_API_TOKEN }}
+          TARGET_URL: ${{ github.event.target_url }}
+        run: |
+          set -euo pipefail
+          # The status links to the job that ran the tests
+          pattern='^https://buildkite\.com/julialang/ferrite-dot-jl/builds/([0-9]+)#([0-9a-f-]+)$'
+          if [[ ! "$TARGET_URL" =~ $pattern ]]; then
+            echo "Unexpected target URL: $TARGET_URL"
+            exit 1
+          fi
+          api="https://api.buildkite.com/v2/organizations/julialang/pipelines/ferrite-dot-jl/builds/${BASH_REMATCH[1]}"
+          job="${BASH_REMATCH[2]}"
+          auth="Authorization: Bearer $BUILDKITE_TOKEN"
+
+          build=$(curl -fsS -H "$auth" "$api")
+          if [[ "$(jq -r .commit <<<"$build")" != "$SHA" ]]; then
+            echo "Build does not match commit $SHA"
+            exit 1
+          fi
+
+          url=$(curl -fsS -H "$auth" "$api/jobs/$job/artifacts" |
+            jq -r '.[] | select(.path == "lcov.info") | .download_url')
+          if [[ -z "$url" ]]; then
+            echo "No coverage found"
+            exit 0
+          fi
+          curl -fsSL --max-filesize 50000000 -H "$auth" -o lcov.info "$url"
+
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "branch=$(jq -r .branch <<<"$build")" >> "$GITHUB_OUTPUT"
+          echo "pull_request=$(jq -r '.pull_request.id // empty' <<<"$build")" >> "$GITHUB_OUTPUT"
+
+      # Codecov matches the paths in the report against the files of the repository. The
+      # checkout is only read, nothing from it is executed.
+      - uses: actions/checkout@v7
+        if: steps.download.outputs.found == 'true'
+        with:
+          ref: ${{ github.event.sha }}
+          path: repo
+          persist-credentials: false
+
+      - uses: codecov/codecov-action@v7
+        if: steps.download.outputs.found == 'true'
+        with:
+          files: lcov.info
+          root_dir: repo
+          plugins: noop
+          disable_search: true
+          override_commit: ${{ github.event.sha }}
+          override_branch: ${{ steps.download.outputs.branch }}
+          override_pr: ${{ steps.download.outputs.pull_request }}
+          flags: metal
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

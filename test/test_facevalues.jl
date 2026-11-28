@@ -281,6 +281,124 @@ end
 
 end # of testset
 
+# Normals of an embedded surface element: unit vectors, tangent to the surface and pointing
+# out of the element, independently of the orientation of the element.
+function test_embedded_facet_normals(fv, ip, fqr, x)
+    xc = sum(x) / length(x)
+    for facet in 1:nfacets(getrefshape(ip))
+        reinit!(fv, x, facet)
+        for (qp, ξ) in pairs(Ferrite.getpoints(fqr, facet))
+            J = Ferrite.calculate_mapping(ip, ξ, x, Val(1)).J
+            surface_normal = Vec{3}(J[:, 1]) × Vec{3}(J[:, 2])
+            n = getnormal(fv, qp)
+            @test norm(n) ≈ 1
+            @test abs(n ⋅ surface_normal) < 1.0e-12 * norm(surface_normal)
+            @test n ⋅ (spatial_coordinate(fv, qp, x) - xc) > 0
+        end
+    end
+    return
+end
+
+@testset "EmbeddedQuadrilateralFacetValues" begin
+    ip = Lagrange{RefQuadrilateral, 2}()
+    ip_geo = Lagrange{RefQuadrilateral, 2}()^3
+    fqr = FacetQuadratureRule{RefQuadrilateral}(4)
+    fv = FacetValues(fqr, ip, ip_geo)
+    ref_coords = Ferrite.reference_coordinates(ip)
+    coords = [
+        Vec(ξ[1], ξ[2], 0.2 * ξ[1]^2 + 0.1 * ξ[2]^2 + 0.15 * ξ[1] * ξ[2])
+            for ξ in ref_coords
+    ]
+
+    for facet in 1:4
+        reinit!(fv, coords, facet)
+        for (qp, ξfacet) in enumerate(Ferrite.getpoints(fqr, facet))
+            ξ, η = ξfacet
+            a₁ = Vec(1.0, 0.0, 0.4 * ξ + 0.15 * η)
+            a₂ = Vec(0.0, 1.0, 0.2 * η + 0.15 * ξ)
+            weighted_tangent = if facet == 1
+                a₁
+            elseif facet == 2
+                a₂
+            elseif facet == 3
+                -a₁
+            else
+                -a₂
+            end
+
+            @test getdetJdV(fv, qp) ≈ norm(weighted_tangent) * Ferrite.getweights(fqr, facet)[qp] atol = 1.0e-10
+        end
+    end
+    test_embedded_facet_normals(fv, ip, fqr, coords)
+    # Mirrored element, i.e. with reversed orientation
+    test_embedded_facet_normals(fv, ip, fqr, [Vec(x[2], x[1], x[3]) for x in coords])
+
+    # Test unknown facet error path as its not yet tested in "test_quadrules.jl"
+    J = MixedTensor2{3, 2}((1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
+    for facet in (0, 5)
+        @test_throws ArgumentError("unknown facet number") Ferrite.weighted_normal(J, RefQuadrilateral, facet)
+    end
+end
+
+@testset "EmbeddedTriangleFacetValues" begin
+    ip = Lagrange{RefTriangle, 2}()
+    ip_geo = Lagrange{RefTriangle, 2}()^3
+    fqr = FacetQuadratureRule{RefTriangle}(4)
+    fv = FacetValues(fqr, ip, ip_geo)
+    ref_coords = Ferrite.reference_coordinates(ip)
+    coords = [
+        Vec(ξ[1], ξ[2], 0.2 * ξ[1]^2 + 0.1 * ξ[2]^2 + 0.15 * ξ[1] * ξ[2])
+            for ξ in ref_coords
+    ]
+
+    for facet in 1:3
+        reinit!(fv, coords, facet)
+        for (qp, ξfacet) in enumerate(Ferrite.getpoints(fqr, facet))
+            ξ, η = ξfacet
+            a₁ = Vec(1.0, 0.0, 0.4 * ξ + 0.15 * η)
+            a₂ = Vec(0.0, 1.0, 0.2 * η + 0.15 * ξ)
+            weighted_tangent = if facet == 1
+                a₂ - a₁
+            elseif facet == 2
+                -a₂
+            else
+                a₁
+            end
+
+            @test getdetJdV(fv, qp) ≈ norm(weighted_tangent) * Ferrite.getweights(fqr, facet)[qp] atol = 1.0e-10
+        end
+    end
+    test_embedded_facet_normals(fv, ip, fqr, coords)
+    # Mirrored element, i.e. with reversed orientation
+    test_embedded_facet_normals(fv, ip, fqr, [Vec(x[2], x[1], x[3]) for x in coords])
+
+    # Test unknown facet error path as its not yet tested in "test_quadrules.jl"
+    J = MixedTensor2{3, 2}((1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
+    for facet in (0, 4)
+        @test_throws ArgumentError("unknown facet number") Ferrite.weighted_normal(J, RefTriangle, facet)
+    end
+end
+
+@testset "Embedded flat surface FacetValues (RefShape = $RefShape)" for RefShape in (RefTriangle, RefQuadrilateral)
+    # A flat element rotated into 3D gives the rotated normals and the same detJdV as in 2D
+    ip = Lagrange{RefShape, 2}()
+    fqr = FacetQuadratureRule{RefShape}(3)
+    fv2 = FacetValues(fqr, ip, ip^2)
+    fv3 = FacetValues(fqr, ip, ip^3)
+    x2 = [Vec{2}((ξ[1], ξ[2])) + 0.1 * rand(Vec{2}) for ξ in Ferrite.reference_coordinates(ip)]
+    Q = Tensor{2, 3}(Matrix(qr(randn(3, 3)).Q))
+    x3 = [Q ⋅ Vec{3}((x[1], x[2], 0.0)) for x in x2]
+    for facet in 1:nfacets(RefShape)
+        reinit!(fv2, x2, facet)
+        reinit!(fv3, x3, facet)
+        for qp in 1:getnquadpoints(fv2)
+            n2 = getnormal(fv2, qp)
+            @test getnormal(fv3, qp) ≈ Q ⋅ Vec{3}((n2[1], n2[2], 0.0))
+            @test getdetJdV(fv3, qp) ≈ getdetJdV(fv2, qp)
+        end
+    end
+end
+
 @testset "EmbeddedLineFacetValues" begin
 
     for dim in (2, 3)
