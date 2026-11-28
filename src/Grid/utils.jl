@@ -5,7 +5,7 @@ _warn_emptyset(set, name) = length(set) == 0 && @warn("no entities added to the 
 
 """
     addcellset!(grid::AbstractGrid, name::String, cellid::AbstractVecOrSet{Int})
-    addcellset!(grid::AbstractGrid, name::String, f::Function; all::Bool = true, condition::Symbol = all ? :all : :any)
+    addcellset!(grid::AbstractGrid, name::String, f::Function; condition::Symbol = :all)
 
 Adds a cellset to the grid with key `name`.
 Cellsets are typically used to define subdomains of the problem, e.g. two materials in the computational domain.
@@ -13,12 +13,14 @@ The `DofHandler` can construct different fields which live not on the whole doma
 
 When a function `f(x)` is given, the cell is added to the set depending on `condition`:
 
- - `condition = :all`: `f(x)` must return `true` for all nodal coordinates `x` in the cell.
- - `condition = :any`: it suffices that `f(x)` returns `true` for at least one nodal coordinate `x` in the cell.
- - `condition = :center`: `f(x)` is evaluated at the physical center of the cell, i.e. the
-   reference center of the cell mapped by the geometric interpolation. This makes complementary
-   predicates (e.g. `norm(x) ≤ 1` and `norm(x) > 1`) partition the grid, whereas a cell cut by
-   the boundary would be in neither set for `:all`.
+ - `condition = :all`: `f(x)` must return `true` for all nodal coordinates, `x`, in the cell.
+ - `condition = :any`: `f(x)` must return `true` for at least one nodal coordinate, `x`, in the cell.
+ - `condition = :center`: `f(x)` must return `true` for the physical coordinate, `x`, corresponding to the center of the reference element.
+
+!!! tip
+    `condition = :center` makes complementary predicates (e.g. `norm(x) ≤ 1`
+    and `norm(x) > 1`) partition the grid. Using `:any` or `:all` can cause
+    cells to be either in both or none of the sets, respectively.
 
 The keyword `all` is kept for backwards compatibility: `all = true` is equivalent to
 `condition = :all` and `all = false` to `condition = :any`. If `condition` is given it takes

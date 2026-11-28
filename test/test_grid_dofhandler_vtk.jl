@@ -293,7 +293,6 @@ end
     std_grid = generate_grid(Quadrilateral, (getncells(mixed_grid), 1))
     @test Ferrite._check_same_celltype(std_grid, cellset) === nothing
     @test Ferrite._check_same_celltype(std_grid, facetset) === nothing
-
 end
 
 @testset "Grid sets" begin
@@ -320,13 +319,13 @@ end
         grid = generate_grid(Quadrilateral, (4, 1))
 
         f = x -> x[1] < 0.3
-        @test collect(Ferrite.create_cellset(grid, f; condition = :all)) == [1, 2]
-        @test collect(Ferrite.create_cellset(grid, f; condition = :any)) == [1, 2, 3]
-        @test collect(Ferrite.create_cellset(grid, f; condition = :center)) == [1, 2, 3] # center 0.25 < 0.3
+        @test Ferrite.create_cellset(grid, f; condition = :all) == Set([1, 2])
+        @test Ferrite.create_cellset(grid, f; condition = :any) == Set([1, 2, 3])
+        @test Ferrite.create_cellset(grid, f; condition = :center) == Set([1, 2, 3]) # center 0.25 < 0.3
 
         g = x -> x[1] < 0.2
-        @test collect(Ferrite.create_cellset(grid, g; condition = :center)) == [1, 2] # center 0.25 > 0.2
-        @test collect(Ferrite.create_cellset(grid, g; condition = :any)) == [1, 2, 3]
+        @test Ferrite.create_cellset(grid, g; condition = :center) == Set([1, 2]) # center 0.25 > 0.2
+        @test Ferrite.create_cellset(grid, g; condition = :any) == Set([1, 2, 3])
 
         # The `all` keyword is kept for backwards compatibility, `condition` takes precedence
         @test Ferrite.create_cellset(grid, f) == Ferrite.create_cellset(grid, f; condition = :all)
@@ -339,8 +338,8 @@ end
         # Through addcellset!
         addcellset!(grid, "center", f; condition = :center)
         addcellset!(grid, "any", f; all = false)
-        @test collect(getcellset(grid, "center")) == [1, 2, 3]
-        @test collect(getcellset(grid, "any")) == [1, 2, 3]
+        @test getcellset(grid, "center") == Set([1, 2, 3])
+        @test getcellset(grid, "any") == Set([1, 2, 3])
         @test_throws ArgumentError addcellset!(grid, "foo", f; condition = :foo)
 
         # Complementary predicates partition the grid with `:center` (but not with `:all`)
@@ -362,11 +361,10 @@ end
             [Node(x) for x in (Vec(0.0, 0.0), Vec(1.0, 0.0), Vec(1.0, 1.0), Vec(0.0, 1.0), Vec(2.0, 0.0))]
         )
         h = x -> x[1] < 1.5
-        @test collect(Ferrite.create_cellset(mixed_grid, h; condition = :all)) == [1]
-        @test collect(Ferrite.create_cellset(mixed_grid, h; condition = :any)) == [1, 2]
-        @test collect(Ferrite.create_cellset(mixed_grid, h; condition = :center)) == [1, 2] # triangle center 4/3 < 1.5
+        @test Ferrite.create_cellset(mixed_grid, h; condition = :all) == Set([1])
+        @test Ferrite.create_cellset(mixed_grid, h; condition = :any) == Set([1, 2])
+        @test Ferrite.create_cellset(mixed_grid, h; condition = :center) == Set([1, 2]) # triangle center 4/3 < 1.5
     end
-
 end
 
 @testset "Grid topology" begin
